@@ -1,0 +1,2 @@
+ALTER TABLE workshop_incidents
+  ADD COLUMN IF NOT EXISTS display_order BIGINT NOT NULL DEFAULT 0;
