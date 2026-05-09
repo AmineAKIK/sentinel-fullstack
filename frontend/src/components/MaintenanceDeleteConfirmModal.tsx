@@ -4,6 +4,7 @@ import { WorkshopIncident } from '../types';
 interface MaintenanceDeleteConfirmModalProps {
   incident: WorkshopIncident;
   title: string;
+  message?: string;
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }
@@ -11,6 +12,7 @@ interface MaintenanceDeleteConfirmModalProps {
 export default function MaintenanceDeleteConfirmModal({
   incident,
   title,
+  message,
   onClose,
   onConfirm,
 }: MaintenanceDeleteConfirmModalProps) {
@@ -19,20 +21,20 @@ export default function MaintenanceDeleteConfirmModal({
       title={title}
       onClose={onClose}
       closeOnOverlay={false}
+      variant="danger"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose}>
             Annuler
           </button>
           <button className="btn btn-danger" onClick={onConfirm}>
-            Confirmer
+            Confirmer l’annulation
           </button>
         </>
       }
     >
       <div className="notice">
-        Vous n'avez pas le droit de supprimer un signalement ou valider sa suppression sans prise en charge
-        sauf erreur de signalement. Confirmez-vous cette action ?
+        {message || "Cette action annule le signalement et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon."}
       </div>
       <div className="detail-grid" style={{ marginTop: 12 }}>
         <div className="detail-field">

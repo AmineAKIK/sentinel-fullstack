@@ -20,11 +20,17 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [impact, setImpact] = useState<{ reported_incidents: number; taken_incidents: number } | null>(null);
+  const [impact, setImpact] = useState<{
+    reported_incidents: number;
+    taken_incidents: number;
+    active_taken_incidents: number;
+  } | null>(null);
 
   useEffect(() => {
     getAccountImpact(user.id).then(setImpact).catch(() => setImpact(null));
   }, [user.id]);
+
+  const hasActiveTakenIncidents = Boolean(impact && impact.active_taken_incidents > 0);
 
   async function handleConfirm() {
     setError('');
@@ -67,12 +73,14 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       title="Supprimer l'utilisateur"
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
+      isLoading={loading}
+      variant="danger"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Annuler
           </button>
-          <button className="btn btn-danger" onClick={handleConfirm} disabled={loading}>
+          <button className="btn btn-danger" onClick={handleConfirm} disabled={loading || hasActiveTakenIncidents}>
             {loading ? <><span className="spinner" /> Suppression…</> : 'Confirmer'}
           </button>
         </>
@@ -88,6 +96,9 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       {impact && (impact.reported_incidents > 0 || impact.taken_incidents > 0) && (
         <div className="notice">
           Impact historique : {impact.reported_incidents} incident(s) signalé(s), {impact.taken_incidents} incident(s) pris en charge.
+          {hasActiveTakenIncidents && (
+            <> Suppression bloquée tant que {impact.active_taken_incidents} incident(s) actif(s) restent pris en charge.</>
+          )}
         </div>
       )}
       <div className="form-group" style={{ marginTop: 16 }}>

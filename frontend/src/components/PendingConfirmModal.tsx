@@ -35,13 +35,16 @@ export default function PendingConfirmModal({ incident, onClose, onConfirm }: Pe
     <Modal
       title="Mettre en attente"
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isDirty={reason.trim().length > 0}
+      isLoading={loading}
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Annuler
           </button>
           <button className="btn btn-primary" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Confirmation…' : 'Confirmer'}
+            {loading ? 'Confirmation…' : 'Mettre en attente'}
           </button>
         </>
       }

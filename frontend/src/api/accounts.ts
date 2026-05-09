@@ -69,6 +69,7 @@ export async function deleteAccount(id: number): Promise<void> {
 export async function getAccountImpact(id: number): Promise<{
   reported_incidents: number;
   taken_incidents: number;
+  active_taken_incidents: number;
 }> {
   return api.get(`/api/admin/accounts/${id}/impact`);
 }

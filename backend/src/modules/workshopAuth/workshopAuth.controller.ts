@@ -1,8 +1,12 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
+import {
+  findActiveWorkshopUserByBadge,
+  findActiveWorkshopUserBySession,
+  setWorkshopUserPassword,
+} from './workshopAuth.repository';
 
 const COOKIE_NAME = 'sentinel_workshop_token';
 const COOKIE_OPTIONS = {
@@ -21,19 +25,11 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT id, first_name, last_name, badge_number, role, password_hash
-       FROM sentinel_users
-       WHERE badge_number = $1 AND is_active = TRUE AND is_deleted = FALSE`,
-      [badgeNumber.trim()]
-    );
-
-    if (rows.length === 0) {
+    const user = await findActiveWorkshopUserByBadge(badgeNumber);
+    if (!user) {
       sendError(res, 401, 'UNAUTHORIZED', 'Badge invalide ou utilisateur inactif.');
       return;
     }
-
-    const user = rows[0];
 
     if (!user.password_hash) {
       if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
@@ -45,10 +41,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       }
 
       const passwordHash = await bcrypt.hash(newPassword, 10);
-      await pool.query(
-        'UPDATE sentinel_users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-        [passwordHash, user.id]
-      );
+      await setWorkshopUserPassword(user.id, passwordHash);
     } else {
       if (!password || typeof password !== 'string') {
         res.status(200).json({
@@ -111,19 +104,16 @@ export async function me(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT id, first_name, last_name, badge_number, role
-       FROM sentinel_users
-       WHERE id = $1 AND badge_number = $2 AND is_active = TRUE AND is_deleted = FALSE`,
-      [req.workshopUser.userId, req.workshopUser.badgeNumber]
-    );
-
-    if (rows.length === 0) {
+    const user = await findActiveWorkshopUserBySession({
+      userId: req.workshopUser.userId,
+      badgeNumber: req.workshopUser.badgeNumber,
+    });
+    if (!user) {
       sendError(res, 401, 'UNAUTHORIZED', 'Utilisateur inactif ou introuvable.');
       return;
     }
 
-    res.json(rows[0]);
+    res.json(user);
   } catch (err) {
     console.error('Workshop me error:', err);
     sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');

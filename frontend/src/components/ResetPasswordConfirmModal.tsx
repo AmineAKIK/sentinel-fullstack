@@ -35,6 +35,8 @@ export default function ResetPasswordConfirmModal({
       title="Réinitialiser le mot de passe"
       onClose={loading ? undefined : onClose}
       closeOnOverlay={!user.has_password}
+      isLoading={loading}
+      variant={user.has_password ? 'danger' : 'default'}
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>

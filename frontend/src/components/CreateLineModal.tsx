@@ -152,11 +152,20 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
     setStep('form');
   }
 
+  const isDirty = step === 'form' && (
+    form.lineNumber.trim() !== '' ||
+    form.machines.length !== EMPTY_LINE_FORM.machines.length ||
+    JSON.stringify(form.machines) !== JSON.stringify(EMPTY_LINE_FORM.machines)
+  );
+
   return (
     <Modal
       title={step === 'preview' ? 'Aperçu de la ligne' : 'Ajouter une ligne'}
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
+      isDirty={isDirty}
+      isLoading={loading}
+      size="lg"
       footer={
         step === 'preview' ? (
           <>

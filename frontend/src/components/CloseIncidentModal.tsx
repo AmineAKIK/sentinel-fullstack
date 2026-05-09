@@ -35,13 +35,16 @@ export default function CloseIncidentModal({ incident, onClose, onConfirm }: Clo
     <Modal
       title="Clôturer l'incident"
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isDirty={note.trim().length > 0}
+      isLoading={loading}
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Annuler
           </button>
           <button className="btn btn-primary" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Clôture…' : 'Confirmer'}
+            {loading ? 'Clôture…' : 'Clôturer'}
           </button>
         </>
       }

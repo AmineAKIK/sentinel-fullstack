@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import NavBar from '../components/NavBar';
+import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import { listReferenceAudit } from '../api/admin';
 import { ReferenceAuditEvent } from '../types';
 
@@ -104,39 +105,26 @@ export default function AdminAuditPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const { start, end } = dateBoundary(period, customStart, customEnd);
     setLoading(true);
     setError('');
-    listReferenceAudit(scope)
+    listReferenceAudit({
+      scope,
+      taskGroup,
+      q: query.trim(),
+      start: start?.toISOString(),
+      end: end?.toISOString(),
+      order: sortOrder,
+      limit: 250,
+    })
       .then(setEvents)
       .catch(() => setError('Impossible de charger le journal.'))
       .finally(() => setLoading(false));
-  }, [scope]);
+  }, [scope, taskGroup, period, customStart, customEnd, query, sortOrder]);
 
   const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const allowedTasks = TASK_GROUPS[taskGroup]?.events || [];
-    const { start, end } = dateBoundary(period, customStart, customEnd);
-
-    const result = events.filter((event) => {
-      if (allowedTasks.length > 0 && !allowedTasks.includes(event.event_type)) return false;
-      const createdAt = new Date(event.created_at);
-      if (start && createdAt < start) return false;
-      if (end && createdAt > end) return false;
-      if (!needle) return true;
-      const haystack = [
-        EVENT_LABELS[event.event_type] || event.event_type,
-        targetLabel(event),
-        event.scope,
-        changesLabel(event.changes),
-      ].join(' ').toLowerCase();
-      return haystack.includes(needle);
-    });
-
-    return result.sort((a, b) => {
-      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return sortOrder === 'asc' ? diff : -diff;
-    });
-  }, [events, query, taskGroup, period, customStart, customEnd, sortOrder]);
+    return events;
+  }, [events]);
 
   const summary = useMemo(() => {
     const accountCount = filtered.filter((event) => event.scope === 'account').length;
@@ -154,6 +142,38 @@ export default function AdminAuditPage() {
     setCustomEnd('');
     setQuery('');
   }
+
+  const filterChips: FilterChip[] = [
+    ...(query.trim() ? [{
+      key: 'search',
+      label: `Recherche: ${query.trim()}`,
+      onRemove: () => setQuery(''),
+    }] : []),
+    ...(taskGroup !== 'all' ? [{
+      key: 'task',
+      label: `Action: ${TASK_GROUPS[taskGroup]?.label || taskGroup}`,
+      onRemove: () => setTaskGroup('all'),
+    }] : []),
+    ...(scope !== 'all' ? [{
+      key: 'scope',
+      label: `Référentiel: ${scope === 'account' ? 'Utilisateurs' : 'Lignes'}`,
+      onRemove: () => setScope('all'),
+    }] : []),
+    ...(period !== 'all' ? [{
+      key: 'period',
+      label: `Période: ${period === 'today' ? "Aujourd'hui" : period === '7d' ? '7 jours' : period === '30d' ? '30 jours' : 'Personnalisée'}`,
+      onRemove: () => {
+        setPeriod('all');
+        setCustomStart('');
+        setCustomEnd('');
+      },
+    }] : []),
+    ...(sortOrder !== 'desc' ? [{
+      key: 'sort',
+      label: 'Plus anciennes d’abord',
+      onRemove: () => setSortOrder('desc'),
+    }] : []),
+  ];
 
   return (
     <>
@@ -238,6 +258,14 @@ export default function AdminAuditPage() {
               Effacer les filtres
             </button>
           </div>
+          <FilterSummary
+            count={filtered.length}
+            countLabel="événement(s) affiché(s)"
+            chips={filterChips}
+            onClear={resetFilters}
+            emptyText="Journal complet"
+            className="filter-summary-embedded"
+          />
         </div>
 
         <div className="card">

@@ -70,7 +70,7 @@ export default function UserDetailPage() {
         <NavBar />
         <div className="page-container">
           <button className="back-link" onClick={() => navigate('/admin/users')}>
-            ← Retour à la liste
+            Retour à la liste
           </button>
           <div className="error-message">{error || 'Utilisateur introuvable.'}</div>
         </div>
@@ -83,7 +83,7 @@ export default function UserDetailPage() {
       <NavBar />
       <div className="page-container">
         <button className="back-link" onClick={() => navigate('/admin/users')}>
-          ← Retour à la liste
+          Retour à la liste
         </button>
 
         <div className="page-header">

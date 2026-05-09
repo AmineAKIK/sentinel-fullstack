@@ -65,6 +65,9 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
       title={step === 'preview' ? 'Aperçu du plan' : 'Plan de la ligne'}
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
+      isDirty={step === 'plan' && hasChanges}
+      isLoading={loading}
+      size="lg"
       footer={
         step === 'preview' ? (
           <>

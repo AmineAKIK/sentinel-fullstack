@@ -148,11 +148,16 @@ export default function EditMachineModal({
     onClose();
   }
 
+  const isDirty = JSON.stringify(normalizeLineMachine(form)) !== JSON.stringify(normalizeLineMachine(line.machines[machineIndex]));
+
   return (
     <Modal
       title={step === 'preview' ? 'Aperçu machine' : 'Modifier la machine'}
-      onClose={handleClose}
+      onClose={loading ? undefined : handleClose}
       closeOnOverlay={false}
+      isDirty={step === 'form' && isDirty}
+      isLoading={loading}
+      size="lg"
       footer={
         step === 'preview' ? (
           <>

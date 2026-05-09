@@ -7,6 +7,7 @@ import DeleteLineConfirmModal from '../components/DeleteLineConfirmModal';
 import EditMachineModal from '../components/EditMachineModal';
 import LinePlanModal from '../components/LinePlanModal';
 import Modal from '../components/Modal';
+import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import { listLines } from '../api/lines';
 import { LineMachine, ProductionLine } from '../types';
 
@@ -113,13 +114,39 @@ export default function LinesPage() {
     return sorted;
   }, [lines, search, statusFilter, sortValue]);
 
+  const filterChips: FilterChip[] = [
+    ...(search.trim() ? [{
+      key: 'search',
+      label: `Recherche: ${search.trim()}`,
+      onRemove: () => setSearch(''),
+    }] : []),
+    ...(statusFilter !== 'all' ? [{
+      key: 'status',
+      label: `Statut: ${statusFilter === 'active' ? 'Actif' : 'Inactif'}`,
+      onRemove: () => setStatusFilter('all'),
+    }] : []),
+    ...(sortValue !== 'created_desc' ? [{
+      key: 'sort',
+      label: 'Tri personnalisé',
+      onRemove: () => setSortValue('created_desc'),
+    }] : []),
+  ];
+
+  function clearAllFilters() {
+    setSearch('');
+    setStatusFilter('all');
+    setSortValue('created_desc');
+    setDraftStatus('all');
+    setDraftSortValue('created_desc');
+  }
+
   if (selected) {
     return (
       <>
         <NavBar />
         <main className="page-container">
           <button className="back-link" onClick={() => setSelected(null)}>
-            ← Retour à la liste
+            Retour à la liste
           </button>
 
           <div className="page-header">
@@ -276,7 +303,7 @@ export default function LinesPage() {
       <NavBar />
       <main className="page-container">
         <button className="back-link" onClick={() => navigate('/admin/accueil')}>
-          ← Retour à l'accueil
+          Retour à l'accueil
         </button>
 
         <div className="page-header">
@@ -310,6 +337,12 @@ export default function LinesPage() {
             </button>
           </div>
         </div>
+        <FilterSummary
+          count={filteredLines.length}
+          countLabel="ligne(s) affichée(s)"
+          chips={filterChips}
+          onClear={clearAllFilters}
+        />
 
         <div className="card">
           {loading ? (
@@ -389,6 +422,7 @@ export default function LinesPage() {
         <Modal
           title="Filtrer les lignes"
           onClose={() => setShowFilters(false)}
+          size="sm"
           footer={(
             <>
               <button className="btn btn-secondary" onClick={resetFilters}>

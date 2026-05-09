@@ -109,11 +109,20 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
     setStep('form');
   }
 
+  const isDirty = step === 'form' && (
+    form.firstName.trim() !== '' ||
+    form.lastName.trim() !== '' ||
+    form.badgeNumber.trim() !== '' ||
+    form.role !== ''
+  );
+
   return (
     <Modal
       title={step === 'preview' ? 'Aperçu utilisateur' : 'Ajouter un utilisateur'}
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
+      isDirty={isDirty}
+      isLoading={loading}
       footer={
         step === 'preview' ? (
           <>

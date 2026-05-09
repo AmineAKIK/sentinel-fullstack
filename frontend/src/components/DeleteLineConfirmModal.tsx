@@ -30,6 +30,8 @@ export default function DeleteLineConfirmModal({
     getLineImpact(line.id).then(setImpact).catch(() => setImpact(null));
   }, [line.id]);
 
+  const hasActiveIncidents = Boolean(impact && impact.open_or_pending_incidents > 0);
+
   async function handleConfirm() {
     setError('');
     setPasswordError('');
@@ -71,12 +73,14 @@ export default function DeleteLineConfirmModal({
       title="Supprimer la ligne"
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
+      isLoading={loading}
+      variant="danger"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Annuler
           </button>
-          <button className="btn btn-danger" onClick={handleConfirm} disabled={loading}>
+          <button className="btn btn-danger" onClick={handleConfirm} disabled={loading || hasActiveIncidents}>
             {loading ? <><span className="spinner" /> Suppression…</> : 'Confirmer'}
           </button>
         </>
@@ -90,7 +94,10 @@ export default function DeleteLineConfirmModal({
       </p>
       {impact && impact.incidents > 0 && (
         <div className="notice">
-          Impact historique : {impact.incidents} incident(s) lié(s), dont {impact.open_or_pending_incidents} non clôturé(s).
+          Impact historique : {impact.incidents} incident(s) lié(s), dont {impact.open_or_pending_incidents} actif(s).
+          {hasActiveIncidents && (
+            <> Suppression bloquée tant que ces incidents ne sont pas clôturés ou annulés.</>
+          )}
         </div>
       )}
       <div className="form-group" style={{ marginTop: 16 }}>

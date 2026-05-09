@@ -16,6 +16,7 @@ export default function TakeChargeConfirmModal({
     <Modal
       title="Confirmer la prise en charge"
       onClose={onClose}
+      closeOnOverlay={false}
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose}>

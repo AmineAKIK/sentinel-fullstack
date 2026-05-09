@@ -3,14 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import CreateUserModal from '../components/CreateUserModal';
 import Modal from '../components/Modal';
+import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import { listAccounts } from '../api/accounts';
 import { SentinelUser, Role, SortField, SortOrder } from '../types';
-
-const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
-  RESPONSABLE: 'Responsable',
-};
+import { ROLE_LABELS } from '../utils/labels';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', {
@@ -88,6 +84,32 @@ export default function UserListPage() {
     });
   }, [users, search, statusFilter]);
 
+  const filterChips: FilterChip[] = [
+    ...(search.trim() ? [{
+      key: 'search',
+      label: `Recherche: ${search.trim()}`,
+      onRemove: () => setSearch(''),
+    }] : []),
+    ...(filterRole ? [{
+      key: 'role',
+      label: `Rôle: ${ROLE_LABELS[filterRole] || filterRole}`,
+      onRemove: () => setFilterRole(''),
+    }] : []),
+    ...(statusFilter !== 'all' ? [{
+      key: 'status',
+      label: `Statut: ${statusFilter === 'active' ? 'Actif' : 'Inactif'}`,
+      onRemove: () => setStatusFilter('all'),
+    }] : []),
+    ...(getSortValue() !== 'created_desc' ? [{
+      key: 'sort',
+      label: 'Tri personnalisé',
+      onRemove: () => {
+        setSort('created_at');
+        setOrder('desc');
+      },
+    }] : []),
+  ];
+
   function openFilters() {
     setDraftRole(filterRole);
     setDraftSortValue(getSortValue());
@@ -103,6 +125,17 @@ export default function UserListPage() {
   }
 
   function resetFilters() {
+    setDraftRole('');
+    setDraftSortValue('created_desc');
+    setDraftStatus('all');
+  }
+
+  function clearAllFilters() {
+    setSearch('');
+    setFilterRole('');
+    setSort('created_at');
+    setOrder('desc');
+    setStatusFilter('all');
     setDraftRole('');
     setDraftSortValue('created_desc');
     setDraftStatus('all');
@@ -143,6 +176,12 @@ export default function UserListPage() {
             </button>
           </div>
         </div>
+        <FilterSummary
+          count={filteredUsers.length}
+          countLabel="utilisateur(s) affiché(s)"
+          chips={filterChips}
+          onClear={clearAllFilters}
+        />
 
         <div className="card">
           {loading ? (
@@ -224,6 +263,7 @@ export default function UserListPage() {
         <Modal
           title="Filtrer la liste"
           onClose={() => setShowFilters(false)}
+          size="sm"
           footer={(
             <>
               <button className="btn btn-secondary" onClick={resetFilters}>

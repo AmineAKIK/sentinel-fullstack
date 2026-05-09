@@ -35,7 +35,6 @@ const STATES: { value: IncidentState; label: string }[] = [
   { value: 'SKIPEE_PAR_CONDUCTEUR', label: 'Skipée par conducteur' },
   { value: 'DEGRADEE', label: 'Dégradée' },
   { value: 'INDISPONIBLE', label: 'Indisponible' },
-  { value: 'AUTRE', label: 'Autre' },
 ];
 
 function robotOptions(machine?: LineMachine): RobotOption[] {
@@ -56,6 +55,7 @@ export default function CreateIncidentModal({
   onClose,
   onSuccess,
 }: CreateIncidentModalProps) {
+  const hasLineReferences = lines.length > 0;
   const [shift, setShift] = useState<IncidentShift | ''>(incident?.shift || '');
   const [lineId, setLineId] = useState(incident ? String(incident.line_id) : '');
   const [machineId, setMachineId] = useState(incident?.machine_id || '');
@@ -79,6 +79,10 @@ export default function CreateIncidentModal({
 
   function validate(): boolean {
     setError('');
+    if (!hasLineReferences) {
+      setError("Aucune ligne active n'est disponible dans le référentiel.");
+      return false;
+    }
     if (!shift || !lineId || !machineId || !robotLabel || !headNumber || !state) {
       setError('Veuillez renseigner tous les champs obligatoires.');
       return false;
@@ -120,10 +124,26 @@ export default function CreateIncidentModal({
     }
   }
 
+  const isEditing = Boolean(incident);
+  const isDirty = !showPreview && (
+    shift !== (incident?.shift || '') ||
+    lineId !== (incident ? String(incident.line_id) : '') ||
+    machineId !== (incident?.machine_id || '') ||
+    robotLabel !== (incident?.robot_label || '') ||
+    headNumber !== (incident ? String(incident.head_number) : '') ||
+    state !== (incident?.state || '') ||
+    comment !== (incident?.comment || '') ||
+    currentProduct !== (incident?.current_product || '')
+  );
+
   return (
     <Modal
       title={showPreview ? "Aperçu de l'incident" : incident ? "Modifier l'incident" : 'Créer un incident'}
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isDirty={isDirty}
+      isLoading={loading}
+      size="lg"
       footer={
         showPreview ? (
           <>
@@ -131,7 +151,7 @@ export default function CreateIncidentModal({
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? <><span className="spinner" /> Création…</> : 'Valider la création'}
+              {loading ? <><span className="spinner" /> Enregistrement…</> : isEditing ? 'Valider la modification' : 'Valider la création'}
             </button>
           </>
         ) : (
@@ -190,6 +210,12 @@ export default function CreateIncidentModal({
         </>
       ) : (
         <>
+      <div className={hasLineReferences ? 'notice' : 'error-message'} style={{ marginBottom: 12 }}>
+        {hasLineReferences
+          ? 'Ligne, machine, robot et tête proviennent du référentiel actif créé dans l’administration.'
+          : "Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration avant de déclarer un incident."}
+      </div>
+
       <div className="form-group">
         <label className="form-label" htmlFor="incidentShift">Équipe *</label>
         <select
@@ -218,9 +244,9 @@ export default function CreateIncidentModal({
             setRobotLabel('');
             setHeadNumber('');
           }}
-          disabled={loading}
+          disabled={loading || !hasLineReferences}
         >
-          <option value="">-- Sélectionner --</option>
+          <option value="">{hasLineReferences ? '-- Ligne du référentiel --' : '-- Aucune ligne active --'}</option>
           {lines.map((line) => (
             <option key={line.id} value={line.id}>{line.line_number}</option>
           ))}
@@ -240,10 +266,10 @@ export default function CreateIncidentModal({
           }}
           disabled={loading || !selectedLine}
         >
-          <option value="">-- Sélectionner --</option>
+          <option value="">{selectedLine ? '-- Machine du référentiel --' : '-- Sélectionnez une ligne d’abord --'}</option>
           {selectedLine?.machines.map((machine) => (
             <option key={machine.machineId} value={machine.machineId}>
-              {machine.machineId} - {machine.brand}
+              {machine.machineId} · {machine.brand}
             </option>
           ))}
         </select>
@@ -261,7 +287,7 @@ export default function CreateIncidentModal({
           }}
           disabled={loading || !selectedMachine}
         >
-          <option value="">-- Sélectionner --</option>
+          <option value="">{selectedMachine ? '-- Robot du référentiel --' : '-- Sélectionnez une machine d’abord --'}</option>
           {robots.map((robot) => (
             <option key={robot.label} value={robot.label}>{robot.label}</option>
           ))}
@@ -277,7 +303,7 @@ export default function CreateIncidentModal({
           onChange={(e) => setHeadNumber(e.target.value)}
           disabled={loading || !selectedRobot}
         >
-          <option value="">-- Sélectionner --</option>
+          <option value="">{selectedRobot ? '-- Tête disponible --' : '-- Sélectionnez un robot d’abord --'}</option>
           {heads.map((head) => (
             <option key={head} value={head}>{head}</option>
           ))}

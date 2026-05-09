@@ -3,6 +3,9 @@ import LoginPage from './pages/LoginPage';
 import WorkshopLoginPage from './pages/WorkshopLoginPage';
 import WorkshopDashboardPage from './pages/WorkshopDashboardPage';
 import WorkshopHistoryPage from './pages/WorkshopHistoryPage';
+import WorkshopPilotagePage from './pages/WorkshopPilotagePage';
+import WorkshopKnowledgePage from './pages/WorkshopKnowledgePage';
+import WorkshopBoardPage from './pages/WorkshopBoardPage';
 import AdminHomePage from './pages/AdminHomePage';
 import UserListPage from './pages/UserListPage';
 import UserDetailPage from './pages/UserDetailPage';
@@ -24,13 +27,39 @@ export default function App() {
           <Route
             path="/workshop/dashboard"
             element={
-              <WorkshopDashboardPage />
+              <WorkshopProtectedRoute>
+                <WorkshopDashboardPage />
+              </WorkshopProtectedRoute>
+            }
+          />
+          <Route
+            path="/workshop/pilotage"
+            element={
+              <WorkshopProtectedRoute>
+                <WorkshopPilotagePage />
+              </WorkshopProtectedRoute>
             }
           />
           <Route
             path="/workshop/history"
             element={
-              <WorkshopHistoryPage />
+              <WorkshopProtectedRoute>
+                <WorkshopHistoryPage />
+              </WorkshopProtectedRoute>
+            }
+          />
+          <Route
+            path="/workshop/knowledge"
+            element={
+              <WorkshopProtectedRoute>
+                <WorkshopKnowledgePage />
+              </WorkshopProtectedRoute>
+            }
+          />
+          <Route
+            path="/workshop/board"
+            element={
+              <WorkshopBoardPage />
             }
           />
         <Route path="/admin" element={<Navigate to="/admin/accueil" replace />} />

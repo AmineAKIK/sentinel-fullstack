@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'BADGE_ALREADY_EXISTS'
   | 'LINE_ALREADY_EXISTS'
   | 'MACHINE_ALREADY_EXISTS'
+  | 'RESOURCE_IN_USE'
   | 'SERVER_ERROR';
 
 export interface ApiError {

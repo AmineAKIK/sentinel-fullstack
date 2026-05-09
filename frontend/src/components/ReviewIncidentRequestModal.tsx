@@ -41,7 +41,6 @@ const STATE_LABELS: Record<IncidentState, string> = {
   SKIPEE_PAR_CONDUCTEUR: 'Skipée par conducteur',
   DEGRADEE: 'Dégradée',
   INDISPONIBLE: 'Indisponible',
-  AUTRE: 'Autre',
 };
 
 function formatValue(value: string | null | undefined): string {
@@ -199,7 +198,7 @@ export default function ReviewIncidentRequestModal({
           onClick={onApproveDelete}
           disabled={loading || deleteApprovalDisabled}
         >
-          {loading ? 'Suppression…' : 'Supprimer'}
+          {loading ? 'Annulation…' : 'Annuler le signalement'}
         </button>
       )}
     </>
@@ -207,8 +206,12 @@ export default function ReviewIncidentRequestModal({
 
   return (
     <Modal
-      title={type === 'edit' ? 'Demande de modification' : 'Demande de suppression'}
+      title={type === 'edit' ? 'Demande de modification' : 'Demande d’annulation'}
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isLoading={loading}
+      variant={type === 'delete' ? 'danger' : 'default'}
+      size="lg"
       footer={footer}
     >
       <div className="detail-grid">
@@ -244,7 +247,7 @@ export default function ReviewIncidentRequestModal({
           )}
           {deleteApprovalDisabled && (
             <div className="notice" style={{ marginTop: 12 }}>
-              Suppression impossible apres prise en charge.
+              Annulation impossible après prise en charge.
             </div>
           )}
         </>

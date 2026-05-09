@@ -23,10 +23,14 @@ export default function EditLineModal({ line, onClose, onSuccess }: EditLineModa
   const [form, setForm] = useState<LineFormData>(lineToForm(line));
   const [error, setError] = useState('');
   const [showSummary, setShowSummary] = useState(false);
+  const normalizedMachines = form.machines.map(normalizeLineMachine);
+  const isDirty =
+    form.lineNumber.trim() !== line.line_number ||
+    form.isActive !== line.is_active ||
+    JSON.stringify(line.machines) !== JSON.stringify(normalizedMachines);
 
   function handleSubmit() {
     setError('');
-    const normalizedMachines = form.machines.map(normalizeLineMachine);
     const noChanges =
       form.lineNumber.trim() === line.line_number &&
       form.isActive === line.is_active &&
@@ -61,6 +65,8 @@ export default function EditLineModal({ line, onClose, onSuccess }: EditLineModa
       title="Modifier la ligne"
       onClose={onClose}
       closeOnOverlay={false}
+      isDirty={isDirty}
+      size="lg"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose}>

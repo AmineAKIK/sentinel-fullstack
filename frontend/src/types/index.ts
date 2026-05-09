@@ -69,8 +69,7 @@ export type IncidentState =
   | 'SKIPEE_PAR_MACHINE'
   | 'SKIPEE_PAR_CONDUCTEUR'
   | 'DEGRADEE'
-  | 'INDISPONIBLE'
-  | 'AUTRE';
+  | 'INDISPONIBLE';
 
 export interface WorkshopIncident {
   id: number;
@@ -86,7 +85,7 @@ export interface WorkshopIncident {
   current_product: string | null;
   is_taken: boolean;
   is_priority: boolean;
-  status: 'OPEN' | 'PENDING' | 'CLOSED';
+  status: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
   diagnostic: string | null;
   intervention_note: string | null;
   responsible_comment: string | null;
@@ -97,14 +96,13 @@ export interface WorkshopIncident {
   taken_at: string | null;
   taken_by_first_name: string | null;
   taken_by_last_name: string | null;
-  taken_by_badge_number: string | null;
   taken_by_role: Role | null;
   display_order: number;
   created_at: string;
   updated_at: string;
   first_name: string;
   last_name: string;
-  badge_number: string;
+  badge_number?: string | null;
   role: Role;
 }
 
@@ -119,13 +117,61 @@ export interface WorkshopIncidentEvent {
   role: Role | null;
 }
 
+export interface WorkshopHistoryEvent extends WorkshopIncidentEvent {
+  incident_id: number;
+  line_id: number;
+  line_number: string;
+  machine_id: string;
+  robot_label: string;
+  head_number: number;
+  state: IncidentState;
+  status: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
+}
+
 export interface WorkshopIncidentMetrics {
   total: number;
   open: number;
   pending: number;
-  closed: number;
+  priority: number;
+  taken: number;
+  not_taken: number;
   open_over_7d: number;
-  median_take_seconds: number | null;
+}
+
+export interface WorkshopBoardLine {
+  id: number;
+  line_number: string;
+}
+
+export interface WorkshopBoardIncident {
+  id: number;
+  shift: IncidentShift;
+  line_id: number;
+  line_number: string;
+  machine_id: string;
+  robot_label: string;
+  head_number: number;
+  state: IncidentState;
+  current_product: string | null;
+  is_taken: boolean;
+  is_priority: boolean;
+  status: 'OPEN' | 'PENDING';
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkshopBoardMetrics {
+  total: number;
+  open: number;
+  pending: number;
+  open_over_7d: number;
+}
+
+export interface WorkshopBoardData {
+  lines: WorkshopBoardLine[];
+  incidents: WorkshopBoardIncident[];
+  metrics: WorkshopBoardMetrics;
 }
 
 export interface WorkshopAnalyticsBucket {
@@ -139,6 +185,13 @@ export interface WorkshopAnalytics {
   pending: number;
   closed: number;
   priority: number;
+  active: number;
+  not_taken: number;
+  urgent_not_taken: number;
+  taken: number;
+  open_over_24h: number;
+  open_over_7d: number;
+  oldest_active_seconds: number | null;
   median_take_seconds: number | null;
   avg_take_seconds: number | null;
   median_close_seconds: number | null;
@@ -146,6 +199,14 @@ export interface WorkshopAnalytics {
   by_state: { state: string; count: number }[];
   by_line: { line_number: string; count: number }[];
   by_machine: { machine_id: string; count: number }[];
+  trend: {
+    day: string;
+    created: number;
+    closed: number;
+    priority: number;
+    median_take_seconds: number | null;
+    median_close_seconds: number | null;
+  }[];
 }
 
 export interface ApiError {

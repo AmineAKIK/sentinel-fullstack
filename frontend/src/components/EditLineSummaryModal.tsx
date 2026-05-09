@@ -83,6 +83,9 @@ export default function EditLineSummaryModal({
     <Modal
       title="Récapitulatif des modifications"
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isLoading={loading}
+      size="lg"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onBack} disabled={loading}>

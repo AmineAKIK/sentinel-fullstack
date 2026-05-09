@@ -1,120 +1,108 @@
-# Sentinel - Administration des comptes utilisateurs
+# Sentinel
 
-Application full-stack de gestion des comptes Sentinel.
+Application full-stack de pilotage Sentinel : administration des comptes et lignes, exploitation atelier, suivi des incidents, affichage grand écran, historique, pilotage et base de connaissance.
 
 ## Stack
 
-- **Frontend**: React 18 + TypeScript + Vite + React Router v6
-- **Backend**: Node.js + Express + TypeScript
-- **Base de données**: PostgreSQL 15
-- **Authentification**: JWT via cookie HTTP-only
+- Frontend : React 18, TypeScript, Vite, React Router
+- Backend : Node.js, Express, TypeScript
+- Base de données : PostgreSQL
+- Authentification : JWT en cookie HTTP-only
 
-## Démarrage rapide avec Docker Compose
+## Démarrage Docker
 
 ```bash
-cd sentinel
 docker compose up --build
 ```
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- Identifiants par défaut: `admin` / `admin123`
+- Frontend : http://localhost:5173
+- Backend API : http://localhost:3000
+- Admin par défaut : `admin` / `admin123`
 
-## Développement local
-
-### Prérequis
-
-- Node.js 20+
-- PostgreSQL 15 (ou via Docker)
+## Développement Local
 
 ### Backend
 
 ```bash
 cd backend
-cp .env.example .env   # adapter DATABASE_URL si besoin
+cp .env.example .env
 npm install
-npm run migrate        # exécute les migrations SQL
-npm run dev            # démarre en mode watch
+npm run migrate
+npm run dev
 ```
 
 ### Frontend
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-## Structure du projet
+## Scripts
 
+Backend :
+
+- `npm run dev` : API en mode watch
+- `npm run build` : compilation TypeScript vers `dist/`
+- `npm run start` : démarre `dist/server.js`
+- `npm run migrate` : exécute les migrations SQL
+- `npm run verify:reliability` : vérifications de fiabilité atelier
+
+Frontend :
+
+- `npm run dev` : serveur Vite
+- `npm run build` : typecheck puis build Vite
+- `npm run preview` : prévisualisation du build
+
+## Structure
+
+```text
+backend/
+  migrations/      Migrations SQL PostgreSQL
+  scripts/         Scripts de seed/vérification
+  src/
+    db/            Pool, migrations, seed admin
+    middlewares/   Auth admin et atelier
+    modules/       Auth, comptes, lignes, atelier, audit admin
+    utils/         Gestion d'erreurs
+
+frontend/
+  src/
+    api/           Clients HTTP
+    components/    Modals, formulaires, navigations, filtres
+    pages/         Pages admin et atelier
+    routes/        Contextes/protections d'authentification
+    utils/         Labels, permissions, helpers historique
 ```
-sentinel/
-├── backend/
-│   ├── migrations/          # Fichiers SQL de migration
-│   ├── src/
-│   │   ├── db/              # Pool PostgreSQL, migrate, seed
-│   │   ├── middlewares/     # adminAuth JWT middleware
-│   │   ├── modules/
-│   │   │   ├── adminAuth/   # Login / logout / me
-│   │   │   └── accounts/   # CRUD comptes Sentinel
-│   │   ├── utils/           # Gestion d'erreurs
-│   │   └── server.ts        # Point d'entrée Express
-│   └── ...
-└── frontend/
-    └── src/
-        ├── api/             # Clients HTTP (auth, accounts)
-        ├── components/      # Modal, formulaires, NavBar
-        ├── pages/           # Login, UserList, UserDetail
-        ├── routes/          # AuthContext, ProtectedRoute
-        └── types/           # Types TypeScript partagés
-```
 
-## API
+## Routes Principales
 
-### Authentification
+Admin :
 
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| POST | /api/admin/auth/login | Connexion admin |
-| GET | /api/admin/auth/me | Infos admin courant |
-| POST | /api/admin/auth/logout | Déconnexion |
+- `/admin/login`
+- `/admin/accueil`
+- `/admin/users`
+- `/admin/users/:id`
+- `/admin/lines`
+- `/admin/audit`
 
-### Comptes (protégées par JWT cookie)
+Atelier :
 
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| GET | /api/admin/accounts | Liste (filtres: role, sort, order) |
-| POST | /api/admin/accounts | Créer un compte |
-| GET | /api/admin/accounts/:id | Détail d'un compte |
-| PATCH | /api/admin/accounts/:id | Mise à jour partielle |
-| PATCH | /api/admin/accounts/:id/activate | Activer |
-| PATCH | /api/admin/accounts/:id/deactivate | Désactiver |
-| DELETE | /api/admin/accounts/:id | Suppression logique |
+- `/workshop`
+- `/workshop/dashboard`
+- `/workshop/board`
+- `/workshop/history`
+- `/workshop/pilotage`
+- `/workshop/knowledge`
 
-## Variables d'environnement
+## Variables D'environnement
 
-### Backend
+Backend : voir [backend/.env.example](backend/.env.example).
 
-| Variable | Valeur par défaut | Description |
-|----------|-------------------|-------------|
-| PORT | 3000 | Port d'écoute |
-| DATABASE_URL | postgres://... | URL PostgreSQL |
-| ADMIN_USERNAME | admin | Identifiant admin initial |
-| ADMIN_PASSWORD | admin123 | Mot de passe admin initial |
-| JWT_SECRET | - | Secret JWT (à changer en production) |
-| COOKIE_SECRET | - | Secret cookie (à changer en production) |
-| CLIENT_ORIGIN | http://localhost:5173 | Origine CORS autorisée |
+Frontend : voir [frontend/.env.example](frontend/.env.example).
 
-### Frontend
+## Notes De Dépôt
 
-| Variable | Valeur par défaut | Description |
-|----------|-------------------|-------------|
-| VITE_API_URL | http://localhost:3000 | URL de l'API backend |
-
-## Sécurité
-
-- Authentification par cookie HTTP-only uniquement (pas de token localStorage)
-- Suppression logique uniquement (is_deleted=true, jamais de DELETE SQL)
-- Toutes les actions sensibles créent un événement d'audit (table account_audit_events)
-- Le hash du mot de passe n'est jamais retourné au frontend
-- Validation Zod côté backend sur toutes les entrées
+Les dossiers `node_modules/`, `dist/` et les fichiers `.env` sont ignorés. Les dépendances se restaurent avec `npm install`, et les builds se régénèrent avec `npm run build`.

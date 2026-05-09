@@ -3,7 +3,7 @@ import Modal from './Modal';
 import UserForm, { UserFormData } from './UserForm';
 import EditSummaryModal from './EditSummaryModal';
 import ResetPasswordConfirmModal from './ResetPasswordConfirmModal';
-import { SentinelUser, Role } from '../types';
+import { SentinelUser } from '../types';
 
 interface EditUserModalProps {
   user: SentinelUser;
@@ -26,6 +26,12 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
   const [error, setError] = useState('');
   const [showSummary, setShowSummary] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const isDirty =
+    form.firstName.trim() !== user.first_name ||
+    form.lastName.trim() !== user.last_name ||
+    form.badgeNumber.trim() !== user.badge_number ||
+    form.role !== user.role ||
+    form.isActive !== user.is_active;
 
   function handleConfirm() {
     setError('');
@@ -79,6 +85,7 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
         title="Modifier l'utilisateur"
         onClose={onClose}
         closeOnOverlay={false}
+        isDirty={isDirty}
         footer={
           <>
             <button className="btn btn-secondary" onClick={onClose}>

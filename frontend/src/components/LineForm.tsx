@@ -1,4 +1,3 @@
-import React from 'react';
 import { LineMachine } from '../types';
 
 export interface LineFormData {

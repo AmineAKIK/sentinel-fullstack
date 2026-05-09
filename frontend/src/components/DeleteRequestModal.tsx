@@ -16,7 +16,7 @@ export default function DeleteRequestModal({ incident, onClose, onConfirm }: Del
   async function handleConfirm() {
     const trimmed = reason.trim();
     if (!trimmed) {
-      setError('Merci de renseigner le motif de suppression.');
+      setError('Merci de renseigner le motif d’annulation.');
       return;
     }
 
@@ -25,7 +25,7 @@ export default function DeleteRequestModal({ incident, onClose, onConfirm }: Del
     try {
       await onConfirm(trimmed);
     } catch (err) {
-      setError("Impossible d'envoyer la demande de suppression.");
+      setError("Impossible d'envoyer la demande d’annulation.");
     } finally {
       setLoading(false);
     }
@@ -33,8 +33,12 @@ export default function DeleteRequestModal({ incident, onClose, onConfirm }: Del
 
   return (
     <Modal
-      title="Demande de suppression"
+      title="Demande d’annulation"
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isDirty={reason.trim().length > 0}
+      isLoading={loading}
+      variant="danger"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
@@ -47,10 +51,10 @@ export default function DeleteRequestModal({ incident, onClose, onConfirm }: Del
       }
     >
       <div className="notice">
-        Vous demandez la suppression de l'incident {incident.line_number} · {incident.machine_id}.
+        Vous demandez l’annulation de l'incident {incident.line_number} · {incident.machine_id}. Le signalement restera tracé dans l’historique.
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor="deleteRequestReason">Motif de suppression *</label>
+        <label className="form-label" htmlFor="deleteRequestReason">Motif d’annulation *</label>
         <textarea
           id="deleteRequestReason"
           className="form-input"
@@ -58,7 +62,7 @@ export default function DeleteRequestModal({ incident, onClose, onConfirm }: Del
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           disabled={loading}
-          placeholder="Expliquez la raison de la suppression"
+          placeholder="Erreur de signalement, doublon, mauvais équipement..."
         />
       </div>
       {error && <div className="error-message">{error}</div>}

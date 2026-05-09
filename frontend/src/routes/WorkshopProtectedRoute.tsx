@@ -13,5 +13,7 @@ export default function WorkshopProtectedRoute({ children }: { children: React.R
     );
   }
 
+  if (!user) return <Navigate to="/workshop" replace />;
+
   return <>{children}</>;
 }

@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
+import { findAdminByUsername, getAdminPasswordHash } from './adminAuth.repository';
 
 const COOKIE_NAME = 'sentinel_admin_token';
 const COOKIE_OPTIONS = {
@@ -23,17 +23,12 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const { rows } = await pool.query(
-      'SELECT id, username, password_hash FROM admin_accounts WHERE username = $1',
-      [username]
-    );
-
-    if (rows.length === 0) {
+    const admin = await findAdminByUsername(username);
+    if (!admin) {
       sendError(res, 401, 'UNAUTHORIZED', 'Identifiants incorrects.');
       return;
     }
 
-    const admin = rows[0];
     const valid = await bcrypt.compare(password, admin.password_hash);
 
     if (!valid) {
@@ -91,17 +86,13 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
   }
 
   try {
-    const { rows } = await pool.query(
-      'SELECT password_hash FROM admin_accounts WHERE id = $1',
-      [req.admin.adminId]
-    );
-
-    if (rows.length === 0) {
+    const passwordHash = await getAdminPasswordHash(req.admin.adminId);
+    if (!passwordHash) {
       sendError(res, 401, 'UNAUTHORIZED', 'Non authentifié.');
       return;
     }
 
-    const valid = await bcrypt.compare(password, rows[0].password_hash);
+    const valid = await bcrypt.compare(password, passwordHash);
     if (!valid) {
       const attempts = (verifyFailures.get(req.admin.adminId) || 0) + 1;
       verifyFailures.set(req.admin.adminId, attempts);
