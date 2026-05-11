@@ -11,6 +11,8 @@ import WorkshopNavBar from '../components/WorkshopNavBar';
 import Modal from '../components/Modal';
 import InvalidateIncidentModal from '../components/InvalidateIncidentModal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import DetailField from '../components/ui/DetailField';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import {
   deleteWorkshopIncident,
   getIncidentMetrics,
@@ -20,18 +22,9 @@ import {
 } from '../api/workshop';
 import { useWorkshopAuth } from '../routes/WorkshopAuthContext';
 import { ProductionLine, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
+import { formatDateTime } from '../utils/date';
 import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function isWithinLastDays(iso: string, days: number): boolean {
   const createdAt = new Date(iso).getTime();
@@ -588,66 +581,24 @@ export default function WorkshopDashboardPage() {
         <div className="card">
           <div className="card-body">
               <div className="detail-grid">
-                <div className="detail-field">
-                  <span className="detail-field-label">Utilisateur</span>
-                  <span className="detail-field-value">{selectedIncident.first_name} {selectedIncident.last_name}</span>
-                </div>
-                <div className="detail-field">
-                <span className="detail-field-label">Rôle créateur</span>
-                <span className="detail-field-value">{ROLE_LABELS[selectedIncident.role] || selectedIncident.role}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Équipe</span>
-                <span className="detail-field-value">{SHIFT_LABELS[selectedIncident.shift]}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">État</span>
-                <span className="detail-field-value">{STATE_LABELS[selectedIncident.state]}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Ligne</span>
-                <span className="detail-field-value">{selectedIncident.line_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Machine</span>
-                <span className="detail-field-value">{selectedIncident.machine_id} · {selectedIncident.machine_brand}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Robot</span>
-                <span className="detail-field-value">{selectedIncident.robot_label}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Tête</span>
-                <span className="detail-field-value">{selectedIncident.head_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Prise en charge</span>
-                <span className="detail-field-value">{selectedIncident.is_taken ? 'Oui' : 'Non'}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Pris en charge par</span>
-                <span className="detail-field-value">
+                <DetailField label="Utilisateur">{selectedIncident.first_name} {selectedIncident.last_name}</DetailField>
+                <DetailField label="Rôle créateur">{ROLE_LABELS[selectedIncident.role] || selectedIncident.role}</DetailField>
+                <DetailField label="Équipe">{SHIFT_LABELS[selectedIncident.shift]}</DetailField>
+                <DetailField label="État">{STATE_LABELS[selectedIncident.state]}</DetailField>
+                <DetailField label="Ligne">{selectedIncident.line_number}</DetailField>
+                <DetailField label="Machine">{selectedIncident.machine_id} · {selectedIncident.machine_brand}</DetailField>
+                <DetailField label="Robot">{selectedIncident.robot_label}</DetailField>
+                <DetailField label="Tête">{selectedIncident.head_number}</DetailField>
+                <DetailField label="Prise en charge">{selectedIncident.is_taken ? 'Oui' : 'Non'}</DetailField>
+                <DetailField label="Pris en charge par">
                   {selectedIncident.taken_by_first_name
                     ? `${selectedIncident.taken_by_first_name} ${selectedIncident.taken_by_last_name || ''}`.trim()
                     : '-'}
-                </span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Priorité</span>
-                <span className="detail-field-value">{selectedIncident.is_priority ? 'Oui' : 'Non'}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Statut</span>
-                <span className="detail-field-value">{STATUS_LABELS[selectedIncident.status] || selectedIncident.status}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Produit en cours</span>
-                <span className="detail-field-value">{selectedIncident.current_product || '-'}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Création</span>
-                <span className="detail-field-value">{formatDateTime(selectedIncident.created_at)}</span>
-              </div>
+                </DetailField>
+                <DetailField label="Priorité">{selectedIncident.is_priority ? 'Oui' : 'Non'}</DetailField>
+                <DetailField label="Statut">{STATUS_LABELS[selectedIncident.status] || selectedIncident.status}</DetailField>
+                <DetailField label="Produit en cours">{selectedIncident.current_product || '-'}</DetailField>
+                <DetailField label="Création">{formatDateTime(selectedIncident.created_at)}</DetailField>
             </div>
             {selectedIncident.comment && (
               <p className="incident-comment">{selectedIncident.comment}</p>
@@ -867,7 +818,7 @@ export default function WorkshopDashboardPage() {
         </div>
       )}
 
-      {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+      {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
       <div className="workshop-metrics">
         {metricsLoading ? (

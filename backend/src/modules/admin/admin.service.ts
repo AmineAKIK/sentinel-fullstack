@@ -1,3 +1,4 @@
+import { boundedInt } from '../../db/sql';
 import {
   getReferenceDashboardData,
   getReferenceQualityData,
@@ -19,8 +20,6 @@ export interface ReferenceAuditQuery {
 }
 
 function normalizeReferenceAuditFilters(query: ReferenceAuditQuery): ListReferenceAuditFilters {
-  const parsedLimit = parseInt(String(query.limit || '100'), 10) || 100;
-
   return {
     scope: String(query.scope || 'all'),
     taskGroup: String(query.taskGroup || 'all'),
@@ -28,7 +27,7 @@ function normalizeReferenceAuditFilters(query: ReferenceAuditQuery): ListReferen
     start: String(query.start || '').trim(),
     end: String(query.end || '').trim(),
     order: query.order === 'asc' ? 'ASC' : 'DESC',
-    limit: Math.min(parsedLimit, 250),
+    limit: boundedInt(query.limit, 100, 1, 250),
   };
 }
 

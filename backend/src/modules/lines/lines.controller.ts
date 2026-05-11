@@ -1,8 +1,13 @@
 import { Request, Response } from 'express';
-import { ZodError } from 'zod';
-import { sendError } from '../../utils/errors';
 import {
-  badRequest,
+  formatZodError,
+  handleControllerError,
+  parseIdParam,
+  sendServiceError,
+} from '../../utils/controller';
+import { sendError } from '../../utils/errors';
+import { badRequest } from '../../utils/serviceResult';
+import {
   checkLineAvailabilityService,
   checkLineConflictsService,
   createLineService,
@@ -10,30 +15,15 @@ import {
   getLineImpactService,
   getLineService,
   listLinesService,
-  ServiceResult,
   updateLineService,
 } from './lines.service';
 import { createLineSchema, updateLineSchema } from './lines.validation';
-
-function formatZodError(err: ZodError): string {
-  return err.errors.map((e) => e.message).join(' ');
-}
-
-function sendServiceError<T>(
-  res: Response,
-  result: ServiceResult<T>
-): result is Extract<ServiceResult<T>, { ok: false }> {
-  if (result.ok) return false;
-  sendError(res, result.status, result.code, result.message);
-  return true;
-}
 
 export async function listLines(_req: Request, res: Response): Promise<void> {
   try {
     res.json(await listLinesService());
   } catch (err) {
-    console.error('listLines error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'listLines', err);
   }
 }
 
@@ -47,8 +37,7 @@ export async function checkLineAvailability(req: Request, res: Response): Promis
 
     res.json(await checkLineAvailabilityService(lineNumber));
   } catch (err) {
-    console.error('checkLineAvailability error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'checkLineAvailability', err);
   }
 }
 
@@ -65,8 +54,7 @@ export async function checkLineConflicts(req: Request, res: Response): Promise<v
 
     res.json(await checkLineConflictsService(lineNumber, machineIds, lineId));
   } catch (err) {
-    console.error('checkLineConflicts error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'checkLineConflicts', err);
   }
 }
 
@@ -83,36 +71,28 @@ export async function createLine(req: Request, res: Response): Promise<void> {
 
     res.status(201).json(result.data);
   } catch (err) {
-    console.error('createLine error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'createLine', err);
   }
 }
 
 export async function getLine(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await getLineService(id);
+    const result = await getLineService(id.data);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('getLine error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'getLine', err);
   }
 }
 
 export async function updateLine(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
     const parsed = updateLineSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -126,45 +106,36 @@ export async function updateLine(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const result = await updateLineService(id, updates, req.admin!.adminId);
+    const result = await updateLineService(id.data, updates, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('updateLine error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'updateLine', err);
   }
 }
 
 export async function deleteLine(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await deleteLineService(id, req.admin!.adminId);
+    const result = await deleteLineService(id.data, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('deleteLine error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'deleteLine', err);
   }
 }
 
 export async function getLineImpact(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    res.json(await getLineImpactService(id));
+    res.json(await getLineImpactService(id.data));
   } catch (err) {
-    console.error('getLineImpact error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'getLineImpact', err);
   }
 }

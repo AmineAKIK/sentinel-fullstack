@@ -1,24 +1,8 @@
-import { ErrorCode } from '../../utils/errors';
+import { badRequest, forbidden, notFound, ServiceResult } from '../../utils/serviceResult';
 import { logIncidentEvent } from './workshop.events';
 import { canPerform } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
-
-export type ServiceResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; code: ErrorCode; message: string };
-
-export function badRequest(message: string): ServiceResult<never> {
-  return { ok: false, status: 400, code: 'VALIDATION_ERROR', message };
-}
-
-function forbidden(message: string): ServiceResult<never> {
-  return { ok: false, status: 403, code: 'FORBIDDEN', message };
-}
-
-function notFound(message: string): ServiceResult<never> {
-  return { ok: false, status: 404, code: 'NOT_FOUND', message };
-}
 
 function requestedChangeKeys(changes: Record<string, unknown> | null | undefined): string[] {
   if (!changes) return [];

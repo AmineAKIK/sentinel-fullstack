@@ -1,12 +1,17 @@
 import { Request, Response } from 'express';
+import {
+  formatZodError,
+  handleControllerError,
+  parseIdParam,
+  sendServiceError,
+} from '../../utils/controller';
 import { sendError } from '../../utils/errors';
+import { badRequest } from '../../utils/serviceResult';
 import {
   createAccountSchema,
   updateAccountSchema,
 } from './accounts.validation';
-import { ZodError } from 'zod';
 import {
-  badRequest,
   checkBadgeAvailabilityService,
   createAccountService,
   deleteAccountService,
@@ -14,24 +19,10 @@ import {
   getAccountService,
   listAccountsService,
   resetAccountPasswordService,
-  ServiceResult,
   activateAccountService,
   deactivateAccountService,
   updateAccountService,
 } from './accounts.service';
-
-function formatZodError(err: ZodError): string {
-  return err.errors.map((e) => e.message).join(' ');
-}
-
-function sendServiceError<T>(
-  res: Response,
-  result: ServiceResult<T>
-): result is Extract<ServiceResult<T>, { ok: false }> {
-  if (result.ok) return false;
-  sendError(res, result.status, result.code, result.message);
-  return true;
-}
 
 export async function listAccounts(req: Request, res: Response): Promise<void> {
   try {
@@ -43,8 +34,7 @@ export async function listAccounts(req: Request, res: Response): Promise<void> {
 
     res.json(await listAccountsService({ role, sort, order }));
   } catch (err) {
-    console.error('listAccounts error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'listAccounts', err);
   }
 }
 
@@ -58,8 +48,7 @@ export async function checkBadgeAvailability(req: Request, res: Response): Promi
 
     res.json(await checkBadgeAvailabilityService(badgeNumber));
   } catch (err) {
-    console.error('checkBadgeAvailability error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'checkBadgeAvailability', err);
   }
 }
 
@@ -76,36 +65,28 @@ export async function createAccount(req: Request, res: Response): Promise<void> 
 
     res.status(201).json(result.data);
   } catch (err) {
-    console.error('createAccount error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'createAccount', err);
   }
 }
 
 export async function getAccount(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await getAccountService(id);
+    const result = await getAccountService(id.data);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('getAccount error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'getAccount', err);
   }
 }
 
 export async function updateAccount(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
     const parsed = updateAccountSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -120,100 +101,79 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const result = await updateAccountService(id, updates, req.admin!.adminId);
+    const result = await updateAccountService(id.data, updates, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('updateAccount error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'updateAccount', err);
   }
 }
 
 export async function activateAccount(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await activateAccountService(id, req.admin!.adminId);
+    const result = await activateAccountService(id.data, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('activateAccount error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'activateAccount', err);
   }
 }
 
 export async function deactivateAccount(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await deactivateAccountService(id, req.admin!.adminId);
+    const result = await deactivateAccountService(id.data, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('deactivateAccount error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'deactivateAccount', err);
   }
 }
 
 export async function deleteAccount(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await deleteAccountService(id, req.admin!.adminId);
+    const result = await deleteAccountService(id.data, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('deleteAccount error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'deleteAccount', err);
   }
 }
 
 export async function getAccountImpact(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    res.json(await getAccountImpactService(id));
+    res.json(await getAccountImpactService(id.data));
   } catch (err) {
-    console.error('getAccountImpact error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'getAccountImpact', err);
   }
 }
 
 
 export async function resetAccountPassword(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant invalide.');
-      return;
-    }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
 
-    const result = await resetAccountPasswordService(id, req.admin!.adminId);
+    const result = await resetAccountPasswordService(id.data, req.admin!.adminId);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    console.error('resetAccountPassword error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'resetAccountPassword', err);
   }
 }

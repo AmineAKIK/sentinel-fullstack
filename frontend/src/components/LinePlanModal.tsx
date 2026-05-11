@@ -3,7 +3,7 @@ import Modal from './Modal';
 import { ProductionLine } from '../types';
 import { updateLine } from '../api/lines';
 import { ApiResponseError } from '../api/client';
-import { normalizeLineMachine } from './CreateLineModal';
+import { normalizeLineMachine } from '../utils/lineMachines';
 
 interface LinePlanModalProps {
   line: ProductionLine;

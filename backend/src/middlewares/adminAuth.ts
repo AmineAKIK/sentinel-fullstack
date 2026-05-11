@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { sendError } from '../utils/errors';
+import { ADMIN_AUTH_COOKIE } from '../auth/authCookies';
+import {
+  sendInvalidServerConfig,
+  sendInvalidSession,
+  sendMissingAuth,
+} from '../auth/authResponses';
+import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
 
 export interface AdminPayload {
   adminId: number;
@@ -20,24 +25,27 @@ export function adminAuthMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  const token = req.cookies?.sentinel_admin_token;
+  const token = req.cookies?.[ADMIN_AUTH_COOKIE];
 
   if (!token) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Authentification requise.');
+    sendMissingAuth(res);
     return;
   }
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    sendError(res, 500, 'SERVER_ERROR', 'Configuration du serveur invalide.');
+  if (!getJwtSecret()) {
+    sendInvalidServerConfig(res);
     return;
   }
 
   try {
-    const payload = jwt.verify(token, secret) as AdminPayload;
+    const payload = verifyAuthToken<AdminPayload>(token);
+    if (!payload) {
+      sendInvalidServerConfig(res);
+      return;
+    }
     req.admin = payload;
     next();
   } catch {
-    sendError(res, 401, 'UNAUTHORIZED', 'Session invalide ou expirée.');
+    sendInvalidSession(res);
   }
 }

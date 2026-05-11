@@ -1,18 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import KpiCard from '../components/ui/KpiCard';
 import { getReferenceDashboard, getReferenceQuality } from '../api/admin';
 import { ReferenceDashboard, ReferenceQuality } from '../types';
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatDateTime } from '../utils/date';
 
 function eventTarget(event: ReferenceDashboard['recent_events'][number]): string {
   if (event.scope === 'line') return event.line_number || 'Ligne supprimée';
@@ -65,29 +59,13 @@ export default function AdminHomePage() {
           <h1>Accueil administration</h1>
         </div>
 
-        {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="kpi-grid">
-          <div className="card kpi-card">
-            <span className="kpi-label">Utilisateurs actifs</span>
-            <strong className="kpi-value">{dashboard?.users_active ?? '-'}</strong>
-            <span className="kpi-sub">{dashboard?.users_inactive ?? '-'} inactifs</span>
-          </div>
-          <div className="card kpi-card">
-            <span className="kpi-label">Sans mot de passe</span>
-            <strong className="kpi-value">{dashboard?.users_without_password ?? '-'}</strong>
-            <span className="kpi-sub">Comptes à finaliser</span>
-          </div>
-          <div className="card kpi-card">
-            <span className="kpi-label">Lignes actives</span>
-            <strong className="kpi-value">{dashboard?.lines_active ?? '-'}</strong>
-            <span className="kpi-sub">{dashboard?.machines_total ?? '-'} machines référencées</span>
-          </div>
-          <div className="card kpi-card">
-            <span className="kpi-label">Points à vérifier</span>
-            <strong className="kpi-value">{quality ? qualityCount : '-'}</strong>
-            <span className="kpi-sub">Qualité des référentiels</span>
-          </div>
+          <KpiCard label="Utilisateurs actifs" value={dashboard?.users_active ?? '-'} sub={`${dashboard?.users_inactive ?? '-'} inactifs`} />
+          <KpiCard label="Sans mot de passe" value={dashboard?.users_without_password ?? '-'} sub="Comptes à finaliser" />
+          <KpiCard label="Lignes actives" value={dashboard?.lines_active ?? '-'} sub={`${dashboard?.machines_total ?? '-'} machines référencées`} />
+          <KpiCard label="Points à vérifier" value={quality ? qualityCount : '-'} sub="Qualité des référentiels" />
         </div>
 
         <div className="admin-home-grid">
@@ -107,7 +85,7 @@ export default function AdminHomePage() {
             <div className="card-body">
               <h2 style={{ marginBottom: 12 }}>Contrôle qualité</h2>
               {!quality ? (
-                <div className="empty-state" style={{ padding: 24 }}>Chargement...</div>
+                <EmptyState style={{ padding: 24 }}>Chargement...</EmptyState>
               ) : qualityCount === 0 ? (
                 <div className="notice">Aucun point bloquant détecté dans les référentiels.</div>
               ) : (
@@ -145,9 +123,9 @@ export default function AdminHomePage() {
             <div className="card-body">
               <h2 style={{ marginBottom: 12 }}>Derniers changements</h2>
               {!dashboard ? (
-                <div className="empty-state" style={{ padding: 24 }}>Chargement...</div>
+                <EmptyState style={{ padding: 24 }}>Chargement...</EmptyState>
               ) : dashboard.recent_events.length === 0 ? (
-                <div className="empty-state" style={{ padding: 24 }}>Aucun changement tracé.</div>
+                <EmptyState style={{ padding: 24 }}>Aucun changement tracé.</EmptyState>
               ) : (
                 <div className="audit-list">
                   {dashboard.recent_events.map((event) => (

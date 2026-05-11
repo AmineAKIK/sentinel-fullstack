@@ -1,16 +1,13 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { ADMIN_AUTH_COOKIE, clearAuthCookie, setAuthCookie } from '../../auth/authCookies';
+import {
+  sendInvalidServerConfig,
+  sendUnauthenticated,
+} from '../../auth/authResponses';
+import { signAuthToken } from '../../auth/jwt';
 import { sendError } from '../../utils/errors';
 import { findAdminByUsername, getAdminPasswordHash } from './adminAuth.repository';
-
-const COOKIE_NAME = 'sentinel_admin_token';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
-  maxAge: 8 * 60 * 60 * 1000, // 8 hours
-};
 
 const verifyFailures = new Map<number, number>();
 
@@ -36,19 +33,15 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      sendError(res, 500, 'SERVER_ERROR', 'Configuration du serveur invalide.');
+    const token = signAuthToken(
+      { adminId: admin.id, username: admin.username },
+    );
+    if (!token) {
+      sendInvalidServerConfig(res);
       return;
     }
 
-    const token = jwt.sign(
-      { adminId: admin.id, username: admin.username },
-      secret,
-      { expiresIn: '8h' }
-    );
-
-    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+    setAuthCookie(res, ADMIN_AUTH_COOKIE, token);
     res.json({ id: admin.id, username: admin.username });
   } catch (err) {
     console.error('Login error:', err);
@@ -58,24 +51,20 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 export async function me(req: Request, res: Response): Promise<void> {
   if (!req.admin) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Non authentifié.');
+    sendUnauthenticated(res);
     return;
   }
   res.json({ id: req.admin.adminId, username: req.admin.username });
 }
 
 export async function logout(_req: Request, res: Response): Promise<void> {
-  res.clearCookie(COOKIE_NAME, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  });
+  clearAuthCookie(res, ADMIN_AUTH_COOKIE);
   res.json({ message: 'Déconnecté.' });
 }
 
 export async function verifyPassword(req: Request, res: Response): Promise<void> {
   if (!req.admin) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Non authentifié.');
+    sendUnauthenticated(res);
     return;
   }
 
@@ -98,11 +87,7 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
       verifyFailures.set(req.admin.adminId, attempts);
       if (attempts >= 3) {
         verifyFailures.delete(req.admin.adminId);
-        res.clearCookie(COOKIE_NAME, {
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
-        });
+        clearAuthCookie(res, ADMIN_AUTH_COOKIE);
         sendError(res, 401, 'UNAUTHORIZED', 'Session expirée.');
         return;
       }

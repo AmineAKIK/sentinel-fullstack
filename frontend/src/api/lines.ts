@@ -1,5 +1,6 @@
 import { api } from './client';
 import { LineMachine, ProductionLine } from '../types';
+import { buildRequiredQuery } from '../utils/query';
 
 export interface CreateLinePayload {
   lineNumber: string;
@@ -22,7 +23,7 @@ export async function createLine(payload: CreateLinePayload): Promise<Production
 }
 
 export async function checkLineAvailability(lineNumber: string): Promise<{ exists: boolean }> {
-  const query = new URLSearchParams({ lineNumber }).toString();
+  const query = buildRequiredQuery({ lineNumber });
   return api.get<{ exists: boolean }>(`/api/admin/lines/check-line?${query}`);
 }
 

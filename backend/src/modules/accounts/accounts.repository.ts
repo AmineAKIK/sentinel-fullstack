@@ -1,4 +1,6 @@
 import pool from '../../db/pool';
+import { statusInSql } from '../../db/sql';
+import { ACTIVE_INCIDENT_STATUSES, isWorkshopRole } from '../../domain/constants';
 import { CreateAccountInput, UpdateAccountInput } from './accounts.validation';
 
 export interface ListAccountsFilters {
@@ -55,7 +57,7 @@ export async function listAccountsData(filters: ListAccountsFilters): Promise<Ac
   const conditions: string[] = ['is_deleted = FALSE'];
   const params: unknown[] = [];
 
-  if (filters.role && ['OPERATOR', 'MAINTENANCE', 'RESPONSABLE'].includes(filters.role)) {
+  if (filters.role && isWorkshopRole(filters.role)) {
     params.push(filters.role);
     conditions.push(`role = $${params.length}`);
   }
@@ -189,7 +191,7 @@ export async function getAccountImpactData(id: number): Promise<AccountImpactDto
        COUNT(*) FILTER (WHERE user_id = $1)::int AS reported_incidents,
        COUNT(*) FILTER (WHERE taken_by_user_id = $1)::int AS taken_incidents,
        COUNT(*) FILTER (
-         WHERE taken_by_user_id = $1 AND status IN ('OPEN', 'PENDING')
+         WHERE taken_by_user_id = $1 AND ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)}
        )::int AS active_taken_incidents
      FROM workshop_incidents`,
     [id]
@@ -218,7 +220,7 @@ export async function getActiveTakenIncidentCountForUser(userId: number): Promis
   const { rows } = await pool.query<{ count: number }>(
     `SELECT COUNT(*)::int AS count
      FROM workshop_incidents
-     WHERE taken_by_user_id = $1 AND status IN ('OPEN', 'PENDING')`,
+     WHERE taken_by_user_id = $1 AND ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)}`,
     [userId]
   );
 

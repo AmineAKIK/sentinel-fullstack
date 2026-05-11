@@ -1,14 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { clearAuthCookie, WORKSHOP_AUTH_COOKIE } from '../auth/authCookies';
+import {
+  sendInvalidServerConfig,
+  sendInvalidSession,
+  sendMissingAuth,
+} from '../auth/authResponses';
+import { getJwtSecret, isJwtSessionError, verifyAuthToken } from '../auth/jwt';
 import pool from '../db/pool';
 import { sendError } from '../utils/errors';
-
-const COOKIE_NAME = 'sentinel_workshop_token';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
-};
 
 export interface WorkshopPayload {
   userId: number;
@@ -37,21 +36,24 @@ async function authenticateWorkshopRequest(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const token = req.cookies?.[COOKIE_NAME];
+  const token = req.cookies?.[WORKSHOP_AUTH_COOKIE];
 
   if (!token) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Authentification requise.');
+    sendMissingAuth(res);
     return;
   }
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    sendError(res, 500, 'SERVER_ERROR', 'Configuration du serveur invalide.');
+  if (!getJwtSecret()) {
+    sendInvalidServerConfig(res);
     return;
   }
 
   try {
-    const payload = jwt.verify(token, secret) as WorkshopPayload;
+    const payload = verifyAuthToken<WorkshopPayload>(token);
+    if (!payload) {
+      sendInvalidServerConfig(res);
+      return;
+    }
     const { rows } = await pool.query(
       `SELECT id, badge_number, role, password_hash
        FROM sentinel_users
@@ -63,14 +65,14 @@ async function authenticateWorkshopRequest(
     );
 
     if (rows.length === 0) {
-      res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
       sendError(res, 401, 'UNAUTHORIZED', 'Utilisateur inactif ou introuvable.');
       return;
     }
 
     const user = rows[0];
     if (!user.password_hash) {
-      res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
       sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe à réinitialiser.');
       return;
     }
@@ -82,12 +84,12 @@ async function authenticateWorkshopRequest(
     };
     next();
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError || err instanceof jwt.TokenExpiredError) {
-      res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
-      sendError(res, 401, 'UNAUTHORIZED', 'Session invalide ou expirée.');
+    if (isJwtSessionError(err)) {
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+      sendInvalidSession(res);
       return;
     }
     console.error('Workshop auth middleware error:', err);
-    sendError(res, 401, 'UNAUTHORIZED', 'Session invalide ou expirée.');
+    sendInvalidSession(res);
   }
 }

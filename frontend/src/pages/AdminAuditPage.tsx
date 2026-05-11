@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import NavBar from '../components/NavBar';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import { listReferenceAudit } from '../api/admin';
 import { ReferenceAuditEvent } from '../types';
+import { formatDateTime } from '../utils/date';
 
 const EVENT_LABELS: Record<string, string> = {
   USER_CREATED: 'Utilisateur créé',
@@ -30,16 +33,6 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   deletion: { label: 'Suppressions', events: ['USER_SOFT_DELETED', 'LINE_SOFT_DELETED'] },
   access: { label: 'Accès utilisateurs', events: ['USER_PASSWORD_RESET'] },
 };
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function targetLabel(event: ReferenceAuditEvent): string {
   if (event.scope === 'line') return event.line_number || 'Ligne supprimée';
@@ -270,11 +263,11 @@ export default function AdminAuditPage() {
 
         <div className="card">
           {loading ? (
-            <div className="empty-state">Chargement...</div>
+            <EmptyState>Chargement...</EmptyState>
           ) : error ? (
-            <div className="error-message" style={{ margin: 20 }}>{error}</div>
+            <ErrorBanner style={{ margin: 20 }}>{error}</ErrorBanner>
           ) : filtered.length === 0 ? (
-            <div className="empty-state">Aucun événement trouvé.</div>
+            <EmptyState>Aucun événement trouvé.</EmptyState>
           ) : (
             <div className="table-wrapper">
               <table>

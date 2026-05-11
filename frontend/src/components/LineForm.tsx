@@ -1,4 +1,5 @@
 import { LineMachine } from '../types';
+import { emptyMachine, switchMachineRobotMode } from '../utils/lineMachines';
 
 export interface LineFormData {
   lineNumber: string;
@@ -12,16 +13,6 @@ interface LineFormProps {
   disabled?: boolean;
   showStatus?: boolean;
   lineError?: string;
-}
-
-function emptyMachine(): LineMachine {
-  return {
-    machineId: '',
-    brand: '',
-    hasDoubleRobot: false,
-    robotNumber: '',
-    robotHeads: 0,
-  };
 }
 
 export const EMPTY_LINE_FORM: LineFormData = {
@@ -49,25 +40,7 @@ export default function LineForm({
     const current = data.machines[index];
 
     if (field === 'hasDoubleRobot') {
-      const nextMachine: LineMachine = value
-        ? {
-            machineId: current.machineId,
-            brand: current.brand,
-            hasDoubleRobot: true,
-            leftRobotNumber: '',
-            leftRobotHeads: 0,
-            rightRobotNumber: '',
-            rightRobotHeads: 0,
-          }
-        : {
-            machineId: current.machineId,
-            brand: current.brand,
-            hasDoubleRobot: false,
-            robotNumber: '',
-            robotHeads: 0,
-          };
-
-      updateMachine(index, nextMachine);
+      updateMachine(index, switchMachineRobotMode(current, Boolean(value)));
       return;
     }
 

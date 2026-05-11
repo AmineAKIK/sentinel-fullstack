@@ -1,22 +1,9 @@
-export type WorkshopRole = 'OPERATOR' | 'MAINTENANCE' | 'RESPONSABLE';
-export type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
-export type IncidentAction =
-  | 'REQUEST_EDIT'
-  | 'DIRECT_EDIT'
-  | 'REQUEST_CANCEL'
-  | 'CANCEL'
-  | 'APPROVE_EDIT'
-  | 'REJECT_EDIT'
-  | 'APPROVE_CANCEL'
-  | 'REJECT_CANCEL'
-  | 'TAKE'
-  | 'SET_PENDING'
-  | 'RESUME'
-  | 'CLOSE'
-  | 'SET_PRIORITY'
-  | 'REORDER'
-  | 'RESPONSIBLE_COMMENT'
-  | 'INVALIDATE_CLOSED';
+import {
+  IncidentAction,
+  IncidentStatus,
+  isWorkshopRole,
+  WorkshopRole,
+} from '../../domain/constants';
 
 export interface CurrentIncident {
   status: IncidentStatus;
@@ -30,6 +17,7 @@ export function isActiveIncident(incident: CurrentIncident): boolean {
 }
 
 export function canPerform(role: string, action: IncidentAction, incident: CurrentIncident): boolean {
+  if (!isWorkshopRole(role)) return false;
   const workshopRole = role as WorkshopRole;
 
   switch (action) {

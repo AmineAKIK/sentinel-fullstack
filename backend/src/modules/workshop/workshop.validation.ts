@@ -1,13 +1,9 @@
 import { z } from 'zod';
+import { INCIDENT_SHIFTS, INCIDENT_STATES, INCIDENT_STATUSES } from '../../domain/constants';
 
-export const ShiftEnum = z.enum(['MATIN', 'APRES_MIDI', 'NUIT', 'WEEKEND']);
-export const IncidentStateEnum = z.enum([
-  'SKIPEE_PAR_MACHINE',
-  'SKIPEE_PAR_CONDUCTEUR',
-  'DEGRADEE',
-  'INDISPONIBLE',
-]);
-export const IncidentStatusEnum = z.enum(['OPEN', 'PENDING', 'CLOSED', 'CANCELED']);
+export const ShiftEnum = z.enum(INCIDENT_SHIFTS);
+export const IncidentStateEnum = z.enum(INCIDENT_STATES);
+export const IncidentStatusEnum = z.enum(INCIDENT_STATUSES);
 
 export const createIncidentSchema = z.object({
   shift: ShiftEnum,

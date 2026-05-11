@@ -1,9 +1,22 @@
 import pool from '../../db/pool';
-import { CurrentIncident, IncidentStatus } from './workshop.policy';
+import { boundedInt, parseOptionalInt, statusEqualsSql, statusInSql, statusNotEqualsSql } from '../../db/sql';
+import {
+  ACTIVE_INCIDENT_STATUSES,
+  isIncidentState,
+  isIncidentStatus,
+  IncidentStatus,
+} from '../../domain/constants';
+import { CurrentIncident } from './workshop.policy';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
 
 export type IncidentListMode = 'history' | 'knowledge';
 type QueryParams = Record<string, unknown>;
+
+const activeIncidentStatusSql = statusInSql('status', ACTIVE_INCIDENT_STATUSES);
+const openStatusSql = statusEqualsSql('status', 'OPEN');
+const pendingStatusSql = statusEqualsSql('status', 'PENDING');
+const closedStatusSql = statusEqualsSql('status', 'CLOSED');
+const nonCanceledWorkshopIncidentStatusSql = statusNotEqualsSql('wi.status', 'CANCELED');
 
 export type StoredMachine =
   | {
@@ -51,26 +64,25 @@ function buildIncidentWorkspaceFilters(
   const { q, status, state, lineId, machineId, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
-  const parsedLimit = parseInt(String(limit || ''), 10);
-  const safeLimit = Number.isInteger(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 500) : 200;
+  const safeLimit = boundedInt(limit, 200, 1, 500);
 
   if (mode === 'knowledge') {
-    filters.push(`wi.status = 'CLOSED'`);
+    filters.push(statusEqualsSql('wi.status', 'CLOSED'));
     filters.push(`wi.intervention_note IS NOT NULL`);
     filters.push(`btrim(wi.intervention_note) != ''`);
-  } else if (status && ['OPEN', 'PENDING', 'CLOSED', 'CANCELED'].includes(String(status))) {
+  } else if (status && isIncidentStatus(String(status))) {
     params.push(String(status));
     filters.push(`wi.status = $${params.length}`);
   }
 
-  if (state && ['SKIPEE_PAR_MACHINE', 'SKIPEE_PAR_CONDUCTEUR', 'DEGRADEE', 'INDISPONIBLE'].includes(String(state))) {
+  if (state && isIncidentState(String(state))) {
     params.push(String(state));
     filters.push(`wi.state = $${params.length}`);
   }
 
   if (lineId) {
-    const parsedLine = parseInt(String(lineId), 10);
-    if (!isNaN(parsedLine)) {
+    const parsedLine = parseOptionalInt(lineId);
+    if (parsedLine !== null) {
       params.push(parsedLine);
       filters.push(`wi.line_id = $${params.length}`);
     }
@@ -111,20 +123,19 @@ function buildHistoryEventFilters(query: QueryParams): { whereClause: string; pa
   const { q, status, state, lineId, machineId, eventType, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
-  const parsedLimit = parseInt(String(limit || ''), 10);
-  const safeLimit = Number.isInteger(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 500) : 200;
+  const safeLimit = boundedInt(limit, 200, 1, 500);
 
-  if (status && ['OPEN', 'PENDING', 'CLOSED', 'CANCELED'].includes(String(status))) {
+  if (status && isIncidentStatus(String(status))) {
     params.push(String(status));
     filters.push(`wi.status = $${params.length}`);
   }
-  if (state && ['SKIPEE_PAR_MACHINE', 'SKIPEE_PAR_CONDUCTEUR', 'DEGRADEE', 'INDISPONIBLE'].includes(String(state))) {
+  if (state && isIncidentState(String(state))) {
     params.push(String(state));
     filters.push(`wi.state = $${params.length}`);
   }
   if (lineId) {
-    const parsedLine = parseInt(String(lineId), 10);
-    if (!isNaN(parsedLine)) {
+    const parsedLine = parseOptionalInt(lineId);
+    if (parsedLine !== null) {
       params.push(parsedLine);
       filters.push(`wi.line_id = $${params.length}`);
     }
@@ -175,16 +186,16 @@ export async function getBoardData() {
               head_number, state, current_product, is_taken, is_priority,
               status, display_order, created_at, updated_at
        FROM workshop_incidents
-       WHERE status IN ('OPEN', 'PENDING')
+       WHERE ${activeIncidentStatusSql}
        ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC`
     ),
     pool.query(
       `SELECT
-         COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING'))::int AS total,
-         COUNT(*) FILTER (WHERE status = 'OPEN')::int AS open_count,
-         COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending_count,
+         COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
+         COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
+         COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
          COUNT(*) FILTER (
-           WHERE status = 'OPEN' AND NOW() - created_at > INTERVAL '7 days'
+           WHERE ${openStatusSql} AND NOW() - created_at > INTERVAL '7 days'
          )::int AS open_over_7d
        FROM workshop_incidents`
     ),
@@ -533,13 +544,13 @@ export async function listIncidentEvents(incidentId: number) {
 export async function getIncidentMetrics() {
   const { rows } = await pool.query(
     `SELECT
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING'))::int AS total,
-       COUNT(*) FILTER (WHERE status = 'OPEN')::int AS open_count,
-       COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending_count,
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING') AND is_priority = TRUE)::int AS priority_count,
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING') AND is_taken = TRUE)::int AS taken_count,
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING') AND is_taken = FALSE)::int AS not_taken_count,
-       COUNT(*) FILTER (WHERE status = 'OPEN'
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
+       COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
+       COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_priority = TRUE)::int AS priority_count,
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = TRUE)::int AS taken_count,
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = FALSE)::int AS not_taken_count,
+       COUNT(*) FILTER (WHERE ${openStatusSql}
          AND NOW() - created_at > INTERVAL '7 days')::int AS open_over_7d
      FROM workshop_incidents`
   );
@@ -558,7 +569,7 @@ export async function getIncidentMetrics() {
 
 export async function getWorkshopAnalytics(query: QueryParams) {
   const { start, end, lineId, machineId } = query;
-  const filters: string[] = [`wi.status != 'CANCELED'`];
+  const filters: string[] = [nonCanceledWorkshopIncidentStatusSql];
   const params: Array<string | number> = [];
 
   if (start) {
@@ -570,8 +581,8 @@ export async function getWorkshopAnalytics(query: QueryParams) {
     filters.push(`wi.created_at <= $${params.length}`);
   }
   if (lineId) {
-    const parsedLine = parseInt(String(lineId), 10);
-    if (!isNaN(parsedLine)) {
+    const parsedLine = parseOptionalInt(lineId);
+    if (parsedLine !== null) {
       params.push(parsedLine);
       filters.push(`wi.line_id = $${params.length}`);
     }
@@ -585,29 +596,29 @@ export async function getWorkshopAnalytics(query: QueryParams) {
 
   const { rows: totalsRows } = await pool.query(
     `SELECT
-       COUNT(*) FILTER (WHERE status != 'CANCELED')::int AS total,
-       COUNT(*) FILTER (WHERE status = 'OPEN')::int AS open_count,
-       COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending_count,
-       COUNT(*) FILTER (WHERE status = 'CLOSED')::int AS closed_count,
+       COUNT(*) FILTER (WHERE ${statusNotEqualsSql('status', 'CANCELED')})::int AS total,
+       COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
+       COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
+       COUNT(*) FILTER (WHERE ${closedStatusSql})::int AS closed_count,
        COUNT(*) FILTER (WHERE is_priority = TRUE)::int AS priority_count,
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING'))::int AS active_count,
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING') AND is_taken = FALSE)::int AS not_taken_count,
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS active_count,
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = FALSE)::int AS not_taken_count,
        COUNT(*) FILTER (
-         WHERE status IN ('OPEN', 'PENDING')
+         WHERE ${activeIncidentStatusSql}
            AND is_priority = TRUE
            AND is_taken = FALSE
        )::int AS urgent_not_taken_count,
        COUNT(*) FILTER (WHERE taken_at IS NOT NULL)::int AS taken_count,
        COUNT(*) FILTER (
-         WHERE status IN ('OPEN', 'PENDING')
+         WHERE ${activeIncidentStatusSql}
            AND NOW() - created_at > INTERVAL '24 hours'
        )::int AS open_over_24h_count,
        COUNT(*) FILTER (
-         WHERE status IN ('OPEN', 'PENDING')
+         WHERE ${activeIncidentStatusSql}
            AND NOW() - created_at > INTERVAL '7 days'
        )::int AS open_over_7d_count,
        MAX(EXTRACT(EPOCH FROM (NOW() - created_at))) FILTER (
-         WHERE status IN ('OPEN', 'PENDING')
+         WHERE ${activeIncidentStatusSql}
        ) AS oldest_active_seconds,
        percentile_cont(0.5) WITHIN GROUP (
          ORDER BY EXTRACT(EPOCH FROM (taken_at - created_at))

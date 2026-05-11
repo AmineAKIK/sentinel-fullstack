@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getWorkshopAnalytics, listWorkshopLines } from '../api/workshop';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import KpiCard from '../components/ui/KpiCard';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopAnalytics } from '../types';
+import { formatShortDate } from '../utils/date';
+import { getWorkshopMachineOptions, lineFilterChip, machineFilterChip } from '../utils/workshopFilters';
 import { buildAnalyticsParams, formatSeconds, HistoryPeriod, STATE_LABELS } from '../utils/workshopHistory';
 
 export default function WorkshopPilotagePage() {
@@ -36,11 +41,7 @@ export default function WorkshopPilotagePage() {
       .finally(() => setLoading(false));
   }, [period, customStart, customEnd, lineFilter, machineFilter]);
 
-  const machineOptions = useMemo(() => {
-    const line = lines.find((item) => String(item.id) === lineFilter);
-    if (!line) return [];
-    return line.machines.map((machine) => ({ id: machine.machineId, label: machine.machineId }));
-  }, [lineFilter, lines]);
+  const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
 
   const trendSummary = useMemo(() => {
     const trend = analytics?.trend || [];
@@ -95,26 +96,18 @@ export default function WorkshopPilotagePage() {
       label: `Fin: ${customEnd}`,
       onRemove: () => setCustomEnd(''),
     }] : []),
-    ...(lineFilter !== 'all' ? [{
-      key: 'line',
-      label: `Ligne ${lines.find((line) => String(line.id) === lineFilter)?.line_number || lineFilter}`,
-      onRemove: () => {
-        setLineFilter('all');
-        setMachineFilter('all');
-      },
-    }] : []),
-    ...(machineFilter !== 'all' ? [{
-      key: 'machine',
-      label: `Machine ${machineFilter}`,
-      onRemove: () => setMachineFilter('all'),
-    }] : []),
+    ...lineFilterChip(lines, lineFilter, () => {
+      setLineFilter('all');
+      setMachineFilter('all');
+    }),
+    ...machineFilterChip(machineFilter, () => setMachineFilter('all')),
   ];
   const summaryText = analytics
     ? `Le recensement montre ${trendSummary.created} création(s), ${trendSummary.closed} clôture(s) et ${activeLoad} cas encore actif(s). L’analyse classe la situation "${loadStatus.toLowerCase()}" avec ${urgentNotTaken} urgence(s) non prise(s), ${priorityShare}% d’urgences et une tension principale sur ${mainLine ? `la ligne ${mainLine.line_number}` : 'aucune ligne dominante'}${mainMachine ? `, machine ${mainMachine.machine_id}` : ''}.`
     : '';
 
   function renderBarList(items: { label: string; count: number }[]) {
-    if (items.length === 0) return <div className="empty-state">Aucune donnée sur cette période.</div>;
+    if (items.length === 0) return <EmptyState>Aucune donnée sur cette période.</EmptyState>;
     return (
       <div className="bar-list">
         {items.map((item) => (
@@ -135,7 +128,7 @@ export default function WorkshopPilotagePage() {
 
   function renderComparisonBars(items: { label: string; count: number; tone?: 'blue' | 'green' | 'red' }[]) {
     const maxCount = Math.max(...items.map((item) => item.count), 1);
-    if (items.length === 0) return <div className="empty-state">Aucune donnée sur cette période.</div>;
+    if (items.length === 0) return <EmptyState>Aucune donnée sur cette période.</EmptyState>;
     return (
       <div className="comparison-list">
         {items.map((item) => (
@@ -155,7 +148,7 @@ export default function WorkshopPilotagePage() {
   }
 
   function formatTrendDate(value: string): string {
-    return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    return formatShortDate(value);
   }
 
   function clearFilters(): void {
@@ -178,7 +171,7 @@ export default function WorkshopPilotagePage() {
           <h1>Pilotage atelier</h1>
         </div>
 
-        {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-body">
@@ -247,10 +240,14 @@ export default function WorkshopPilotagePage() {
           </div>
 
           <div className="kpi-grid pilotage-live-grid">
-            <div className="card"><div className="card-body"><span className="kpi-label">Cas actifs</span><span className="kpi-value">{loading ? '...' : activeLoad}</span><span className="kpi-sub">Ouverts + en attente</span></div></div>
-            <div className="card"><div className="card-body"><span className="kpi-label">Non pris</span><span className="kpi-value">{loading ? '...' : analytics?.not_taken ?? 0}</span><span className="kpi-sub">À affecter rapidement</span></div></div>
-            <div className="card"><div className="card-body"><span className="kpi-label">Urgences non prises</span><span className="kpi-value">{loading ? '...' : urgentNotTaken}</span><span className="kpi-sub">Risque immédiat</span></div></div>
-            <div className="card"><div className="card-body"><span className="kpi-label">Plus vieux actif</span><span className="kpi-value">{loading ? '...' : formatSeconds(analytics?.oldest_active_seconds ?? null)}</span><span className="kpi-sub">Ancienneté maximale en cours</span></div></div>
+            <KpiCard label="Cas actifs" value={loading ? '...' : activeLoad} sub="Ouverts + en attente" />
+            <KpiCard label="Non pris" value={loading ? '...' : analytics?.not_taken ?? 0} sub="À affecter rapidement" />
+            <KpiCard label="Urgences non prises" value={loading ? '...' : urgentNotTaken} sub="Risque immédiat" />
+            <KpiCard
+              label="Plus vieux actif"
+              value={loading ? '...' : formatSeconds(analytics?.oldest_active_seconds ?? null)}
+              sub="Ancienneté maximale en cours"
+            />
           </div>
 
           <div className="pilotage-split-grid">
@@ -293,51 +290,29 @@ export default function WorkshopPilotagePage() {
           </div>
 
           <div className="pilotage-insight-grid">
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Signalements créés</span>
-                <span className="kpi-value">{loading ? '...' : trendSummary.created}</span>
-                <span className="kpi-sub">Hors annulations invalidées</span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Cas clôturés</span>
-                <span className="kpi-value">{loading ? '...' : analytics?.closed ?? 0}</span>
-                <span className="kpi-sub">Clôtures constatées</span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Urgences créées</span>
-                <span className="kpi-value">{loading ? '...' : trendSummary.priority}</span>
-                <span className="kpi-sub">Signalements passés en priorité</span>
-              </div>
-            </div>
+            <KpiCard label="Signalements créés" value={loading ? '...' : trendSummary.created} sub="Hors annulations invalidées" />
+            <KpiCard label="Cas clôturés" value={loading ? '...' : analytics?.closed ?? 0} sub="Clôtures constatées" />
+            <KpiCard label="Urgences créées" value={loading ? '...' : trendSummary.priority} sub="Signalements passés en priorité" />
           </div>
 
           <div className="pilotage-insight-grid">
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Anomalie dominante</span>
-                <span className="kpi-value kpi-value-small">{loading ? '...' : mainState ? STATE_LABELS[mainState.state] || mainState.state : '-'}</span>
-                <span className="kpi-sub">{mainState ? `${mainState.count} signalement(s)` : 'Aucune anomalie dominante'}</span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Ligne la plus exposée</span>
-                <span className="kpi-value">{loading ? '...' : mainLine ? mainLine.line_number : '-'}</span>
-                <span className="kpi-sub">{mainLine ? `${mainLine.count} signalement(s)` : 'Aucune ligne dominante'}</span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Machine récurrente</span>
-                <span className="kpi-value kpi-value-small">{loading ? '...' : mainMachine ? mainMachine.machine_id : '-'}</span>
-                <span className="kpi-sub">{mainMachine ? `${mainMachine.count} signalement(s)` : 'Aucune machine dominante'}</span>
-              </div>
-            </div>
+            <KpiCard
+              label="Anomalie dominante"
+              value={loading ? '...' : mainState ? STATE_LABELS[mainState.state] || mainState.state : '-'}
+              sub={mainState ? `${mainState.count} signalement(s)` : 'Aucune anomalie dominante'}
+              valueClassName="kpi-value-small"
+            />
+            <KpiCard
+              label="Ligne la plus exposée"
+              value={loading ? '...' : mainLine ? mainLine.line_number : '-'}
+              sub={mainLine ? `${mainLine.count} signalement(s)` : 'Aucune ligne dominante'}
+            />
+            <KpiCard
+              label="Machine récurrente"
+              value={loading ? '...' : mainMachine ? mainMachine.machine_id : '-'}
+              sub={mainMachine ? `${mainMachine.count} signalement(s)` : 'Aucune machine dominante'}
+              valueClassName="kpi-value-small"
+            />
           </div>
         </section>
 
@@ -346,7 +321,7 @@ export default function WorkshopPilotagePage() {
             <div className="card-body">
               <div className="chart-title">Tendance quotidienne</div>
               {(analytics?.trend || []).length === 0 ? (
-                <div className="empty-state">Aucune donnée sur cette période.</div>
+                <EmptyState>Aucune donnée sur cette période.</EmptyState>
               ) : (
                 <div className="trend-list">
                   {(analytics?.trend || []).map((item) => {
@@ -419,27 +394,17 @@ export default function WorkshopPilotagePage() {
             </div>
 
           <div className="pilotage-insight-grid">
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Charge résiduelle</span>
-                <span className="kpi-value">{loading ? '...' : activeLoad}</span>
-                <span className="kpi-sub">Cas encore ouverts ou en attente</span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Variation de charge</span>
-                <span className="kpi-value">{loading ? '...' : backlogDelta > 0 ? `+${backlogDelta}` : backlogDelta}</span>
-                <span className="kpi-sub">Créations moins clôtures</span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-body">
-                <span className="kpi-label">Traitement médian</span>
-                <span className="kpi-value">{loading ? '...' : formatSeconds(analytics?.median_close_seconds ?? null)}</span>
-                <span className="kpi-sub">Moyenne: {loading ? '...' : formatSeconds(analytics?.avg_close_seconds ?? null)}</span>
-              </div>
-            </div>
+            <KpiCard label="Charge résiduelle" value={loading ? '...' : activeLoad} sub="Cas encore ouverts ou en attente" />
+            <KpiCard
+              label="Variation de charge"
+              value={loading ? '...' : backlogDelta > 0 ? `+${backlogDelta}` : backlogDelta}
+              sub="Créations moins clôtures"
+            />
+            <KpiCard
+              label="Traitement médian"
+              value={loading ? '...' : formatSeconds(analytics?.median_close_seconds ?? null)}
+              sub={<>Moyenne: {loading ? '...' : formatSeconds(analytics?.avg_close_seconds ?? null)}</>}
+            />
           </div>
         </section>
       </main>

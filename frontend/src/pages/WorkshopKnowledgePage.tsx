@@ -1,15 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getWorkshopKnowledgeIncident,
-  IncidentWorkspaceParams,
   listWorkshopKnowledgeIncidents,
   listWorkshopLines,
 } from '../api/workshop';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import KpiCard from '../components/ui/KpiCard';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
+import {
+  buildIncidentWorkspaceParams,
+  getWorkshopMachineOptions,
+  lineFilterChip,
+  machineFilterChip,
+  searchFilterChip,
+  stateFilterChip,
+  withWorkshopLineFilter,
+  withWorkshopUrlFilter,
+} from '../utils/workshopFilters';
 
 export default function WorkshopKnowledgePage() {
   const navigate = useNavigate();
@@ -31,11 +43,13 @@ export default function WorkshopKnowledgePage() {
   }, []);
 
   useEffect(() => {
-    const params: IncidentWorkspaceParams = { limit: 300 };
-    if (query.trim()) params.q = query.trim();
-    if (stateFilter !== 'all') params.state = stateFilter as IncidentWorkspaceParams['state'];
-    if (lineFilter !== 'all') params.lineId = Number(lineFilter);
-    if (machineFilter !== 'all') params.machineId = machineFilter;
+    const params = buildIncidentWorkspaceParams({
+      query,
+      stateFilter,
+      lineFilter,
+      machineFilter,
+      limit: 300,
+    });
 
     setLoading(true);
     setError('');
@@ -71,45 +85,25 @@ export default function WorkshopKnowledgePage() {
       .catch(() => setError('Cette fiche connaissance n’est pas disponible.'));
   }, [searchParams, incidents]);
 
-  const machineOptions = useMemo(() => {
-    const line = lines.find((item) => String(item.id) === lineFilter);
-    if (!line) return [];
-    return line.machines.map((machine) => ({ id: machine.machineId, label: machine.machineId }));
-  }, [lineFilter, lines]);
+  const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
 
   const machineCount = new Set(incidents.map((incident) => incident.machine_id)).size;
   const lastItem = incidents[0];
   const selectedIncident = incidents.find((incident) => String(incident.id) === selectedId);
   const filterChips: FilterChip[] = [
-    ...(query.trim() ? [{
-      key: 'search',
-      label: `Recherche: ${query.trim()}`,
-      onRemove: () => {
-        setQuery('');
-        updateSearchFilter('q', '', '');
-      },
-    }] : []),
-    ...(lineFilter !== 'all' ? [{
-      key: 'line',
-      label: `Ligne ${lines.find((line) => String(line.id) === lineFilter)?.line_number || lineFilter}`,
-      onRemove: () => updateLineFilter('all'),
-    }] : []),
-    ...(machineFilter !== 'all' ? [{
-      key: 'machine',
-      label: `Machine ${machineFilter}`,
-      onRemove: () => {
-        setMachineFilter('all');
-        updateSearchFilter('machine', 'all');
-      },
-    }] : []),
-    ...(stateFilter !== 'all' ? [{
-      key: 'state',
-      label: `Anomalie: ${STATE_LABELS[stateFilter] || stateFilter}`,
-      onRemove: () => {
-        setStateFilter('all');
-        updateSearchFilter('state', 'all');
-      },
-    }] : []),
+    ...searchFilterChip(query, () => {
+      setQuery('');
+      updateSearchFilter('q', '', '');
+    }),
+    ...lineFilterChip(lines, lineFilter, () => updateLineFilter('all')),
+    ...machineFilterChip(machineFilter, () => {
+      setMachineFilter('all');
+      updateSearchFilter('machine', 'all');
+    }),
+    ...stateFilterChip(stateFilter, () => {
+      setStateFilter('all');
+      updateSearchFilter('state', 'all');
+    }),
   ];
 
   function selectKnowledgeIncident(id: number): void {
@@ -120,20 +114,13 @@ export default function WorkshopKnowledgePage() {
   }
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
-    const nextParams = new URLSearchParams(searchParams);
-    if (!value || value === fallback) nextParams.delete(name);
-    else nextParams.set(name, value);
-    setSearchParams(nextParams);
+    setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
   }
 
   function updateLineFilter(value: string): void {
     setLineFilter(value);
     setMachineFilter('all');
-    const nextParams = new URLSearchParams(searchParams);
-    if (value === 'all') nextParams.delete('line');
-    else nextParams.set('line', value);
-    nextParams.delete('machine');
-    setSearchParams(nextParams);
+    setSearchParams(withWorkshopLineFilter(searchParams, value));
   }
 
   function clearFilters(): void {
@@ -158,12 +145,16 @@ export default function WorkshopKnowledgePage() {
           <h1>Base de connaissance</h1>
         </div>
 
-        {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="kpi-grid">
-          <div className="card"><div className="card-body"><span className="kpi-label">Cas exploitables</span><span className="kpi-value">{loading ? '...' : incidents.length}</span></div></div>
-          <div className="card"><div className="card-body"><span className="kpi-label">Machines concernées</span><span className="kpi-value">{loading ? '...' : machineCount}</span></div></div>
-          <div className="card"><div className="card-body"><span className="kpi-label">Dernière fiche</span><span className="kpi-value kpi-value-small">{lastItem ? formatDateTime(lastItem.updated_at) : '-'}</span></div></div>
+          <KpiCard label="Cas exploitables" value={loading ? '...' : incidents.length} />
+          <KpiCard label="Machines concernées" value={loading ? '...' : machineCount} />
+          <KpiCard
+            label="Dernière fiche"
+            value={lastItem ? formatDateTime(lastItem.updated_at) : '-'}
+            valueClassName="kpi-value-small"
+          />
         </div>
 
         <div className="card" style={{ marginBottom: 16 }}>
@@ -248,9 +239,9 @@ export default function WorkshopKnowledgePage() {
               </div>
               <div className="knowledge-card-list">
                 {loading ? (
-                  <div className="empty-state">Chargement...</div>
+                  <EmptyState>Chargement...</EmptyState>
                 ) : incidents.length === 0 ? (
-                  <div className="empty-state">Aucune fiche exploitable.</div>
+                  <EmptyState>Aucune fiche exploitable.</EmptyState>
                 ) : (
                   incidents.map((incident) => (
                     <button
@@ -328,7 +319,7 @@ export default function WorkshopKnowledgePage() {
                   </div>
                 </article>
               ) : (
-                <div className="empty-state">Sélectionnez une fiche.</div>
+                <EmptyState>Sélectionnez une fiche.</EmptyState>
               )}
             </div>
           </div>

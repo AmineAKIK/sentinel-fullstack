@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { WORKSHOP_ROLES } from '../../domain/constants';
 
-export const RoleEnum = z.enum(['OPERATOR', 'MAINTENANCE', 'RESPONSABLE']);
+export const RoleEnum = z.enum(WORKSHOP_ROLES);
 
 export const createAccountSchema = z.object({
   firstName: z.string().trim().min(2, 'Le prénom doit contenir au moins 2 caractères.'),

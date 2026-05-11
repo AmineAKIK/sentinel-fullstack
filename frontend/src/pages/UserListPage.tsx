@@ -4,17 +4,13 @@ import NavBar from '../components/NavBar';
 import CreateUserModal from '../components/CreateUserModal';
 import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import Spinner from '../components/ui/Spinner';
 import { listAccounts } from '../api/accounts';
 import { SentinelUser, Role, SortField, SortOrder } from '../types';
+import { formatDate } from '../utils/date';
 import { ROLE_LABELS } from '../utils/labels';
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
 
 export default function UserListPage() {
   const navigate = useNavigate();
@@ -186,12 +182,12 @@ export default function UserListPage() {
         <div className="card">
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-              <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }} />
+              <Spinner size={24} borderWidth={3} />
             </div>
           ) : error ? (
-            <div className="error-message" style={{ margin: 20 }}>{error}</div>
+            <ErrorBanner style={{ margin: 20 }}>{error}</ErrorBanner>
           ) : filteredUsers.length === 0 ? (
-            <div className="empty-state">Aucun utilisateur trouvé.</div>
+            <EmptyState>Aucun utilisateur trouvé.</EmptyState>
           ) : (
             <div className="table-wrapper">
               <table>

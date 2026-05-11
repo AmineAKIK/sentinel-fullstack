@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import Modal from './Modal';
+import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
 
 interface DeleteRequestModalProps {
@@ -9,63 +8,20 @@ interface DeleteRequestModalProps {
 }
 
 export default function DeleteRequestModal({ incident, onClose, onConfirm }: DeleteRequestModalProps) {
-  const [reason, setReason] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleConfirm() {
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      setError('Merci de renseigner le motif d’annulation.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    try {
-      await onConfirm(trimmed);
-    } catch (err) {
-      setError("Impossible d'envoyer la demande d’annulation.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <Modal
+    <TextConfirmModal
       title="Demande d’annulation"
-      onClose={loading ? undefined : onClose}
-      closeOnOverlay={false}
-      isDirty={reason.trim().length > 0}
-      isLoading={loading}
       variant="danger"
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
-            Annuler
-          </button>
-          <button className="btn btn-danger" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Envoi…' : 'Envoyer la demande'}
-          </button>
-        </>
-      }
-    >
-      <div className="notice">
-        Vous demandez l’annulation de l'incident {incident.line_number} · {incident.machine_id}. Le signalement restera tracé dans l’historique.
-      </div>
-      <div className="form-group">
-        <label className="form-label" htmlFor="deleteRequestReason">Motif d’annulation *</label>
-        <textarea
-          id="deleteRequestReason"
-          className="form-input"
-          rows={4}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          disabled={loading}
-          placeholder="Erreur de signalement, doublon, mauvais équipement..."
-        />
-      </div>
-      {error && <div className="error-message">{error}</div>}
-    </Modal>
+      notice={<>Vous demandez l’annulation de l'incident {incident.line_number} · {incident.machine_id}. Le signalement restera tracé dans l’historique.</>}
+      label="Motif d’annulation *"
+      placeholder="Erreur de signalement, doublon, mauvais équipement..."
+      confirmLabel="Envoyer la demande"
+      loadingLabel="Envoi…"
+      requiredMessage="Merci de renseigner le motif d’annulation."
+      failureMessage="Impossible d'envoyer la demande d’annulation."
+      textareaId="deleteRequestReason"
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
   );
 }

@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import Modal from './Modal';
+import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
 
 interface CloseIncidentModalProps {
@@ -9,62 +8,19 @@ interface CloseIncidentModalProps {
 }
 
 export default function CloseIncidentModal({ incident, onClose, onConfirm }: CloseIncidentModalProps) {
-  const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleConfirm() {
-    const trimmed = note.trim();
-    if (!trimmed) {
-      setError('Merci de renseigner le compte rendu.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    try {
-      await onConfirm(trimmed);
-    } catch (err) {
-      setError("Impossible de clôturer l'incident.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <Modal
+    <TextConfirmModal
       title="Clôturer l'incident"
-      onClose={loading ? undefined : onClose}
-      closeOnOverlay={false}
-      isDirty={note.trim().length > 0}
-      isLoading={loading}
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
-            Annuler
-          </button>
-          <button className="btn btn-primary" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Clôture…' : 'Clôturer'}
-          </button>
-        </>
-      }
-    >
-      <div className="notice">
-        Vous allez clôturer l'incident {incident.line_number} · {incident.machine_id}.
-      </div>
-      <div className="form-group">
-        <label className="form-label" htmlFor="closeNote">Compte rendu / intervention *</label>
-        <textarea
-          id="closeNote"
-          className="form-input"
-          rows={4}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          disabled={loading}
-          placeholder="Décrivez l'intervention réalisée"
-        />
-      </div>
-      {error && <div className="error-message">{error}</div>}
-    </Modal>
+      notice={<>Vous allez clôturer l'incident {incident.line_number} · {incident.machine_id}.</>}
+      label="Compte rendu / intervention *"
+      placeholder="Décrivez l'intervention réalisée"
+      confirmLabel="Clôturer"
+      loadingLabel="Clôture…"
+      requiredMessage="Merci de renseigner le compte rendu."
+      failureMessage="Impossible de clôturer l'incident."
+      textareaId="closeNote"
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
   );
 }

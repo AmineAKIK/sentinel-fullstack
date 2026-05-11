@@ -3,24 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import EditUserModal from '../components/EditUserModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DetailField from '../components/ui/DetailField';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import FullPageLoader from '../components/ui/FullPageLoader';
 import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
+import { formatDateTime } from '../utils/date';
 
 const ROLE_LABELS: Record<string, string> = {
   OPERATOR: 'Opérateur',
   MAINTENANCE: 'Maintenance',
   RESPONSABLE: 'Responsable',
 };
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -57,9 +51,7 @@ export default function UserDetailPage() {
     return (
       <>
         <NavBar />
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
-          <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
-        </div>
+        <FullPageLoader />
       </>
     );
   }
@@ -72,7 +64,7 @@ export default function UserDetailPage() {
           <button className="back-link" onClick={() => navigate('/admin/users')}>
             Retour à la liste
           </button>
-          <div className="error-message">{error || 'Utilisateur introuvable.'}</div>
+          <ErrorBanner>{error || 'Utilisateur introuvable.'}</ErrorBanner>
         </div>
       </>
     );
@@ -104,38 +96,17 @@ export default function UserDetailPage() {
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-body">
             <div className="detail-grid">
-              <div className="detail-field">
-                <span className="detail-field-label">Nom</span>
-                <span className="detail-field-value">{user.last_name}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Prénom</span>
-                <span className="detail-field-value">{user.first_name}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Numéro de badge</span>
-                <span className="detail-field-value">{user.badge_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Rôle</span>
-                <span className="detail-field-value">
-                  <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
-                </span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Mot de passe workshop</span>
-                <span className="detail-field-value">
-                  {user.has_password ? 'Défini' : 'À définir'}
-                </span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Date de création</span>
-                <span className="detail-field-value">{formatDateTime(user.created_at)}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Dernière modification</span>
-                <span className="detail-field-value">{formatDateTime(user.updated_at)}</span>
-              </div>
+              <DetailField label="Nom">{user.last_name}</DetailField>
+              <DetailField label="Prénom">{user.first_name}</DetailField>
+              <DetailField label="Numéro de badge">{user.badge_number}</DetailField>
+              <DetailField label="Rôle">
+                <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
+              </DetailField>
+              <DetailField label="Mot de passe workshop">
+                {user.has_password ? 'Défini' : 'À définir'}
+              </DetailField>
+              <DetailField label="Date de création">{formatDateTime(user.created_at)}</DetailField>
+              <DetailField label="Dernière modification">{formatDateTime(user.updated_at)}</DetailField>
             </div>
           </div>
         </div>

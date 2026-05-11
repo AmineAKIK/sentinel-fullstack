@@ -1444,6 +1444,12 @@ tbody tr:hover .row-action {
   animation: spin 0.6s linear infinite;
 }
 
+.full-page-loader {
+  display: flex;
+  justify-content: center;
+  padding: 64px;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

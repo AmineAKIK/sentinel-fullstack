@@ -1,20 +1,17 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { WORKSHOP_AUTH_COOKIE, setAuthCookie, clearAuthCookie } from '../../auth/authCookies';
+import {
+  sendInvalidServerConfig,
+  sendUnauthenticated,
+} from '../../auth/authResponses';
+import { signAuthToken } from '../../auth/jwt';
 import { sendError } from '../../utils/errors';
 import {
   findActiveWorkshopUserByBadge,
   findActiveWorkshopUserBySession,
   setWorkshopUserPassword,
 } from './workshopAuth.repository';
-
-const COOKIE_NAME = 'sentinel_workshop_token';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
-  maxAge: 8 * 60 * 60 * 1000,
-};
 
 export async function login(req: Request, res: Response): Promise<void> {
   const { badgeNumber, password, newPassword } = req.body;
@@ -58,23 +55,19 @@ export async function login(req: Request, res: Response): Promise<void> {
       }
     }
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      sendError(res, 500, 'SERVER_ERROR', 'Configuration du serveur invalide.');
-      return;
-    }
-
-    const token = jwt.sign(
+    const token = signAuthToken(
       {
         userId: user.id,
         badgeNumber: user.badge_number,
         role: user.role,
-      },
-      secret,
-      { expiresIn: '8h' }
+      }
     );
+    if (!token) {
+      sendInvalidServerConfig(res);
+      return;
+    }
 
-    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+    setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token);
     res.json({
       id: user.id,
       first_name: user.first_name,
@@ -89,17 +82,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 }
 
 export async function logout(_req: Request, res: Response): Promise<void> {
-  res.clearCookie(COOKIE_NAME, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  });
+  clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
   res.json({ message: 'Déconnecté.' });
 }
 
 export async function me(req: Request, res: Response): Promise<void> {
   if (!req.workshopUser) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Non authentifié.');
+    sendUnauthenticated(res);
     return;
   }
 

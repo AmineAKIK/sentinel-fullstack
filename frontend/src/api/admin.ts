@@ -1,5 +1,6 @@
 import { api } from './client';
 import { ReferenceAuditEvent, ReferenceDashboard, ReferenceQuality } from '../types';
+import { buildQuery } from '../utils/query';
 
 export async function getReferenceDashboard(): Promise<ReferenceDashboard> {
   return api.get<ReferenceDashboard>('/api/admin/dashboard');
@@ -20,14 +21,13 @@ export interface ReferenceAuditParams {
 }
 
 export async function listReferenceAudit(params: ReferenceAuditParams = {}): Promise<ReferenceAuditEvent[]> {
-  const queryParams = new URLSearchParams();
-  queryParams.set('scope', params.scope || 'all');
-  queryParams.set('limit', String(params.limit || 250));
-  if (params.taskGroup && params.taskGroup !== 'all') queryParams.set('taskGroup', params.taskGroup);
-  if (params.q) queryParams.set('q', params.q);
-  if (params.start) queryParams.set('start', params.start);
-  if (params.end) queryParams.set('end', params.end);
-  if (params.order) queryParams.set('order', params.order);
-  const query = queryParams.toString();
-  return api.get<ReferenceAuditEvent[]>(`/api/admin/audit?${query}`);
+  return api.get<ReferenceAuditEvent[]>(`/api/admin/audit${buildQuery({
+    scope: params.scope || 'all',
+    limit: params.limit || 250,
+    taskGroup: params.taskGroup && params.taskGroup !== 'all' ? params.taskGroup : undefined,
+    q: params.q,
+    start: params.start,
+    end: params.end,
+    order: params.order,
+  })}`);
 }

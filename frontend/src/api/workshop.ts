@@ -1,4 +1,5 @@
 import { api } from './client';
+import { buildQuery } from '../utils/query';
 import {
   IncidentShift,
   IncidentState,
@@ -44,23 +45,10 @@ export type IncidentWorkspaceParams = {
   limit?: number;
 };
 
-function buildIncidentWorkspaceQuery(params: IncidentWorkspaceParams): string {
-  const query = new URLSearchParams();
-  if (params.q) query.set('q', params.q);
-  if (params.status) query.set('status', params.status);
-  if (params.state) query.set('state', params.state);
-  if (params.lineId) query.set('lineId', String(params.lineId));
-  if (params.machineId) query.set('machineId', params.machineId);
-  if (params.eventType) query.set('eventType', params.eventType);
-  if (params.limit) query.set('limit', String(params.limit));
-  const suffix = query.toString();
-  return suffix ? `?${suffix}` : '';
-}
-
 export async function listWorkshopHistoryIncidents(
   params: IncidentWorkspaceParams = {}
 ): Promise<WorkshopIncident[]> {
-  return api.get<WorkshopIncident[]>(`/api/workshop/history/incidents${buildIncidentWorkspaceQuery(params)}`);
+  return api.get<WorkshopIncident[]>(`/api/workshop/history/incidents${buildQuery(params)}`);
 }
 
 export async function getWorkshopHistoryIncident(id: number): Promise<WorkshopIncident> {
@@ -70,13 +58,13 @@ export async function getWorkshopHistoryIncident(id: number): Promise<WorkshopIn
 export async function listWorkshopHistoryEvents(
   params: IncidentWorkspaceParams = {}
 ): Promise<WorkshopHistoryEvent[]> {
-  return api.get<WorkshopHistoryEvent[]>(`/api/workshop/history/events${buildIncidentWorkspaceQuery(params)}`);
+  return api.get<WorkshopHistoryEvent[]>(`/api/workshop/history/events${buildQuery(params)}`);
 }
 
 export async function listWorkshopKnowledgeIncidents(
   params: IncidentWorkspaceParams = {}
 ): Promise<WorkshopIncident[]> {
-  return api.get<WorkshopIncident[]>(`/api/workshop/knowledge/incidents${buildIncidentWorkspaceQuery(params)}`);
+  return api.get<WorkshopIncident[]>(`/api/workshop/knowledge/incidents${buildQuery(params)}`);
 }
 
 export async function getWorkshopKnowledgeIncident(id: number): Promise<WorkshopIncident> {
@@ -133,11 +121,5 @@ export type AnalyticsParams = {
 };
 
 export async function getWorkshopAnalytics(params: AnalyticsParams): Promise<WorkshopAnalytics> {
-  const query = new URLSearchParams();
-  if (params.start) query.set('start', params.start);
-  if (params.end) query.set('end', params.end);
-  if (params.lineId) query.set('lineId', String(params.lineId));
-  if (params.machineId) query.set('machineId', params.machineId);
-  const suffix = query.toString();
-  return api.get<WorkshopAnalytics>(`/api/workshop/analytics${suffix ? `?${suffix}` : ''}`);
+  return api.get<WorkshopAnalytics>(`/api/workshop/analytics${buildQuery(params)}`);
 }

@@ -1,0 +1,158 @@
+import { describe, it, expect } from 'vitest';
+import { canPerform, WorkshopAction } from '../../utils/workshopPermissions';
+import type { WorkshopIncident } from '../../types';
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function incident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
+  return {
+    id: 1,
+    shift: 'MATIN',
+    line_id: 1,
+    line_number: 'L01',
+    machine_id: 'M01',
+    machine_brand: 'Brand',
+    robot_label: 'R1',
+    head_number: 1,
+    state: 'DEGRADEE',
+    comment: null,
+    current_product: null,
+    is_taken: false,
+    is_priority: false,
+    status: 'OPEN',
+    diagnostic: null,
+    intervention_note: null,
+    responsible_comment: null,
+    edit_request: null,
+    delete_request: false,
+    delete_request_reason: null,
+    taken_by_user_id: null,
+    taken_at: null,
+    taken_by_first_name: null,
+    taken_by_last_name: null,
+    taken_by_role: null,
+    display_order: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    first_name: 'Alice',
+    last_name: 'Dupont',
+    role: 'OPERATOR',
+    ...overrides,
+  };
+}
+
+// ─── undefined role ────────────────────────────────────────────────────────────
+
+describe('canPerform – undefined role', () => {
+  it('returns false for any action', () => {
+    expect(canPerform(undefined, 'take', incident())).toBe(false);
+    expect(canPerform(undefined, 'close', incident())).toBe(false);
+  });
+});
+
+// ─── OPERATOR ─────────────────────────────────────────────────────────────────
+
+describe('OPERATOR permissions', () => {
+  it('can requestEdit on active incident', () => {
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'OPEN' }))).toBe(true);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'PENDING' }))).toBe(true);
+  });
+
+  it('cannot requestEdit on CLOSED or CANCELED', () => {
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'CLOSED' }))).toBe(false);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'CANCELED' }))).toBe(false);
+  });
+
+  it('can requestCancel on open non-taken incident', () => {
+    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: false }))).toBe(true);
+  });
+
+  it('cannot requestCancel when taken', () => {
+    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: true }))).toBe(false);
+  });
+
+  it('cannot directEdit, cancel, take, close', () => {
+    const inc = incident();
+    (['directEdit', 'cancel', 'take', 'close'] as WorkshopAction[]).forEach((action) => {
+      expect(canPerform('OPERATOR', action, inc)).toBe(false);
+    });
+  });
+});
+
+// ─── MAINTENANCE ──────────────────────────────────────────────────────────────
+
+describe('MAINTENANCE permissions', () => {
+  it('can take an open non-taken incident', () => {
+    expect(canPerform('MAINTENANCE', 'take', incident({ status: 'OPEN', is_taken: false }))).toBe(true);
+  });
+
+  it('cannot take an already-taken incident', () => {
+    expect(canPerform('MAINTENANCE', 'take', incident({ is_taken: true }))).toBe(false);
+  });
+
+  it('can setPending when OPEN and taken', () => {
+    expect(canPerform('MAINTENANCE', 'setPending', incident({ status: 'OPEN', is_taken: true }))).toBe(true);
+  });
+
+  it('cannot setPending when not taken', () => {
+    expect(canPerform('MAINTENANCE', 'setPending', incident({ status: 'OPEN', is_taken: false }))).toBe(false);
+  });
+
+  it('can resume when PENDING and taken', () => {
+    expect(canPerform('MAINTENANCE', 'resume', incident({ status: 'PENDING', is_taken: true }))).toBe(true);
+  });
+
+  it('can close when OPEN and taken', () => {
+    expect(canPerform('MAINTENANCE', 'close', incident({ status: 'OPEN', is_taken: true }))).toBe(true);
+  });
+
+  it('cannot close when not taken', () => {
+    expect(canPerform('MAINTENANCE', 'close', incident({ status: 'OPEN', is_taken: false }))).toBe(false);
+  });
+
+  it('can directEdit on active non-taken incident', () => {
+    expect(canPerform('MAINTENANCE', 'directEdit', incident({ is_taken: false }))).toBe(true);
+  });
+});
+
+// ─── RESPONSABLE ──────────────────────────────────────────────────────────────
+
+describe('RESPONSABLE permissions', () => {
+  it('can approveEdit and rejectEdit on active incident', () => {
+    expect(canPerform('RESPONSABLE', 'approveEdit', incident())).toBe(true);
+    expect(canPerform('RESPONSABLE', 'rejectEdit', incident())).toBe(true);
+  });
+
+  it('cannot approveEdit on CLOSED incident', () => {
+    expect(canPerform('RESPONSABLE', 'approveEdit', incident({ status: 'CLOSED' }))).toBe(false);
+  });
+
+  it('can approveCancel when delete_request is true', () => {
+    expect(canPerform('RESPONSABLE', 'approveCancel', incident({ delete_request: true }))).toBe(true);
+  });
+
+  it('cannot approveCancel when delete_request is false', () => {
+    expect(canPerform('RESPONSABLE', 'approveCancel', incident({ delete_request: false }))).toBe(false);
+  });
+
+  it('can rejectCancel on active incident', () => {
+    expect(canPerform('RESPONSABLE', 'rejectCancel', incident())).toBe(true);
+  });
+
+  it('can setPriority, reorder, responsibleComment on active incident', () => {
+    const inc = incident();
+    expect(canPerform('RESPONSABLE', 'setPriority', inc)).toBe(true);
+    expect(canPerform('RESPONSABLE', 'reorder', inc)).toBe(true);
+    expect(canPerform('RESPONSABLE', 'responsibleComment', inc)).toBe(true);
+  });
+
+  it('can invalidateClosed only when CLOSED', () => {
+    expect(canPerform('RESPONSABLE', 'invalidateClosed', incident({ status: 'CLOSED' }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'invalidateClosed', incident({ status: 'OPEN' }))).toBe(false);
+  });
+
+  it('cannot take or close', () => {
+    expect(canPerform('RESPONSABLE', 'take', incident())).toBe(false);
+    expect(canPerform('RESPONSABLE', 'close', incident({ status: 'OPEN', is_taken: true }))).toBe(false);
+  });
+});

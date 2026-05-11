@@ -8,16 +8,13 @@ import EditMachineModal from '../components/EditMachineModal';
 import LinePlanModal from '../components/LinePlanModal';
 import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import DetailField from '../components/ui/DetailField';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import Spinner from '../components/ui/Spinner';
 import { listLines } from '../api/lines';
 import { LineMachine, ProductionLine } from '../types';
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
+import { formatDate } from '../utils/date';
 
 function robotLabel(machine: LineMachine): string {
   if (machine.hasDoubleRobot) {
@@ -170,31 +167,19 @@ export default function LinesPage() {
             </div>
           )}
 
-          {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+          {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
           <div className="card">
             <div className="card-body">
               <div className="detail-grid" style={{ marginBottom: 20 }}>
-                <div className="detail-field">
-                  <span className="detail-field-label">Numéro de ligne</span>
-                  <span className="detail-field-value">{selected.line_number}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Machines</span>
-                  <span className="detail-field-value">{selected.machines.length}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Statut</span>
-                  <span className="detail-field-value">
-                    <span className={`badge-status ${selected.is_active ? 'active' : 'inactive'}`}>
-                      {selected.is_active ? 'Actif' : 'Inactif'}
-                    </span>
+                <DetailField label="Numéro de ligne">{selected.line_number}</DetailField>
+                <DetailField label="Machines">{selected.machines.length}</DetailField>
+                <DetailField label="Statut">
+                  <span className={`badge-status ${selected.is_active ? 'active' : 'inactive'}`}>
+                    {selected.is_active ? 'Actif' : 'Inactif'}
                   </span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Date de création</span>
-                  <span className="detail-field-value">{formatDate(selected.created_at)}</span>
-                </div>
+                </DetailField>
+                <DetailField label="Date de création">{formatDate(selected.created_at)}</DetailField>
               </div>
 
               <div className="notice" style={{ marginBottom: 16 }}>
@@ -347,12 +332,12 @@ export default function LinesPage() {
         <div className="card">
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-              <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }} />
+              <Spinner size={24} borderWidth={3} />
             </div>
           ) : error ? (
-            <div className="error-message" style={{ margin: 20 }}>{error}</div>
+            <ErrorBanner style={{ margin: 20 }}>{error}</ErrorBanner>
           ) : filteredLines.length === 0 ? (
-            <div className="empty-state">Aucune ligne trouvée.</div>
+            <EmptyState>Aucune ligne trouvée.</EmptyState>
           ) : (
             <div className="table-wrapper">
               <table>

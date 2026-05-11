@@ -1,4 +1,4 @@
-import { ErrorCode } from '../../utils/errors';
+import { badRequest, ServiceResult } from '../../utils/serviceResult';
 import { createLineAuditEvent } from './lines.events';
 import { getLineEventType } from './lines.policy';
 import {
@@ -16,14 +16,6 @@ import {
   updateLineData,
 } from './lines.repository';
 import { CreateLineInput, UpdateLineInput } from './lines.validation';
-
-export type ServiceResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; code: ErrorCode; message: string };
-
-export function badRequest(message: string): ServiceResult<never> {
-  return { ok: false, status: 400, code: 'VALIDATION_ERROR', message };
-}
 
 export async function listLinesService(): Promise<LineDto[]> {
   return listLinesData();

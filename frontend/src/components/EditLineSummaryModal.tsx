@@ -4,7 +4,7 @@ import { updateLine } from '../api/lines';
 import { ApiResponseError } from '../api/client';
 import { ProductionLine } from '../types';
 import { LineFormData } from './LineForm';
-import { normalizeLineMachine } from './CreateLineModal';
+import { normalizeLineMachine } from '../utils/lineMachines';
 
 interface EditLineSummaryModalProps {
   line: ProductionLine;

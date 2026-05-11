@@ -1,0 +1,25 @@
+import jwt from 'jsonwebtoken';
+
+export type JwtExpiresIn = '8h';
+
+export function getJwtSecret(): string | null {
+  return process.env.JWT_SECRET || null;
+}
+
+export function signAuthToken(payload: object, expiresIn: JwtExpiresIn = '8h'): string | null {
+  const secret = getJwtSecret();
+  if (!secret) return null;
+
+  return jwt.sign(payload, secret, { expiresIn });
+}
+
+export function verifyAuthToken<TPayload>(token: string): TPayload | null {
+  const secret = getJwtSecret();
+  if (!secret) return null;
+
+  return jwt.verify(token, secret) as TPayload;
+}
+
+export function isJwtSessionError(err: unknown): boolean {
+  return err instanceof jwt.JsonWebTokenError || err instanceof jwt.TokenExpiredError;
+}

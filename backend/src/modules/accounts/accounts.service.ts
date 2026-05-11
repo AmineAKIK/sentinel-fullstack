@@ -1,4 +1,4 @@
-import { ErrorCode } from '../../utils/errors';
+import { badRequest, ServiceResult } from '../../utils/serviceResult';
 import { createAccountAuditEvent } from './accounts.events';
 import {
   accountBadgeExists,
@@ -16,14 +16,6 @@ import {
   updateAccountData,
 } from './accounts.repository';
 import { CreateAccountInput, UpdateAccountInput } from './accounts.validation';
-
-export type ServiceResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; code: ErrorCode; message: string };
-
-export function badRequest(message: string): ServiceResult<never> {
-  return { ok: false, status: 400, code: 'VALIDATION_ERROR', message };
-}
 
 export async function listAccountsService(filters: ListAccountsFilters): Promise<AccountDto[]> {
   return listAccountsData(filters);

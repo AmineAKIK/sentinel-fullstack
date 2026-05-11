@@ -1,4 +1,6 @@
 import pool from '../../db/pool';
+import { statusInSql } from '../../db/sql';
+import { ACTIVE_INCIDENT_STATUSES } from '../../domain/constants';
 import { CreateLineInput, UpdateLineInput } from './lines.validation';
 
 export interface LineMachineDto {
@@ -135,7 +137,7 @@ export async function getLineImpactData(id: number): Promise<LineImpactDto> {
   const { rows } = await pool.query<LineImpactDto>(
     `SELECT
        COUNT(*)::int AS incidents,
-       COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING'))::int AS open_or_pending_incidents
+       COUNT(*) FILTER (WHERE ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)})::int AS open_or_pending_incidents
      FROM workshop_incidents
      WHERE line_id = $1`,
     [id]
@@ -170,7 +172,7 @@ export async function getActiveIncidentCountForLine(lineId: number): Promise<num
   const { rows } = await pool.query<{ count: number }>(
     `SELECT COUNT(*)::int AS count
      FROM workshop_incidents
-     WHERE line_id = $1 AND status IN ('OPEN', 'PENDING')`,
+     WHERE line_id = $1 AND ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)}`,
     [lineId]
   );
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
 import { resetAccountPassword } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
 import { SentinelUser } from '../types';
@@ -31,24 +31,15 @@ export default function ResetPasswordConfirmModal({
   }
 
   return (
-    <Modal
+    <ConfirmModal
       title="Réinitialiser le mot de passe"
-      onClose={loading ? undefined : onClose}
+      onClose={onClose}
       closeOnOverlay={!user.has_password}
-      isLoading={loading}
       variant={user.has_password ? 'danger' : 'default'}
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
-            Annuler
-          </button>
-          {user.has_password && (
-            <button className="btn btn-danger" onClick={handleConfirm} disabled={loading}>
-              {loading ? <><span className="spinner" /> Réinitialisation…</> : 'Confirmer'}
-            </button>
-          )}
-        </>
-      }
+      onConfirm={user.has_password ? handleConfirm : undefined}
+      loading={loading}
+      loadingLabel="Réinitialisation…"
+      error={error}
     >
       {user.has_password ? (
         <>
@@ -64,7 +55,6 @@ export default function ResetPasswordConfirmModal({
           Aucun mot de passe n'est défini pour cet utilisateur.
         </div>
       )}
-      {error && <div className="error-message">{error}</div>}
-    </Modal>
+    </ConfirmModal>
   );
 }

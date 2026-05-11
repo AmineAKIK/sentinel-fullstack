@@ -3,18 +3,22 @@ import Modal from './Modal';
 import { LineMachine, ProductionLine } from '../types';
 import { ApiResponseError } from '../api/client';
 import { checkLineConflicts, updateLine } from '../api/lines';
-import { normalizeLineMachine } from './CreateLineModal';
+import DetailField from './ui/DetailField';
+import ErrorBanner from './ui/ErrorBanner';
+import Spinner from './ui/Spinner';
+import {
+  emptyToString,
+  machineRobotSummary,
+  normalizeLineMachine,
+  switchMachineRobotMode,
+  validateMachineAgainstLine,
+} from '../utils/lineMachines';
 
 interface EditMachineModalProps {
   line: ProductionLine;
   machineIndex: number;
   onClose: () => void;
   onSuccess: (line: ProductionLine) => void;
-}
-
-function emptyToString(value: number | undefined): string {
-  if (!value) return '';
-  return String(value);
 }
 
 export default function EditMachineModal({
@@ -31,24 +35,7 @@ export default function EditMachineModal({
 
   function updateField(field: string, value: string | number | boolean) {
     if (field === 'hasDoubleRobot') {
-      const next: LineMachine = value
-        ? {
-            machineId: form.machineId,
-            brand: form.brand,
-            hasDoubleRobot: true,
-            leftRobotNumber: '',
-            leftRobotHeads: 0,
-            rightRobotNumber: '',
-            rightRobotHeads: 0,
-          }
-        : {
-            machineId: form.machineId,
-            brand: form.brand,
-            hasDoubleRobot: false,
-            robotNumber: '',
-            robotHeads: 0,
-          };
-      setForm(next);
+      setForm(switchMachineRobotMode(form, Boolean(value)));
       return;
     }
 
@@ -56,29 +43,7 @@ export default function EditMachineModal({
   }
 
   function validate(): string[] {
-    const issues: string[] = [];
-
-    if (!form.machineId.trim()) issues.push('L\'ID machine est obligatoire.');
-    if (!form.brand.trim()) issues.push('La marque est obligatoire.');
-
-    if (form.hasDoubleRobot) {
-      if (!form.leftRobotNumber.trim()) issues.push('Le robot gauche est obligatoire.');
-      if (!form.rightRobotNumber.trim()) issues.push('Le robot droit est obligatoire.');
-      if (form.leftRobotHeads < 1 || form.rightRobotHeads < 1) {
-        issues.push('Le nombre de têtes doit être positif.');
-      }
-    } else {
-      if (!form.robotNumber.trim()) issues.push('Le numéro de robot est obligatoire.');
-      if (form.robotHeads < 1) issues.push('Le nombre de têtes doit être positif.');
-    }
-
-    const normalizedId = form.machineId.trim().toLowerCase();
-    const duplicate = line.machines.some((machine, index) =>
-      index !== machineIndex && machine.machineId.trim().toLowerCase() === normalizedId
-    );
-    if (duplicate) issues.push('L\'ID machine existe déjà sur cette ligne.');
-
-    return issues;
+    return validateMachineAgainstLine(form, line.machines, machineIndex);
   }
 
   async function handlePreview() {
@@ -165,7 +130,7 @@ export default function EditMachineModal({
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
-              {loading ? <><span className="spinner" /> Enregistrement…</> : 'Confirmer'}
+              {loading ? <><Spinner /> Enregistrement…</> : 'Confirmer'}
             </button>
           </>
         ) : (
@@ -182,22 +147,11 @@ export default function EditMachineModal({
     >
       {step === 'preview' ? (
         <div className="detail-grid">
-          <div className="detail-field">
-            <span className="detail-field-label">ID machine</span>
-            <span className="detail-field-value">{form.machineId}</span>
-          </div>
-          <div className="detail-field">
-            <span className="detail-field-label">Marque</span>
-            <span className="detail-field-value">{form.brand}</span>
-          </div>
-          <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
-            <span className="detail-field-label">Configuration robot</span>
-            <span className="detail-field-value">
-              {form.hasDoubleRobot
-                ? `Double robot · Gauche ${form.leftRobotNumber} (${form.leftRobotHeads} têtes) · Droite ${form.rightRobotNumber} (${form.rightRobotHeads} têtes)`
-                : `Robot unique · ${form.robotNumber} (${form.robotHeads} têtes)`}
-            </span>
-          </div>
+          <DetailField label="ID machine">{form.machineId}</DetailField>
+          <DetailField label="Marque">{form.brand}</DetailField>
+          <DetailField label="Configuration robot" style={{ gridColumn: '1 / -1' }}>
+            {machineRobotSummary(form)}
+          </DetailField>
         </div>
       ) : (
         <>
@@ -332,11 +286,11 @@ export default function EditMachineModal({
               </div>
             </div>
           )}
-          {fieldError && <div className="error-message">{fieldError}</div>}
-          {error && <div className="error-message">{error}</div>}
+          {fieldError && <ErrorBanner>{fieldError}</ErrorBanner>}
+          {error && <ErrorBanner>{error}</ErrorBanner>}
         </>
       )}
-      {step === 'preview' && error && <div className="error-message">{error}</div>}
+      {step === 'preview' && error && <ErrorBanner>{error}</ErrorBanner>}
     </Modal>
   );
 }

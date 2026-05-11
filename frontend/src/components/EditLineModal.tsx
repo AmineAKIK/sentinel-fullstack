@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Modal from './Modal';
 import LineForm, { LineFormData } from './LineForm';
 import { ProductionLine } from '../types';
-import { normalizeLineMachine, validateLineForm } from './CreateLineModal';
+import { normalizeLineMachine, validateLineForm } from '../utils/lineMachines';
 import EditLineSummaryModal from './EditLineSummaryModal';
 
 interface EditLineModalProps {
@@ -39,9 +39,9 @@ export default function EditLineModal({ line, onClose, onSuccess }: EditLineModa
       onClose();
       return;
     }
-    const validationError = validateLineForm(form);
-    if (validationError) {
-      setError(validationError);
+    const validationIssues = validateLineForm(form);
+    if (validationIssues.length > 0) {
+      setError(validationIssues.length > 1 ? 'Merci de compléter les champs obligatoires.' : validationIssues[0]);
       return;
     }
 

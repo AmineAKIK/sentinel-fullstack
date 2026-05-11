@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getWorkshopHistoryIncident,
-  IncidentWorkspaceParams,
   listIncidentEvents,
   listWorkshopHistoryEvents,
   listWorkshopHistoryIncidents,
   listWorkshopLines,
 } from '../api/workshop';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopHistoryEvent, WorkshopIncident, WorkshopIncidentEvent } from '../types';
 import {
@@ -19,6 +20,16 @@ import {
   STATE_LABELS,
   STATUS_LABELS,
 } from '../utils/workshopHistory';
+import {
+  buildIncidentWorkspaceParams,
+  getWorkshopMachineOptions,
+  lineFilterChip,
+  machineFilterChip,
+  searchFilterChip,
+  stateFilterChip,
+  withWorkshopLineFilter,
+  withWorkshopUrlFilter,
+} from '../utils/workshopFilters';
 
 type HistoryStatusFilter = 'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
 
@@ -54,12 +65,14 @@ export default function WorkshopHistoryPage() {
   }, []);
 
   useEffect(() => {
-    const params: IncidentWorkspaceParams = { limit: 250 };
-    if (query.trim()) params.q = query.trim();
-    if (statusFilter !== 'all') params.status = statusFilter;
-    if (stateFilter !== 'all') params.state = stateFilter as IncidentWorkspaceParams['state'];
-    if (lineFilter !== 'all') params.lineId = Number(lineFilter);
-    if (machineFilter !== 'all') params.machineId = machineFilter;
+    const params = buildIncidentWorkspaceParams({
+      query,
+      statusFilter,
+      stateFilter,
+      lineFilter,
+      machineFilter,
+      limit: 250,
+    });
 
     setLoading(true);
     setError('');
@@ -96,13 +109,15 @@ export default function WorkshopHistoryPage() {
   }, [searchParams, incidents]);
 
   useEffect(() => {
-    const params: IncidentWorkspaceParams = { limit: 80 };
-    if (query.trim()) params.q = query.trim();
-    if (statusFilter !== 'all') params.status = statusFilter;
-    if (stateFilter !== 'all') params.state = stateFilter as IncidentWorkspaceParams['state'];
-    if (lineFilter !== 'all') params.lineId = Number(lineFilter);
-    if (machineFilter !== 'all') params.machineId = machineFilter;
-    if (eventTypeFilter !== 'all') params.eventType = eventTypeFilter;
+    const params = buildIncidentWorkspaceParams({
+      query,
+      statusFilter,
+      stateFilter,
+      lineFilter,
+      machineFilter,
+      eventTypeFilter,
+      limit: 80,
+    });
 
     setHistoryEventsLoading(true);
     listWorkshopHistoryEvents(params)
@@ -123,23 +138,15 @@ export default function WorkshopHistoryPage() {
       .finally(() => setEventsLoading(false));
   }, [selectedId]);
 
-  const machineOptions = useMemo(() => {
-    const line = lines.find((item) => String(item.id) === lineFilter);
-    if (!line) return [];
-    return line.machines.map((machine) => ({ id: machine.machineId, label: machine.machineId }));
-  }, [lineFilter, lines]);
+  const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
 
   const selectedIncident = incidents.find((incident) => String(incident.id) === selectedId);
   const eventTypeOptions = Object.entries(EVENT_LABELS);
   const filterChips: FilterChip[] = [
-    ...(query.trim() ? [{
-      key: 'search',
-      label: `Recherche: ${query.trim()}`,
-      onRemove: () => {
-        setQuery('');
-        updateSearchFilter('q', '', '');
-      },
-    }] : []),
+    ...searchFilterChip(query, () => {
+      setQuery('');
+      updateSearchFilter('q', '', '');
+    }),
     ...(statusFilter !== 'all' ? [{
       key: 'status',
       label: `Statut: ${STATUS_LABELS[statusFilter] || statusFilter}`,
@@ -148,27 +155,15 @@ export default function WorkshopHistoryPage() {
         updateSearchFilter('status', 'all');
       },
     }] : []),
-    ...(lineFilter !== 'all' ? [{
-      key: 'line',
-      label: `Ligne ${lines.find((line) => String(line.id) === lineFilter)?.line_number || lineFilter}`,
-      onRemove: () => updateLineFilter('all'),
-    }] : []),
-    ...(machineFilter !== 'all' ? [{
-      key: 'machine',
-      label: `Machine ${machineFilter}`,
-      onRemove: () => {
-        setMachineFilter('all');
-        updateSearchFilter('machine', 'all');
-      },
-    }] : []),
-    ...(stateFilter !== 'all' ? [{
-      key: 'state',
-      label: `Anomalie: ${STATE_LABELS[stateFilter] || stateFilter}`,
-      onRemove: () => {
-        setStateFilter('all');
-        updateSearchFilter('state', 'all');
-      },
-    }] : []),
+    ...lineFilterChip(lines, lineFilter, () => updateLineFilter('all')),
+    ...machineFilterChip(machineFilter, () => {
+      setMachineFilter('all');
+      updateSearchFilter('machine', 'all');
+    }),
+    ...stateFilterChip(stateFilter, () => {
+      setStateFilter('all');
+      updateSearchFilter('state', 'all');
+    }),
   ];
   const eventFilterChips: FilterChip[] = [
     ...(eventTypeFilter !== 'all' ? [{
@@ -193,20 +188,13 @@ export default function WorkshopHistoryPage() {
   }
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
-    const nextParams = new URLSearchParams(searchParams);
-    if (!value || value === fallback) nextParams.delete(name);
-    else nextParams.set(name, value);
-    setSearchParams(nextParams);
+    setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
   }
 
   function updateLineFilter(value: string): void {
     setLineFilter(value);
     setMachineFilter('all');
-    const nextParams = new URLSearchParams(searchParams);
-    if (value === 'all') nextParams.delete('line');
-    else nextParams.set('line', value);
-    nextParams.delete('machine');
-    setSearchParams(nextParams);
+    setSearchParams(withWorkshopLineFilter(searchParams, value));
   }
 
   function clearFilters(): void {
@@ -253,7 +241,7 @@ export default function WorkshopHistoryPage() {
           <h1>Historique atelier</h1>
         </div>
 
-        {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-body">
@@ -354,9 +342,9 @@ export default function WorkshopHistoryPage() {
               </div>
               <div className="history-incident-list">
                 {loading ? (
-                  <div className="empty-state">Chargement...</div>
+                  <EmptyState>Chargement...</EmptyState>
                 ) : incidents.length === 0 ? (
-                  <div className="empty-state">Aucun incident.</div>
+                  <EmptyState>Aucun incident.</EmptyState>
                 ) : (
                   incidents.map((incident) => (
                     <button
@@ -445,9 +433,9 @@ export default function WorkshopHistoryPage() {
                   </div>
 
                   {eventsLoading ? (
-                    <div className="empty-state">Chargement de la trace...</div>
+                    <EmptyState>Chargement de la trace...</EmptyState>
                   ) : events.length === 0 ? (
-                    <div className="empty-state">Aucune trace pour cet incident.</div>
+                    <EmptyState>Aucune trace pour cet incident.</EmptyState>
                   ) : (
                     <div className="timeline-list">
                       {events.map((event) => {
@@ -467,7 +455,7 @@ export default function WorkshopHistoryPage() {
                   )}
                 </>
               ) : (
-                <div className="empty-state">Sélectionnez un incident.</div>
+                <EmptyState>Sélectionnez un incident.</EmptyState>
               )}
             </div>
           </div>
