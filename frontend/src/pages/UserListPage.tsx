@@ -206,6 +206,15 @@ export default function UserListPage() {
                     <tr
                       key={user.id}
                       onClick={() => navigate(`/admin/users/${user.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          navigate(`/admin/users/${user.id}`);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Voir la fiche utilisateur ${user.first_name} ${user.last_name}`}
                       title="Voir la fiche"
                     >
                       <td>

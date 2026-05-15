@@ -55,12 +55,13 @@ async function authenticateWorkshopRequest(
       return;
     }
     const { rows } = await pool.query(
-      `SELECT id, badge_number, role, password_hash
+      `SELECT id, badge_number, role
        FROM sentinel_users
        WHERE id = $1
          AND badge_number = $2
          AND is_active = TRUE
-         AND is_deleted = FALSE`,
+         AND is_deleted = FALSE
+         AND password_hash IS NOT NULL`,
       [payload.userId, payload.badgeNumber]
     );
 
@@ -71,12 +72,6 @@ async function authenticateWorkshopRequest(
     }
 
     const user = rows[0];
-    if (!user.password_hash) {
-      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
-      sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe à réinitialiser.');
-      return;
-    }
-
     req.workshopUser = {
       userId: user.id,
       badgeNumber: user.badge_number,
@@ -90,6 +85,6 @@ async function authenticateWorkshopRequest(
       return;
     }
     console.error('Workshop auth middleware error:', err);
-    sendInvalidSession(res);
+    sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');
   }
 }

@@ -1,8 +1,10 @@
 import { badRequest, forbidden, notFound, ServiceResult } from '../../utils/serviceResult';
-import { logIncidentEvent } from './workshop.events';
+import { withTransaction } from '../../db/transaction';
+import { logIncidentEvent, IncidentEventType } from './workshop.events';
 import { canPerform } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
+import type { ReorderIncidentsInput } from './workshop.validation';
 
 function requestedChangeKeys(changes: Record<string, unknown> | null | undefined): string[] {
   if (!changes) return [];
@@ -48,8 +50,22 @@ export async function listWorkshopLinesService() {
   return workshopRepository.listActiveWorkshopLines();
 }
 
-export async function listIncidentsService() {
-  return workshopRepository.listIncidents();
+async function fetchIncidentForActor(incidentId: number, actorUserId: number) {
+  return workshopRepository.fetchIncidentWithUsersForActor(incidentId, actorUserId);
+}
+
+async function autoFollowForResponsable(
+  incidentId: number,
+  actorUserId: number,
+  actorRole: string,
+  client: Parameters<typeof workshopRepository.followIncidentData>[2]
+): Promise<void> {
+  if (actorRole !== 'RESPONSABLE') return;
+  await workshopRepository.followIncidentData(incidentId, actorUserId, client);
+}
+
+export async function listIncidentsService(userId: number, role: string) {
+  return workshopRepository.listIncidents(userId, role);
 }
 
 export async function listHistoryIncidentsService(query: Record<string, unknown>) {
@@ -91,8 +107,8 @@ export async function listIncidentEventsService(id: number) {
   return workshopRepository.listIncidentEvents(id);
 }
 
-export async function getIncidentMetricsService() {
-  return workshopRepository.getIncidentMetrics();
+export async function getIncidentMetricsService(userId: number) {
+  return workshopRepository.getIncidentMetrics(userId);
 }
 
 export async function getWorkshopAnalyticsService(query: Record<string, unknown>) {
@@ -121,42 +137,99 @@ export async function createIncidentService(
     return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'Tête invalide pour ce robot.' };
   }
 
-  const incidentId = await workshopRepository.createIncidentData({
-    actorUserId,
-    data,
-    line,
-    machine,
-    robotLabel: robot.label,
+  const incidentId = await withTransaction(async (client) => {
+    const id = await workshopRepository.createIncidentData({
+      actorUserId,
+      data,
+      line,
+      machine,
+      robotLabel: robot.label,
+    }, client);
+    await logIncidentEvent(id, actorUserId, 'INCIDENT_CREATED', {
+      shift: data.shift,
+      lineNumber: line.line_number,
+      machineId: machine.machineId,
+      robotLabel: robot.label,
+      headNumber: data.headNumber,
+      state: data.state,
+      hasComment: Boolean(data.comment?.trim()),
+      hasCurrentProduct: Boolean(data.currentProduct?.trim()),
+    }, client);
+    return id;
   });
 
-  await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_CREATED', {
-    shift: data.shift,
-    lineNumber: line.line_number,
-    machineId: machine.machineId,
-    robotLabel: robot.label,
-    headNumber: data.headNumber,
-    state: data.state,
-    hasComment: Boolean(data.comment?.trim()),
-    hasCurrentProduct: Boolean(data.currentProduct?.trim()),
-  });
-
-  return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+  return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
 }
 
-export async function deleteIncidentService(
+export async function followIncidentService(
+  incidentId: number,
+  actorUserId: number,
+  actorRole: string
+): Promise<ServiceResult<unknown>> {
+  if (actorRole !== 'RESPONSABLE') {
+    return forbidden('Seul le responsable peut suivre un incident.');
+  }
+  if (!(await workshopRepository.incidentExists(incidentId))) {
+    return notFound('Incident introuvable.');
+  }
+
+  await withTransaction(async (client) => {
+    await workshopRepository.followIncidentData(incidentId, actorUserId, client);
+    await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client);
+  });
+
+  return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
+}
+
+export async function unfollowIncidentService(
+  incidentId: number,
+  actorUserId: number,
+  actorRole: string
+): Promise<ServiceResult<unknown>> {
+  if (actorRole !== 'RESPONSABLE') {
+    return forbidden('Seul le responsable peut retirer un suivi.');
+  }
+  if (!(await workshopRepository.incidentExists(incidentId))) {
+    return notFound('Incident introuvable.');
+  }
+
+  await withTransaction(async (client) => {
+    await workshopRepository.unfollowIncidentData(incidentId, actorUserId, client);
+    await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_UNFOLLOWED', {}, client);
+  });
+
+  return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
+}
+
+export async function cancelIncidentService(
   incidentId: number,
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<{ message: string }>> {
-  const incident = await workshopRepository.getIncidentCancelSnapshot(incidentId);
-  if (!incident) {
+  const result = await withTransaction(async (client) => {
+    const incident = await workshopRepository.getIncidentCancelSnapshot(incidentId, client);
+    if (!incident) return { kind: 'not_found' as const };
+
+    const action = actorRole === 'RESPONSABLE' && canPerform(actorRole, 'APPROVE_CANCEL', incident)
+      ? 'APPROVE_CANCEL'
+      : 'CANCEL';
+    if (!canPerform(actorRole, action, incident)) {
+      return { kind: 'forbidden' as const };
+    }
+    const ok = await workshopRepository.cancelIncidentData(incidentId, client);
+    if (!ok) return { kind: 'not_found' as const };
+    await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_CANCELED', {
+      mode: action === 'APPROVE_CANCEL' ? 'request_approved' : 'direct',
+      requestedReason: incident.cancel_request_reason ?? incident.delete_request_reason,
+      previousStatus: incident.status,
+    }, client);
+    return { kind: 'ok' as const };
+  });
+
+  if (result.kind === 'not_found') {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Incident introuvable.' };
   }
-
-  const action = actorRole === 'RESPONSABLE' && incident.delete_request
-    ? 'APPROVE_CANCEL'
-    : 'CANCEL';
-  if (!canPerform(actorRole, action, incident)) {
+  if (result.kind === 'forbidden') {
     return {
       ok: false,
       status: 403,
@@ -164,16 +237,6 @@ export async function deleteIncidentService(
       message: 'Annulation non autorisée pour ce rôle ou ce statut.',
     };
   }
-
-  if (!(await workshopRepository.cancelIncidentData(incidentId))) {
-    return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Incident introuvable.' };
-  }
-
-  await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_CANCELED', {
-    mode: action === 'APPROVE_CANCEL' ? 'request_approved' : 'direct',
-    requestedReason: incident.delete_request_reason,
-    previousStatus: incident.status,
-  });
 
   return { ok: true, data: { message: 'Incident annulé.' } };
 }
@@ -185,71 +248,107 @@ export async function updateIncidentService(
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
   const current = await workshopRepository.getIncidentById(id);
-  if (!current) {
-    return notFound('Incident introuvable.');
-  }
+  if (!current) return notFound('Incident introuvable.');
 
-  const role = actorRole;
+  const wantsCancelRequest = updates.cancelRequest === true || updates.deleteRequest === true;
+  const cancelRequestReason = updates.cancelRequestReason ?? updates.deleteRequestReason;
 
-  if (updates.deleteRequest) {
-    if (!canPerform(role, 'REQUEST_CANCEL', current)) {
-      return forbidden('Demande d’annulation non autorisée pour ce rôle ou ce statut.');
+  if (wantsCancelRequest) {
+    if (!canPerform(actorRole, 'REQUEST_CANCEL', current)) {
+      return forbidden(`Demande d'annulation non autorisée pour ce rôle ou ce statut.`);
     }
-    if (!updates.deleteRequestReason?.trim()) {
-      return badRequest('Motif obligatoire pour l’annulation.');
+    if (!cancelRequestReason?.trim()) {
+      return badRequest(`Motif obligatoire pour l'annulation.`);
     }
-    const incidentId = await workshopRepository.requestCancelIncident(id, updates.deleteRequestReason.trim());
-    await logIncidentEvent(id, actorUserId, 'CANCEL_REQUESTED', {
-      reason: updates.deleteRequestReason.trim(),
-      status: current.status,
+    const incidentId = await withTransaction(async (client) => {
+      const locked = await workshopRepository.getIncidentById(id, client);
+      if (!locked) return null;
+      if (!canPerform(actorRole, 'REQUEST_CANCEL', locked)) return 'forbidden';
+      const rid = await workshopRepository.requestCancelIncident(id, cancelRequestReason.trim(), client);
+      if (!rid) return null;
+      await logIncidentEvent(id, actorUserId, 'CANCEL_REQUESTED', {
+        reason: cancelRequestReason.trim(),
+        status: locked.status,
+      }, client);
+      return rid;
     });
-    return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+    if (incidentId === 'forbidden') return forbidden(`Demande d'annulation non autorisée pour ce rôle ou ce statut.`);
+    if (!incidentId) return notFound('Incident introuvable.');
+    return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
   }
 
-  if (role === 'OPERATOR') {
+  if (actorRole === 'OPERATOR') {
     if (updates.requestOnly) {
-      if (!canPerform(role, 'REQUEST_EDIT', current)) {
-        return forbidden('Demande de correction non autorisée pour ce statut.');
+      if (!canPerform(actorRole, 'REQUEST_EDIT', current)) {
+        return forbidden(`Demande de correction non autorisée pour ce statut.`);
       }
-      const { requestOnly, deleteRequest, deleteRequestReason, ...editPayload } = updates;
+      const {
+        requestOnly,
+        deleteRequest,
+        deleteRequestReason,
+        cancelRequest,
+        cancelRequestReason,
+        ...editPayload
+      } = updates;
       if (Object.keys(editPayload).length === 0) {
         return badRequest('Aucune modification demandée.');
       }
-      const incidentId = await workshopRepository.requestEditIncident(id, editPayload);
-      await logIncidentEvent(id, actorUserId, 'EDIT_REQUESTED', {
-        changes: editPayload,
-        fields: requestedChangeKeys(editPayload),
+      const incidentId = await withTransaction(async (client) => {
+        const rid = await workshopRepository.requestEditIncident(id, editPayload, client);
+        if (!rid) return null;
+        await logIncidentEvent(id, actorUserId, 'EDIT_REQUESTED', {
+          changes: editPayload,
+          fields: requestedChangeKeys(editPayload),
+        }, client);
+        return rid;
       });
-      return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+      if (!incidentId) return notFound('Incident introuvable.');
+      return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
     }
-    return forbidden('Modification directe non autorisée pour ce rôle.');
+    return forbidden(`Modification directe non autorisée pour ce rôle.`);
   }
 
   if (updates.rejectEditRequest) {
-    if (!canPerform(role, 'REJECT_EDIT', current)) {
-      return forbidden('Seul le responsable peut refuser une correction.');
+    if (!canPerform(actorRole, 'REJECT_EDIT', current)) {
+      return forbidden(`Seul le responsable peut refuser une correction.`);
     }
-    const incidentId = await workshopRepository.rejectEditIncident(id);
-    await logIncidentEvent(id, actorUserId, 'EDIT_REJECTED', {
-      rejectedFields: requestedChangeKeys(current.edit_request as Record<string, unknown> | null),
+    if (!current.edit_request) {
+      return badRequest('Aucune demande de modification à refuser.');
+    }
+    const incidentId = await withTransaction(async (client) => {
+      const rid = await workshopRepository.rejectEditIncident(id, client);
+      if (!rid) return null;
+      await logIncidentEvent(id, actorUserId, 'EDIT_REJECTED', {
+        rejectedFields: requestedChangeKeys(current.edit_request as Record<string, unknown> | null),
+      }, client);
+      return rid;
     });
-    return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+    if (!incidentId) return notFound('Incident introuvable.');
+    return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
   }
 
   if (updates.rejectDeleteRequest) {
-    if (!canPerform(role, 'REJECT_CANCEL', current)) {
-      return forbidden('Seul le responsable peut refuser une annulation.');
+    if (!canPerform(actorRole, 'REJECT_CANCEL', current)) {
+      return forbidden(`Seul le responsable peut refuser une annulation.`);
     }
-    const incidentId = await workshopRepository.rejectCancelIncident(id);
-    await logIncidentEvent(id, actorUserId, 'CANCEL_REQUEST_REJECTED', {
-      requestedReason: current.delete_request_reason,
+    if (!current.cancel_request) {
+      return badRequest(`Aucune demande d'annulation à refuser.`);
+    }
+    const incidentId = await withTransaction(async (client) => {
+      const rid = await workshopRepository.rejectCancelIncident(id, client);
+      if (!rid) return null;
+      await logIncidentEvent(id, actorUserId, 'CANCEL_REQUEST_REJECTED', {
+        requestedReason: current.cancel_request_reason,
+      }, client);
+      return rid;
     });
-    return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+    if (!incidentId) return notFound('Incident introuvable.');
+    return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
   }
 
   if (updates.applyEditRequest) {
-    if (!canPerform(role, 'APPROVE_EDIT', current)) {
-      return forbidden('Seul le responsable peut appliquer une correction.');
+    if (!canPerform(actorRole, 'APPROVE_EDIT', current)) {
+      return forbidden(`Seul le responsable peut appliquer une correction.`);
     }
     if (!current.edit_request) {
       return badRequest('Aucune demande de modification à appliquer.');
@@ -270,53 +369,65 @@ export async function updateIncidentService(
       return badRequest('Sélection ligne/machine/robot/tête invalide.');
     }
 
-    const incidentId = await workshopRepository.applyEditRequestIncident({
-      incidentId: id,
-      current,
-      requested,
-      selection,
+    const incidentId = await withTransaction(async (client) => {
+      const rid = await workshopRepository.applyEditRequestIncident({
+        incidentId: id,
+        current,
+        requested,
+        selection,
+      }, client);
+      if (!rid) return null;
+      await logIncidentEvent(id, actorUserId, 'EDIT_APPLIED', {
+        changes: requested,
+        fields: requestedChangeKeys(requested),
+      }, client);
+      await autoFollowForResponsable(id, actorUserId, actorRole, client);
+      return rid;
     });
-    await logIncidentEvent(id, actorUserId, 'EDIT_APPLIED', {
-      changes: requested,
-      fields: requestedChangeKeys(requested),
-    });
-    return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+    if (!incidentId) return notFound('Incident introuvable.');
+    return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
   }
 
-  if (updates.isTaken !== undefined && !canPerform(role, 'TAKE', current)) {
-    return forbidden('Prise en charge non autorisée pour ce rôle ou ce statut.');
+  if (updates.isTaken !== undefined && !canPerform(actorRole, 'TAKE', current)) {
+    return forbidden(`Prise en charge non autorisée pour ce rôle ou ce statut.`);
   }
-  if (updates.isPriority !== undefined && !canPerform(role, 'SET_PRIORITY', current)) {
-    return forbidden('Seul le responsable peut modifier la priorité d’un incident actif.');
+  if (updates.isPriority !== undefined && !canPerform(actorRole, 'SET_PRIORITY', current)) {
+    return forbidden(`Seul le responsable peut modifier la priorité d'un incident actif.`);
   }
-  if (updates.displayOrder !== undefined && !canPerform(role, 'REORDER', current)) {
-    return forbidden('Seul le responsable peut réordonner un incident actif.');
+  if (updates.displayOrder !== undefined && !canPerform(actorRole, 'REORDER', current)) {
+    return forbidden(`Seul le responsable peut réordonner un incident actif.`);
   }
-  if (updates.responsibleComment !== undefined && !canPerform(role, 'RESPONSIBLE_COMMENT', current)) {
-    return forbidden('Seul le responsable peut gérer la consigne.');
+  if (updates.responsibleComment !== undefined && !canPerform(actorRole, 'RESPONSIBLE_COMMENT', current)) {
+    return forbidden(`Seul le responsable peut gérer la consigne.`);
   }
-  if (updates.status === 'CANCELED') {
-    if (!canPerform(role, 'INVALIDATE_CLOSED', current)) {
-      return forbidden('Seul le responsable peut invalider un cas clôturé.');
+  if (updates.status === 'INVALIDATED' || (updates.status === 'CANCELED' && current.status === 'CLOSED')) {
+    if (!canPerform(actorRole, 'INVALIDATE_CLOSED', current)) {
+      return forbidden(`Seul le responsable peut invalider un cas clôturé.`);
     }
     if (!updates.invalidationReason?.trim()) {
-      return badRequest('Motif obligatoire pour l’invalidation.');
+      return badRequest(`Motif obligatoire pour l'invalidation.`);
     }
-    const incidentId = await workshopRepository.invalidateIncident(id);
-    await logIncidentEvent(id, actorUserId, 'INCIDENT_INVALIDATED', {
-      reason: updates.invalidationReason.trim(),
-      previousStatus: current.status,
+    const incidentId = await withTransaction(async (client) => {
+      const rid = await workshopRepository.invalidateIncident(id, client);
+      if (!rid) return null;
+      await logIncidentEvent(id, actorUserId, 'INCIDENT_INVALIDATED', {
+        reason: updates.invalidationReason!.trim(),
+        previousStatus: current.status,
+      }, client);
+      await autoFollowForResponsable(id, actorUserId, actorRole, client);
+      return rid;
     });
-    return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+    if (!incidentId) return notFound('Incident introuvable.');
+    return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
   }
-  if (updates.status === 'PENDING' && !canPerform(role, 'SET_PENDING', current)) {
-    return forbidden('Mise en attente non autorisée pour ce rôle ou ce statut.');
+  if (updates.status === 'PENDING' && !canPerform(actorRole, 'SET_PENDING', current)) {
+    return forbidden(`Mise en attente non autorisée pour ce rôle ou ce statut.`);
   }
-  if (updates.status === 'OPEN' && current.status === 'PENDING' && !canPerform(role, 'RESUME', current)) {
-    return forbidden('Reprise non autorisée pour ce rôle ou ce statut.');
+  if (updates.status === 'OPEN' && current.status === 'PENDING' && !canPerform(actorRole, 'RESUME', current)) {
+    return forbidden(`Reprise non autorisée pour ce rôle ou ce statut.`);
   }
-  if (updates.status === 'CLOSED' && !canPerform(role, 'CLOSE', current)) {
-    return forbidden('Clôture non autorisée pour ce rôle ou ce statut.');
+  if (updates.status === 'CLOSED' && !canPerform(actorRole, 'CLOSE', current)) {
+    return forbidden(`Clôture non autorisée pour ce rôle ou ce statut.`);
   }
   if (updates.status === 'PENDING' && !updates.diagnostic && !current.diagnostic) {
     return badRequest('Diagnostic obligatoire avant mise en attente.');
@@ -338,8 +449,10 @@ export async function updateIncidentService(
     updates.comment !== undefined ||
     updates.currentProduct !== undefined;
 
-  if (editingFieldsTouched && !canPerform(role, 'DIRECT_EDIT', current)) {
-    return forbidden('Modification directe non autorisée pour ce rôle ou ce statut.');
+  if (editingFieldsTouched &&
+      !canPerform(actorRole, 'DIRECT_EDIT', current) &&
+      !canPerform(actorRole, 'EDIT_AFTER_TAKE', current, actorUserId)) {
+    return forbidden(`Modification directe non autorisée pour ce rôle ou ce statut.`);
   }
 
   const tookOwnership = updates.isTaken === true && !current.is_taken;
@@ -347,7 +460,7 @@ export async function updateIncidentService(
   const priorityChanged = updates.isPriority !== undefined && updates.isPriority !== current.is_priority;
   const orderChanged = updates.displayOrder !== undefined && updates.displayOrder !== current.display_order;
   const responsibleChanged =
-    role === 'RESPONSABLE' && updates.responsibleComment !== undefined &&
+    actorRole === 'RESPONSABLE' && updates.responsibleComment !== undefined &&
     updates.responsibleComment !== current.responsible_comment;
   const directChanges: Record<string, { old: unknown; new: unknown }> = {};
 
@@ -355,9 +468,15 @@ export async function updateIncidentService(
   const machineId = updates.machineId ?? current.machine_id;
   const robotLabel = updates.robotLabel ?? current.robot_label;
   const headNumber = updates.headNumber ?? current.head_number;
-  const selection = await validateIncidentSelectionService({ lineId, machineId, robotLabel, headNumber });
-  if (!selection) {
-    return badRequest('Sélection ligne/machine/robot/tête invalide.');
+
+  let selection: { lineNumber: string; machineBrand: string } | null = null;
+  if (editingFieldsTouched) {
+    selection = await validateIncidentSelectionService({ lineId, machineId, robotLabel, headNumber });
+    if (!selection) {
+      return badRequest('Sélection ligne/machine/robot/tête invalide.');
+    }
+  } else {
+    selection = { lineNumber: current.line_number, machineBrand: current.machine_brand };
   }
 
   if (updates.shift !== undefined && updates.shift !== current.shift) {
@@ -387,55 +506,94 @@ export async function updateIncidentService(
     directChanges.currentProduct = { old: current.current_product, new: updates.currentProduct };
   }
 
-  const incidentId = await workshopRepository.updateIncidentData({
-    incidentId: id,
-    current,
-    updates,
-    role,
-    actorUserId,
-    selection,
-    lineId,
-    machineId,
-    robotLabel,
-    headNumber,
+  const incidentId = await withTransaction(async (client) => {
+    const rid = await workshopRepository.updateIncidentData({
+      incidentId: id,
+      current,
+      updates,
+      role: actorRole,
+      actorUserId,
+      selection,
+      lineId,
+      machineId,
+      robotLabel,
+      headNumber,
+    }, client);
+    if (!rid) return null;
+    if (tookOwnership) {
+      await logIncidentEvent(id, actorUserId, 'INCIDENT_TAKEN', {
+        previousTakenByUserId: current.taken_by_user_id,
+      }, client);
+    }
+    if (statusChanged) {
+      const statusEventType: IncidentEventType =
+        updates.status === 'PENDING' ? 'INCIDENT_SET_PENDING' :
+        updates.status === 'OPEN' ? 'INCIDENT_RESUMED' :
+        updates.status === 'CLOSED' ? 'INCIDENT_CLOSED' :
+        'STATUS_CHANGED';
+      await logIncidentEvent(id, actorUserId, statusEventType, {
+        from: current.status,
+        to: updates.status,
+        diagnostic: updates.status === 'PENDING' ? updates.diagnostic ?? current.diagnostic : undefined,
+        interventionNote: updates.status === 'CLOSED' ? updates.interventionNote ?? current.intervention_note : undefined,
+      }, client);
+    }
+    if (priorityChanged) {
+      await logIncidentEvent(id, actorUserId, 'PRIORITY_CHANGED', {
+        from: current.is_priority,
+        to: updates.isPriority,
+      }, client);
+      await autoFollowForResponsable(id, actorUserId, actorRole, client);
+    }
+    if (orderChanged) {
+      await logIncidentEvent(id, actorUserId, 'ORDER_CHANGED', {
+        from: current.display_order,
+        to: updates.displayOrder,
+      }, client);
+    }
+    if (responsibleChanged) {
+      await logIncidentEvent(id, actorUserId, 'RESPONSIBLE_COMMENT_UPDATED', {
+        from: current.responsible_comment,
+        to: updates.responsibleComment,
+      }, client);
+      await autoFollowForResponsable(id, actorUserId, actorRole, client);
+    }
+    if (editingFieldsTouched) {
+      await logIncidentEvent(id, actorUserId, 'INCIDENT_UPDATED', {
+        changes: directChanges,
+        fields: Object.keys(directChanges),
+      }, client);
+    }
+    return rid;
   });
-  if (tookOwnership) {
-    await logIncidentEvent(id, actorUserId, 'INCIDENT_TAKEN', {
-      previousTakenByUserId: current.taken_by_user_id,
-    });
+  if (!incidentId) return notFound('Incident introuvable.');
+
+  return { ok: true, data: await fetchIncidentForActor(incidentId, actorUserId) };
+}
+
+export async function reorderIncidentsService(
+  input: ReorderIncidentsInput,
+  actorUserId: number,
+  actorRole: string
+): Promise<ServiceResult<{ updated: number }>> {
+  if (actorRole !== 'RESPONSABLE') {
+    return forbidden('Seul le responsable peut réordonner les incidents.');
   }
-  if (statusChanged) {
-    await logIncidentEvent(id, actorUserId, 'STATUS_CHANGED', {
-      from: current.status,
-      to: updates.status,
-      diagnostic: updates.status === 'PENDING' ? updates.diagnostic ?? current.diagnostic : undefined,
-      interventionNote: updates.status === 'CLOSED' ? updates.interventionNote ?? current.intervention_note : undefined,
-    });
-  }
-  if (priorityChanged) {
-    await logIncidentEvent(id, actorUserId, 'PRIORITY_CHANGED', {
-      from: current.is_priority,
-      to: updates.isPriority,
-    });
-  }
-  if (orderChanged) {
-    await logIncidentEvent(id, actorUserId, 'ORDER_CHANGED', {
-      from: current.display_order,
-      to: updates.displayOrder,
-    });
-  }
-  if (responsibleChanged) {
-    await logIncidentEvent(id, actorUserId, 'RESPONSIBLE_COMMENT_UPDATED', {
-      from: current.responsible_comment,
-      to: updates.responsibleComment,
-    });
-  }
-  if (editingFieldsTouched) {
-    await logIncidentEvent(id, actorUserId, 'INCIDENT_UPDATED', {
-      changes: directChanges,
-      fields: Object.keys(directChanges),
-    });
+  const uniqueIds = [...new Set(input.orderedIncidentIds)];
+  if (uniqueIds.length !== input.orderedIncidentIds.length) {
+    return badRequest('La liste de réordonnancement contient des doublons.');
   }
 
-  return { ok: true, data: await workshopRepository.fetchIncidentWithUsers(incidentId) };
+  const updated = await withTransaction(async (client) => {
+    const count = await workshopRepository.reorderIncidentsData(uniqueIds, client);
+    await Promise.all(uniqueIds.map((incidentId, index) =>
+      logIncidentEvent(incidentId, actorUserId, 'INCIDENT_REORDERED', {
+        position: index + 1,
+        batchSize: uniqueIds.length,
+      }, client)
+    ));
+    return count;
+  });
+
+  return { ok: true, data: { updated } };
 }

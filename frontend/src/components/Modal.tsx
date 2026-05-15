@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface ModalProps {
   title: string;
@@ -28,6 +28,8 @@ export default function Modal({
   dirtyMessage = 'Des modifications ne sont pas enregistrées. Quitter quand même ?',
 }: ModalProps) {
   const [confirmClose, setConfirmClose] = useState(false);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useMemo(() => `modal-title-${Math.random().toString(36).slice(2)}`, []);
   const canClose = Boolean(onClose) && !isLoading;
   const escapeEnabled = closeOnEscape ?? closeOnOverlay;
   const modalClassName = useMemo(() => {
@@ -44,11 +46,50 @@ export default function Modal({
   }
 
   useEffect(() => {
+    const previousActiveElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const focusableSelector = [
+      'button:not([disabled])',
+      '[href]',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const firstFocusable = modalRef.current?.querySelector<HTMLElement>(focusableSelector);
+    window.setTimeout(() => {
+      firstFocusable?.focus();
+    }, 0);
+
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && escapeEnabled) requestClose();
+      if (e.key === 'Escape' && escapeEnabled) {
+        requestClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !modalRef.current) return;
+      const focusable = Array.from(modalRef.current.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null);
+      if (focusable.length === 0) {
+        e.preventDefault();
+        modalRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      previousActiveElement?.focus();
+    };
   }, [canClose, escapeEnabled, isDirty, isLoading, onClose]);
 
   return (
@@ -59,9 +100,16 @@ export default function Modal({
         if (e.target === e.currentTarget) requestClose();
       }}
     >
-      <div className={modalClassName} role="dialog" aria-modal="true" aria-label={title}>
+      <div
+        className={modalClassName}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        ref={modalRef}
+        tabIndex={-1}
+      >
         <div className="modal-header">
-          <span className="modal-title">{title}</span>
+          <span className="modal-title" id={titleId}>{title}</span>
           {canClose && (
             <button className="btn btn-ghost btn-sm" onClick={requestClose} aria-label="Fermer">
               ✕

@@ -37,7 +37,7 @@ export async function listWorkshopIncidents(): Promise<WorkshopIncident[]> {
 
 export type IncidentWorkspaceParams = {
   q?: string;
-  status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
+  status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
   state?: IncidentState;
   lineId?: number;
   machineId?: string;
@@ -81,11 +81,13 @@ export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   isTaken?: boolean;
   isPriority?: boolean;
   displayOrder?: number;
-  status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
+  status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
   diagnostic?: string;
   interventionNote?: string;
   responsibleComment?: string;
   requestOnly?: boolean;
+  cancelRequest?: boolean;
+  cancelRequestReason?: string;
   deleteRequest?: boolean;
   deleteRequestReason?: string;
   invalidationReason?: string;
@@ -101,8 +103,20 @@ export async function updateWorkshopIncident(
   return api.patch<WorkshopIncident>(`/api/workshop/incidents/${id}`, payload);
 }
 
+export async function reorderWorkshopIncidents(orderedIncidentIds: number[]): Promise<{ updated: number }> {
+  return api.post<{ updated: number }>('/api/workshop/incidents/reorder', { orderedIncidentIds });
+}
+
+export async function followWorkshopIncident(id: number): Promise<WorkshopIncident> {
+  return api.post<WorkshopIncident>(`/api/workshop/incidents/${id}/follow`, {});
+}
+
+export async function unfollowWorkshopIncident(id: number): Promise<WorkshopIncident> {
+  return api.delete<WorkshopIncident>(`/api/workshop/incidents/${id}/follow`);
+}
+
 export async function deleteWorkshopIncident(id: number): Promise<void> {
-  return api.delete<void>(`/api/workshop/incidents/${id}`);
+  return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {});
 }
 
 export async function listIncidentEvents(id: number): Promise<WorkshopIncidentEvent[]> {

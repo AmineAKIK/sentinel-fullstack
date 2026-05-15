@@ -35,13 +35,19 @@ export default function WorkshopNavBar() {
       </div>
       <div className="nav-links" aria-label="Navigation atelier">
         {NAV_ITEMS.map((item) => (
-          <button
-            key={item.path}
-            className={`nav-link ${isActive(item.match) ? 'active' : ''}`}
-            onClick={() => navigate(item.path)}
-          >
-            {item.label}
-          </button>
+          (() => {
+            const active = isActive(item.match);
+            return (
+              <button
+                key={item.path}
+                className={`nav-link ${active ? 'active' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => navigate(item.path)}
+              >
+                {item.label}
+              </button>
+            );
+          })()
         ))}
       </div>
       <div className="nav-actions">

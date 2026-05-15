@@ -171,7 +171,7 @@ export default function AdminAuditPage() {
   return (
     <>
       <NavBar />
-      <main className="page-container">
+      <main id="main-content" className="page-container">
         <div className="page-header">
           <h1>Journal d'administration</h1>
         </div>

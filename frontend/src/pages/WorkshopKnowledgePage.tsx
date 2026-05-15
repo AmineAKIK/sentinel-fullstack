@@ -136,7 +136,7 @@ export default function WorkshopKnowledgePage() {
   return (
     <>
       <WorkshopNavBar />
-      <main className="page-container workshop-page">
+      <main id="main-content" className="page-container workshop-page">
         <button className="back-link" onClick={() => navigate('/workshop/dashboard')}>
           Retour au dashboard
         </button>

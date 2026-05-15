@@ -240,7 +240,7 @@ export default function ReviewIncidentRequestModal({
       {type === 'delete' && (
         <>
           <div className="notice">
-            <strong>Motif :</strong> {incident.delete_request_reason || 'Non renseigné'}
+            <strong>Motif :</strong> {incident.cancel_request_reason || 'Non renseigné'}
           </div>
           {deleteWarning && (
             <div className="notice" style={{ marginTop: 12 }}>{deleteWarning}</div>

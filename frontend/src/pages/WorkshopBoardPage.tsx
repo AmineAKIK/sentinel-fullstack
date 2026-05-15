@@ -435,7 +435,7 @@ export default function WorkshopBoardPage() {
   const screenLabel = screenId.replace(/^ecran[-_]/i, '').toUpperCase();
 
   return (
-    <main className={`board-page board-page-${boardMode}`}>
+    <main id="main-content" className={`board-page board-page-${boardMode}`}>
       <header className="board-header">
         <div>
           <div className="board-brand">SENTINEL · {profileLabel}</div>

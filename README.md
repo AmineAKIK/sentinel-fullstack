@@ -11,13 +11,17 @@ Application full-stack de pilotage Sentinel : administration des comptes et lign
 
 ## Démarrage Docker
 
+Le `docker-compose.yml` démarre un environnement local par défaut.
+
 ```bash
 docker compose up --build
 ```
 
 - Frontend : http://localhost:5173
 - Backend API : http://localhost:3000
-- Admin par défaut : `admin` / `admin123`
+- Admin local par défaut : `admin` / `admin123`
+
+Pour une publication, copier `.env.release.example` vers `.env` sur l'hôte de déploiement et remplacer toutes les valeurs sensibles avant de lancer Docker Compose. En `NODE_ENV=production`, le backend refuse de démarrer si les secrets ou l'origine client restent sur des valeurs de démonstration.
 
 ## Développement Local
 
@@ -55,6 +59,23 @@ Frontend :
 - `npm run dev` : serveur Vite
 - `npm run build` : typecheck puis build Vite
 - `npm run preview` : prévisualisation du build
+
+## Publication
+
+Avant de déclarer une version publiable :
+
+```bash
+cd backend
+npm run build
+npm test
+npm run verify:reliability
+
+cd ../frontend
+npm run build
+npm test
+```
+
+Puis exécuter la recette manuelle et les contrôles de configuration décrits dans [docs/release-checklist.md](docs/release-checklist.md).
 
 ## Structure
 

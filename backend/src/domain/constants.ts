@@ -12,7 +12,7 @@ export const INCIDENT_STATES = [
 ] as const;
 export type IncidentState = (typeof INCIDENT_STATES)[number];
 
-export const INCIDENT_STATUSES = ['OPEN', 'PENDING', 'CLOSED', 'CANCELED'] as const;
+export const INCIDENT_STATUSES = ['OPEN', 'PENDING', 'CLOSED', 'CANCELED', 'INVALIDATED'] as const;
 export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
 
 export const ACTIVE_INCIDENT_STATUSES = ['OPEN', 'PENDING'] as const;
@@ -22,11 +22,11 @@ export const INCIDENT_ACTIONS = [
   'REQUEST_EDIT',
   'DIRECT_EDIT',
   'REQUEST_CANCEL',
+  'APPROVE_CANCEL',
+  'REJECT_CANCEL',
   'CANCEL',
   'APPROVE_EDIT',
   'REJECT_EDIT',
-  'APPROVE_CANCEL',
-  'REJECT_CANCEL',
   'TAKE',
   'SET_PENDING',
   'RESUME',
@@ -35,6 +35,7 @@ export const INCIDENT_ACTIONS = [
   'REORDER',
   'RESPONSIBLE_COMMENT',
   'INVALIDATE_CLOSED',
+  'EDIT_AFTER_TAKE',
 ] as const;
 export type IncidentAction = (typeof INCIDENT_ACTIONS)[number];
 

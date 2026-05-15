@@ -9,11 +9,12 @@
     "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "verify:reliability": "node scripts/verifyReliability.js",
+    "seed:demo": "node scripts/seedWorkshopProductionDemo.js",
     "test": "jest",
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

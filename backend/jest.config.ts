@@ -11,6 +11,9 @@ const config: Config = {
     'src/domain/**/*.ts',
     'src/modules/workshop/workshop.policy.ts',
     'src/modules/workshop/workshop.validation.ts',
+    'src/modules/accounts/accounts.service.ts',
+    'src/modules/lines/lines.service.ts',
+    'src/modules/workshop/workshop.service.ts',
   ],
 };
 

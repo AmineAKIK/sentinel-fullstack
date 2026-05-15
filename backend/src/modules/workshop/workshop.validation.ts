@@ -25,6 +25,8 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   interventionNote: z.string().trim().max(1000).optional(),
   responsibleComment: z.string().trim().max(500).optional(),
   requestOnly: z.boolean().optional(),
+  cancelRequest: z.boolean().optional(),
+  cancelRequestReason: z.string().trim().max(500).optional(),
   deleteRequest: z.boolean().optional(),
   deleteRequestReason: z.string().trim().max(500).optional(),
   invalidationReason: z.string().trim().max(500).optional(),
@@ -33,5 +35,27 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   rejectDeleteRequest: z.boolean().optional(),
 });
 
+export const incidentWorkspaceQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  status: IncidentStatusEnum.optional(),
+  state: IncidentStateEnum.optional(),
+  lineId: z.coerce.number().int().positive().optional(),
+  machineId: z.string().trim().max(120).optional(),
+  eventType: z.string().trim().max(80).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
+export const workshopAnalyticsQuerySchema = z.object({
+  start: z.string().trim().max(40).optional(),
+  end: z.string().trim().max(40).optional(),
+  lineId: z.coerce.number().int().positive().optional(),
+  machineId: z.string().trim().max(120).optional(),
+});
+
+export const reorderIncidentsSchema = z.object({
+  orderedIncidentIds: z.array(z.coerce.number().int().positive()).min(1).max(500),
+});
+
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type UpdateIncidentInput = z.infer<typeof updateIncidentSchema>;
+export type ReorderIncidentsInput = z.infer<typeof reorderIncidentsSchema>;

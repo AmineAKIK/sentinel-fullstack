@@ -3,6 +3,7 @@ import { workshopAuthMiddleware } from '../../middlewares/workshopAuth';
 import {
 	createIncident,
 	deleteIncident,
+	followIncident,
 	getBoardData,
 	getHistoryIncident,
 	getIncidentMetrics,
@@ -14,6 +15,8 @@ import {
 	listIncidents,
 	listKnowledgeIncidents,
 	listWorkshopLines,
+	reorderIncidents,
+	unfollowIncident,
 	updateIncident,
 } from './workshop.controller';
 
@@ -33,7 +36,11 @@ router.get('/incidents/:id/events', listIncidentEvents);
 router.get('/metrics', getIncidentMetrics);
 router.get('/analytics', getWorkshopAnalytics);
 router.post('/incidents', createIncident);
+router.post('/incidents/reorder', reorderIncidents);
+router.post('/incidents/:id/follow', followIncident);
+router.post('/incidents/:id/cancel', deleteIncident);
 router.patch('/incidents/:id', updateIncident);
+router.delete('/incidents/:id/follow', unfollowIncident);
 router.delete('/incidents/:id', deleteIncident);
 
 export default router;

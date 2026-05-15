@@ -21,6 +21,7 @@ export default function App() {
   return (
     <AuthProvider>
       <WorkshopAuthProvider>
+        <a className="skip-link" href="#main-content">Passer au contenu principal</a>
         <Routes>
           <Route path="/" element={<Navigate to="/admin/login" replace />} />
           <Route path="/workshop" element={<WorkshopLoginPage />} />

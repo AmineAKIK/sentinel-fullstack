@@ -36,39 +36,46 @@ check('Workshop middleware revalidates active user and current role from databas
     && middleware.includes('is_active = TRUE')
     && middleware.includes('is_deleted = FALSE')
     && middleware.includes('role: user.role')
-    && middleware.includes('!user.password_hash');
+    && middleware.includes('password_hash IS NOT NULL');
 });
 
 check('Admin cannot remove active operational references', () => {
-  const accounts = read('backend/src/modules/accounts/accounts.controller.ts');
-  const lines = read('backend/src/modules/lines/lines.controller.ts');
+  const accounts = read('backend/src/modules/accounts/accounts.service.ts');
+  const accountsRepo = read('backend/src/modules/accounts/accounts.repository.ts');
+  const lines = read('backend/src/modules/lines/lines.service.ts');
+  const linesRepo = read('backend/src/modules/lines/lines.repository.ts');
+  const constants = read('backend/src/domain/constants.ts');
   return accounts.includes('getActiveTakenIncidentCountForUser')
     && accounts.includes('RESOURCE_IN_USE')
-    && accounts.includes("status IN ('OPEN', 'PENDING')")
+    && accountsRepo.includes('getActiveTakenIncidentCountForUser')
+    && accountsRepo.includes('ACTIVE_INCIDENT_STATUSES')
     && lines.includes('getActiveIncidentCountForLine')
     && lines.includes('RESOURCE_IN_USE')
-    && lines.includes("status IN ('OPEN', 'PENDING')");
+    && linesRepo.includes('getActiveIncidentCountForLine')
+    && linesRepo.includes('ACTIVE_INCIDENT_STATUSES')
+    && constants.includes("'OPEN', 'PENDING'");
 });
 
 check('Workshop permissions are mirrored backend/frontend', () => {
-  const controller = read('backend/src/modules/workshop/workshop.controller.ts');
+  const policy = read('backend/src/modules/workshop/workshop.policy.ts');
   const permissions = read('frontend/src/utils/workshopPermissions.ts');
-  return controller.includes("case 'REQUEST_CANCEL':")
-    && controller.includes("!incident.is_taken")
-    && controller.includes("case 'APPROVE_CANCEL':")
-    && controller.includes('incident.delete_request === true')
-    && permissions.includes("case 'requestCancel':")
-    && permissions.includes('!incident.is_taken')
-    && permissions.includes("case 'approveCancel':")
-    && permissions.includes('incident.delete_request === true');
+	return policy.includes("case 'REQUEST_CANCEL':")
+	    && policy.includes("!incident.is_taken")
+	    && policy.includes("case 'APPROVE_CANCEL':")
+	    && policy.includes('incident.cancel_request === true')
+	    && permissions.includes("case 'requestCancel':")
+	    && permissions.includes('!incident.is_taken')
+	    && permissions.includes("case 'approveCancel':")
+	    && permissions.includes('incident.cancel_request === true');
 });
 
-check('Canceled incidents are preserved but excluded from operational metrics', () => {
-  const controller = read('backend/src/modules/workshop/workshop.controller.ts');
-  return controller.includes("SET status = 'CANCELED'")
-    && controller.includes("COUNT(*) FILTER (WHERE status IN ('OPEN', 'PENDING'))::int AS total")
-    && controller.includes("WHERE status = 'CLOSED'")
-    && controller.includes("wi.status != 'CANCELED'");
+check('Canceled and invalidated incidents are preserved but excluded from operational metrics', () => {
+  const repository = read('backend/src/modules/workshop/workshop.repository.ts');
+  return repository.includes("SET status = 'CANCELED'")
+    && repository.includes("SET status = 'INVALIDATED'")
+    && repository.includes("COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total")
+    && repository.includes("statusEqualsSql('wi.status', 'CLOSED')")
+    && repository.includes("nonTerminalRejectedWorkshopIncidentStatusSql");
 });
 
 check('Board frontend consumes only the public board endpoint', () => {
@@ -81,9 +88,9 @@ check('Board frontend consumes only the public board endpoint', () => {
 });
 
 check('Board respects responsible manual ordering after priority', () => {
-  const controller = read('backend/src/modules/workshop/workshop.controller.ts');
+  const repository = read('backend/src/modules/workshop/workshop.repository.ts');
   const board = read('frontend/src/pages/WorkshopBoardPage.tsx');
-  return controller.includes('ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC')
+  return repository.includes('ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC')
     && includesInOrder(board, 'if (a.is_priority !== b.is_priority)', 'if (a.display_order !== b.display_order)')
     && includesInOrder(board, 'if (a.display_order !== b.display_order)', 'if (a.is_taken !== b.is_taken)');
 });
@@ -113,7 +120,7 @@ check('Workshop history, pilotage, and knowledge are separated pages', () => {
   const history = read('frontend/src/pages/WorkshopHistoryPage.tsx');
   const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
   const api = read('frontend/src/api/workshop.ts');
-  const controller = read('backend/src/modules/workshop/workshop.controller.ts');
+  const repository = read('backend/src/modules/workshop/workshop.repository.ts');
   return pilotage.includes('getWorkshopAnalytics')
     && !pilotage.includes('mode=')
     && history.includes('listWorkshopHistoryIncidents')
@@ -127,8 +134,8 @@ check('Workshop history, pilotage, and knowledge are separated pages', () => {
     && api.includes('/api/workshop/history/incidents')
     && api.includes('/api/workshop/history/events')
     && api.includes('/api/workshop/knowledge/incidents')
-    && controller.includes("wi.status = 'CLOSED'")
-    && controller.includes("wi.intervention_note IS NOT NULL");
+    && repository.includes("statusEqualsSql('wi.status', 'CLOSED')")
+    && repository.includes("wi.intervention_note IS NOT NULL");
 });
 
 check('Workshop knowledge page presents validated intervention cards', () => {
@@ -143,14 +150,14 @@ check('Workshop knowledge page presents validated intervention cards', () => {
 });
 
 check('Workshop pilotage exposes period trend indicators', () => {
-  const controller = read('backend/src/modules/workshop/workshop.controller.ts');
+  const repository = read('backend/src/modules/workshop/workshop.repository.ts');
   const types = read('frontend/src/types/index.ts');
   const pilotage = read('frontend/src/pages/WorkshopPilotagePage.tsx');
   const styles = read('frontend/src/styles.css');
-  return controller.includes('trendRows')
-    && controller.includes('created_count')
-    && controller.includes('closed_count')
-    && controller.includes('oldest_active_seconds')
+  return repository.includes('trendRows')
+    && repository.includes('created_count')
+    && repository.includes('closed_count')
+    && repository.includes('oldest_active_seconds')
     && types.includes('trend: {')
     && pilotage.includes('Temps réel')
     && pilotage.includes('Recensement')
@@ -237,7 +244,7 @@ check('Modal base protects sensitive and dirty flows consistently', () => {
     && createIncident.includes('closeOnOverlay={false}')
     && createLine.includes('size="lg"')
     && editMachine.includes('isLoading={loading}')
-    && deleteUser.includes('variant="danger"')
+    && deleteUser.includes('hasActiveTakenIncidents')
     && invalidate.includes('variant="danger"');
 });
 
@@ -253,16 +260,16 @@ check('Database constraints and indexes harden core workshop integrity', () => {
 });
 
 check('Workshop event log has payloads for important operational decisions', () => {
-  const controller = read('backend/src/modules/workshop/workshop.controller.ts');
-  return controller.includes('INCIDENT_CREATED')
-    && controller.includes('EDIT_REQUESTED')
-    && controller.includes('EDIT_APPLIED')
-    && controller.includes('CANCEL_REQUESTED')
-    && controller.includes('INCIDENT_CANCELED')
-    && controller.includes('INCIDENT_INVALIDATED')
-    && controller.includes('STATUS_CHANGED')
-    && controller.includes('RESPONSIBLE_COMMENT_UPDATED')
-    && controller.includes('requestedChangeKeys');
+  const service = read('backend/src/modules/workshop/workshop.service.ts');
+  return service.includes('INCIDENT_CREATED')
+    && service.includes('EDIT_REQUESTED')
+    && service.includes('EDIT_APPLIED')
+    && service.includes('CANCEL_REQUESTED')
+    && service.includes('INCIDENT_CANCELED')
+    && service.includes('INCIDENT_INVALIDATED')
+    && service.includes('STATUS_CHANGED')
+    && service.includes('RESPONSIBLE_COMMENT_UPDATED')
+    && service.includes('requestedChangeKeys');
 });
 
 let failures = 0;

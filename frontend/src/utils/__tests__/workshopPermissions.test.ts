@@ -24,8 +24,8 @@ function incident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
     intervention_note: null,
     responsible_comment: null,
     edit_request: null,
-    delete_request: false,
-    delete_request_reason: null,
+    cancel_request: false,
+    cancel_request_reason: null,
     taken_by_user_id: null,
     taken_at: null,
     taken_by_first_name: null,
@@ -118,25 +118,28 @@ describe('MAINTENANCE permissions', () => {
 // ─── RESPONSABLE ──────────────────────────────────────────────────────────────
 
 describe('RESPONSABLE permissions', () => {
-  it('can approveEdit and rejectEdit on active incident', () => {
-    expect(canPerform('RESPONSABLE', 'approveEdit', incident())).toBe(true);
-    expect(canPerform('RESPONSABLE', 'rejectEdit', incident())).toBe(true);
+  it('can approveEdit and rejectEdit only when an edit request exists', () => {
+    expect(canPerform('RESPONSABLE', 'approveEdit', incident({ edit_request: { comment: 'x' } }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'rejectEdit', incident({ edit_request: { comment: 'x' } }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'approveEdit', incident())).toBe(false);
+    expect(canPerform('RESPONSABLE', 'rejectEdit', incident())).toBe(false);
   });
 
   it('cannot approveEdit on CLOSED incident', () => {
     expect(canPerform('RESPONSABLE', 'approveEdit', incident({ status: 'CLOSED' }))).toBe(false);
   });
 
-  it('can approveCancel when delete_request is true', () => {
-    expect(canPerform('RESPONSABLE', 'approveCancel', incident({ delete_request: true }))).toBe(true);
+  it('can approveCancel when cancel_request is true', () => {
+    expect(canPerform('RESPONSABLE', 'approveCancel', incident({ cancel_request: true }))).toBe(true);
   });
 
-  it('cannot approveCancel when delete_request is false', () => {
-    expect(canPerform('RESPONSABLE', 'approveCancel', incident({ delete_request: false }))).toBe(false);
+  it('cannot approveCancel when cancel_request is false', () => {
+    expect(canPerform('RESPONSABLE', 'approveCancel', incident({ cancel_request: false }))).toBe(false);
   });
 
-  it('can rejectCancel on active incident', () => {
-    expect(canPerform('RESPONSABLE', 'rejectCancel', incident())).toBe(true);
+  it('can rejectCancel only when cancel_request is true', () => {
+    expect(canPerform('RESPONSABLE', 'rejectCancel', incident({ cancel_request: true }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'rejectCancel', incident())).toBe(false);
   });
 
   it('can setPriority, reorder, responsibleComment on active incident', () => {

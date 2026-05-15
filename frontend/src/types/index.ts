@@ -70,6 +70,7 @@ export type IncidentState =
   | 'SKIPEE_PAR_CONDUCTEUR'
   | 'DEGRADEE'
   | 'INDISPONIBLE';
+export type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
 
 export interface WorkshopIncident {
   id: number;
@@ -85,13 +86,15 @@ export interface WorkshopIncident {
   current_product: string | null;
   is_taken: boolean;
   is_priority: boolean;
-  status: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
+  status: IncidentStatus;
   diagnostic: string | null;
   intervention_note: string | null;
   responsible_comment: string | null;
   edit_request: Record<string, unknown> | null;
-  delete_request: boolean;
-  delete_request_reason: string | null;
+  cancel_request?: boolean;
+  cancel_request_reason?: string | null;
+  delete_request?: boolean;
+  delete_request_reason?: string | null;
   taken_by_user_id: number | null;
   taken_at: string | null;
   taken_by_first_name: string | null;
@@ -100,6 +103,8 @@ export interface WorkshopIncident {
   display_order: number;
   created_at: string;
   updated_at: string;
+  is_followed?: boolean;
+  followed_at?: string | null;
   first_name: string;
   last_name: string;
   badge_number?: string | null;
@@ -125,7 +130,7 @@ export interface WorkshopHistoryEvent extends WorkshopIncidentEvent {
   robot_label: string;
   head_number: number;
   state: IncidentState;
-  status: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
+  status: IncidentStatus;
 }
 
 export interface WorkshopIncidentMetrics {
@@ -136,6 +141,9 @@ export interface WorkshopIncidentMetrics {
   taken: number;
   not_taken: number;
   open_over_7d: number;
+  assigned_to_me?: number;
+  followed?: number;
+  followed_resolved?: number;
 }
 
 export interface WorkshopBoardLine {

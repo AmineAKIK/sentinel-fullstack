@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { assertProductionConfig } from './config/production';
 import runMigrations from './db/migrate';
 import seedAdminAccount from './db/seed';
 import adminAuthRoutes from './modules/adminAuth/adminAuth.routes';
@@ -12,10 +13,13 @@ import linesRoutes from './modules/lines/lines.routes';
 import workshopAuthRoutes from './modules/workshopAuth/workshopAuth.routes';
 import workshopRoutes from './modules/workshop/workshop.routes';
 import adminRoutes from './modules/admin/admin.routes';
+import { securityHeaders } from './middlewares/securityHeaders';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+
+assertProductionConfig();
 
 app.use(
   cors({
@@ -24,6 +28,7 @@ app.use(
   })
 );
 
+app.use(securityHeaders);
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 

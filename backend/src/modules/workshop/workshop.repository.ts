@@ -1,7 +1,9 @@
+import { PoolClient } from 'pg';
 import pool from '../../db/pool';
-import { boundedInt, parseOptionalInt, statusEqualsSql, statusInSql, statusNotEqualsSql } from '../../db/sql';
+import { boundedInt, parseOptionalInt, statusEqualsSql, statusInSql } from '../../db/sql';
 import {
   ACTIVE_INCIDENT_STATUSES,
+  INCIDENT_STATUSES,
   isIncidentState,
   isIncidentStatus,
   IncidentStatus,
@@ -16,7 +18,9 @@ const activeIncidentStatusSql = statusInSql('status', ACTIVE_INCIDENT_STATUSES);
 const openStatusSql = statusEqualsSql('status', 'OPEN');
 const pendingStatusSql = statusEqualsSql('status', 'PENDING');
 const closedStatusSql = statusEqualsSql('status', 'CLOSED');
-const nonCanceledWorkshopIncidentStatusSql = statusNotEqualsSql('wi.status', 'CANCELED');
+const nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql('wi.status', INCIDENT_STATUSES.filter(
+  (status) => status !== 'CANCELED' && status !== 'INVALIDATED'
+));
 
 export type StoredMachine =
   | {
@@ -46,15 +50,71 @@ export interface IncidentCancelSnapshot {
   status: IncidentStatus;
   is_taken: boolean;
   taken_by_user_id: number | null;
-  delete_request: boolean;
-  delete_request_reason: string | null;
+  cancel_request?: boolean;
+  cancel_request_reason?: string | null;
+  delete_request?: boolean;
+  delete_request_reason?: string | null;
+  edit_request?: unknown | null;
 }
 
-export type WorkshopIncidentRow = CurrentIncident & Record<string, any>;
+export interface WorkshopIncidentRow extends CurrentIncident {
+  id: number;
+  shift: string;
+  line_id: number;
+  line_number: string;
+  machine_id: string;
+  machine_brand: string;
+  robot_label: string;
+  head_number: number;
+  state: string;
+  comment: string | null;
+  current_product: string | null;
+  is_priority: boolean;
+  diagnostic: string | null;
+  intervention_note: string | null;
+  responsible_comment: string | null;
+  edit_request: unknown | null;
+  cancel_request?: boolean;
+  cancel_request_reason?: string | null;
+  taken_at: Date | null;
+  display_order: number;
+  created_at: Date;
+  updated_at: Date;
+  is_followed?: boolean;
+  followed_at?: Date | null;
+  [key: string]: unknown;
+}
 
 export interface IncidentSelection {
   lineNumber: string;
   machineBrand: string;
+}
+
+export interface WorkshopIncidentMetricsResult {
+  global?: {
+    total: number;
+    open: number;
+    pending: number;
+    priority: number;
+    taken: number;
+    not_taken: number;
+    open_over_7d: number;
+  };
+  personal?: {
+    assigned_to_me: number;
+    followed: number;
+    followed_resolved: number;
+  };
+  total: number;
+  open: number;
+  pending: number;
+  priority: number;
+  taken: number;
+  not_taken: number;
+  assigned_to_me: number;
+  followed: number;
+  followed_resolved: number;
+  open_over_7d: number;
 }
 
 function buildIncidentWorkspaceFilters(
@@ -225,21 +285,36 @@ export async function listActiveWorkshopLines() {
   return rows;
 }
 
-export async function listIncidents() {
+export async function listIncidents(userId: number, role: string) {
+  const includeFollowedResolved = role === 'RESPONSABLE';
   const { rows } = await pool.query(
     `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
             wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
             wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-          wi.responsible_comment, wi.edit_request, wi.delete_request, wi.delete_request_reason,
+          wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
           wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
           su.first_name, su.last_name, su.role,
           tu.first_name AS taken_by_first_name,
           tu.last_name AS taken_by_last_name,
-          tu.role AS taken_by_role
+          tu.role AS taken_by_role,
+          (wif.id IS NOT NULL) AS is_followed,
+          wif.created_at AS followed_at
      FROM workshop_incidents wi
      JOIN sentinel_users su ON su.id = wi.user_id
      LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
-     ORDER BY wi.display_order DESC, wi.created_at DESC`
+     LEFT JOIN workshop_incident_followers wif
+       ON wif.incident_id = wi.id
+      AND wif.user_id = $1
+      AND wif.deleted_at IS NULL
+     WHERE wi.status IN ('OPEN', 'PENDING')
+        OR ($2 = TRUE AND wif.id IS NOT NULL)
+     ORDER BY
+       CASE WHEN wi.status IN ('OPEN', 'PENDING') THEN 0 ELSE 1 END ASC,
+       wi.is_priority DESC,
+       wi.display_order DESC,
+       wi.is_taken ASC,
+       wi.created_at DESC`,
+    [userId, includeFollowedResolved]
   );
 
   return rows;
@@ -249,13 +324,13 @@ export async function listIncidentWorkspaceRows(query: QueryParams, mode: Incide
   const { whereClause, params, limit } = buildIncidentWorkspaceFilters(query, mode);
   const orderBy = mode === 'knowledge'
     ? 'wi.updated_at DESC, wi.created_at DESC'
-    : 'wi.updated_at DESC, wi.created_at DESC';
+    : 'wi.created_at DESC, wi.updated_at DESC';
 
   const { rows } = await pool.query(
     `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
             wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
             wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-            wi.responsible_comment, wi.edit_request, wi.delete_request, wi.delete_request_reason,
+            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
             wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
             su.first_name, su.last_name, su.role,
             tu.first_name AS taken_by_first_name,
@@ -278,7 +353,7 @@ export async function fetchIncidentWithUsers(incidentId: number) {
     `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
             wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
             wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-            wi.responsible_comment, wi.edit_request, wi.delete_request, wi.delete_request_reason,
+            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
             wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
             su.first_name, su.last_name, su.role,
             tu.first_name AS taken_by_first_name,
@@ -289,6 +364,33 @@ export async function fetchIncidentWithUsers(incidentId: number) {
      LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
      WHERE wi.id = $1`,
     [incidentId]
+  );
+
+  return rows[0];
+}
+
+export async function fetchIncidentWithUsersForActor(incidentId: number, actorUserId: number) {
+  const { rows } = await pool.query(
+    `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
+            wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
+            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
+            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
+            wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
+            su.first_name, su.last_name, su.role,
+            tu.first_name AS taken_by_first_name,
+            tu.last_name AS taken_by_last_name,
+            tu.role AS taken_by_role,
+            (wif.id IS NOT NULL) AS is_followed,
+            wif.created_at AS followed_at
+     FROM workshop_incidents wi
+     JOIN sentinel_users su ON su.id = wi.user_id
+     LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
+     LEFT JOIN workshop_incident_followers wif
+       ON wif.incident_id = wi.id
+      AND wif.user_id = $2
+      AND wif.deleted_at IS NULL
+     WHERE wi.id = $1`,
+    [incidentId, actorUserId]
   );
 
   return rows[0];
@@ -311,8 +413,9 @@ export async function createIncidentData(input: {
   line: ActiveWorkshopLine;
   machine: StoredMachine;
   robotLabel: string;
-}): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
+}, client?: PoolClient): Promise<number> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `INSERT INTO workshop_incidents (
       user_id, shift, line_id, line_number, machine_id, machine_brand,
       robot_label, head_number, state, comment, current_product, display_order
@@ -338,19 +441,33 @@ export async function createIncidentData(input: {
   return rows[0].id;
 }
 
-export async function getIncidentCancelSnapshot(incidentId: number): Promise<IncidentCancelSnapshot | null> {
-  const { rows } = await pool.query<IncidentCancelSnapshot>(
-    'SELECT status, is_taken, taken_by_user_id, delete_request, delete_request_reason FROM workshop_incidents WHERE id = $1',
+export async function getIncidentCancelSnapshot(
+  incidentId: number,
+  client?: PoolClient
+): Promise<IncidentCancelSnapshot | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<IncidentCancelSnapshot>(
+    `SELECT status, is_taken, taken_by_user_id, cancel_request, cancel_request_reason,
+            delete_request, delete_request_reason, edit_request
+     FROM workshop_incidents
+     WHERE id = $1
+     FOR UPDATE`,
     [incidentId]
   );
 
   return rows[0] ?? null;
 }
 
-export async function cancelIncidentData(incidentId: number): Promise<boolean> {
-  const result = await pool.query(
+export async function cancelIncidentData(incidentId: number, client?: PoolClient): Promise<boolean> {
+  const db = client ?? pool;
+  const result = await db.query(
     `UPDATE workshop_incidents
-     SET status = 'CANCELED', delete_request = FALSE, delete_request_reason = NULL, updated_at = NOW()
+     SET status = 'CANCELED',
+         cancel_request = FALSE,
+         cancel_request_reason = NULL,
+         delete_request = FALSE,
+         delete_request_reason = NULL,
+         updated_at = NOW()
      WHERE id = $1`,
     [incidentId]
   );
@@ -358,25 +475,32 @@ export async function cancelIncidentData(incidentId: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function getIncidentById(incidentId: number): Promise<WorkshopIncidentRow | null> {
-  const { rows } = await pool.query('SELECT * FROM workshop_incidents WHERE id = $1', [incidentId]);
+export async function getIncidentById(incidentId: number, client?: PoolClient): Promise<WorkshopIncidentRow | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query('SELECT * FROM workshop_incidents WHERE id = $1 FOR UPDATE', [incidentId]);
   return rows[0] ?? null;
 }
 
-export async function requestCancelIncident(incidentId: number, reason: string): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function requestCancelIncident(incidentId: number, reason: string, client?: PoolClient): Promise<number | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
-     SET delete_request = TRUE, delete_request_reason = $1, updated_at = NOW()
+     SET cancel_request = TRUE,
+         cancel_request_reason = $1,
+         delete_request = TRUE,
+         delete_request_reason = $1,
+         updated_at = NOW()
      WHERE id = $2
      RETURNING id`,
     [reason, incidentId]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
 }
 
-export async function requestEditIncident(incidentId: number, editPayload: Record<string, unknown>): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function requestEditIncident(incidentId: number, editPayload: Record<string, unknown>, client?: PoolClient): Promise<number | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
      SET edit_request = $1, updated_at = NOW()
      WHERE id = $2
@@ -384,11 +508,12 @@ export async function requestEditIncident(incidentId: number, editPayload: Recor
     [JSON.stringify(editPayload), incidentId]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
 }
 
-export async function rejectEditIncident(incidentId: number): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function rejectEditIncident(incidentId: number, client?: PoolClient): Promise<number | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
      SET edit_request = NULL, updated_at = NOW()
      WHERE id = $1
@@ -396,19 +521,24 @@ export async function rejectEditIncident(incidentId: number): Promise<number> {
     [incidentId]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
 }
 
-export async function rejectCancelIncident(incidentId: number): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function rejectCancelIncident(incidentId: number, client?: PoolClient): Promise<number | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
-     SET delete_request = FALSE, delete_request_reason = NULL, updated_at = NOW()
+     SET cancel_request = FALSE,
+         cancel_request_reason = NULL,
+         delete_request = FALSE,
+         delete_request_reason = NULL,
+         updated_at = NOW()
      WHERE id = $1
      RETURNING id`,
     [incidentId]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
 }
 
 export async function applyEditRequestIncident(input: {
@@ -416,9 +546,10 @@ export async function applyEditRequestIncident(input: {
   current: WorkshopIncidentRow;
   requested: Record<string, unknown>;
   selection: IncidentSelection;
-}): Promise<number> {
+}, client?: PoolClient): Promise<number> {
+  const db = client ?? pool;
   const requested = input.requested;
-  const { rows } = await pool.query<{ id: number }>(
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
      SET shift = $1, line_id = $2, line_number = $3, machine_id = $4, machine_brand = $5,
          robot_label = $6, head_number = $7, state = $8, comment = $9, current_product = $10,
@@ -440,19 +571,25 @@ export async function applyEditRequestIncident(input: {
     ]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
 }
 
-export async function invalidateIncident(incidentId: number): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function invalidateIncident(incidentId: number, client?: PoolClient): Promise<number | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
-     SET status = 'CANCELED', delete_request = FALSE, delete_request_reason = NULL, updated_at = NOW()
+     SET status = 'INVALIDATED',
+         cancel_request = FALSE,
+         cancel_request_reason = NULL,
+         delete_request = FALSE,
+         delete_request_reason = NULL,
+         updated_at = NOW()
      WHERE id = $1
      RETURNING id`,
     [incidentId]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
 }
 
 export async function updateIncidentData(input: {
@@ -466,13 +603,14 @@ export async function updateIncidentData(input: {
   machineId: string;
   robotLabel: string;
   headNumber: number;
-}): Promise<number> {
+}, client?: PoolClient): Promise<number | null> {
+  const db = client ?? pool;
   const { current, updates } = input;
   const tookOwnership = updates.isTaken === true && !current.is_taken;
   const nextTakenByUserId = tookOwnership ? input.actorUserId : current.taken_by_user_id;
   const nextTakenAt = tookOwnership ? new Date() : current.taken_at;
 
-  const { rows } = await pool.query<{ id: number }>(
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
      SET shift = $1, line_id = $2, line_number = $3, machine_id = $4, machine_brand = $5,
          robot_label = $6, head_number = $7, state = $8, comment = $9, current_product = $10,
@@ -505,7 +643,29 @@ export async function updateIncidentData(input: {
     ]
   );
 
-  return rows[0].id;
+  return rows[0]?.id ?? null;
+}
+
+export async function reorderIncidentsData(
+  orderedIncidentIds: number[],
+  client?: PoolClient
+): Promise<number> {
+  const db = client ?? pool;
+  if (orderedIncidentIds.length === 0) return 0;
+  const baseOrder = orderedIncidentIds.length;
+  const { rowCount } = await db.query(
+    `WITH next_order AS (
+       SELECT incident_id, ($1::int - ordinal)::int AS display_order
+       FROM unnest($2::int[]) WITH ORDINALITY AS ordered(incident_id, ordinal)
+     )
+     UPDATE workshop_incidents wi
+     SET display_order = next_order.display_order, updated_at = NOW()
+     FROM next_order
+     WHERE wi.id = next_order.incident_id
+       AND wi.status IN ('OPEN', 'PENDING')`,
+    [baseOrder + 1, orderedIncidentIds]
+  );
+  return rowCount ?? 0;
 }
 
 export async function listHistoryEvents(query: QueryParams) {
@@ -541,7 +701,7 @@ export async function listIncidentEvents(incidentId: number) {
   return rows;
 }
 
-export async function getIncidentMetrics() {
+export async function getIncidentMetrics(userId: number): Promise<WorkshopIncidentMetricsResult> {
   const { rows } = await pool.query(
     `SELECT
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
@@ -550,26 +710,80 @@ export async function getIncidentMetrics() {
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_priority = TRUE)::int AS priority_count,
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = TRUE)::int AS taken_count,
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = FALSE)::int AS not_taken_count,
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND taken_by_user_id = $1)::int AS assigned_to_me_count,
        COUNT(*) FILTER (WHERE ${openStatusSql}
          AND NOW() - created_at > INTERVAL '7 days')::int AS open_over_7d
-     FROM workshop_incidents`
+     FROM workshop_incidents`,
+    [userId]
+  );
+  const followed = await pool.query(
+    `SELECT
+       COUNT(*)::int AS followed_count,
+       COUNT(*) FILTER (WHERE wi.status IN ('CLOSED', 'CANCELED', 'INVALIDATED'))::int AS followed_resolved_count
+     FROM workshop_incident_followers wif
+     JOIN workshop_incidents wi ON wi.id = wif.incident_id
+     WHERE wif.user_id = $1 AND wif.deleted_at IS NULL`,
+    [userId]
   );
 
   const metrics = rows[0];
+  const followMetrics = followed.rows[0];
   return {
+    global: {
+      total: metrics.total,
+      open: metrics.open_count,
+      pending: metrics.pending_count,
+      priority: metrics.priority_count,
+      taken: metrics.taken_count,
+      not_taken: metrics.not_taken_count,
+      open_over_7d: metrics.open_over_7d,
+    },
+    personal: {
+      assigned_to_me: metrics.assigned_to_me_count,
+      followed: followMetrics.followed_count,
+      followed_resolved: followMetrics.followed_resolved_count,
+    },
     total: metrics.total,
     open: metrics.open_count,
     pending: metrics.pending_count,
     priority: metrics.priority_count,
     taken: metrics.taken_count,
     not_taken: metrics.not_taken_count,
+    assigned_to_me: metrics.assigned_to_me_count,
+    followed: followMetrics.followed_count,
+    followed_resolved: followMetrics.followed_resolved_count,
     open_over_7d: metrics.open_over_7d,
   };
 }
 
+export async function incidentExists(incidentId: number): Promise<boolean> {
+  const { rowCount } = await pool.query('SELECT 1 FROM workshop_incidents WHERE id = $1', [incidentId]);
+  return (rowCount ?? 0) > 0;
+}
+
+export async function followIncidentData(incidentId: number, userId: number, client?: PoolClient): Promise<void> {
+  const db = client ?? pool;
+  await db.query(
+    `INSERT INTO workshop_incident_followers (incident_id, user_id)
+     VALUES ($1, $2)
+     ON CONFLICT (incident_id, user_id) WHERE deleted_at IS NULL DO NOTHING`,
+    [incidentId, userId]
+  );
+}
+
+export async function unfollowIncidentData(incidentId: number, userId: number, client?: PoolClient): Promise<void> {
+  const db = client ?? pool;
+  await db.query(
+    `UPDATE workshop_incident_followers
+     SET deleted_at = NOW()
+     WHERE incident_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+    [incidentId, userId]
+  );
+}
+
 export async function getWorkshopAnalytics(query: QueryParams) {
   const { start, end, lineId, machineId } = query;
-  const filters: string[] = [nonCanceledWorkshopIncidentStatusSql];
+  const filters: string[] = [nonTerminalRejectedWorkshopIncidentStatusSql];
   const params: Array<string | number> = [];
 
   if (start) {
@@ -596,7 +810,7 @@ export async function getWorkshopAnalytics(query: QueryParams) {
 
   const { rows: totalsRows } = await pool.query(
     `SELECT
-       COUNT(*) FILTER (WHERE ${statusNotEqualsSql('status', 'CANCELED')})::int AS total,
+       COUNT(*) FILTER (WHERE ${statusInSql('status', INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED'))})::int AS total,
        COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
        COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
        COUNT(*) FILTER (WHERE ${closedStatusSql})::int AS closed_count,

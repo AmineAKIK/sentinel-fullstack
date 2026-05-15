@@ -38,6 +38,58 @@ body {
   min-height: 100vh;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 3000;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background-color: #111827;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: var(--shadow-lg);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+.btn:focus-visible,
+.form-input:focus-visible,
+.form-select:focus-visible,
+.nav-link:focus-visible,
+.nav-brand:focus-visible,
+.nav-logout:focus-visible,
+.workshop-metric:focus-visible,
+.incident-card:focus-visible,
+.filter-chip:focus-visible,
+.request-badge:focus-visible,
+.inline-link-button:focus-visible,
+.back-link:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.24);
+}
+
 h1 { font-size: 1.5rem; font-weight: 700; }
 h2 { font-size: 1.25rem; font-weight: 600; }
 h3 { font-size: 1rem; font-weight: 600; }
@@ -57,6 +109,7 @@ a { color: var(--color-primary); text-decoration: none; }
   cursor: pointer;
   transition: background-color 0.15s, opacity 0.15s;
   white-space: nowrap;
+  min-height: 40px;
 }
 
 .btn:disabled {
@@ -108,8 +161,9 @@ a { color: var(--color-primary); text-decoration: none; }
 }
 
 .btn-sm {
-  padding: 5px 10px;
+  padding: 7px 12px;
   font-size: 13px;
+  min-height: 36px;
 }
 
 .form-group {
@@ -135,6 +189,7 @@ a { color: var(--color-primary); text-decoration: none; }
   background-color: var(--color-surface);
   transition: border-color 0.15s;
   appearance: none;
+  min-height: 40px;
 }
 
 .form-input:focus,
@@ -188,6 +243,7 @@ a { color: var(--color-primary); text-decoration: none; }
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 500;
+  min-height: 24px;
 }
 
 .badge-status.active {
@@ -1035,7 +1091,8 @@ a { color: var(--color-primary); text-decoration: none; }
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  animation: requestPulse 1.6s ease-in-out infinite;
+  background-color: #dbeafe;
+  color: #1d4ed8;
   box-shadow: 0 0 0 0 var(--pulse-color, rgba(0, 0, 0, 0.2));
 }
 
@@ -1043,12 +1100,19 @@ a { color: var(--color-primary); text-decoration: none; }
   background-color: #fef3c7;
   color: #92400e;
   --pulse-color: rgba(234, 179, 8, 0.6);
+  animation: requestPulse 1.6s ease-in-out infinite;
 }
 
 .request-badge-delete {
   background-color: #fee2e2;
   color: #991b1b;
   --pulse-color: rgba(239, 68, 68, 0.6);
+  animation: requestPulse 1.6s ease-in-out infinite;
+}
+
+.request-badge-followed {
+  background-color: #e0e7ff;
+  color: #3730a3;
 }
 
 @keyframes requestPulse {
@@ -1058,8 +1122,13 @@ a { color: var(--color-primary); text-decoration: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .request-badge {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -1277,6 +1346,12 @@ tbody tr {
 
 tbody tr:hover {
   background-color: #eff6ff;
+}
+
+tbody tr[role="button"]:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: -3px;
+  background-color: #fff7ed;
 }
 
 .row-action {
@@ -1756,7 +1831,7 @@ tbody tr:hover .row-action {
 
 .workshop-search-bar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(260px, 1fr) auto auto;
   align-items: end;
   gap: 12px;
   margin-bottom: 10px;
@@ -1765,6 +1840,46 @@ tbody tr:hover .row-action {
   border-radius: var(--radius);
   background-color: var(--color-surface);
   box-shadow: var(--shadow);
+}
+
+.sort-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 3px;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.sort-toggle-btn {
+  flex: 1;
+  padding: 0 10px;
+  height: 100%;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sort-toggle-btn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.sort-toggle-btn.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.10);
 }
 
 .workshop-search-filter {
@@ -1822,7 +1937,7 @@ tbody tr:hover .row-action {
 
 .workshop-metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -1870,6 +1985,12 @@ button.workshop-metric:hover,
   color: var(--color-text);
   font-size: 22px;
   line-height: 1.1;
+}
+
+.workshop-metric small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .workshop-metric-loading {
@@ -1927,6 +2048,40 @@ button.workshop-metric:hover,
   box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4), var(--shadow);
 }
 
+.incident-card--resolved-followed {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  box-shadow: inset 4px 0 0 #64748b, var(--shadow);
+  opacity: 0.92;
+}
+
+.incident-card--resolved-followed:hover {
+  opacity: 1;
+}
+
+.incident-followed-resolved-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #94a3b8;
+  border-radius: var(--radius);
+  background-color: #e2e8f0;
+  color: #334155;
+}
+
+.incident-followed-resolved-banner strong {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.incident-followed-resolved-banner span {
+  color: #475569;
+}
+
 .incident-card-main {
   display: flex;
   justify-content: space-between;
@@ -1947,6 +2102,17 @@ button.workshop-metric:hover,
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.badge-status.neutral {
+  background-color: #334155;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.badge-status.followed {
+  background-color: #dbeafe;
+  color: #1d4ed8;
 }
 
 .incident-card-summary {
@@ -2050,6 +2216,9 @@ button.workshop-metric:hover,
   }
   .workshop-search-filter {
     min-width: unset;
+  }
+  .sort-toggle-group {
+    width: 100%;
   }
 }
 

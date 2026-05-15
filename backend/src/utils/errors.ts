@@ -9,7 +9,8 @@ export type ErrorCode =
   | 'LINE_ALREADY_EXISTS'
   | 'MACHINE_ALREADY_EXISTS'
   | 'RESOURCE_IN_USE'
-  | 'SERVER_ERROR';
+  | 'SERVER_ERROR'
+  | 'SERVICE_UNAVAILABLE';
 
 export interface ApiError {
   error: {

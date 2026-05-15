@@ -9,14 +9,30 @@ export interface CurrentIncident {
   status: IncidentStatus;
   is_taken: boolean;
   taken_by_user_id: number | null;
+  cancel_request?: boolean;
+  // delete_request is a legacy alias for cancel_request kept for DB compatibility.
   delete_request?: boolean;
+  edit_request?: unknown | null;
 }
 
 export function isActiveIncident(incident: CurrentIncident): boolean {
-  return incident.status !== 'CLOSED' && incident.status !== 'CANCELED';
+  return (
+    incident.status !== 'CLOSED' &&
+    incident.status !== 'CANCELED' &&
+    incident.status !== 'INVALIDATED'
+  );
 }
 
-export function canPerform(role: string, action: IncidentAction, incident: CurrentIncident): boolean {
+function hasCancelRequest(incident: CurrentIncident): boolean {
+  return incident.cancel_request === true || incident.delete_request === true;
+}
+
+export function canPerform(
+  role: string,
+  action: IncidentAction,
+  incident: CurrentIncident,
+  actorId?: number
+): boolean {
   if (!isWorkshopRole(role)) return false;
   const workshopRole = role as WorkshopRole;
 
@@ -24,23 +40,46 @@ export function canPerform(role: string, action: IncidentAction, incident: Curre
     case 'REQUEST_EDIT':
       return workshopRole === 'OPERATOR' && isActiveIncident(incident);
     case 'REQUEST_CANCEL':
+      // OPERATOR can only request cancellation while the incident is untaken.
+      // Once MAINTENANCE takes it, cancellation goes through RESPONSABLE approval.
       return workshopRole === 'OPERATOR' && isActiveIncident(incident) && !incident.is_taken;
     case 'DIRECT_EDIT':
-      return isActiveIncident(incident) && !incident.is_taken && (
-        workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE'
+      return (
+        isActiveIncident(incident) &&
+        !incident.is_taken &&
+        (workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE')
+      );
+    case 'EDIT_AFTER_TAKE':
+      // MAINTENANCE can edit descriptive fields on incidents they personally took charge of.
+      return (
+        workshopRole === 'MAINTENANCE' &&
+        isActiveIncident(incident) &&
+        incident.is_taken &&
+        actorId !== undefined &&
+        incident.taken_by_user_id === actorId
       );
     case 'CANCEL':
-      return isActiveIncident(incident) && !incident.is_taken && (
-        workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE'
+      return (
+        isActiveIncident(incident) &&
+        !incident.is_taken &&
+        (workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE')
       );
     case 'APPROVE_EDIT':
     case 'REJECT_EDIT':
-      return workshopRole === 'RESPONSABLE' && isActiveIncident(incident);
+      return (
+        workshopRole === 'RESPONSABLE' &&
+        isActiveIncident(incident) &&
+        incident.edit_request != null
+      );
     case 'APPROVE_CANCEL':
-      return workshopRole === 'RESPONSABLE' && isActiveIncident(incident) && incident.delete_request === true;
     case 'REJECT_CANCEL':
-      return workshopRole === 'RESPONSABLE' && isActiveIncident(incident);
+      return (
+        workshopRole === 'RESPONSABLE' &&
+        isActiveIncident(incident) &&
+        hasCancelRequest(incident)
+      );
     case 'TAKE':
+      // Reserved for MAINTENANCE only — RESPONSABLE monitors but does not intervene.
       return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && !incident.is_taken;
     case 'SET_PENDING':
       return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;

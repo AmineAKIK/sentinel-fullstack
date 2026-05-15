@@ -54,7 +54,7 @@ export default function AdminHomePage() {
   return (
     <>
       <NavBar />
-      <main className="page-container admin-home">
+      <main id="main-content" className="page-container admin-home">
         <div className="page-header">
           <h1>Accueil administration</h1>
         </div>

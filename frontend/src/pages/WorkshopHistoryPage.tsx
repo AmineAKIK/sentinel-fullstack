@@ -31,10 +31,13 @@ import {
   withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
 
-type HistoryStatusFilter = 'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
+type HistoryStatusFilter = 'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
 
 function readHistoryStatusFilter(value: string | null): HistoryStatusFilter {
-  return value === 'OPEN' || value === 'PENDING' || value === 'CLOSED' || value === 'CANCELED' ? value : 'all';
+  return value === 'OPEN' || value === 'PENDING' || value === 'CLOSED' ||
+    value === 'CANCELED' || value === 'INVALIDATED'
+    ? value
+    : 'all';
 }
 
 export default function WorkshopHistoryPage() {
@@ -214,8 +217,9 @@ export default function WorkshopHistoryPage() {
     updateSearchFilter('event', 'all');
   }
 
-  function durationLabel(startIso?: string, endIso?: string): string {
-    if (!startIso || !endIso) return '-';
+  function durationLabel(startIso?: string, endIso?: string, status?: string): string {
+    if (!startIso) return '-';
+    if (!endIso || (status && status !== 'CLOSED' && status !== 'CANCELED' && status !== 'INVALIDATED')) return 'En cours';
     const diffMs = new Date(endIso).getTime() - new Date(startIso).getTime();
     if (diffMs <= 0) return '-';
     const minutes = Math.round(diffMs / 60000);
@@ -232,7 +236,7 @@ export default function WorkshopHistoryPage() {
   return (
     <>
       <WorkshopNavBar />
-      <main className="page-container workshop-page">
+      <main id="main-content" className="page-container workshop-page">
         <button className="back-link" onClick={() => navigate('/workshop/dashboard')}>
           Retour au dashboard
         </button>
@@ -414,7 +418,7 @@ export default function WorkshopHistoryPage() {
                     </div>
                     <div>
                       <span className="detail-field-label">Durée dossier</span>
-                      <strong>{durationLabel(selectedIncident.created_at, selectedIncident.updated_at)}</strong>
+                      <strong>{durationLabel(selectedIncident.created_at, selectedIncident.updated_at, selectedIncident.status)}</strong>
                       <p>Créé le {formatDateTime(selectedIncident.created_at)}</p>
                     </div>
                   </div>
@@ -426,6 +430,8 @@ export default function WorkshopHistoryPage() {
                         ? 'Cas clôturé et conservé dans l’historique opérationnel.'
                         : selectedIncident.status === 'CANCELED'
                           ? 'Signalement annulé : conservé dans le journal, exclu de la connaissance et des statistiques stratégiques.'
+                          : selectedIncident.status === 'INVALIDATED'
+                            ? 'Cas invalidé après clôture : conservé dans le journal, exclu de la connaissance et des statistiques stratégiques.'
                           : selectedIncident.status === 'PENDING'
                             ? 'Cas en attente : le traitement doit être repris ou justifié avant clôture.'
                             : 'Cas ouvert : le dossier reste en cours dans la file opérationnelle.'}

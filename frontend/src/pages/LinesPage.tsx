@@ -141,7 +141,7 @@ export default function LinesPage() {
     return (
       <>
         <NavBar />
-        <main className="page-container">
+        <main id="main-content" className="page-container">
           <button className="back-link" onClick={() => setSelected(null)}>
             Retour à la liste
           </button>
@@ -286,7 +286,7 @@ export default function LinesPage() {
   return (
     <>
       <NavBar />
-      <main className="page-container">
+      <main id="main-content" className="page-container">
         <button className="back-link" onClick={() => navigate('/admin/accueil')}>
           Retour à l'accueil
         </button>
@@ -357,6 +357,15 @@ export default function LinesPage() {
                     <tr
                       key={line.id}
                       onClick={() => setSelected(line)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelected(line);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Voir la ligne ${line.line_number}`}
                       title="Voir la ligne"
                     >
                       <td><strong>{line.line_number}</strong></td>

@@ -137,4 +137,40 @@ describe('updateIncidentSchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('rejects an interventionNote longer than 1000 characters', () => {
+    const result = updateIncidentSchema.safeParse({ interventionNote: 'x'.repeat(1001) });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts an interventionNote of exactly 1000 characters', () => {
+    const result = updateIncidentSchema.safeParse({ interventionNote: 'x'.repeat(1000) });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a diagnostic longer than 1000 characters', () => {
+    const result = updateIncidentSchema.safeParse({ diagnostic: 'x'.repeat(1001) });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a responsibleComment longer than 500 characters', () => {
+    const result = updateIncidentSchema.safeParse({ responsibleComment: 'x'.repeat(501) });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a currentProduct longer than 120 characters', () => {
+    const result = updateIncidentSchema.safeParse({ currentProduct: 'x'.repeat(121) });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a currentProduct of exactly 120 characters', () => {
+    const result = updateIncidentSchema.safeParse({ currentProduct: 'x'.repeat(120) });
+    expect(result.success).toBe(true);
+  });
+
+  it('coerces a numeric string headNumber', () => {
+    const result = updateIncidentSchema.safeParse({ headNumber: '3' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.headNumber).toBe(3);
+  });
 });

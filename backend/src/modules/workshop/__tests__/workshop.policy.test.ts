@@ -7,7 +7,7 @@ function incident(overrides: Partial<CurrentIncident> = {}): CurrentIncident {
     status: 'OPEN',
     is_taken: false,
     taken_by_user_id: null,
-    delete_request: false,
+    cancel_request: false,
     ...overrides,
   };
 }
@@ -118,25 +118,28 @@ describe('MAINTENANCE permissions', () => {
 // ─── RESPONSABLE actions ──────────────────────────────────────────────────────
 
 describe('RESPONSABLE permissions', () => {
-  it('can APPROVE_EDIT and REJECT_EDIT on active incidents', () => {
-    expect(canPerform('RESPONSABLE', 'APPROVE_EDIT', incident())).toBe(true);
-    expect(canPerform('RESPONSABLE', 'REJECT_EDIT', incident())).toBe(true);
+  it('can APPROVE_EDIT and REJECT_EDIT only when an edit request exists', () => {
+    expect(canPerform('RESPONSABLE', 'APPROVE_EDIT', incident({ edit_request: { comment: 'x' } }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'REJECT_EDIT', incident({ edit_request: { comment: 'x' } }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'APPROVE_EDIT', incident())).toBe(false);
+    expect(canPerform('RESPONSABLE', 'REJECT_EDIT', incident())).toBe(false);
   });
 
   it('cannot APPROVE_EDIT on closed incident', () => {
     expect(canPerform('RESPONSABLE', 'APPROVE_EDIT', incident({ status: 'CLOSED' }))).toBe(false);
   });
 
-  it('can APPROVE_CANCEL when delete_request is true', () => {
-    expect(canPerform('RESPONSABLE', 'APPROVE_CANCEL', incident({ delete_request: true }))).toBe(true);
+  it('can APPROVE_CANCEL when cancel_request is true', () => {
+    expect(canPerform('RESPONSABLE', 'APPROVE_CANCEL', incident({ cancel_request: true }))).toBe(true);
   });
 
-  it('cannot APPROVE_CANCEL when delete_request is false', () => {
-    expect(canPerform('RESPONSABLE', 'APPROVE_CANCEL', incident({ delete_request: false }))).toBe(false);
+  it('cannot APPROVE_CANCEL when cancel_request is false', () => {
+    expect(canPerform('RESPONSABLE', 'APPROVE_CANCEL', incident({ cancel_request: false }))).toBe(false);
   });
 
-  it('can REJECT_CANCEL on active incident', () => {
-    expect(canPerform('RESPONSABLE', 'REJECT_CANCEL', incident())).toBe(true);
+  it('can REJECT_CANCEL only when cancel_request is true', () => {
+    expect(canPerform('RESPONSABLE', 'REJECT_CANCEL', incident({ cancel_request: true }))).toBe(true);
+    expect(canPerform('RESPONSABLE', 'REJECT_CANCEL', incident())).toBe(false);
   });
 
   it('can SET_PRIORITY, REORDER, RESPONSIBLE_COMMENT on active incidents', () => {

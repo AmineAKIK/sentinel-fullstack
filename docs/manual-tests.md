@@ -90,7 +90,7 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 | 6.7 | MAINTENANCE | Clore (CLOSE) avec note d'intervention | Statut CLOSED, `intervention_note` enregistrée |
 | 6.8 | Tous | Vérifier l'incident dans l'historique | Incident visible dans `/workshop/history` |
 | 6.9 | RESPONSABLE | Invalider un incident clôturé | Statut repasse à OPEN, événement INVALIDATE_CLOSED loggué |
-| 6.10 | OPERATOR | Demander annulation (REQUEST_CANCEL) + motif | `delete_request = true`, motif enregistré |
+| 6.10 | OPERATOR | Demander annulation (REQUEST_CANCEL) + motif | `cancel_request = true`, motif enregistré |
 | 6.11 | RESPONSABLE | Approuver l'annulation | Incident CANCELED |
 | 6.12 | Tous | Vérifier que l'incident annulé n'est plus sur le board actif | Absent du board |
 

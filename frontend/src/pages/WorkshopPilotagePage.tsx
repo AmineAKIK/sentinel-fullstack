@@ -30,6 +30,10 @@ export default function WorkshopPilotagePage() {
   }, []);
 
   useEffect(() => {
+    if (period === 'custom' && customStart && customEnd && customStart > customEnd) {
+      setError('La date de début doit être antérieure à la date de fin.');
+      return;
+    }
     setLoading(true);
     setError('');
     getWorkshopAnalytics(buildAnalyticsParams(period, customStart, customEnd, lineFilter, machineFilter))
@@ -162,7 +166,7 @@ export default function WorkshopPilotagePage() {
   return (
     <>
       <WorkshopNavBar />
-      <main className="page-container workshop-page">
+      <main id="main-content" className="page-container workshop-page">
         <button className="back-link" onClick={() => navigate('/workshop/dashboard')}>
           Retour au dashboard
         </button>
@@ -247,6 +251,11 @@ export default function WorkshopPilotagePage() {
               label="Plus vieux actif"
               value={loading ? '...' : formatSeconds(analytics?.oldest_active_seconds ?? null)}
               sub="Ancienneté maximale en cours"
+            />
+            <KpiCard
+              label="Délai médian prise en charge"
+              value={loading ? '...' : formatSeconds(analytics?.median_take_seconds ?? null)}
+              sub="Médiane du temps avant prise en charge"
             />
           </div>
 

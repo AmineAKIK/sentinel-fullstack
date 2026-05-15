@@ -16,6 +16,7 @@ export const STATUS_LABELS: Record<string, string> = {
   PENDING: 'En attente',
   CLOSED: 'Clôturé',
   CANCELED: 'Annulé',
+  INVALIDATED: 'Invalidé',
 };
 
 export const STATE_LABELS: Record<string, string> = {
