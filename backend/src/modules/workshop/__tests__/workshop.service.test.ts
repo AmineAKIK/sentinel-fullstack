@@ -3,6 +3,7 @@ import {
   createIncidentService,
   cancelIncidentService,
   followIncidentService,
+  reorderIncidentsService,
   unfollowIncidentService,
   updateIncidentService,
 } from '../workshop.service';
@@ -33,8 +34,11 @@ jest.mock('../workshop.repository', () => ({
   getWorkshopAnalytics: jest.fn(),
   fetchIncidentWithUsersForActor: jest.fn(),
   incidentExists: jest.fn(),
+  getIncidentStatus: jest.fn(),
   followIncidentData: jest.fn(),
   unfollowIncidentData: jest.fn(),
+  listReorderableIncidentIds: jest.fn(),
+  reorderIncidentsData: jest.fn(),
 }));
 
 jest.mock('../workshop.events', () => ({
@@ -72,6 +76,7 @@ function mockCancelSnapshot(overrides: Partial<{
   status: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED';
   is_taken: boolean;
   taken_by_user_id: number | null;
+  user_id: number;
   delete_request: boolean;
   delete_request_reason: string | null;
 }> = {}) {
@@ -79,6 +84,7 @@ function mockCancelSnapshot(overrides: Partial<{
     status: 'OPEN' as const,
     is_taken: false,
     taken_by_user_id: null,
+    user_id: 1,
     delete_request: false,
     delete_request_reason: null,
     ...overrides,
@@ -89,6 +95,7 @@ function mockIncident(overrides: Record<string, unknown> = {}) {
   const now = new Date('2025-01-01T00:00:00Z');
   return {
     id: 1,
+    user_id: 1,
     status: 'OPEN' as IncidentStatus,
     is_taken: false,
     taken_by_user_id: null,
@@ -139,7 +146,7 @@ describe('createIncidentService', () => {
   it('retourne NOT_FOUND si la ligne n\'existe pas', async () => {
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(null);
 
-    const result = await createIncidentService(validCreateInput, 1);
+    const result = await createIncidentService(validCreateInput, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe('NOT_FOUND');
@@ -151,7 +158,7 @@ describe('createIncidentService', () => {
     const line = mockLine();
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
 
-    const result = await createIncidentService({ ...validCreateInput, machineId: 'INEXISTANT' }, 1);
+    const result = await createIncidentService({ ...validCreateInput, machineId: 'INEXISTANT' }, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe('VALIDATION_ERROR');
@@ -163,7 +170,7 @@ describe('createIncidentService', () => {
     const line = mockLine();
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
 
-    const result = await createIncidentService({ ...validCreateInput, robotLabel: 'INEXISTANT' }, 1);
+    const result = await createIncidentService({ ...validCreateInput, robotLabel: 'INEXISTANT' }, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
   });
@@ -172,7 +179,7 @@ describe('createIncidentService', () => {
     const line = mockLine();
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
 
-    const result = await createIncidentService({ ...validCreateInput, headNumber: 0 }, 1);
+    const result = await createIncidentService({ ...validCreateInput, headNumber: 0 }, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
   });
@@ -181,7 +188,7 @@ describe('createIncidentService', () => {
     const line = mockLine();
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
 
-    const result = await createIncidentService({ ...validCreateInput, headNumber: 99 }, 1);
+    const result = await createIncidentService({ ...validCreateInput, headNumber: 99 }, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
   });
@@ -194,7 +201,7 @@ describe('createIncidentService', () => {
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);
 
-    const result = await createIncidentService(validCreateInput, 1);
+    const result = await createIncidentService(validCreateInput, 1, 'OPERATOR');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(incident);
     expect(events.logIncidentEvent).toHaveBeenCalledWith(1, 1, 'INCIDENT_CREATED', expect.any(Object), null);
@@ -256,9 +263,9 @@ describe('followIncidentService', () => {
     if (!result.ok) expect(result.code).toBe('FORBIDDEN');
   });
 
-  it('permet au responsable de suivre un incident', async () => {
+  it('permet au responsable de suivre un incident actif', async () => {
     const incident = mockIncident({ is_followed: true });
-    jest.mocked(repo.incidentExists).mockResolvedValue(true);
+    jest.mocked(repo.getIncidentStatus).mockResolvedValue({ status: 'OPEN' });
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(repo.followIncidentData).mockResolvedValue(undefined);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);
@@ -293,7 +300,7 @@ describe('updateIncidentService – OPERATOR', () => {
   it('retourne NOT_FOUND si l\'incident n\'existe pas', async () => {
     jest.mocked(repo.getIncidentById).mockResolvedValue(null);
 
-    const result = await updateIncidentService(999, { requestOnly: true }, 1, 'OPERATOR');
+    const result = await updateIncidentService(999, { requestOnly: true, state: 'INDISPONIBLE' }, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('NOT_FOUND');
   });
@@ -340,6 +347,28 @@ describe('updateIncidentService – OPERATOR', () => {
     const result = await updateIncidentService(1, { requestOnly: true, state: 'INDISPONIBLE' }, 1, 'OPERATOR');
     expect(result.ok).toBe(true);
     expect(events.logIncidentEvent).toHaveBeenCalledWith(1, 1, 'EDIT_REQUESTED', expect.any(Object), null);
+  });
+
+  it('OPERATOR peut demander une correction de ligne sans contourner la whitelist', async () => {
+    const incident = mockIncident();
+    const updated = mockIncident({ edit_request: { lineId: 2 } });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(repo.requestEditIncident).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);
+
+    const result = await updateIncidentService(1, { requestOnly: true, lineId: 2 }, 1, 'OPERATOR');
+    expect(result.ok).toBe(true);
+    expect(repo.requestEditIncident).toHaveBeenCalledWith(1, { lineId: 2 }, null);
+  });
+
+  it('rejette une demande de correction mélangée à un champ hors édition', async () => {
+    const result = await updateIncidentService(1, { requestOnly: true, state: 'INDISPONIBLE', isPriority: true }, 1, 'OPERATOR');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.getIncidentById).not.toHaveBeenCalled();
+    expect(repo.requestEditIncident).not.toHaveBeenCalled();
   });
 });
 
@@ -620,6 +649,30 @@ describe('getWorkshopAnalyticsService', () => {
 // ─── cas limites manquants ─────────────────────────────────────────────────────
 
 describe('updateIncidentService – cas limites', () => {
+  it('rejette un payload vide avant toute lecture DB', async () => {
+    const result = await updateIncidentService(1, {}, 1, 'RESPONSABLE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.getIncidentById).not.toHaveBeenCalled();
+  });
+
+  it('rejette un champ technique caché dans une modification descriptive', async () => {
+    const result = await updateIncidentService(1, { state: 'INDISPONIBLE', diagnostic: 'injection' }, 1, 'RESPONSABLE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.updateIncidentData).not.toHaveBeenCalled();
+  });
+
+  it('rejette une action de statut mélangée à une autre action', async () => {
+    const result = await updateIncidentService(1, { status: 'CLOSED', interventionNote: 'Ok', isPriority: true }, 1, 'MAINTENANCE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.getIncidentById).not.toHaveBeenCalled();
+  });
+
   it('retourne NOT_FOUND si requestCancelIncident retourne null (race condition)', async () => {
     const incident = mockIncident({ is_taken: false });
     jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
@@ -686,6 +739,49 @@ describe('cancelIncidentService – cas limites', () => {
   });
 });
 
+describe('reorderIncidentsService', () => {
+  it('interdit le réordonnancement aux rôles non responsables', async () => {
+    const result = await reorderIncidentsService({ orderedIncidentIds: [1, 2] }, 1, 'MAINTENANCE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('FORBIDDEN');
+    expect(repo.listReorderableIncidentIds).not.toHaveBeenCalled();
+  });
+
+  it('rejette les doublons avant la transaction', async () => {
+    const result = await reorderIncidentsService({ orderedIncidentIds: [1, 1] }, 1, 'RESPONSABLE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.listReorderableIncidentIds).not.toHaveBeenCalled();
+  });
+
+  it('rejette les incidents inexistants ou non actifs avant update et logs', async () => {
+    jest.mocked(repo.listReorderableIncidentIds).mockResolvedValue([1]);
+
+    const result = await reorderIncidentsService({ orderedIncidentIds: [1, 2] }, 1, 'RESPONSABLE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.reorderIncidentsData).not.toHaveBeenCalled();
+    expect(events.logIncidentEvent).not.toHaveBeenCalled();
+  });
+
+  it('réordonne uniquement après verrouillage des incidents actifs', async () => {
+    jest.mocked(repo.listReorderableIncidentIds).mockResolvedValue([1, 2]);
+    jest.mocked(repo.reorderIncidentsData).mockResolvedValue(2);
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);
+
+    const result = await reorderIncidentsService({ orderedIncidentIds: [1, 2] }, 7, 'RESPONSABLE');
+
+    expect(result).toEqual({ ok: true, data: { updated: 2 } });
+    expect(repo.listReorderableIncidentIds).toHaveBeenCalledWith([1, 2], null);
+    expect(repo.reorderIncidentsData).toHaveBeenCalledWith([1, 2], null);
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(1, 7, 'INCIDENT_REORDERED', { position: 1, batchSize: 2 }, null);
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(2, 7, 'INCIDENT_REORDERED', { position: 2, batchSize: 2 }, null);
+  });
+});
+
 // ─── policy : EDIT_AFTER_TAKE ─────────────────────────────────────────────────
 
 describe('updateIncidentService – EDIT_AFTER_TAKE', () => {
@@ -747,7 +843,7 @@ describe('updateIncidentService – cohérence transactionnelle', () => {
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);
 
-    await createIncidentService(validCreateInput, 1);
+    await createIncidentService(validCreateInput, 1, 'OPERATOR');
     expect(mockWithTransaction).toHaveBeenCalledTimes(1);
   });
 });

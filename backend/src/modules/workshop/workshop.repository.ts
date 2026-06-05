@@ -22,6 +22,30 @@ const nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql('wi.status', IN
   (status) => status !== 'CANCELED' && status !== 'INVALIDATED'
 ));
 
+// ─── SQL column constants ─────────────────────────────────────────────────────
+
+const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
+            wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
+            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
+            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
+            wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at`;
+
+const INCIDENT_ACTOR_COLS = `su.first_name, su.last_name, su.role,
+            tu.first_name AS taken_by_first_name,
+            tu.last_name AS taken_by_last_name,
+            tu.role AS taken_by_role`;
+
+const INCIDENT_FOLLOWER_COLS = `(wif.id IS NOT NULL) AS is_followed,
+            wif.created_at AS followed_at`;
+
+const INCIDENT_USER_JOINS = `JOIN sentinel_users su ON su.id = wi.user_id
+     LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id`;
+
+// ─── SQL time interval constants ──────────────────────────────────────────────
+
+const INCIDENT_CRITICAL_AGE = `'7 days'`;
+const INCIDENT_RECENT_AGE = `'24 hours'`;
+
 export type StoredMachine =
   | {
       machineId: string;
@@ -50,6 +74,7 @@ export interface IncidentCancelSnapshot {
   status: IncidentStatus;
   is_taken: boolean;
   taken_by_user_id: number | null;
+  user_id: number;
   cancel_request?: boolean;
   cancel_request_reason?: string | null;
   delete_request?: boolean;
@@ -59,6 +84,7 @@ export interface IncidentCancelSnapshot {
 
 export interface WorkshopIncidentRow extends CurrentIncident {
   id: number;
+  user_id: number;
   shift: string;
   line_id: number;
   line_number: string;
@@ -117,11 +143,42 @@ export interface WorkshopIncidentMetricsResult {
   open_over_7d: number;
 }
 
+// ─── Shared filter helper ─────────────────────────────────────────────────────
+
+function appendScalarIncidentFilters(
+  query: QueryParams,
+  filters: string[],
+  params: Array<string | number>,
+  skipStatus = false
+): void {
+  const { status, state, lineId, machineId } = query;
+
+  if (!skipStatus && status && isIncidentStatus(String(status))) {
+    params.push(String(status));
+    filters.push(`wi.status = $${params.length}`);
+  }
+  if (state && isIncidentState(String(state))) {
+    params.push(String(state));
+    filters.push(`wi.state = $${params.length}`);
+  }
+  if (lineId) {
+    const parsedLine = parseOptionalInt(lineId);
+    if (parsedLine !== null) {
+      params.push(parsedLine);
+      filters.push(`wi.line_id = $${params.length}`);
+    }
+  }
+  if (machineId) {
+    params.push(String(machineId));
+    filters.push(`wi.machine_id = $${params.length}`);
+  }
+}
+
 function buildIncidentWorkspaceFilters(
   query: QueryParams,
   mode: IncidentListMode
 ): { whereClause: string; params: Array<string | number>; limit: number } {
-  const { q, status, state, lineId, machineId, limit } = query;
+  const { q, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
   const safeLimit = boundedInt(limit, 200, 1, 500);
@@ -130,28 +187,9 @@ function buildIncidentWorkspaceFilters(
     filters.push(statusEqualsSql('wi.status', 'CLOSED'));
     filters.push(`wi.intervention_note IS NOT NULL`);
     filters.push(`btrim(wi.intervention_note) != ''`);
-  } else if (status && isIncidentStatus(String(status))) {
-    params.push(String(status));
-    filters.push(`wi.status = $${params.length}`);
   }
 
-  if (state && isIncidentState(String(state))) {
-    params.push(String(state));
-    filters.push(`wi.state = $${params.length}`);
-  }
-
-  if (lineId) {
-    const parsedLine = parseOptionalInt(lineId);
-    if (parsedLine !== null) {
-      params.push(parsedLine);
-      filters.push(`wi.line_id = $${params.length}`);
-    }
-  }
-
-  if (machineId) {
-    params.push(String(machineId));
-    filters.push(`wi.machine_id = $${params.length}`);
-  }
+  appendScalarIncidentFilters(query, filters, params, mode === 'knowledge');
 
   if (q && String(q).trim()) {
     params.push(`%${String(q).trim()}%`);
@@ -180,30 +218,13 @@ function buildIncidentWorkspaceFilters(
 }
 
 function buildHistoryEventFilters(query: QueryParams): { whereClause: string; params: Array<string | number>; limit: number } {
-  const { q, status, state, lineId, machineId, eventType, limit } = query;
+  const { q, eventType, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
   const safeLimit = boundedInt(limit, 200, 1, 500);
 
-  if (status && isIncidentStatus(String(status))) {
-    params.push(String(status));
-    filters.push(`wi.status = $${params.length}`);
-  }
-  if (state && isIncidentState(String(state))) {
-    params.push(String(state));
-    filters.push(`wi.state = $${params.length}`);
-  }
-  if (lineId) {
-    const parsedLine = parseOptionalInt(lineId);
-    if (parsedLine !== null) {
-      params.push(parsedLine);
-      filters.push(`wi.line_id = $${params.length}`);
-    }
-  }
-  if (machineId) {
-    params.push(String(machineId));
-    filters.push(`wi.machine_id = $${params.length}`);
-  }
+  appendScalarIncidentFilters(query, filters, params);
+
   if (eventType && String(eventType) !== 'all') {
     params.push(String(eventType));
     filters.push(`we.event_type = $${params.length}`);
@@ -255,7 +276,7 @@ export async function getBoardData() {
          COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
          COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
          COUNT(*) FILTER (
-           WHERE ${openStatusSql} AND NOW() - created_at > INTERVAL '7 days'
+           WHERE ${activeIncidentStatusSql} AND NOW() - created_at > INTERVAL ${INCIDENT_CRITICAL_AGE}
          )::int AS open_over_7d
        FROM workshop_incidents`
     ),
@@ -288,20 +309,11 @@ export async function listActiveWorkshopLines() {
 export async function listIncidents(userId: number, role: string) {
   const includeFollowedResolved = role === 'RESPONSABLE';
   const { rows } = await pool.query(
-    `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
-            wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
-            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-          wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
-          wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
-          su.first_name, su.last_name, su.role,
-          tu.first_name AS taken_by_first_name,
-          tu.last_name AS taken_by_last_name,
-          tu.role AS taken_by_role,
-          (wif.id IS NOT NULL) AS is_followed,
-          wif.created_at AS followed_at
+    `SELECT ${INCIDENT_BASE_COLS},
+            ${INCIDENT_ACTOR_COLS},
+            ${INCIDENT_FOLLOWER_COLS}
      FROM workshop_incidents wi
-     JOIN sentinel_users su ON su.id = wi.user_id
-     LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
+     ${INCIDENT_USER_JOINS}
      LEFT JOIN workshop_incident_followers wif
        ON wif.incident_id = wi.id
       AND wif.user_id = $1
@@ -327,18 +339,10 @@ export async function listIncidentWorkspaceRows(query: QueryParams, mode: Incide
     : 'wi.created_at DESC, wi.updated_at DESC';
 
   const { rows } = await pool.query(
-    `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
-            wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
-            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
-            wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
-            su.first_name, su.last_name, su.role,
-            tu.first_name AS taken_by_first_name,
-            tu.last_name AS taken_by_last_name,
-            tu.role AS taken_by_role
+    `SELECT ${INCIDENT_BASE_COLS},
+            ${INCIDENT_ACTOR_COLS}
      FROM workshop_incidents wi
-     JOIN sentinel_users su ON su.id = wi.user_id
-     LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
+     ${INCIDENT_USER_JOINS}
      ${whereClause}
      ORDER BY ${orderBy}
      LIMIT $${params.length + 1}`,
@@ -348,52 +352,31 @@ export async function listIncidentWorkspaceRows(query: QueryParams, mode: Incide
   return rows;
 }
 
-export async function fetchIncidentWithUsers(incidentId: number) {
+export async function fetchIncidentWithUsers(incidentId: number, actorUserId?: number) {
+  const withFollowers = actorUserId !== undefined;
+  const followerCols = withFollowers ? `, ${INCIDENT_FOLLOWER_COLS}` : '';
+  const followerJoin = withFollowers
+    ? `LEFT JOIN workshop_incident_followers wif
+       ON wif.incident_id = wi.id
+      AND wif.user_id = $2
+      AND wif.deleted_at IS NULL`
+    : '';
+
   const { rows } = await pool.query(
-    `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
-            wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
-            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
-            wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
-            su.first_name, su.last_name, su.role,
-            tu.first_name AS taken_by_first_name,
-            tu.last_name AS taken_by_last_name,
-            tu.role AS taken_by_role
+    `SELECT ${INCIDENT_BASE_COLS},
+            ${INCIDENT_ACTOR_COLS}${followerCols}
      FROM workshop_incidents wi
-     JOIN sentinel_users su ON su.id = wi.user_id
-     LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
+     ${INCIDENT_USER_JOINS}
+     ${followerJoin}
      WHERE wi.id = $1`,
-    [incidentId]
+    withFollowers ? [incidentId, actorUserId] : [incidentId]
   );
 
   return rows[0];
 }
 
-export async function fetchIncidentWithUsersForActor(incidentId: number, actorUserId: number) {
-  const { rows } = await pool.query(
-    `SELECT wi.id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
-            wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
-            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
-            wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
-            wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at,
-            su.first_name, su.last_name, su.role,
-            tu.first_name AS taken_by_first_name,
-            tu.last_name AS taken_by_last_name,
-            tu.role AS taken_by_role,
-            (wif.id IS NOT NULL) AS is_followed,
-            wif.created_at AS followed_at
-     FROM workshop_incidents wi
-     JOIN sentinel_users su ON su.id = wi.user_id
-     LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id
-     LEFT JOIN workshop_incident_followers wif
-       ON wif.incident_id = wi.id
-      AND wif.user_id = $2
-      AND wif.deleted_at IS NULL
-     WHERE wi.id = $1`,
-    [incidentId, actorUserId]
-  );
-
-  return rows[0];
+export function fetchIncidentWithUsersForActor(incidentId: number, actorUserId: number) {
+  return fetchIncidentWithUsers(incidentId, actorUserId);
 }
 
 export async function getActiveWorkshopLine(lineId: number): Promise<ActiveWorkshopLine | null> {
@@ -434,7 +417,7 @@ export async function createIncidentData(input: {
       input.data.state,
       input.data.comment || null,
       input.data.currentProduct || null,
-      Date.now(),
+      0,
     ]
   );
 
@@ -447,7 +430,7 @@ export async function getIncidentCancelSnapshot(
 ): Promise<IncidentCancelSnapshot | null> {
   const db = client ?? pool;
   const { rows } = await db.query<IncidentCancelSnapshot>(
-    `SELECT status, is_taken, taken_by_user_id, cancel_request, cancel_request_reason,
+    `SELECT status, is_taken, taken_by_user_id, user_id, cancel_request, cancel_request_reason,
             delete_request, delete_request_reason, edit_request
      FROM workshop_incidents
      WHERE id = $1
@@ -467,6 +450,7 @@ export async function cancelIncidentData(incidentId: number, client?: PoolClient
          cancel_request_reason = NULL,
          delete_request = FALSE,
          delete_request_reason = NULL,
+         edit_request = NULL,
          updated_at = NOW()
      WHERE id = $1`,
     [incidentId]
@@ -583,6 +567,7 @@ export async function invalidateIncident(incidentId: number, client?: PoolClient
          cancel_request_reason = NULL,
          delete_request = FALSE,
          delete_request_reason = NULL,
+         edit_request = NULL,
          updated_at = NOW()
      WHERE id = $1
      RETURNING id`,
@@ -635,7 +620,11 @@ export async function updateIncidentData(input: {
       updates.status ?? current.status,
       updates.diagnostic ?? current.diagnostic,
       updates.interventionNote ?? current.intervention_note,
-      input.role === 'RESPONSABLE' ? (updates.responsibleComment ?? current.responsible_comment) : current.responsible_comment,
+      input.role === 'RESPONSABLE'
+        ? (updates.responsibleComment !== undefined
+            ? (updates.responsibleComment.trim() === '' ? null : updates.responsibleComment)
+            : current.responsible_comment)
+        : current.responsible_comment,
       nextTakenByUserId,
       nextTakenAt,
       updates.displayOrder ?? current.display_order,
@@ -666,6 +655,23 @@ export async function reorderIncidentsData(
     [baseOrder + 1, orderedIncidentIds]
   );
   return rowCount ?? 0;
+}
+
+export async function listReorderableIncidentIds(
+  incidentIds: number[],
+  client?: PoolClient
+): Promise<number[]> {
+  if (incidentIds.length === 0) return [];
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
+    `SELECT id
+     FROM workshop_incidents
+     WHERE id = ANY($1::int[])
+       AND status IN ('OPEN', 'PENDING')
+     FOR UPDATE`,
+    [incidentIds]
+  );
+  return rows.map((row) => row.id);
 }
 
 export async function listHistoryEvents(query: QueryParams) {
@@ -711,8 +717,8 @@ export async function getIncidentMetrics(userId: number): Promise<WorkshopIncide
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = TRUE)::int AS taken_count,
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = FALSE)::int AS not_taken_count,
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND taken_by_user_id = $1)::int AS assigned_to_me_count,
-       COUNT(*) FILTER (WHERE ${openStatusSql}
-         AND NOW() - created_at > INTERVAL '7 days')::int AS open_over_7d
+       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql}
+         AND NOW() - created_at > INTERVAL ${INCIDENT_CRITICAL_AGE})::int AS open_over_7d
      FROM workshop_incidents`,
     [userId]
   );
@@ -759,6 +765,14 @@ export async function getIncidentMetrics(userId: number): Promise<WorkshopIncide
 export async function incidentExists(incidentId: number): Promise<boolean> {
   const { rowCount } = await pool.query('SELECT 1 FROM workshop_incidents WHERE id = $1', [incidentId]);
   return (rowCount ?? 0) > 0;
+}
+
+export async function getIncidentStatus(incidentId: number): Promise<{ status: IncidentStatus } | null> {
+  const { rows } = await pool.query<{ status: IncidentStatus }>(
+    'SELECT status FROM workshop_incidents WHERE id = $1',
+    [incidentId]
+  );
+  return rows[0] ?? null;
 }
 
 export async function followIncidentData(incidentId: number, userId: number, client?: PoolClient): Promise<void> {
@@ -808,92 +822,94 @@ export async function getWorkshopAnalytics(query: QueryParams) {
 
   const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
 
-  const { rows: totalsRows } = await pool.query(
-    `SELECT
-       COUNT(*) FILTER (WHERE ${statusInSql('status', INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED'))})::int AS total,
-       COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
-       COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
-       COUNT(*) FILTER (WHERE ${closedStatusSql})::int AS closed_count,
-       COUNT(*) FILTER (WHERE is_priority = TRUE)::int AS priority_count,
-       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS active_count,
-       COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = FALSE)::int AS not_taken_count,
-       COUNT(*) FILTER (
-         WHERE ${activeIncidentStatusSql}
-           AND is_priority = TRUE
-           AND is_taken = FALSE
-       )::int AS urgent_not_taken_count,
-       COUNT(*) FILTER (WHERE taken_at IS NOT NULL)::int AS taken_count,
-       COUNT(*) FILTER (
-         WHERE ${activeIncidentStatusSql}
-           AND NOW() - created_at > INTERVAL '24 hours'
-       )::int AS open_over_24h_count,
-       COUNT(*) FILTER (
-         WHERE ${activeIncidentStatusSql}
-           AND NOW() - created_at > INTERVAL '7 days'
-       )::int AS open_over_7d_count,
-       MAX(EXTRACT(EPOCH FROM (NOW() - created_at))) FILTER (
-         WHERE ${activeIncidentStatusSql}
-       ) AS oldest_active_seconds,
-       percentile_cont(0.5) WITHIN GROUP (
-         ORDER BY EXTRACT(EPOCH FROM (taken_at - created_at))
-       ) AS median_take_seconds,
-       AVG(EXTRACT(EPOCH FROM (taken_at - created_at))) AS avg_take_seconds
-     FROM workshop_incidents wi
-     ${whereClause}`,
-    params
-  );
-
-  const { rows: stateRows } = await pool.query(
-    `SELECT wi.state, COUNT(*)::int AS count
-     FROM workshop_incidents wi
-     ${whereClause}
-     GROUP BY wi.state
-     ORDER BY count DESC`,
-    params
-  );
-
-  const { rows: lineRows } = await pool.query(
-    `SELECT wi.line_number, COUNT(*)::int AS count
-     FROM workshop_incidents wi
-     ${whereClause}
-     GROUP BY wi.line_number
-     ORDER BY count DESC`,
-    params
-  );
-
-  const { rows: machineRows } = await pool.query(
-    `SELECT wi.machine_id, COUNT(*)::int AS count
-     FROM workshop_incidents wi
-     ${whereClause}
-     GROUP BY wi.machine_id
-     ORDER BY count DESC`,
-    params
-  );
-
-  const { rows: closeRows } = await pool.query(
-    `WITH filtered_incidents AS (
-       SELECT wi.id, wi.created_at
+  const [
+    { rows: totalsRows },
+    { rows: stateRows },
+    { rows: lineRows },
+    { rows: machineRows },
+    { rows: closeRows },
+    { rows: trendRows },
+  ] = await Promise.all([
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE ${statusInSql('status', INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED'))})::int AS total,
+         COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
+         COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
+         COUNT(*) FILTER (WHERE ${closedStatusSql})::int AS closed_count,
+         COUNT(*) FILTER (WHERE is_priority = TRUE)::int AS priority_count,
+         COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS active_count,
+         COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND is_taken = FALSE)::int AS not_taken_count,
+         COUNT(*) FILTER (
+           WHERE ${activeIncidentStatusSql}
+             AND is_priority = TRUE
+             AND is_taken = FALSE
+         )::int AS urgent_not_taken_count,
+         COUNT(*) FILTER (WHERE taken_at IS NOT NULL)::int AS taken_count,
+         COUNT(*) FILTER (
+           WHERE ${activeIncidentStatusSql}
+             AND NOW() - created_at > INTERVAL ${INCIDENT_RECENT_AGE}
+         )::int AS open_over_24h_count,
+         COUNT(*) FILTER (
+           WHERE ${activeIncidentStatusSql}
+             AND NOW() - created_at > INTERVAL ${INCIDENT_CRITICAL_AGE}
+         )::int AS open_over_7d_count,
+         MAX(EXTRACT(EPOCH FROM (NOW() - created_at))) FILTER (
+           WHERE ${activeIncidentStatusSql}
+         ) AS oldest_active_seconds,
+         percentile_cont(0.5) WITHIN GROUP (
+           ORDER BY EXTRACT(EPOCH FROM (taken_at - created_at))
+         ) AS median_take_seconds,
+         AVG(EXTRACT(EPOCH FROM (taken_at - created_at))) AS avg_take_seconds
+       FROM workshop_incidents wi
+       ${whereClause}`,
+      params
+    ),
+    pool.query(
+      `SELECT wi.state, COUNT(*)::int AS count
        FROM workshop_incidents wi
        ${whereClause}
-     ),
-     closed_events AS (
-       SELECT we.incident_id, MIN(we.created_at) AS closed_at
-       FROM workshop_incident_events we
-       WHERE we.event_type = 'STATUS_CHANGED'
-         AND (we.payload->>'to') = 'CLOSED'
-       GROUP BY we.incident_id
-     )
-     SELECT
-       percentile_cont(0.5) WITHIN GROUP (
-         ORDER BY EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))
-       ) AS median_close_seconds,
-       AVG(EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))) AS avg_close_seconds
-     FROM filtered_incidents fi
-     JOIN closed_events ce ON ce.incident_id = fi.id`,
-    params
-  );
-
-  const { rows: trendRows } = await pool.query(
+       GROUP BY wi.state
+       ORDER BY count DESC`,
+      params
+    ),
+    pool.query(
+      `SELECT wi.line_number, COUNT(*)::int AS count
+       FROM workshop_incidents wi
+       ${whereClause}
+       GROUP BY wi.line_number
+       ORDER BY count DESC`,
+      params
+    ),
+    pool.query(
+      `SELECT wi.machine_id, COUNT(*)::int AS count
+       FROM workshop_incidents wi
+       ${whereClause}
+       GROUP BY wi.machine_id
+       ORDER BY count DESC`,
+      params
+    ),
+    pool.query(
+      `WITH filtered_incidents AS (
+         SELECT wi.id, wi.created_at
+         FROM workshop_incidents wi
+         ${whereClause}
+       ),
+       closed_events AS (
+         SELECT we.incident_id, MIN(we.created_at) AS closed_at
+         FROM workshop_incident_events we
+         WHERE we.event_type = 'INCIDENT_CLOSED'
+         GROUP BY we.incident_id
+       )
+       SELECT
+         percentile_cont(0.5) WITHIN GROUP (
+           ORDER BY EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))
+         ) AS median_close_seconds,
+         AVG(EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))) AS avg_close_seconds
+       FROM filtered_incidents fi
+       JOIN closed_events ce ON ce.incident_id = fi.id`,
+      params
+    ),
+    pool.query(
     `WITH filtered_incidents AS (
        SELECT wi.id, wi.created_at, wi.taken_at, wi.is_priority
        FROM workshop_incidents wi
@@ -902,8 +918,7 @@ export async function getWorkshopAnalytics(query: QueryParams) {
      closed_events AS (
        SELECT we.incident_id, MIN(we.created_at) AS closed_at
        FROM workshop_incident_events we
-       WHERE we.event_type = 'STATUS_CHANGED'
-         AND (we.payload->>'to') = 'CLOSED'
+       WHERE we.event_type = 'INCIDENT_CLOSED'
        GROUP BY we.incident_id
      ),
      day_keys AS (
@@ -931,13 +946,14 @@ export async function getWorkshopAnalytics(query: QueryParams) {
        ) FILTER (
          WHERE date_trunc('day', ce.closed_at)::date = dk.day
        ) AS median_close_seconds
-     FROM day_keys dk
-     LEFT JOIN filtered_incidents fi ON TRUE
-     LEFT JOIN closed_events ce ON ce.incident_id = fi.id
-     GROUP BY dk.day
-     ORDER BY dk.day ASC`,
-    params
-  );
+       FROM day_keys dk
+       LEFT JOIN filtered_incidents fi ON TRUE
+       LEFT JOIN closed_events ce ON ce.incident_id = fi.id
+       GROUP BY dk.day
+       ORDER BY dk.day ASC`,
+      params
+    ),
+  ]);
 
   const totals = totalsRows[0] || {};
   const closeStats = closeRows[0] || {};

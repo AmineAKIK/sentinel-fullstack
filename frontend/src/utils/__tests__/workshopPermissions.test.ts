@@ -7,6 +7,7 @@ import type { WorkshopIncident } from '../../types';
 function incident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
   return {
     id: 1,
+    user_id: 1,
     shift: 'MATIN',
     line_id: 1,
     line_number: 'L01',
@@ -54,21 +55,31 @@ describe('canPerform – undefined role', () => {
 
 describe('OPERATOR permissions', () => {
   it('can requestEdit on active incident', () => {
-    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'OPEN' }))).toBe(true);
-    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'PENDING' }))).toBe(true);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'OPEN', user_id: 1 }), 1)).toBe(true);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'PENDING', user_id: 1 }), 1)).toBe(true);
   });
 
   it('cannot requestEdit on CLOSED or CANCELED', () => {
-    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'CLOSED' }))).toBe(false);
-    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'CANCELED' }))).toBe(false);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'CLOSED', user_id: 1 }), 1)).toBe(false);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ status: 'CANCELED', user_id: 1 }), 1)).toBe(false);
+  });
+
+  it('cannot requestEdit without actor ownership', () => {
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ user_id: 1 }), 2)).toBe(false);
+    expect(canPerform('OPERATOR', 'requestEdit', incident({ user_id: 1 }))).toBe(false);
   });
 
   it('can requestCancel on open non-taken incident', () => {
-    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: false }))).toBe(true);
+    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: false, user_id: 1 }), 1)).toBe(true);
   });
 
   it('cannot requestCancel when taken', () => {
-    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: true }))).toBe(false);
+    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: true, user_id: 1 }), 1)).toBe(false);
+  });
+
+  it('cannot requestCancel without actor ownership', () => {
+    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: false, user_id: 1 }), 2)).toBe(false);
+    expect(canPerform('OPERATOR', 'requestCancel', incident({ is_taken: false, user_id: 1 }))).toBe(false);
   });
 
   it('cannot directEdit, cancel, take, close', () => {

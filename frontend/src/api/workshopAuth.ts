@@ -9,12 +9,14 @@ export type WorkshopLoginResponse =
 export async function workshopLogin(
   badgeNumber: string,
   password?: string,
-  newPassword?: string
+  newPassword?: string,
+  setupCode?: string
 ): Promise<WorkshopLoginResponse> {
   return api.post<WorkshopLoginResponse>('/api/workshop/auth/login', {
     badgeNumber,
     password,
     newPassword,
+    setupCode,
   });
 }
 

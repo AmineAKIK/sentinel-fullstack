@@ -1,4 +1,10 @@
 import { badRequest, ServiceResult } from '../../utils/serviceResult';
+import { withTransaction } from '../../db/transaction';
+import {
+  generateWorkshopPasswordSetupCode,
+  getWorkshopPasswordSetupExpiry,
+  hashWorkshopPasswordSetupCode,
+} from '../../auth/setupCode';
 import { createAccountAuditEvent } from './accounts.events';
 import {
   accountBadgeExists,
@@ -30,15 +36,22 @@ export async function createAccountService(input: CreateAccountInput, adminId: n
     return { ok: false, status: 409, code: 'BADGE_ALREADY_EXISTS', message: 'Ce numéro de badge est déjà utilisé.' };
   }
 
-  const created = await createAccountData(input);
-  await createAccountAuditEvent(created.id, adminId, 'USER_CREATED', {
-    firstName: input.firstName,
-    lastName: input.lastName,
-    badgeNumber: input.badgeNumber,
-    role: input.role,
+  const setupCode = generateWorkshopPasswordSetupCode();
+  const setupExpiresAt = getWorkshopPasswordSetupExpiry();
+  const setupCodeHash = await hashWorkshopPasswordSetupCode(setupCode);
+
+  const created = await withTransaction(async (client) => {
+    const account = await createAccountData(input, setupCodeHash, setupExpiresAt, client);
+    await createAccountAuditEvent(account.id, adminId, 'USER_CREATED', {
+      firstName: input.firstName,
+      lastName: input.lastName,
+      badgeNumber: input.badgeNumber,
+      role: input.role,
+    }, client);
+    return account;
   });
 
-  return { ok: true, data: created };
+  return { ok: true, data: { ...created, password_setup_code: setupCode } };
 }
 
 export async function getAccountService(id: number): Promise<ServiceResult<AccountDto>> {
@@ -78,25 +91,39 @@ export async function updateAccountService(
     }
   }
 
-  const result = await updateAccountData(id, updates);
-  if (!result) {
-    return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Utilisateur introuvable.' };
-  }
+  const changes: Record<string, { old: unknown; new: unknown }> = {};
+  if (updates.firstName !== undefined && updates.firstName !== current.first_name) changes.firstName = { old: current.first_name, new: updates.firstName };
+  if (updates.lastName !== undefined && updates.lastName !== current.last_name) changes.lastName = { old: current.last_name, new: updates.lastName };
+  if (updates.badgeNumber !== undefined && updates.badgeNumber !== current.badge_number) changes.badgeNumber = { old: current.badge_number, new: updates.badgeNumber };
+  if (updates.role !== undefined && updates.role !== current.role) changes.role = { old: current.role, new: updates.role };
 
-  if (Object.keys(result.changes).length > 0) {
-    await createAccountAuditEvent(id, adminId, 'USER_UPDATED', result.changes);
-  }
+  const account = await withTransaction(async (client) => {
+    const updated = await updateAccountData(id, updates, client);
+    if (updated && Object.keys(changes).length > 0) {
+      await createAccountAuditEvent(id, adminId, 'USER_UPDATED', changes, client);
+    }
+    return updated;
+  });
 
-  return { ok: true, data: result.account };
-}
-
-export async function activateAccountService(id: number, adminId: number): Promise<ServiceResult<AccountDto>> {
-  const account = await setAccountActive(id, true);
   if (!account) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Utilisateur introuvable.' };
   }
 
-  await createAccountAuditEvent(id, adminId, 'USER_ACTIVATED', null);
+  return { ok: true, data: account };
+}
+
+export async function activateAccountService(id: number, adminId: number): Promise<ServiceResult<AccountDto>> {
+  const account = await withTransaction(async (client) => {
+    const updated = await setAccountActive(id, true, client);
+    if (!updated) return null;
+    await createAccountAuditEvent(id, adminId, 'USER_ACTIVATED', null, client);
+    return updated;
+  });
+
+  if (!account) {
+    return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Utilisateur introuvable.' };
+  }
+
   return { ok: true, data: account };
 }
 
@@ -111,12 +138,17 @@ export async function deactivateAccountService(id: number, adminId: number): Pro
     };
   }
 
-  const account = await setAccountActive(id, false);
+  const account = await withTransaction(async (client) => {
+    const updated = await setAccountActive(id, false, client);
+    if (!updated) return null;
+    await createAccountAuditEvent(id, adminId, 'USER_DEACTIVATED', null, client);
+    return updated;
+  });
+
   if (!account) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Utilisateur introuvable.' };
   }
 
-  await createAccountAuditEvent(id, adminId, 'USER_DEACTIVATED', null);
   return { ok: true, data: account };
 }
 
@@ -131,11 +163,17 @@ export async function deleteAccountService(id: number, adminId: number): Promise
     };
   }
 
-  if (!(await softDeleteAccount(id))) {
+  const deleted = await withTransaction(async (client) => {
+    const ok = await softDeleteAccount(id, client);
+    if (!ok) return false;
+    await createAccountAuditEvent(id, adminId, 'USER_SOFT_DELETED', null, client);
+    return true;
+  });
+
+  if (!deleted) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Utilisateur introuvable.' };
   }
 
-  await createAccountAuditEvent(id, adminId, 'USER_SOFT_DELETED', null);
   return { ok: true, data: { message: 'Utilisateur supprimé.' } };
 }
 
@@ -144,11 +182,20 @@ export async function getAccountImpactService(id: number): Promise<AccountImpact
 }
 
 export async function resetAccountPasswordService(id: number, adminId: number): Promise<ServiceResult<AccountDto>> {
-  const account = await resetAccountPasswordData(id);
+  const setupCode = generateWorkshopPasswordSetupCode();
+  const setupExpiresAt = getWorkshopPasswordSetupExpiry();
+  const setupCodeHash = await hashWorkshopPasswordSetupCode(setupCode);
+
+  const account = await withTransaction(async (client) => {
+    const updated = await resetAccountPasswordData(id, setupCodeHash, setupExpiresAt, client);
+    if (!updated) return null;
+    await createAccountAuditEvent(id, adminId, 'USER_PASSWORD_RESET', null, client);
+    return updated;
+  });
+
   if (!account) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Utilisateur introuvable.' };
   }
 
-  await createAccountAuditEvent(id, adminId, 'USER_PASSWORD_RESET', null);
-  return { ok: true, data: account };
+  return { ok: true, data: { ...account, password_setup_code: setupCode } };
 }

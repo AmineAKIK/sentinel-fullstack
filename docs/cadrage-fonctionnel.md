@@ -1,6 +1,6 @@
 # Cadrage Fonctionnel — Sentinel
 
-> Version du document : 1.0 — Mai 2026
+> Version du document : 1.1 — Juin 2026
 
 ---
 
@@ -11,21 +11,23 @@
 3. [Architecture fonctionnelle](#3-architecture-fonctionnelle)
 4. [Module Administration — Comptes utilisateurs](#4-module-administration--comptes-utilisateurs)
 5. [Module Administration — Lignes de production](#5-module-administration--lignes-de-production)
-6. [Module Administration — Journal d'audit](#6-module-administration--journal-daudit)
-7. [Module Atelier — Authentification](#7-module-atelier--authentification)
-8. [Module Atelier — Gestion des incidents](#8-module-atelier--gestion-des-incidents)
-9. [Module Atelier — Dashboard opérationnel](#9-module-atelier--dashboard-opérationnel)
-10. [Module Atelier — Board grand écran](#10-module-atelier--board-grand-écran)
-11. [Module Atelier — Historique](#11-module-atelier--historique)
-12. [Module Atelier — Pilotage](#12-module-atelier--pilotage)
-13. [Module Atelier — Base de connaissance](#13-module-atelier--base-de-connaissance)
-14. [Référentiel des statuts et états d'incident](#14-référentiel-des-statuts-et-états-dincident)
-15. [Matrice des permissions par action](#15-matrice-des-permissions-par-action)
-16. [Modèle de données synthétique](#16-modèle-de-données-synthétique)
-17. [Routes et API](#17-routes-et-api)
-18. [Règles métier transverses](#18-règles-métier-transverses)
-19. [Sécurité et authentification](#19-sécurité-et-authentification)
-20. [Stack technique](#20-stack-technique)
+6. [Module Administration — Tableau de bord référentiel](#6-module-administration--tableau-de-bord-référentiel)
+7. [Module Administration — Journal d'audit](#7-module-administration--journal-daudit)
+8. [Module Atelier — Authentification](#8-module-atelier--authentification)
+9. [Module Atelier — Gestion des incidents](#9-module-atelier--gestion-des-incidents)
+10. [Module Atelier — Suivi des incidents (followers)](#10-module-atelier--suivi-des-incidents-followers)
+11. [Module Atelier — Dashboard opérationnel](#11-module-atelier--dashboard-opérationnel)
+12. [Module Atelier — Board grand écran](#12-module-atelier--board-grand-écran)
+13. [Module Atelier — Historique](#13-module-atelier--historique)
+14. [Module Atelier — Pilotage](#14-module-atelier--pilotage)
+15. [Module Atelier — Base de connaissance](#15-module-atelier--base-de-connaissance)
+16. [Référentiel des statuts et états d'incident](#16-référentiel-des-statuts-et-états-dincident)
+17. [Matrice des permissions par action](#17-matrice-des-permissions-par-action)
+18. [Modèle de données synthétique](#18-modèle-de-données-synthétique)
+19. [Routes et API](#19-routes-et-api)
+20. [Règles métier transverses](#20-règles-métier-transverses)
+21. [Sécurité et authentification](#21-sécurité-et-authentification)
+22. [Stack technique](#22-stack-technique)
 
 ---
 
@@ -51,6 +53,7 @@ Sentinel
 ├── Espace Admin
 │   ├── Gestion des comptes atelier
 │   ├── Gestion des lignes de production
+│   ├── Tableau de bord référentiel
 │   └── Journal d'audit référentiel
 └── Espace Atelier
     ├── Dashboard opérationnel (incidents actifs)
@@ -72,6 +75,8 @@ Compte unique de niveau système, distinct des comptes atelier. Accessible via `
 - Création, modification, activation/désactivation et suppression des comptes atelier
 - Création, modification, activation/désactivation et suppression des lignes de production
 - Consultation du journal d'audit de toutes les opérations référentiel
+- Consultation du tableau de bord et des indicateurs de qualité du référentiel
+- Changement de son propre mot de passe admin
 - Vérification du mot de passe avant les actions sensibles (suppression)
 
 ### 2.2 Opérateur (`OPERATOR`)
@@ -80,8 +85,8 @@ Agent de production. Se connecte via badge numérique.
 
 **Responsabilités :**
 - Déclaration d'incidents sur les machines de sa ligne
-- Demande de correction d'un incident déjà créé
-- Demande d'annulation d'un incident non pris en charge
+- Demande de correction d'un incident qu'il a créé (actif)
+- Demande d'annulation d'un incident qu'il a créé, tant qu'il n'est pas pris en charge
 
 ### 2.3 Maintenance (`MAINTENANCE`)
 
@@ -90,10 +95,12 @@ Technicien de maintenance. Se connecte via badge + mot de passe.
 **Responsabilités :**
 - Prise en charge d'un incident ouvert
 - Renseignement du diagnostic
-- Mise en attente avec justification
+- Modification directe d'un incident actif non pris en charge
+- Modification d'un incident qu'il a personnellement pris en charge
+- Mise en attente avec justification (diagnostic requis)
 - Reprise d'un incident mis en attente
 - Clôture d'un incident avec note d'intervention
-- Annulation directe d'un incident non pris en charge
+- Annulation directe d'un incident actif non pris en charge
 
 ### 2.4 Responsable (`RESPONSABLE`)
 
@@ -102,12 +109,13 @@ Encadrant atelier. Se connecte via badge + mot de passe.
 **Responsabilités :**
 - Approbation ou refus des demandes de correction opérateur
 - Approbation ou refus des demandes d'annulation opérateur
-- Modification directe d'un incident non pris en charge
-- Annulation directe d'un incident non pris en charge
-- Marquage de la priorité (urgence) d'un incident
+- Modification directe d'un incident actif non pris en charge
+- Annulation directe d'un incident actif non pris en charge
+- Marquage de la priorité (urgence) d'un incident actif
 - Réordonnancement manuel des incidents prioritaires
 - Ajout/modification de consigne responsable
-- Invalidation d'un incident clôturé
+- Invalidation d'un incident clôturé (avec motif obligatoire)
+- Suivi d'incidents spécifiques (follow/unfollow)
 - Consultation de toutes les vues (dashboard, historique, pilotage, connaissance)
 
 ---
@@ -177,6 +185,8 @@ Champs requis :
 
 Comportement :
 - Vérification d'unicité du badge avant création
+- Génération d'un **code de configuration de mot de passe** (setup code) temporaire hashé en base — l'utilisateur doit l'utiliser à sa première connexion pour définir son mot de passe
+- Le setup code est retourné une seule fois dans la réponse de création, à communiquer à l'utilisateur
 - Événement d'audit `USER_CREATED` généré
 
 #### Modifier un compte
@@ -195,7 +205,8 @@ Contraintes :
 
 #### Réinitialiser le mot de passe
 
-- Efface le hash de mot de passe → l'utilisateur devra en définir un nouveau à sa prochaine connexion badge
+- Efface le hash de mot de passe existant et génère un nouveau **code de configuration** temporaire
+- Le setup code est retourné dans la réponse, à communiquer à l'utilisateur pour qu'il définisse un nouveau mot de passe à sa prochaine connexion badge
 - Événement d'audit `USER_PASSWORD_RESET`
 
 #### Supprimer un compte (suppression logique)
@@ -227,9 +238,9 @@ Route protégée par `adminAuthMiddleware`. Accessible depuis `/admin/lines`.
 Ligne de production
 ├── Numéro de ligne (identifiant métier, unique)
 ├── Statut actif/inactif
-└── Machines (1 à 10 par ligne)
+└── Machines (1 à 10 par ligne) — stockées dans le champ JSONB machine_sequence
     └── Machine
-        ├── Identifiant machine (unique global)
+        ├── Identifiant machine (unique global parmi les lignes actives)
         ├── Marque
         └── Configuration robot
             ├── Robot simple
@@ -290,13 +301,37 @@ Contrainte de désactivation : bloquée si des incidents actifs sont liés à la
 
 ---
 
-## 6. Module Administration — Journal d'audit
+## 6. Module Administration — Tableau de bord référentiel
 
 ### 6.1 Accès
 
+Route protégée par `adminAuthMiddleware`. Accessible depuis `/admin/accueil`.
+
+### 6.2 Dashboard référentiel (`GET /admin/dashboard`)
+
+Synthèse de l'état du référentiel : comptes actifs, lignes actives, statistiques globales.
+
+### 6.3 Qualité référentiel (`GET /admin/quality`)
+
+Détection automatique des anomalies de configuration :
+
+| Anomalie | Description |
+|---|---|
+| Utilisateurs sans mot de passe | Comptes actifs dont le setup code n'a pas encore été utilisé |
+| Utilisateurs inactifs | Comptes désactivés |
+| Lignes inactives | Lignes de production désactivées |
+| Machines malformées | Machines avec identifiant ou marque manquants, ou lignes actives sans machine |
+| Machines dupliquées | Identifiants de machine présents sur plusieurs lignes |
+
+---
+
+## 7. Module Administration — Journal d'audit
+
+### 7.1 Accès
+
 Route protégée. Accessible depuis `/admin/audit`.
 
-### 6.2 Contenu du journal
+### 7.2 Contenu du journal
 
 Deux périmètres consolidés dans un journal unifié :
 
@@ -320,7 +355,7 @@ Deux périmètres consolidés dans un journal unifié :
 | `LINE_PLAN_UPDATED` | Ordre machines modifié |
 | `LINE_SOFT_DELETED` | Ligne supprimée |
 
-### 6.3 Filtres disponibles
+### 7.3 Filtres disponibles
 
 - Périmètre : comptes / lignes / tout
 - Groupe d'action : créations / mises à jour / activations / suppressions / accès
@@ -331,39 +366,54 @@ Deux périmètres consolidés dans un journal unifié :
 
 ---
 
-## 7. Module Atelier — Authentification
+## 8. Module Atelier — Authentification
 
-### 7.1 Connexion par badge (mode Opérateur)
+### 8.1 Flux de connexion
 
-L'opérateur saisit uniquement son numéro de badge.
+Le flux de connexion atelier est en trois étapes selon l'état du compte :
 
-Cas particulier — premier accès :
-- Si l'utilisateur n'a pas encore de mot de passe → le système retourne `requiresPasswordSetup: true`
-- L'utilisateur définit un mot de passe (≥ 6 caractères) qui est stocké hashé (bcrypt)
+#### Étape 1 — Saisie du badge
 
-Cas standard — badge seul :
-- Si l'utilisateur a déjà un mot de passe → le système retourne `requiresPassword: true`
+L'utilisateur saisit son numéro de badge. Le backend détermine l'étape suivante.
+
+#### Étape 2a — Premier accès (setup du mot de passe)
+
+Si l'utilisateur n'a **pas encore de mot de passe** (compte nouvellement créé ou réinitialisé par l'admin) :
+- Le backend retourne `requiresPasswordSetup: true`
+- L'utilisateur doit fournir le **setup code** communiqué par l'admin ainsi qu'un **nouveau mot de passe** (≥ 6 caractères)
+- Le setup code est vérifié côté backend (comparaison du hash + vérification de l'expiration)
+- Si valide, le mot de passe est hashé (bcrypt) et stocké ; le setup code est invalidé
+- La session est ouverte
+
+#### Étape 2b — Connexion standard
+
+Si l'utilisateur a déjà un mot de passe :
+- Le backend retourne `requiresPassword: true`
 - L'utilisateur saisit son mot de passe pour finaliser la connexion
 
-### 7.2 Connexion par badge + mot de passe (mode Maintenance / Responsable)
+### 8.2 Authentification par rôle
 
-Les rôles `MAINTENANCE` et `RESPONSABLE` requièrent badge + mot de passe.
+| Rôle | Méthode d'authentification |
+|---|---|
+| `OPERATOR` | Badge seul (puis mot de passe si déjà défini) |
+| `MAINTENANCE` | Badge + mot de passe obligatoire |
+| `RESPONSABLE` | Badge + mot de passe obligatoire |
 
-### 7.3 Session
+### 8.3 Session
 
 - Token JWT signé, transporté via cookie HTTP-only (`sentinel-workshop-auth`)
 - Validation de session via `GET /workshop/auth/me`
 - Déconnexion via `POST /workshop/auth/logout`
 
-### 7.4 Board public
+### 8.4 Board public
 
 La page `/workshop/board` est accessible **sans authentification**. Elle consomme `GET /workshop/board` qui est la seule route non protégée de l'espace atelier.
 
 ---
 
-## 8. Module Atelier — Gestion des incidents
+## 9. Module Atelier — Gestion des incidents
 
-### 8.1 Modèle d'un incident
+### 9.1 Modèle d'un incident
 
 | Champ | Description |
 |---|---|
@@ -372,12 +422,13 @@ La page `/workshop/board` est accessible **sans authentification**. Elle consomm
 | `machine_id` / `machine_brand` | Machine concernée |
 | `robot_label` | Robot concerné (ex : "Gauche 01", "Droite 02") |
 | `head_number` | Numéro de tête concernée (1 → max robots têtes) |
-| `state` | Type d'anomalie (voir §14) |
+| `state` | Type d'anomalie (voir §16) |
 | `comment` | Commentaire libre opérateur (≤ 1000 car.) |
 | `current_product` | Référence produit en cours (≤ 120 car.) |
-| `status` | Statut du workflow (voir §14) |
+| `status` | Statut du workflow (voir §16) |
 | `is_taken` | Pris en charge par maintenance |
 | `taken_by_user_id` | Identifiant du technicien prenant en charge |
+| `taken_at` | Horodatage de la prise en charge |
 | `is_priority` | Marqué urgent par responsable |
 | `display_order` | Ordre d'affichage manuel |
 | `diagnostic` | Diagnostic renseigné par maintenance (≤ 1000 car.) |
@@ -387,7 +438,7 @@ La page `/workshop/board` est accessible **sans authentification**. Elle consomm
 | `cancel_request` | Annulation demandée par opérateur |
 | `cancel_request_reason` | Motif de la demande d'annulation |
 
-### 8.2 Workflow de vie d'un incident
+### 9.2 Workflow de vie d'un incident
 
 ```
                     ┌──────────────────┐
@@ -423,7 +474,7 @@ La page `/workshop/board` est accessible **sans authentification**. Elle consomm
               │     │     CLOSED       │
               │     └──────┬───────────┘
               │            │
-              │   INVALIDATE_CLOSED (RESPONSABLE)
+              │   INVALIDATE_CLOSED (RESPONSABLE + motif obligatoire)
               │            │
               ▼            │
        ┌──────────────────┐│
@@ -432,62 +483,104 @@ La page `/workshop/board` est accessible **sans authentification**. Elle consomm
 
           CANCEL possible sur OPEN / PENDING non pris en charge
           → statut CANCELED (état terminal, conservé en BDD)
+
+          Clôture directe depuis PENDING interdite
+          → il faut RESUME (PENDING → OPEN) puis CLOSE
 ```
 
-### 8.3 Actions et transitions
+### 9.3 Actions et transitions
 
 | Action | Acteur(s) | Prérequis | Résultat |
 |---|---|---|---|
-| Créer un incident | OPERATOR, MAINTENANCE, RESPONSABLE | Ligne active, machine valide, robot valide, tête valide | Incident OPEN |
-| Demander une correction (`REQUEST_EDIT`) | OPERATOR | Incident actif (OPEN ou PENDING) | Payload `edit_request` stocké |
-| Approuver correction (`APPROVE_EDIT`) | RESPONSABLE | Incident actif avec `edit_request` | Modification appliquée, `edit_request` effacé |
-| Refuser correction (`REJECT_EDIT`) | RESPONSABLE | Incident actif avec `edit_request` | `edit_request` effacé |
+| Créer un incident | OPERATOR, MAINTENANCE, RESPONSABLE | Ligne active, machine valide, robot valide, tête valide, emplacement non déjà actif | Incident OPEN |
+| Demander une correction (`REQUEST_EDIT`) | OPERATOR | Incident actif (OPEN ou PENDING), créé par l'opérateur lui-même | Payload `edit_request` stocké |
+| Approuver correction (`APPROVE_EDIT`) | RESPONSABLE | Incident actif avec `edit_request` non nul | Modification appliquée, `edit_request` effacé |
+| Refuser correction (`REJECT_EDIT`) | RESPONSABLE | Incident actif avec `edit_request` non nul | `edit_request` effacé |
 | Modifier directement (`DIRECT_EDIT`) | MAINTENANCE, RESPONSABLE | Incident actif, non pris en charge | Champs mis à jour |
-| Modifier après prise (`EDIT_AFTER_TAKE`) | MAINTENANCE | Incident actif pris en charge par soi-même | Champs descriptifs mis à jour |
-| Demander annulation (`REQUEST_CANCEL`) | OPERATOR | Incident actif, non pris en charge | Flag `cancel_request = true` |
-| Approuver annulation (`APPROVE_CANCEL`) | RESPONSABLE | `cancel_request = true` | Statut → CANCELED |
-| Refuser annulation (`REJECT_CANCEL`) | RESPONSABLE | `cancel_request = true` | `cancel_request = false` |
+| Modifier après prise (`EDIT_AFTER_TAKE`) | MAINTENANCE | Incident actif, pris en charge par soi-même | Champs descriptifs mis à jour |
+| Demander annulation (`REQUEST_CANCEL`) | OPERATOR | Incident actif, non pris en charge, créé par l'opérateur lui-même | Flag `cancel_request = true` |
+| Approuver annulation (`APPROVE_CANCEL`) | RESPONSABLE | `cancel_request = true`, incident actif | Statut → CANCELED |
+| Refuser annulation (`REJECT_CANCEL`) | RESPONSABLE | `cancel_request = true`, incident actif | `cancel_request = false` |
 | Annuler directement (`CANCEL`) | MAINTENANCE, RESPONSABLE | Incident actif, non pris en charge | Statut → CANCELED |
-| Prendre en charge (`TAKE`) | MAINTENANCE | OPEN, non pris en charge | `is_taken = true`, `taken_by_user_id` renseigné |
+| Prendre en charge (`TAKE`) | MAINTENANCE | OPEN, non pris en charge | `is_taken = true`, `taken_by_user_id` et `taken_at` renseignés |
 | Mettre en attente (`SET_PENDING`) | MAINTENANCE | OPEN, pris en charge, diagnostic renseigné | Statut → PENDING |
 | Reprendre (`RESUME`) | MAINTENANCE | PENDING, pris en charge | Statut → OPEN |
-| Clôturer (`CLOSE`) | MAINTENANCE | OPEN, pris en charge, note d'intervention renseignée | Statut → CLOSED |
-| Invalider (`INVALIDATE_CLOSED`) | RESPONSABLE | CLOSED | Statut → INVALIDATED, motif obligatoire |
+| Clôturer (`CLOSE`) | MAINTENANCE | OPEN, pris en charge, note d'intervention renseignée | Statut → CLOSED, `edit_request` effacé |
+| Invalider (`INVALIDATE_CLOSED`) | RESPONSABLE | CLOSED, motif fourni | Statut → INVALIDATED |
 | Marquer priorité (`SET_PRIORITY`) | RESPONSABLE | Incident actif | `is_priority` bascule |
 | Réordonner (`REORDER`) | RESPONSABLE | Incident actif | `display_order` mis à jour |
 | Consigne responsable (`RESPONSIBLE_COMMENT`) | RESPONSABLE | Incident actif | `responsible_comment` mis à jour |
 
-### 8.4 Journalisation des événements incident
+### 9.4 Journalisation des événements incident
 
 Chaque action génère un événement horodaté dans `workshop_incident_events` :
 
 | Type d'événement | Déclencheur |
 |---|---|
 | `INCIDENT_CREATED` | Création |
+| `INCIDENT_UPDATED` | Modification directe ou après prise en charge |
+| `INCIDENT_TAKEN` | Prise en charge |
+| `INCIDENT_SET_PENDING` | Mise en attente |
+| `INCIDENT_RESUMED` | Reprise |
+| `INCIDENT_CLOSED` | Clôture |
+| `INCIDENT_CANCELED` | Annulation appliquée (directe ou demande approuvée) |
+| `INCIDENT_INVALIDATED` | Invalidation |
+| `INCIDENT_FOLLOWED` | Suivi activé par un RESPONSABLE |
+| `INCIDENT_UNFOLLOWED` | Suivi désactivé par un RESPONSABLE |
+| `INCIDENT_REORDERED` | Réordonnancement (une entrée par incident déplacé) |
 | `EDIT_REQUESTED` | Demande de correction |
 | `EDIT_APPLIED` | Correction approuvée |
 | `EDIT_REJECTED` | Correction refusée |
 | `CANCEL_REQUESTED` | Demande d'annulation |
 | `CANCEL_REQUEST_REJECTED` | Annulation refusée |
-| `INCIDENT_CANCELED` | Annulation appliquée |
-| `INCIDENT_INVALIDATED` | Invalidation |
-| `INCIDENT_TAKEN` | Prise en charge |
-| `INCIDENT_SET_PENDING` | Mise en attente |
-| `INCIDENT_RESUMED` | Reprise |
-| `INCIDENT_CLOSED` | Clôture |
 | `PRIORITY_CHANGED` | Changement de priorité |
 | `ORDER_CHANGED` | Réordonnancement |
 | `RESPONSIBLE_COMMENT_UPDATED` | Consigne responsable |
+| `STATUS_CHANGED` | Changement de statut (usage interne) |
 
 ---
 
-## 9. Module Atelier — Dashboard opérationnel
+## 10. Module Atelier — Suivi des incidents (followers)
 
-### 9.1 Accès
+### 10.1 Principe
+
+Le rôle `RESPONSABLE` peut **suivre** des incidents spécifiques pour les garder visibles dans son dashboard, y compris lorsqu'ils passent à des statuts terminaux (CLOSED, CANCELED, INVALIDATED).
+
+### 10.2 Auto-suivi
+
+Un RESPONSABLE est **automatiquement abonné** à un incident lorsqu'il :
+- Crée un incident
+- Approuve ou refuse une demande de correction
+- Approuve ou refuse une demande d'annulation
+
+### 10.3 Suivi manuel
+
+- `POST /workshop/incidents/:id/follow` — s'abonner à un incident
+- `DELETE /workshop/incidents/:id/follow` — se désabonner
+
+### 10.4 Impact sur la liste des incidents
+
+`GET /workshop/incidents` retourne, pour un RESPONSABLE :
+- Tous les incidents actifs (OPEN + PENDING)
+- Les incidents terminaux (CLOSED, CANCELED, INVALIDATED) qu'il suit encore
+
+### 10.5 Modèle de données
+
+Table `workshop_incident_followers` :
+- `incident_id` → `workshop_incidents` (ON DELETE RESTRICT)
+- `user_id` → `sentinel_users` (ON DELETE RESTRICT)
+- `deleted_at` : désabonnement logique (la ligne est conservée, non supprimée physiquement)
+- Contrainte d'unicité : un seul abonnement actif par paire (incident, utilisateur)
+
+---
+
+## 11. Module Atelier — Dashboard opérationnel
+
+### 11.1 Accès
 
 Nécessite une session atelier valide. Route : `/workshop/dashboard`.
 
-### 9.2 Barre de métriques
+### 11.2 Barre de métriques
 
 Indicateurs affichés en temps réel :
 
@@ -501,7 +594,7 @@ Indicateurs affichés en temps réel :
 | Non pris | Incidents sans prise en charge |
 | Ouverts > 7 jours | Ancienneté critique |
 
-### 9.3 Liste des incidents
+### 11.3 Liste des incidents
 
 Tri par défaut : urgents en premier (`is_priority DESC`), puis par ordre d'affichage (`display_order DESC`), puis non pris en charge en premier, puis par date de création décroissante.
 
@@ -516,7 +609,7 @@ Tri par défaut : urgents en premier (`is_priority DESC`), puis par ordre d'affi
 
 **Recherche texte libre** sur : commentaire, diagnostic, note d'intervention, machine, ligne, produit, opérateur.
 
-### 9.4 Carte incident
+### 11.4 Carte incident
 
 Chaque incident est affiché dans une carte présentant :
 - Identifiant, statut, ancienneté, poste
@@ -524,11 +617,11 @@ Chaque incident est affiché dans une carte présentant :
 - Indicateurs urgence et prise en charge
 - Actions contextuelles selon rôle et état
 
-### 9.5 Réordonnancement par glisser-déposer
+### 11.5 Réordonnancement par glisser-déposer
 
 Le responsable peut réordonner manuellement les incidents prioritaires par drag-and-drop avec défilement automatique.
 
-### 9.6 Modales d'action
+### 11.6 Modales d'action
 
 | Modale | Déclencheur |
 |---|---|
@@ -544,13 +637,13 @@ Le responsable peut réordonner manuellement les incidents prioritaires par drag
 
 ---
 
-## 10. Module Atelier — Board grand écran
+## 12. Module Atelier — Board grand écran
 
-### 10.1 Accès
+### 12.1 Accès
 
 **Aucune session requise.** Accessible depuis `/workshop/board`. Conçu pour un affichage permanent en atelier.
 
-### 10.2 Modes d'affichage
+### 12.2 Modes d'affichage
 
 Le board tourne automatiquement entre trois vues toutes les 12 secondes :
 
@@ -562,7 +655,7 @@ Le board tourne automatiquement entre trois vues toutes les 12 secondes :
 
 Pagination : 9 incidents par page.
 
-### 10.3 Modes de surveillance
+### 12.3 Modes de surveillance
 
 | Mode | Description |
 |---|---|
@@ -570,7 +663,7 @@ Pagination : 9 incidents par page.
 | `watch` | Accentuation des incidents critiques |
 | `critical` | Alerte visuelle maximale |
 
-### 10.4 Presets de configuration
+### 12.4 Presets de configuration
 
 | Preset | Description |
 |---|---|
@@ -579,7 +672,7 @@ Pagination : 9 incidents par page.
 | Responsables | Focus sur les urgences |
 | Personnalisé | Configuration manuelle |
 
-### 10.5 Paramètres configurables par écran
+### 12.5 Paramètres configurables par écran
 
 - Affichage des alertes (oui/non)
 - Affichage des incidents ouverts (oui/non)
@@ -590,19 +683,19 @@ Pagination : 9 incidents par page.
 
 Les paramètres sont **persistés par écran** (`localStorage`) avec un identifiant d'écran configurable via le paramètre URL `?screen=nom-ecran`.
 
-### 10.6 Informations affichées par incident
+### 12.6 Informations affichées par incident
 
 Ligne, machine, robot, tête, type d'anomalie, produit en cours, ancienneté, statut (pris/non pris/en attente), indicateur d'urgence.
 
 ---
 
-## 11. Module Atelier — Historique
+## 13. Module Atelier — Historique
 
-### 11.1 Accès
+### 13.1 Accès
 
 Nécessite une session atelier valide. Route : `/workshop/history`.
 
-### 11.2 Deux vues complémentaires
+### 13.2 Deux vues complémentaires
 
 #### Vue incidents
 
@@ -625,19 +718,19 @@ Filtres supplémentaires :
 
 Chaque ligne de journal inclut : type d'action, acteur (prénom, nom, badge, rôle), incident concerné, horodatage.
 
-### 11.3 Navigation croisée
+### 13.3 Navigation croisée
 
 Cliquer sur un événement du journal navigue vers l'incident correspondant avec mise en surbrillance de l'événement.
 
 ---
 
-## 12. Module Atelier — Pilotage
+## 14. Module Atelier — Pilotage
 
-### 12.1 Accès
+### 14.1 Accès
 
 Nécessite une session atelier valide. Route : `/workshop/pilotage`.
 
-### 12.2 Sélection de période
+### 14.2 Sélection de période
 
 | Option | Description |
 |---|---|
@@ -647,12 +740,12 @@ Nécessite une session atelier valide. Route : `/workshop/pilotage`.
 | Tout | Depuis l'origine |
 | Personnalisée | Date début et fin libres |
 
-### 12.3 Filtres de périmètre
+### 14.3 Filtres de périmètre
 
 - Ligne de production
 - Machine (liste dépendante de la ligne sélectionnée)
 
-### 12.4 Indicateurs KPI
+### 14.4 Indicateurs KPI
 
 | KPI | Description |
 |---|---|
@@ -667,7 +760,7 @@ Nécessite une session atelier valide. Route : `/workshop/pilotage`.
 | Délai moyen de clôture | Moyenne du délai OPEN → CLOSE (secondes) |
 | Incident le plus ancien | Durée depuis la création du plus ancien incident actif |
 
-### 12.5 Tendances temporelles
+### 14.5 Tendances temporelles
 
 Graphique en barres comparatives (créés vs clôturés) par période, avec :
 - Total créations sur la période
@@ -675,35 +768,35 @@ Graphique en barres comparatives (créés vs clôturés) par période, avec :
 - Total urgences
 - Delta backlog (créés − clôturés)
 
-### 12.6 Classements
+### 14.6 Classements
 
 - Classement des lignes les plus impactées (nombre d'incidents)
 - Classement des machines les plus impactées
 - Répartition par type d'anomalie
 
-### 12.7 Synthèse textuelle automatique
+### 14.7 Synthèse textuelle automatique
 
 Génération d'un résumé narratif automatique décrivant la situation opérationnelle : charge active, statut (stable / à surveiller / sous tension), urgences non traitées, ligne et machine dominantes.
 
 ---
 
-## 13. Module Atelier — Base de connaissance
+## 15. Module Atelier — Base de connaissance
 
-### 13.1 Accès
+### 15.1 Accès
 
 Nécessite une session atelier valide. Route : `/workshop/knowledge`.
 
-### 13.2 Contenu
+### 15.2 Contenu
 
 Regroupe uniquement les incidents **clôturés** avec une **note d'intervention renseignée et non vide**. Constitue un référentiel de résolutions documentées.
 
-### 13.3 Filtres disponibles
+### 15.3 Filtres disponibles
 
 - Recherche textuelle (commentaire, diagnostic, note, machine, ligne, produit)
 - Ligne / Machine
 - Type d'anomalie
 
-### 13.4 Fiche connaissance
+### 15.4 Fiche connaissance
 
 Sélection d'un incident → affichage du détail complet :
 - Contexte : ligne, machine, robot, tête, produit en cours, poste, type d'anomalie
@@ -712,7 +805,7 @@ Sélection d'un incident → affichage du détail complet :
 - Opérateur déclarant et technicien ayant clôturé
 - Horodatages
 
-### 13.5 Indicateurs de synthèse
+### 15.5 Indicateurs de synthèse
 
 | Indicateur | Description |
 |---|---|
@@ -720,27 +813,27 @@ Sélection d'un incident → affichage du détail complet :
 | Machines couvertes | Nombre de machines distinctes référencées |
 | Dernière fiche ajoutée | Date de la clôture la plus récente |
 
-### 13.6 Navigation par URL
+### 15.6 Navigation par URL
 
 Paramètre `?incident=ID` permettant d'accéder directement à une fiche depuis un lien externe (historique, communication interne).
 
 ---
 
-## 14. Référentiel des statuts et états d'incident
+## 16. Référentiel des statuts et états d'incident
 
-### 14.1 Statuts (cycle de vie)
+### 16.1 Statuts (cycle de vie)
 
 | Code | Libellé | Description |
 |---|---|---|
 | `OPEN` | Ouvert | Incident actif, en attente de traitement ou en cours |
-| `PENDING` | En attente | En cours de diagnostic, technicien en attente de pièces ou informations |
+| `PENDING` | En attente | En cours de diagnostic, technicien en attente de pièces ou informations — nécessite obligatoirement `is_taken = true` |
 | `CLOSED` | Clôturé | Intervention terminée et documentée |
 | `CANCELED` | Annulé | Annulé avant clôture — conservé en base, exclu des métriques opérationnelles |
 | `INVALIDATED` | Invalidé | Clôture invalidée après coup par responsable — conservé en base, exclu des métriques opérationnelles et de la connaissance |
 
 Statuts actifs (inclus dans les métriques) : `OPEN` et `PENDING`.
 
-### 14.2 Types d'anomalie (états)
+### 16.2 Types d'anomalie (états)
 
 | Code | Libellé |
 |---|---|
@@ -749,7 +842,7 @@ Statuts actifs (inclus dans les métriques) : `OPEN` et `PENDING`.
 | `DEGRADEE` | Dégradée |
 | `INDISPONIBLE` | Indisponible |
 
-### 14.3 Postes de travail (shifts)
+### 16.3 Postes de travail (shifts)
 
 | Code | Libellé |
 |---|---|
@@ -760,20 +853,20 @@ Statuts actifs (inclus dans les métriques) : `OPEN` et `PENDING`.
 
 ---
 
-## 15. Matrice des permissions par action
+## 17. Matrice des permissions par action
 
 | Action | OPERATOR | MAINTENANCE | RESPONSABLE |
 |---|:---:|:---:|:---:|
 | Créer un incident | ✓ | ✓ | ✓ |
-| Demander correction | ✓ (actif) | — | — |
-| Demander annulation | ✓ (actif, non pris) | — | — |
+| Demander correction | ✓ (actif, propre incident) | — | — |
+| Demander annulation | ✓ (actif, non pris, propre incident) | — | — |
 | Modifier directement | — | ✓ (actif, non pris) | ✓ (actif, non pris) |
 | Modifier après prise | — | ✓ (actif, pris par soi-même) | — |
 | Annuler directement | — | ✓ (actif, non pris) | ✓ (actif, non pris) |
-| Approuver correction | — | — | ✓ (actif, edit_request=true) |
-| Refuser correction | — | — | ✓ (actif, edit_request=true) |
-| Approuver annulation | — | — | ✓ (cancel_request=true) |
-| Refuser annulation | — | — | ✓ (cancel_request=true) |
+| Approuver correction | — | — | ✓ (actif, edit_request ≠ null) |
+| Refuser correction | — | — | ✓ (actif, edit_request ≠ null) |
+| Approuver annulation | — | — | ✓ (actif, cancel_request=true) |
+| Refuser annulation | — | — | ✓ (actif, cancel_request=true) |
 | Prendre en charge | — | ✓ (OPEN, non pris) | — |
 | Mettre en attente | — | ✓ (OPEN, pris) | — |
 | Reprendre | — | ✓ (PENDING, pris) | — |
@@ -782,30 +875,36 @@ Statuts actifs (inclus dans les métriques) : `OPEN` et `PENDING`.
 | Marquer priorité | — | — | ✓ (actif) |
 | Réordonner | — | — | ✓ (actif) |
 | Consigne responsable | — | — | ✓ (actif) |
+| Suivre / ne plus suivre | — | — | ✓ (tout incident) |
 
 ---
 
-## 16. Modèle de données synthétique
+## 18. Modèle de données synthétique
 
-### 16.1 Tables principales
+### 18.1 Tables principales
 
 ```
 admin_accounts
 ├── id, username, password_hash
-└── created_at
+└── created_at, updated_at
 
 sentinel_users
-├── id, first_name, last_name, badge_number (unique)
+├── id, first_name, last_name, badge_number (unique parmi non supprimés)
 ├── role (OPERATOR | MAINTENANCE | RESPONSABLE)
 ├── is_active, is_deleted
-├── password_hash (nullable, défini au premier login)
-└── created_at, updated_at
+├── password_hash (nullable — défini au premier login)
+├── password_setup_token_hash (nullable — setup code hashé, temporaire)
+├── password_setup_expires_at (nullable — expiration du setup code)
+└── created_at, updated_at, deleted_at
+
+  Contrainte : password_hash et password_setup_token_hash sont mutuellement exclusifs.
+  Si password_setup_token_hash est défini, password_hash est NULL et vice versa.
 
 production_lines
-├── id, line_number (unique)
-├── machines (JSONB — tableau de machines)
+├── id, line_number (unique parmi non supprimées)
+├── machine_sequence (JSONB — tableau de machines ordonné)
 ├── is_active, is_deleted
-└── created_at, updated_at
+└── created_at, updated_at, deleted_at
 
 workshop_incidents
 ├── id
@@ -820,15 +919,24 @@ workshop_incidents
 ├── edit_request (JSONB), cancel_request, cancel_request_reason
 └── created_at, updated_at
 
+  Contraintes :
+  - chk_taken_consistency : si is_taken=true → taken_by_user_id et taken_at obligatoires
+  - chk_pending_must_be_taken : status='PENDING' implique is_taken=true
+  - chk_edit_request_shape : edit_request doit être un objet JSON avec au moins un champ connu
+  - idx_unique_active_incident_per_machine : un seul incident OPEN ou PENDING
+    par combinaison (line_id, machine_id, robot_label, head_number)
+
 workshop_incident_followers
-├── id, incident_id → workshop_incidents
-├── user_id → sentinel_users
+├── id, incident_id → workshop_incidents (ON DELETE RESTRICT)
+├── user_id → sentinel_users (ON DELETE RESTRICT)
 ├── created_at
-└── deleted_at (désabonnement logique)
+└── deleted_at (désabonnement logique — la ligne est conservée)
+
+  Contrainte : un seul abonnement actif par paire (incident_id, user_id)
 
 workshop_incident_events
 ├── id, incident_id → workshop_incidents
-├── actor_user_id → sentinel_users (obligatoire)
+├── actor_user_id → sentinel_users (NOT NULL — le système ne loggue jamais anonymement)
 ├── event_type, payload (JSONB)
 └── created_at
 
@@ -839,7 +947,7 @@ account_audit_events
 └── created_at
 
 line_audit_events
-├── id, line_id → production_lines
+├── id, target_line_id → production_lines
 ├── admin_id → admin_accounts
 ├── event_type, changes (JSONB)
 └── created_at
@@ -847,16 +955,20 @@ line_audit_events
 
 ---
 
-## 17. Routes et API
+## 19. Routes et API
 
-### 17.1 Administration
+### 19.1 Administration
 
 | Méthode | Route | Description |
 |---|---|---|
 | `POST` | `/admin/auth/login` | Connexion admin |
 | `GET` | `/admin/auth/me` | Session courante |
 | `POST` | `/admin/auth/logout` | Déconnexion |
-| `POST` | `/admin/auth/verify-password` | Vérification mot de passe admin |
+| `POST` | `/admin/auth/verify-password` | Vérification mot de passe admin (avant action sensible) |
+| `PATCH` | `/admin/auth/password` | Changement du mot de passe admin |
+| `GET` | `/admin/dashboard` | Tableau de bord référentiel (synthèse) |
+| `GET` | `/admin/quality` | Indicateurs de qualité du référentiel |
+| `GET` | `/admin/audit` | Journal d'audit référentiel |
 | `GET` | `/admin/accounts` | Liste des utilisateurs |
 | `GET` | `/admin/accounts/check-badge` | Vérification disponibilité badge |
 | `POST` | `/admin/accounts` | Créer un utilisateur |
@@ -865,7 +977,7 @@ line_audit_events
 | `PATCH` | `/admin/accounts/:id` | Modifier un utilisateur |
 | `PATCH` | `/admin/accounts/:id/activate` | Activer |
 | `PATCH` | `/admin/accounts/:id/deactivate` | Désactiver |
-| `PATCH` | `/admin/accounts/:id/reset-password` | Réinitialiser mot de passe |
+| `PATCH` | `/admin/accounts/:id/reset-password` | Réinitialiser mot de passe (génère un setup code) |
 | `DELETE` | `/admin/accounts/:id` | Supprimer (logique) |
 | `GET` | `/admin/lines` | Liste des lignes |
 | `GET` | `/admin/lines/check-line` | Vérification numéro de ligne |
@@ -875,25 +987,24 @@ line_audit_events
 | `GET` | `/admin/lines/:id/impact` | Impact avant suppression |
 | `PATCH` | `/admin/lines/:id` | Modifier une ligne |
 | `DELETE` | `/admin/lines/:id` | Supprimer (logique) |
-| `GET` | `/admin/audit` | Journal d'audit référentiel |
 
-### 17.2 Atelier
+### 19.2 Atelier
 
 | Méthode | Route | Auth | Description |
 |---|---|---|---|
-| `POST` | `/workshop/auth/login` | Aucune | Connexion badge |
+| `POST` | `/workshop/auth/login` | Aucune | Connexion badge (toutes étapes du flux) |
 | `POST` | `/workshop/auth/logout` | Aucune | Déconnexion |
 | `GET` | `/workshop/auth/me` | Session | Session courante |
 | `GET` | `/workshop/board` | **Aucune** | Données board public |
 | `GET` | `/workshop/lines` | Session | Lignes actives |
-| `GET` | `/workshop/incidents` | Session | Incidents actifs ; pour RESPONSABLE, inclut aussi les cas terminaux encore suivis |
+| `GET` | `/workshop/incidents` | Session | Incidents actifs ; pour RESPONSABLE, inclut aussi les incidents terminaux suivis |
 | `POST` | `/workshop/incidents` | Session | Créer un incident |
 | `POST` | `/workshop/incidents/reorder` | Session | Réordonner atomiquement une liste d'incidents actifs |
 | `POST` | `/workshop/incidents/:id/follow` | Session | Suivre un incident (RESPONSABLE) |
 | `DELETE` | `/workshop/incidents/:id/follow` | Session | Arrêter le suivi d'un incident (RESPONSABLE) |
 | `POST` | `/workshop/incidents/:id/cancel` | Session | Annuler un incident |
-| `PATCH` | `/workshop/incidents/:id` | Session | Mettre à jour un incident |
-| `DELETE` | `/workshop/incidents/:id` | Session | Compatibilité ancienne API : annuler un incident |
+| `PATCH` | `/workshop/incidents/:id` | Session | Mettre à jour un incident (toutes actions de workflow) |
+| `DELETE` | `/workshop/incidents/:id` | Session | Annuler un incident (compatibilité API) |
 | `GET` | `/workshop/incidents/:id/events` | Session | Événements d'un incident |
 | `GET` | `/workshop/metrics` | Session | Métriques temps réel |
 | `GET` | `/workshop/analytics` | Session | Indicateurs pilotage |
@@ -905,16 +1016,20 @@ line_audit_events
 
 ---
 
-## 18. Règles métier transverses
+## 20. Règles métier transverses
 
-### 18.1 Intégrité des références
+### 20.1 Intégrité des références
 
-- Un numéro de badge est **unique** dans `sentinel_users`
-- Un numéro de ligne est **unique** dans `production_lines`
+- Un numéro de badge est **unique** dans `sentinel_users` (parmi les non supprimés)
+- Un numéro de ligne est **unique** dans `production_lines` (parmi les non supprimées)
 - Un identifiant de machine est **unique** dans l'ensemble des lignes actives
 - Les données ne sont jamais supprimées physiquement (soft delete)
 
-### 18.2 Blocages opérationnels
+### 20.2 Unicité des incidents actifs par emplacement machine
+
+Une seule combinaison `(line_id, machine_id, robot_label, head_number)` peut avoir un incident au statut `OPEN` ou `PENDING` simultanément. Cette contrainte est appliquée au niveau base de données par un index partiel unique. Toute tentative de créer un second incident actif sur le même emplacement est rejetée.
+
+### 20.3 Blocages opérationnels
 
 | Opération | Condition de blocage |
 |---|---|
@@ -924,57 +1039,70 @@ line_audit_events
 | Désactiver une ligne | Incidents actifs liés à cette ligne |
 | Supprimer une ligne | Incidents actifs liés à cette ligne |
 
-### 18.3 Contraintes de workflow incident
+### 20.4 Contraintes de workflow incident
 
 - La **mise en attente** (`SET_PENDING`) nécessite un diagnostic renseigné
 - La **clôture** (`CLOSE`) nécessite une note d'intervention renseignée
-- La clôture directe depuis le statut `PENDING` est **interdite** (il faut reprendre → `RESUME` puis clôturer)
+- La clôture directe depuis le statut `PENDING` est **interdite** (il faut `RESUME` → OPEN, puis `CLOSE`)
 - L'**invalidation** d'un incident clôturé nécessite un motif
 - La demande d'annulation opérateur nécessite un motif
+- À la clôture, tout `edit_request` en attente est automatiquement effacé
 
-### 18.4 Métriques
+### 20.5 Cohérence des champs de prise en charge
 
-- Les incidents `CANCELED` et `INVALIDATED` sont **exclus** des métriques opérationnelles
+Les champs `is_taken`, `taken_by_user_id` et `taken_at` sont contraints par la base de données pour rester cohérents :
+- Si `is_taken = false` : `taken_by_user_id` et `taken_at` doivent être NULL
+- Si `is_taken = true` : `taken_by_user_id` et `taken_at` doivent être non NULL
+- Un incident `PENDING` doit obligatoirement avoir `is_taken = true`
+
+### 20.6 Métriques
+
+- Les incidents `CANCELED` et `INVALIDATED` sont **exclus** des métriques opérationnelles et de la base de connaissance
 - L'ancienneté critique est définie à **7 jours** pour les incidents OPEN
 - L'ordre d'affichage respecte : priorité → ordre manuel → non pris en charge → date de création
 
 ---
 
-## 19. Sécurité et authentification
+## 21. Sécurité et authentification
 
-### 19.1 Sessions
+### 21.1 Sessions
 
 - Deux systèmes de sessions indépendants : admin (`sentinel-admin-auth`) et atelier (`sentinel-workshop-auth`)
 - Tokens JWT, transportés exclusivement via **cookies HTTP-only** (non accessible en JavaScript)
 - Secrets JWT configurés via variables d'environnement
 
-### 19.2 Protection des routes backend
+### 21.2 Protection des routes backend
 
-- `adminAuthMiddleware` : valide le token admin sur toutes les routes `/admin/**` (sauf login)
+- `adminAuthMiddleware` : valide le token admin sur toutes les routes `/admin/**` (sauf login, logout)
 - `workshopAuthMiddleware` : valide le token atelier sur toutes les routes `/workshop/**` (sauf login, logout et board)
 - La route `/workshop/board` est intentionnellement publique
 
-### 19.3 Mots de passe
+### 21.3 Mots de passe
 
 - Mots de passe admin : hashés (bcrypt)
-- Mots de passe atelier : hashés (bcrypt, facteur 10), définis au premier login badge
-- Les opérateurs sans rôle sensible (OPERATOR) n'ont pas de mot de passe requis — badge seul
+- Mots de passe atelier : hashés (bcrypt, facteur 10), définis lors du premier login via setup code
+- Setup codes : hashés (bcrypt), expiration gérée côté base de données (`password_setup_expires_at`)
+- Les opérateurs (`OPERATOR`) n'ont pas de mot de passe requis — badge seul suffit si le mot de passe n'a pas encore été défini
 
-### 19.4 Validation des entrées
+### 21.4 Validation des entrées
 
 - Toutes les entrées API sont validées via des schémas **Zod** côté backend avant tout traitement
 - Les paramètres de filtres SQL utilisent des requêtes **paramétrées** (protection injection SQL)
 - Les statuts et états sont validés contre les constantes du domaine
 
-### 19.5 Vérification du mot de passe admin pour les actions sensibles
+### 21.5 Protection des actions sensibles admin
 
 La route `POST /admin/auth/verify-password` permet de confirmer le mot de passe admin avant les opérations destructives (suppression utilisateur, suppression ligne) sans rouvrir de session.
 
+### 21.6 Limitation du débit (rate limiting)
+
+Les endpoints de connexion (`/admin/auth/login`, `/workshop/auth/login`) sont protégés par un middleware de limitation du débit pour prévenir les attaques par force brute.
+
 ---
 
-## 20. Stack technique
+## 22. Stack technique
 
-### 20.1 Frontend
+### 22.1 Frontend
 
 | Technologie | Rôle |
 |---|---|
@@ -984,7 +1112,7 @@ La route `POST /admin/auth/verify-password` permet de confirmer le mot de passe 
 | React Router | Navigation SPA |
 | Validation HTML/TypeScript | Validation côté interface et contraintes de formulaire |
 
-### 20.2 Backend
+### 22.2 Backend
 
 | Technologie | Rôle |
 |---|---|
@@ -992,19 +1120,19 @@ La route `POST /admin/auth/verify-password` permet de confirmer le mot de passe 
 | Express | Framework HTTP |
 | TypeScript | Typage statique |
 | Zod | Validation des schémas API |
-| bcrypt | Hachage des mots de passe |
+| bcrypt | Hachage des mots de passe et des setup codes |
 | jsonwebtoken | Génération et vérification JWT |
 | node-postgres (pg) | Client PostgreSQL |
 
-### 20.3 Base de données
+### 22.3 Base de données
 
 | Technologie | Rôle |
 |---|---|
 | PostgreSQL | Base de données relationnelle |
-| Migrations SQL | Gestion des évolutions de schéma (019 migrations) |
-| JSONB | Stockage des payloads flexibles (edit_request, payload événements, machines) |
+| Migrations SQL | Gestion des évolutions de schéma (021 migrations) |
+| JSONB | Stockage des payloads flexibles (edit_request, payload événements, machine_sequence) |
 
-### 20.4 Infrastructure
+### 22.4 Infrastructure
 
 | Composant | Configuration |
 |---|---|
@@ -1012,7 +1140,7 @@ La route `POST /admin/auth/verify-password` permet de confirmer le mot de passe 
 | Nginx | Serveur statique frontend en production |
 | Variables d'environnement | Configuration des secrets et URLs (`.env`) |
 
-### 20.5 Ports par défaut (développement)
+### 22.5 Ports par défaut (développement)
 
 | Service | Port |
 |---|---|
@@ -1022,4 +1150,4 @@ La route `POST /admin/auth/verify-password` permet de confirmer le mot de passe 
 
 ---
 
-*Document généré à partir de l'analyse du code source de Sentinel v1 — Mai 2026.*
+*Document mis à jour à partir de l'analyse du code source de Sentinel v1 — Juin 2026.*

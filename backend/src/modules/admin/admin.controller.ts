@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { sendError } from '../../utils/errors';
+import { handleControllerError } from '../../utils/controller';
 import {
   getReferenceDashboardService,
   getReferenceQualityService,
@@ -10,8 +10,7 @@ export async function getReferenceDashboard(_req: Request, res: Response): Promi
   try {
     res.json(await getReferenceDashboardService());
   } catch (err) {
-    console.error('getReferenceDashboard error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'getReferenceDashboard', err);
   }
 }
 
@@ -19,8 +18,7 @@ export async function getReferenceQuality(_req: Request, res: Response): Promise
   try {
     res.json(await getReferenceQualityService());
   } catch (err) {
-    console.error('getReferenceQuality error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'getReferenceQuality', err);
   }
 }
 
@@ -28,7 +26,6 @@ export async function listReferenceAudit(req: Request, res: Response): Promise<v
   try {
     res.json(await listReferenceAuditService(req.query));
   } catch (err) {
-    console.error('listReferenceAudit error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'listReferenceAudit', err);
   }
 }

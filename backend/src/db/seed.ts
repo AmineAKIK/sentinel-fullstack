@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import { hashAdminPassword } from '../auth/bcrypt';
 import pool from './pool';
 
 async function seedAdminAccount(): Promise<void> {
@@ -20,7 +20,7 @@ async function seedAdminAccount(): Promise<void> {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await hashAdminPassword(password);
   await pool.query(
     'INSERT INTO admin_accounts (username, password_hash) VALUES ($1, $2)',
     [username, passwordHash]

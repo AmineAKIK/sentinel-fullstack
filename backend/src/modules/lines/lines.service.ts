@@ -1,4 +1,5 @@
-import { badRequest, ServiceResult } from '../../utils/serviceResult';
+import { ServiceResult } from '../../utils/serviceResult';
+import { withTransaction } from '../../db/transaction';
 import { createLineAuditEvent } from './lines.events';
 import { getLineEventType } from './lines.policy';
 import {
@@ -48,11 +49,14 @@ export async function createLineService(input: CreateLineInput, adminId: number)
     return { ok: false, status: 409, code: 'MACHINE_ALREADY_EXISTS', message: 'Un ou plusieurs IDs machine existent déjà.' };
   }
 
-  const line = await createLineData(input);
-  await createLineAuditEvent(line.id, adminId, 'LINE_CREATED', {
-    lineNumber: input.lineNumber,
-    machinesCount: input.machines.length,
-    isActive: input.isActive ?? true,
+  const line = await withTransaction(async (client) => {
+    const created = await createLineData(input, client);
+    await createLineAuditEvent(created.id, adminId, 'LINE_CREATED', {
+      lineNumber: input.lineNumber,
+      machinesCount: input.machines.length,
+      isActive: input.isActive ?? true,
+    }, client);
+    return created;
   });
 
   return { ok: true, data: line };
@@ -103,12 +107,19 @@ export async function updateLineService(
     }
   }
 
-  const line = await updateLineData(id, updates);
+  const eventType = getLineEventType(current, updates);
+
+  const line = await withTransaction(async (client) => {
+    const updated = await updateLineData(id, updates, client);
+    if (!updated) return null;
+    await createLineAuditEvent(id, adminId, eventType, updates as Record<string, unknown>, client);
+    return updated;
+  });
+
   if (!line) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Ligne introuvable.' };
   }
 
-  await createLineAuditEvent(id, adminId, getLineEventType(current, updates), updates);
   return { ok: true, data: line };
 }
 
@@ -123,11 +134,17 @@ export async function deleteLineService(id: number, adminId: number): Promise<Se
     };
   }
 
-  if (!(await softDeleteLine(id))) {
+  const deleted = await withTransaction(async (client) => {
+    const ok = await softDeleteLine(id, client);
+    if (!ok) return false;
+    await createLineAuditEvent(id, adminId, 'LINE_SOFT_DELETED', null, client);
+    return true;
+  });
+
+  if (!deleted) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Ligne introuvable.' };
   }
 
-  await createLineAuditEvent(id, adminId, 'LINE_SOFT_DELETED', null);
   return { ok: true, data: { message: 'Ligne supprimée.' } };
 }
 

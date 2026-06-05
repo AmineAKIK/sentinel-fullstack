@@ -45,9 +45,14 @@ export const incidentWorkspaceQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 
+const isoDateTimeSchema = z
+  .string()
+  .trim()
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: 'Date invalide (format ISO 8601 attendu).' });
+
 export const workshopAnalyticsQuerySchema = z.object({
-  start: z.string().trim().max(40).optional(),
-  end: z.string().trim().max(40).optional(),
+  start: isoDateTimeSchema.optional(),
+  end: isoDateTimeSchema.optional(),
   lineId: z.coerce.number().int().positive().optional(),
   machineId: z.string().trim().max(120).optional(),
 });

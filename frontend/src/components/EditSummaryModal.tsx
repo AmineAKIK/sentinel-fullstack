@@ -4,6 +4,7 @@ import { UserFormData } from './UserForm';
 import { SentinelUser, Role } from '../types';
 import { activateAccount, deactivateAccount, updateAccount } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
+import { ROLE_LABELS } from '../utils/labels';
 
 interface EditSummaryModalProps {
   user: SentinelUser;
@@ -19,12 +20,6 @@ const FIELD_LABELS: Record<string, string> = {
   badgeNumber: 'Numéro de badge',
   role: 'Rôle',
   isActive: 'Statut',
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
-  RESPONSABLE: 'Responsable',
 };
 
 function roleLabel(val: string): string {

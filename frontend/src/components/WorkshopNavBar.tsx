@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { label: 'Historique', path: '/workshop/history', match: ['/workshop/history'] },
   { label: 'Connaissance', path: '/workshop/knowledge', match: ['/workshop/knowledge'] },
   { label: 'Affichage', path: '/workshop/board', match: ['/workshop/board'] },
+  { label: 'Support', path: '/workshop/support', match: ['/workshop/support'] },
 ];
 
 export default function WorkshopNavBar() {

@@ -4,6 +4,7 @@ import UserForm, { UserFormData } from './UserForm';
 import { checkBadgeAvailability, createAccount } from '../api/accounts';
 import { SentinelUser, Role } from '../types';
 import { ApiResponseError } from '../api/client';
+import { formatDateTime } from '../utils/date';
 
 interface CreateUserModalProps {
   onClose: () => void;
@@ -17,7 +18,8 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
   const [error, setError] = useState('');
   const [badgeError, setBadgeError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'form' | 'preview'>('form');
+  const [step, setStep] = useState<'form' | 'preview' | 'created'>('form');
+  const [createdUser, setCreatedUser] = useState<SentinelUser | null>(null);
 
   async function handlePreview() {
     setError('');
@@ -87,7 +89,8 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
         badgeNumber: form.badgeNumber.trim(),
         role: form.role as Role,
       });
-      onSuccess(user);
+      setCreatedUser(user);
+      setStep('created');
     } catch (err) {
       if (err instanceof ApiResponseError) {
         if (err.code === 'BADGE_ALREADY_EXISTS') {
@@ -109,6 +112,14 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
     setStep('form');
   }
 
+  function handleClose() {
+    if (createdUser) {
+      onSuccess(createdUser);
+      return;
+    }
+    onClose();
+  }
+
   const isDirty = step === 'form' && (
     form.firstName.trim() !== '' ||
     form.lastName.trim() !== '' ||
@@ -118,13 +129,17 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
 
   return (
     <Modal
-      title={step === 'preview' ? 'Aperçu utilisateur' : 'Ajouter un utilisateur'}
-      onClose={loading ? undefined : onClose}
+      title={step === 'created' ? 'Code temporaire' : step === 'preview' ? 'Aperçu utilisateur' : 'Ajouter un utilisateur'}
+      onClose={loading ? undefined : handleClose}
       closeOnOverlay={false}
       isDirty={isDirty}
       isLoading={loading}
       footer={
-        step === 'preview' ? (
+        step === 'created' ? (
+          <button className="btn btn-primary" onClick={handleClose}>
+            Fermer
+          </button>
+        ) : step === 'preview' ? (
           <>
             <button className="btn btn-secondary" onClick={handleBack} disabled={loading}>
               Retour
@@ -145,7 +160,22 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
         )
       }
     >
-      {step === 'preview' ? (
+      {step === 'created' && createdUser ? (
+        <div>
+          <div className="success-message" style={{ marginBottom: 16 }}>
+            Utilisateur créé. Communiquez ce code temporaire à {createdUser.first_name} {createdUser.last_name}.
+          </div>
+          <div className="detail-field" style={{ marginBottom: 14 }}>
+            <span className="detail-field-label">Code temporaire</span>
+            <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>
+              {createdUser.password_setup_code}
+            </span>
+          </div>
+          <div className="notice">
+            Ce code est affiché une seule fois. Il expire le {createdUser.password_setup_expires_at ? formatDateTime(createdUser.password_setup_expires_at) : 'prochainement'}.
+          </div>
+        </div>
+      ) : step === 'preview' ? (
         <div className="detail-grid">
           <div>
             <div className="detail-field">

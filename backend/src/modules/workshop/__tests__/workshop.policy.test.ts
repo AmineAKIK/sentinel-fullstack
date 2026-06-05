@@ -2,11 +2,14 @@ import { canPerform, CurrentIncident } from '../workshop.policy';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+const ACTOR_ID = 42;
+
 function incident(overrides: Partial<CurrentIncident> = {}): CurrentIncident {
   return {
     status: 'OPEN',
     is_taken: false,
     taken_by_user_id: null,
+    user_id: ACTOR_ID,
     cancel_request: false,
     ...overrides,
   };
@@ -24,26 +27,38 @@ describe('canPerform – unknown role', () => {
 // ─── OPERATOR actions ─────────────────────────────────────────────────────────
 
 describe('OPERATOR permissions', () => {
-  it('can REQUEST_EDIT on an active incident', () => {
-    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'OPEN' }))).toBe(true);
-    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'PENDING' }))).toBe(true);
+  it('can REQUEST_EDIT on their own active incident', () => {
+    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'OPEN' }), ACTOR_ID)).toBe(true);
+    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'PENDING' }), ACTOR_ID)).toBe(true);
+  });
+
+  it('cannot REQUEST_EDIT on another operator\'s incident', () => {
+    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ user_id: 99 }), ACTOR_ID)).toBe(false);
+  });
+
+  it('cannot REQUEST_EDIT without passing actorId', () => {
+    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident())).toBe(false);
   });
 
   it('cannot REQUEST_EDIT on a closed/canceled incident', () => {
-    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'CLOSED' }))).toBe(false);
-    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'CANCELED' }))).toBe(false);
+    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'CLOSED' }), ACTOR_ID)).toBe(false);
+    expect(canPerform('OPERATOR', 'REQUEST_EDIT', incident({ status: 'CANCELED' }), ACTOR_ID)).toBe(false);
   });
 
-  it('can REQUEST_CANCEL on an open, non-taken incident', () => {
-    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ status: 'OPEN', is_taken: false }))).toBe(true);
+  it('can REQUEST_CANCEL on their own open, non-taken incident', () => {
+    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ status: 'OPEN', is_taken: false }), ACTOR_ID)).toBe(true);
+  });
+
+  it('cannot REQUEST_CANCEL on another operator\'s incident', () => {
+    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ user_id: 99, is_taken: false }), ACTOR_ID)).toBe(false);
   });
 
   it('cannot REQUEST_CANCEL when incident is taken', () => {
-    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ is_taken: true }))).toBe(false);
+    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ is_taken: true }), ACTOR_ID)).toBe(false);
   });
 
   it('cannot REQUEST_CANCEL on a closed incident', () => {
-    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ status: 'CLOSED' }))).toBe(false);
+    expect(canPerform('OPERATOR', 'REQUEST_CANCEL', incident({ status: 'CLOSED' }), ACTOR_ID)).toBe(false);
   });
 
   it('cannot perform DIRECT_EDIT, CANCEL, TAKE, CLOSE', () => {

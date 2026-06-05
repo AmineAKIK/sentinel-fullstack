@@ -1,7 +1,7 @@
 import { boundedInt } from '../../db/sql';
 import {
   getReferenceDashboardData,
-  getReferenceQualityData,
+  getReferenceQualityRawData,
   listReferenceAuditData,
   ListReferenceAuditFilters,
   ReferenceAuditEventDto,
@@ -36,7 +36,54 @@ export async function getReferenceDashboardService(): Promise<ReferenceDashboard
 }
 
 export async function getReferenceQualityService(): Promise<ReferenceQualityDto> {
-  return getReferenceQualityData();
+  const raw = await getReferenceQualityRawData();
+
+  const malformedMachines: ReferenceQualityDto['malformed_machines'] = [];
+  const machineOwners = new Map<string, string[]>();
+
+  for (const line of raw.all_lines) {
+    const machines = Array.isArray(line.machines) ? line.machines : [];
+
+    if (line.is_active && machines.length === 0) {
+      malformedMachines.push({
+        line_id: line.id,
+        line_number: line.line_number,
+        machine_id: '-',
+        issue: 'Ligne active sans machine',
+      });
+    }
+
+    for (const machine of machines) {
+      const machineId = String(machine.machineId || '').trim();
+      const hasMissingFields = !machineId || !String(machine.brand || '').trim();
+
+      if (hasMissingFields) {
+        malformedMachines.push({
+          line_id: line.id,
+          line_number: line.line_number,
+          machine_id: machineId || '-',
+          issue: 'Machine incomplète',
+        });
+      }
+
+      if (machineId) {
+        const key = machineId.toLowerCase();
+        machineOwners.set(key, [...(machineOwners.get(key) ?? []), line.line_number]);
+      }
+    }
+  }
+
+  const duplicateMachines = Array.from(machineOwners.entries())
+    .filter(([, owners]) => owners.length > 1)
+    .map(([machine_id, line_numbers]) => ({ machine_id, line_numbers }));
+
+  return {
+    users_without_password: raw.users_without_password,
+    inactive_users: raw.inactive_users,
+    inactive_lines: raw.inactive_lines,
+    malformed_machines: malformedMachines,
+    duplicate_machines: duplicateMachines,
+  };
 }
 
 export async function listReferenceAuditService(query: ReferenceAuditQuery): Promise<ReferenceAuditEventDto[]> {

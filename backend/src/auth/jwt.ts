@@ -1,16 +1,15 @@
 import jwt from 'jsonwebtoken';
-
-export type JwtExpiresIn = '8h';
+import { SESSION_DURATION_JWT } from './session';
 
 export function getJwtSecret(): string | null {
   return process.env.JWT_SECRET || null;
 }
 
-export function signAuthToken(payload: object, expiresIn: JwtExpiresIn = '8h'): string | null {
+export function signAuthToken(payload: object): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
 
-  return jwt.sign(payload, secret, { expiresIn });
+  return jwt.sign(payload, secret, { expiresIn: SESSION_DURATION_JWT });
 }
 
 export function verifyAuthToken<TPayload>(token: string): TPayload | null {

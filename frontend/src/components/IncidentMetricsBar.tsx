@@ -15,6 +15,7 @@ interface IncidentMetricsBarProps {
   metrics: WorkshopIncidentMetrics | null;
   filters: Filters;
   role?: string;
+  createdByMeCount?: number;
   onSetFilters: (value: any) => void;
 }
 
@@ -23,8 +24,10 @@ export default function IncidentMetricsBar({
   metrics,
   filters,
   role,
+  createdByMeCount = 0,
   onSetFilters,
 }: IncidentMetricsBarProps) {
+  const isOperator = role === 'OPERATOR';
   const isResponsable = role === 'RESPONSABLE';
   const isMaintenance = role === 'MAINTENANCE';
 
@@ -104,6 +107,23 @@ export default function IncidentMetricsBar({
             <span>Non pris</span>
             <strong>{metrics.not_taken}</strong>
           </button>
+          {isOperator && (
+            <button
+              className={`workshop-metric ${filters.scope === 'created_by_me' ? 'active' : ''}`}
+              onClick={() => onSetFilters((prev: Filters) => ({
+                ...prev,
+                status: 'all',
+                aging: 'all',
+                priority: 'all',
+                taken: 'all',
+                scope: prev.scope === 'created_by_me' ? 'all' : 'created_by_me',
+              }))}
+              type="button"
+            >
+              <span>Créés par moi</span>
+              <strong>{createdByMeCount}</strong>
+            </button>
+          )}
           {isMaintenance && (
             <button
               className={`workshop-metric ${filters.scope === 'assigned_to_me' ? 'active' : ''}`}

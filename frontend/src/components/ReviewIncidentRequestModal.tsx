@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import Modal from './Modal';
 import { IncidentShift, IncidentState, ProductionLine, WorkshopIncident } from '../types';
+import { SHIFT_LABELS, STATE_LABELS } from '../utils/labels';
 
 interface ChangeRow {
   label: string;
@@ -28,20 +29,6 @@ interface ReviewIncidentRequestModalProps {
   onApproveDelete: () => void;
   onRejectDelete: () => void;
 }
-
-const SHIFT_LABELS: Record<IncidentShift, string> = {
-  MATIN: 'Matin',
-  APRES_MIDI: 'Après midi',
-  NUIT: 'Nuit',
-  WEEKEND: 'Weekend',
-};
-
-const STATE_LABELS: Record<IncidentState, string> = {
-  SKIPEE_PAR_MACHINE: 'Skipée par machine',
-  SKIPEE_PAR_CONDUCTEUR: 'Skipée par conducteur',
-  DEGRADEE: 'Dégradée',
-  INDISPONIBLE: 'Indisponible',
-};
 
 function formatValue(value: string | null | undefined): string {
   if (!value) return '-';

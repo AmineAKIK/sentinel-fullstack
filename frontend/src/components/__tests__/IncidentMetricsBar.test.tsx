@@ -123,4 +123,28 @@ describe('IncidentMetricsBar – filtres', () => {
     if (!ouverts) throw new Error('Bouton Ouverts introuvable');
     expect(ouverts.className).toContain('active');
   });
+
+  it('affiche le filtre "Créés par moi" pour un opérateur', () => {
+    const onSetFilters = vi.fn();
+    const filters = { ...defaultFilters, scope: 'all' };
+    render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={filters}
+        role="OPERATOR"
+        createdByMeCount={4}
+        onSetFilters={onSetFilters}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Créés par moi/i }));
+    const updater = onSetFilters.mock.calls[0][0];
+    const result = updater(filters);
+    expect(screen.getByText('4')).toBeDefined();
+    expect(result.scope).toBe('created_by_me');
+    expect(result.status).toBe('all');
+    expect(result.priority).toBe('all');
+    expect(result.taken).toBe('all');
+  });
 });

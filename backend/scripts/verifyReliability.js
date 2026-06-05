@@ -267,7 +267,11 @@ check('Workshop event log has payloads for important operational decisions', () 
     && service.includes('CANCEL_REQUESTED')
     && service.includes('INCIDENT_CANCELED')
     && service.includes('INCIDENT_INVALIDATED')
-    && service.includes('STATUS_CHANGED')
+    && service.includes('INCIDENT_SET_PENDING')
+    && service.includes('INCIDENT_RESUMED')
+    && service.includes('INCIDENT_CLOSED')
+    && service.includes('PRIORITY_CHANGED')
+    && service.includes('INCIDENT_REORDERED')
     && service.includes('RESPONSIBLE_COMMENT_UPDATED')
     && service.includes('requestedChangeKeys');
 });

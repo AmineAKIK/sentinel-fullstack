@@ -9,12 +9,7 @@ import FullPageLoader from '../components/ui/FullPageLoader';
 import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
 import { formatDateTime } from '../utils/date';
-
-const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
-  RESPONSABLE: 'Responsable',
-};
+import { ROLE_LABELS } from '../utils/labels';
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,6 +40,12 @@ export default function UserDetailPage() {
   function showSuccess(msg: string) {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(''), 4000);
+  }
+
+  function passwordStatusLabel(account: SentinelUser): string {
+    if (account.has_password) return 'Défini';
+    if (account.has_password_setup_code) return 'Code temporaire actif';
+    return 'À réinitialiser';
   }
 
   if (loading) {
@@ -103,7 +104,7 @@ export default function UserDetailPage() {
                 <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
               </DetailField>
               <DetailField label="Mot de passe workshop">
-                {user.has_password ? 'Défini' : 'À définir'}
+                {passwordStatusLabel(user)}
               </DetailField>
               <DetailField label="Date de création">{formatDateTime(user.created_at)}</DetailField>
               <DetailField label="Dernière modification">{formatDateTime(user.updated_at)}</DetailField>

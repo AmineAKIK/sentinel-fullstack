@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
 import { WORKSHOP_AUTH_COOKIE, setAuthCookie, clearAuthCookie } from '../../auth/authCookies';
 import {
   sendInvalidServerConfig,
@@ -7,14 +6,12 @@ import {
 } from '../../auth/authResponses';
 import { signAuthToken } from '../../auth/jwt';
 import { sendError } from '../../utils/errors';
-import {
-  findActiveWorkshopUserByBadge,
-  findActiveWorkshopUserBySession,
-  setWorkshopUserPassword,
-} from './workshopAuth.repository';
+import { handleControllerError } from '../../utils/controller';
+import { findActiveWorkshopUserBySession } from './workshopAuth.repository';
+import { loginWorkshopUserService } from './workshopAuth.service';
 
 export async function login(req: Request, res: Response): Promise<void> {
-  const { badgeNumber, password, newPassword } = req.body;
+  const { badgeNumber, password, newPassword, setupCode } = req.body;
 
   if (!badgeNumber || typeof badgeNumber !== 'string') {
     sendError(res, 400, 'VALIDATION_ERROR', 'Numéro de badge requis.');
@@ -22,46 +19,43 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const user = await findActiveWorkshopUserByBadge(badgeNumber);
-    if (!user) {
+    const result = await loginWorkshopUserService(badgeNumber, password, newPassword, setupCode);
+
+    if (result.kind === 'invalid_badge') {
       sendError(res, 401, 'UNAUTHORIZED', 'Badge invalide ou utilisateur inactif.');
       return;
     }
 
-    if (!user.password_hash) {
-      if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-        res.status(200).json({
-          requiresPasswordSetup: true,
-          badge_number: user.badge_number,
-        });
-        return;
-      }
-
-      const passwordHash = await bcrypt.hash(newPassword, 10);
-      await setWorkshopUserPassword(user.id, passwordHash);
-    } else {
-      if (!password || typeof password !== 'string') {
-        res.status(200).json({
-          requiresPassword: true,
-          badge_number: user.badge_number,
-        });
-        return;
-      }
-
-      const valid = await bcrypt.compare(password, user.password_hash);
-      if (!valid) {
-        sendError(res, 401, 'UNAUTHORIZED', 'Badge ou mot de passe incorrect.');
-        return;
-      }
+    if (result.kind === 'requires_password_setup') {
+      res.status(200).json({ requiresPasswordSetup: true, badge_number: result.badgeNumber });
+      return;
     }
 
-    const token = signAuthToken(
-      {
-        userId: user.id,
-        badgeNumber: user.badge_number,
-        role: user.role,
-      }
-    );
+    if (result.kind === 'invalid_setup_code') {
+      sendError(res, 401, 'UNAUTHORIZED', 'Code temporaire incorrect.');
+      return;
+    }
+
+    if (result.kind === 'expired_setup_code') {
+      sendError(res, 401, 'UNAUTHORIZED', 'Code temporaire expiré ou absent. Demandez une réinitialisation à l’administrateur.');
+      return;
+    }
+
+    if (result.kind === 'requires_password') {
+      res.status(200).json({ requiresPassword: true, badge_number: result.badgeNumber });
+      return;
+    }
+
+    if (result.kind === 'invalid_password') {
+      sendError(res, 401, 'UNAUTHORIZED', 'Badge ou mot de passe incorrect.');
+      return;
+    }
+
+    const token = signAuthToken({
+      userId: result.user.id,
+      badgeNumber: result.user.badge_number,
+      role: result.user.role,
+    });
     if (!token) {
       sendInvalidServerConfig(res);
       return;
@@ -69,15 +63,14 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token);
     res.json({
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      badge_number: user.badge_number,
-      role: user.role,
+      id: result.user.id,
+      first_name: result.user.first_name,
+      last_name: result.user.last_name,
+      badge_number: result.user.badge_number,
+      role: result.user.role,
     });
   } catch (err) {
-    console.error('Workshop login error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'workshopLogin', err);
   }
 }
 
@@ -104,7 +97,6 @@ export async function me(req: Request, res: Response): Promise<void> {
 
     res.json(user);
   } catch (err) {
-    console.error('Workshop me error:', err);
-    sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
+    handleControllerError(res, 'workshopMe', err);
   }
 }

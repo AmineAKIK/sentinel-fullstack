@@ -7,36 +7,23 @@ import {
 } from '../../utils/controller';
 import { sendError } from '../../utils/errors';
 import {
-  approveEditIncidentService,
   cancelIncidentService,
-  closeIncidentService,
   createIncidentService,
-  editIncidentService,
   followIncidentService,
   getBoardDataService,
   getHistoryIncidentService,
   getIncidentMetricsService,
   getKnowledgeIncidentService,
   getWorkshopAnalyticsService,
-  invalidateIncidentService,
   listHistoryEventsService,
   listHistoryIncidentsService,
   listIncidentEventsService,
   listIncidentsService,
   listKnowledgeIncidentsService,
   listWorkshopLinesService,
-  rejectCancelIncidentService,
-  rejectEditIncidentService,
   reorderIncidentsService,
-  requestCancelIncidentService,
-  requestEditIncidentService,
-  resumeIncidentService,
-  setDisplayOrderIncidentService,
-  setPendingIncidentService,
-  setPriorityIncidentService,
-  setResponsibleCommentService,
-  takeIncidentService,
   unfollowIncidentService,
+  updateIncidentService,
 } from './workshop.service';
 import {
   createIncidentSchema,
@@ -171,7 +158,7 @@ export async function createIncident(req: Request, res: Response): Promise<void>
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
-    const result = await createIncidentService(parsed.data, req.workshopUser!.userId);
+    const result = await createIncidentService(parsed.data, req.workshopUser!.userId, req.workshopUser!.role);
     if (sendServiceError(res, result)) return;
     res.status(201).json(result.data);
   } catch (err) {
@@ -179,8 +166,6 @@ export async function createIncident(req: Request, res: Response): Promise<void>
   }
 }
 
-// Le PATCH /incidents/:id route vers la bonne fonction selon le contenu du body.
-// Chaque action du cycle de vie a sa propre fonction de service dédiée.
 export async function updateIncident(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIdParam(req.params.id);
@@ -193,42 +178,7 @@ export async function updateIncident(req: Request, res: Response): Promise<void>
     }
 
     const { userId, role } = req.workshopUser!;
-    const updates = parsed.data;
-    let result;
-
-    if (updates.isTaken === true) {
-      result = await takeIncidentService(id.data, userId, role);
-    } else if (updates.status === 'PENDING') {
-      result = await setPendingIncidentService(id.data, updates.diagnostic, userId, role);
-    } else if (updates.status === 'OPEN' && updates.diagnostic === undefined) {
-      result = await resumeIncidentService(id.data, userId, role);
-    } else if (updates.status === 'CLOSED') {
-      result = await closeIncidentService(id.data, updates.interventionNote, userId, role);
-    } else if (updates.status === 'INVALIDATED') {
-      result = await invalidateIncidentService(id.data, updates.invalidationReason, userId, role);
-    } else if (updates.isPriority !== undefined) {
-      result = await setPriorityIncidentService(id.data, updates.isPriority, userId, role);
-    } else if (updates.responsibleComment !== undefined) {
-      result = await setResponsibleCommentService(id.data, updates.responsibleComment, userId, role);
-    } else if (updates.displayOrder !== undefined) {
-      result = await setDisplayOrderIncidentService(id.data, updates.displayOrder, userId, role);
-    } else if (updates.requestOnly === true) {
-      const { requestOnly, cancelRequest, cancelRequestReason, deleteRequest, deleteRequestReason, ...editPayload } = updates;
-      result = await requestEditIncidentService(id.data, editPayload as Record<string, unknown>, userId, role);
-    } else if (updates.cancelRequest === true || updates.deleteRequest === true) {
-      const reason = updates.cancelRequestReason ?? updates.deleteRequestReason ?? '';
-      result = await requestCancelIncidentService(id.data, reason, userId, role);
-    } else if (updates.applyEditRequest === true) {
-      result = await approveEditIncidentService(id.data, userId, role);
-    } else if (updates.rejectEditRequest === true) {
-      result = await rejectEditIncidentService(id.data, userId, role);
-    } else if (updates.rejectDeleteRequest === true) {
-      result = await rejectCancelIncidentService(id.data, userId, role);
-    } else {
-      const { requestOnly, cancelRequest, cancelRequestReason, deleteRequest, deleteRequestReason, applyEditRequest, rejectEditRequest, rejectDeleteRequest, isTaken, isPriority, displayOrder, status, responsibleComment, ...editFields } = updates;
-      result = await editIncidentService(id.data, editFields, userId, role);
-    }
-
+    const result = await updateIncidentService(id.data, parsed.data, userId, role);
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {

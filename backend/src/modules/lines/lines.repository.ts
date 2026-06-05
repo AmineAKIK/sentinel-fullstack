@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import pool from '../../db/pool';
 import { statusInSql } from '../../db/sql';
 import { ACTIVE_INCIDENT_STATUSES } from '../../domain/constants';
@@ -60,8 +61,9 @@ export async function lineNumberExists(lineNumber: string, excludeLineId?: numbe
   return rows.length > 0;
 }
 
-export async function createLineData(input: CreateLineInput): Promise<LineDto> {
-  const { rows } = await pool.query<LineDto>(
+export async function createLineData(input: CreateLineInput, client?: PoolClient): Promise<LineDto> {
+  const db = client ?? pool;
+  const { rows } = await db.query<LineDto>(
     `INSERT INTO production_lines (line_number, machine_sequence, is_active)
      VALUES ($1, $2, $3)
      RETURNING ${lineSelect}`,
@@ -93,7 +95,8 @@ export async function getLineForUpdate(id: number): Promise<LineForUpdateDto | n
   return rows[0] ?? null;
 }
 
-export async function updateLineData(id: number, updates: UpdateLineInput): Promise<LineDto | null> {
+export async function updateLineData(id: number, updates: UpdateLineInput, client?: PoolClient): Promise<LineDto | null> {
+  const db = client ?? pool;
   const setClauses: string[] = ['updated_at = NOW()'];
   const params: unknown[] = [];
 
@@ -111,7 +114,7 @@ export async function updateLineData(id: number, updates: UpdateLineInput): Prom
   }
 
   params.push(id);
-  const { rows } = await pool.query<LineDto>(
+  const { rows } = await db.query<LineDto>(
     `UPDATE production_lines SET ${setClauses.join(', ')}
      WHERE id = $${params.length} AND is_deleted = FALSE
      RETURNING ${lineSelect}`,
@@ -121,8 +124,9 @@ export async function updateLineData(id: number, updates: UpdateLineInput): Prom
   return rows[0] ?? null;
 }
 
-export async function softDeleteLine(id: number): Promise<boolean> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function softDeleteLine(id: number, client?: PoolClient): Promise<boolean> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE production_lines
      SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
      WHERE id = $1 AND is_deleted = FALSE

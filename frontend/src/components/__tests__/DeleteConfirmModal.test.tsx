@@ -33,6 +33,8 @@ function mockUser(overrides: Partial<SentinelUser> = {}): SentinelUser {
     role: 'OPERATOR',
     is_active: true,
     has_password: true,
+    has_password_setup_code: false,
+    password_setup_expires_at: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,

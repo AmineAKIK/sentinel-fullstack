@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
 import DashboardFilters from '../components/DashboardFilters';
@@ -43,6 +43,7 @@ function isWithinLastDays(iso: string, days: number): boolean {
 export default function WorkshopDashboardPage() {
   const { user } = useWorkshopAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -83,8 +84,10 @@ export default function WorkshopDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const canAct = Boolean(user);
+  const isOperator = user?.role === 'OPERATOR';
   const isMaintenance = user?.role === 'MAINTENANCE';
   const isResponsable = user?.role === 'RESPONSABLE';
+  const selectedIncidentParam = searchParams.get('incident');
 
   const secondaryFilterCount = [
     filters.lineId !== 'all',
@@ -92,8 +95,9 @@ export default function WorkshopDashboardPage() {
     filters.taken !== 'all',
   ].filter(Boolean).length;
   const hasQuickFilter = filters.status !== 'all' || filters.aging !== 'all';
+  const hasScopeFilter = filters.scope !== 'all';
   const hasSearchFilter = filters.query.trim().length > 0;
-  const activeFilterCount = secondaryFilterCount + (hasQuickFilter ? 1 : 0) + (hasSearchFilter ? 1 : 0);
+  const activeFilterCount = secondaryFilterCount + (hasQuickFilter ? 1 : 0) + (hasScopeFilter ? 1 : 0) + (hasSearchFilter ? 1 : 0);
 
   function clearAllFilters() {
     setFilters({
@@ -105,6 +109,21 @@ export default function WorkshopDashboardPage() {
       query: '',
       aging: 'all',
     });
+  }
+
+  function setIncidentUrlParam(id: number | null, replace = false) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (id === null) {
+      nextParams.delete('incident');
+    } else {
+      nextParams.set('incident', String(id));
+    }
+    setSearchParams(nextParams, { replace });
+  }
+
+  function clearSelectedIncident(replace = true) {
+    setSelectedIncident(null);
+    setIncidentUrlParam(null, replace);
   }
 
   function selectedLineLabel(): string {
@@ -160,6 +179,11 @@ export default function WorkshopDashboardPage() {
     ...(filters.scope === 'assigned_to_me' ? [{
       key: 'assigned_to_me',
       label: 'Pris par moi',
+      onRemove: () => setFilters((prev) => ({ ...prev, scope: 'all' })),
+    }] : []),
+    ...(filters.scope === 'created_by_me' ? [{
+      key: 'created_by_me',
+      label: 'Créés par moi',
       onRemove: () => setFilters((prev) => ({ ...prev, scope: 'all' })),
     }] : []),
   ];
@@ -281,6 +305,21 @@ export default function WorkshopDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!selectedIncidentParam) {
+      setSelectedIncident(null);
+      return;
+    }
+    const requestedIncident = incidents.find((incident) => String(incident.id) === selectedIncidentParam);
+    if (requestedIncident) {
+      setSelectedIncident(requestedIncident);
+      return;
+    }
+    if (!loading && incidents.length > 0) {
+      setIncidentUrlParam(null, true);
+    }
+  }, [selectedIncidentParam, incidents, loading]);
+
   async function refreshMetrics() {
     setMetricsLoading(true);
     try {
@@ -394,7 +433,7 @@ export default function WorkshopDashboardPage() {
       setIncidents((prev) => sortIncidents(prev.map((item) => (
         item.id === reviewIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
       ))));
-      if (selectedIncident?.id === reviewIncident.id) setSelectedIncident(null);
+      if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
       void refreshMetrics();
       closeReview();
     } catch (err) {
@@ -507,9 +546,10 @@ export default function WorkshopDashboardPage() {
     const isResolved = incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED';
     if (filters.scope === 'followed' && !incident.is_followed) return false;
     if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
+    if (filters.scope === 'created_by_me' && incident.user_id !== user?.id) return false;
     if (filters.scope !== 'followed' && (incident.status === 'CANCELED' || incident.status === 'INVALIDATED')) return false;
     if (filters.scope !== 'followed' && filters.status === 'all' && filters.aging === 'all' && incident.status === 'CLOSED') return false;
-    if (filters.scope === 'assigned_to_me' && isResolved) return false;
+    if ((filters.scope === 'assigned_to_me' || filters.scope === 'created_by_me') && isResolved) return false;
     if (filters.lineId !== 'all' && String(incident.line_id) !== filters.lineId) return false;
     if (filters.status !== 'all' && incident.status !== filters.status) return false;
     if (filters.status === 'CLOSED' && !isWithinLastDays(incident.updated_at || incident.created_at, 7)) return false;
@@ -539,6 +579,13 @@ export default function WorkshopDashboardPage() {
     return true;
   });
 
+  const createdByMeCount = isOperator
+    ? incidents.filter((incident) => {
+        const isResolved = incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED';
+        return incident.user_id === user?.id && !isResolved;
+      }).length
+    : 0;
+
   const sortedIncidents = sortOrder === 'default'
     ? filteredIncidents
     : [...filteredIncidents].sort((a, b) => {
@@ -552,7 +599,7 @@ export default function WorkshopDashboardPage() {
       setIncidents((prev) => sortIncidents(prev.map((item) => (
         item.id === reviewIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
       ))));
-      if (selectedIncident?.id === reviewIncident.id) setSelectedIncident(null);
+      if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
       void refreshMetrics();
       closeReview();
     }
@@ -561,7 +608,7 @@ export default function WorkshopDashboardPage() {
       setIncidents((prev) => sortIncidents(prev.map((item) => (
         item.id === selectedIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
       ))));
-      setSelectedIncident(null);
+      clearSelectedIncident();
       void refreshMetrics();
     }
     setShowMaintenanceDeleteConfirm(false);
@@ -569,9 +616,9 @@ export default function WorkshopDashboardPage() {
   }
 
   if (selectedIncident) {
-    const canRequestEdit = canPerform(user?.role, 'requestEdit', selectedIncident);
+    const canRequestEdit = canPerform(user?.role, 'requestEdit', selectedIncident, user?.id);
     const canDirectEdit = canPerform(user?.role, 'directEdit', selectedIncident);
-    const canRequestCancel = canPerform(user?.role, 'requestCancel', selectedIncident);
+    const canRequestCancel = canPerform(user?.role, 'requestCancel', selectedIncident, user?.id);
     const canCancel = canPerform(user?.role, 'cancel', selectedIncident);
     const canTake = canPerform(user?.role, 'take', selectedIncident);
     const canSetPending = canPerform(user?.role, 'setPending', selectedIncident);
@@ -585,7 +632,7 @@ export default function WorkshopDashboardPage() {
       <>
         <WorkshopNavBar />
         <main id="main-content" className="page-container workshop-page">
-          <button className="back-link" onClick={() => setSelectedIncident(null)}>
+          <button className="back-link" onClick={() => clearSelectedIncident()}>
             Retour à la liste
           </button>
 
@@ -910,6 +957,7 @@ export default function WorkshopDashboardPage() {
         metrics={metrics}
         filters={filters}
         role={user?.role}
+        createdByMeCount={createdByMeCount}
         onSetFilters={setFilters}
       />
 
@@ -1003,6 +1051,7 @@ export default function WorkshopDashboardPage() {
               onDragEnd={resetDragState}
               onClick={(inc) => {
                 setSelectedIncident(inc);
+                setIncidentUrlParam(inc.id);
                 if (isResponsable && inc.cancel_request) {
                   openReview(inc, 'delete');
                   return;

@@ -11,6 +11,8 @@ import UserListPage from './pages/UserListPage';
 import UserDetailPage from './pages/UserDetailPage';
 import LinesPage from './pages/LinesPage';
 import AdminAuditPage from './pages/AdminAuditPage';
+import AdminSupportPage from './pages/AdminSupportPage';
+import WorkshopSupportPage from './pages/WorkshopSupportPage';
 import { AuthProvider } from './routes/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import PublicRoute from './routes/PublicRoute';
@@ -54,6 +56,14 @@ export default function App() {
             element={
               <WorkshopProtectedRoute>
                 <WorkshopKnowledgePage />
+              </WorkshopProtectedRoute>
+            }
+          />
+          <Route
+            path="/workshop/support"
+            element={
+              <WorkshopProtectedRoute>
+                <WorkshopSupportPage />
               </WorkshopProtectedRoute>
             }
           />
@@ -110,6 +120,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AdminAuditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/support"
+          element={
+            <ProtectedRoute>
+              <AdminSupportPage />
             </ProtectedRoute>
           }
         />

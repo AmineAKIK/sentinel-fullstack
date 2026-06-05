@@ -9,6 +9,7 @@ export interface CurrentIncident {
   status: IncidentStatus;
   is_taken: boolean;
   taken_by_user_id: number | null;
+  user_id: number;
   cancel_request?: boolean;
   // delete_request is a legacy alias for cancel_request kept for DB compatibility.
   delete_request?: boolean;
@@ -38,11 +39,23 @@ export function canPerform(
 
   switch (action) {
     case 'REQUEST_EDIT':
-      return workshopRole === 'OPERATOR' && isActiveIncident(incident);
+      // OPERATOR can only correct their own declaration.
+      return (
+        workshopRole === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
     case 'REQUEST_CANCEL':
-      // OPERATOR can only request cancellation while the incident is untaken.
+      // OPERATOR can only cancel their own declaration, and only while untaken.
       // Once MAINTENANCE takes it, cancellation goes through RESPONSABLE approval.
-      return workshopRole === 'OPERATOR' && isActiveIncident(incident) && !incident.is_taken;
+      return (
+        workshopRole === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        !incident.is_taken &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
     case 'DIRECT_EDIT':
       return (
         isActiveIncident(incident) &&

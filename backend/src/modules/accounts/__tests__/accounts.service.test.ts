@@ -28,6 +28,16 @@ jest.mock('../accounts.events', () => ({
   createAccountAuditEvent: jest.fn(),
 }));
 
+jest.mock('../../../db/transaction', () => ({
+  withTransaction: jest.fn((fn: (client: null) => Promise<unknown>) => fn(null)),
+}));
+
+jest.mock('../../../auth/setupCode', () => ({
+  generateWorkshopPasswordSetupCode: jest.fn(() => 'ABCD234567'),
+  getWorkshopPasswordSetupExpiry: jest.fn(() => new Date('2025-01-02T00:00:00Z')),
+  hashWorkshopPasswordSetupCode: jest.fn(() => Promise.resolve('hashed-setup-code')),
+}));
+
 import * as repo from '../accounts.repository';
 import * as events from '../accounts.events';
 
@@ -42,6 +52,8 @@ function mockAccount(overrides: Record<string, unknown> = {}) {
     role: 'OPERATOR' as const,
     is_active: true,
     has_password: false,
+    has_password_setup_code: true,
+    password_setup_expires_at: new Date('2025-01-02T00:00:00Z'),
     created_at: new Date(),
     updated_at: new Date(),
     ...overrides,
@@ -96,8 +108,11 @@ describe('createAccountService', () => {
 
     const result = await createAccountService(input, 1);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data).toEqual(created);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(created.id, 1, 'USER_CREATED', expect.any(Object));
+    if (result.ok) {
+      expect(result.data).toEqual({ ...created, password_setup_code: 'ABCD234567' });
+    }
+    expect(repo.createAccountData).toHaveBeenCalledWith(input, 'hashed-setup-code', new Date('2025-01-02T00:00:00Z'), null);
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(created.id, 1, 'USER_CREATED', expect.any(Object), null);
   });
 });
 
@@ -166,10 +181,7 @@ describe('updateAccountService', () => {
     jest.mocked(repo.getAccountData).mockResolvedValue(current);
     jest.mocked(repo.accountBadgeExists).mockResolvedValue(false);
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
-    jest.mocked(repo.updateAccountData).mockResolvedValue({
-      account: updated,
-      changes: { first_name: { old: 'Jean', new: 'Pierre' } },
-    });
+    jest.mocked(repo.updateAccountData).mockResolvedValue(updated);
     jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
 
     const result = await updateAccountService(1, { firstName: 'Pierre' }, 1);
@@ -210,7 +222,7 @@ describe('deactivateAccountService', () => {
     const result = await deactivateAccountService(1, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.is_active).toBe(false);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_DEACTIVATED', null);
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_DEACTIVATED', null, null);
   });
 });
 
@@ -248,7 +260,7 @@ describe('deleteAccountService', () => {
     const result = await deleteAccountService(1, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.message).toBe('Utilisateur supprimé.');
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_SOFT_DELETED', null);
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_SOFT_DELETED', null, null);
   });
 });
 
@@ -273,8 +285,11 @@ describe('resetAccountPasswordService', () => {
 
     const result = await resetAccountPasswordService(1, 1);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data).toEqual(account);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_PASSWORD_RESET', null);
+    if (result.ok) {
+      expect(result.data).toEqual({ ...account, password_setup_code: 'ABCD234567' });
+    }
+    expect(repo.resetAccountPasswordData).toHaveBeenCalledWith(1, 'hashed-setup-code', new Date('2025-01-02T00:00:00Z'), null);
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_PASSWORD_RESET', null, null);
   });
 });
 

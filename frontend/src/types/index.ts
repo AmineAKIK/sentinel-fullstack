@@ -31,6 +31,9 @@ export interface SentinelUser {
   role: Role;
   is_active: boolean;
   has_password: boolean;
+  has_password_setup_code: boolean;
+  password_setup_expires_at: string | null;
+  password_setup_code?: string;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +77,7 @@ export type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVAL
 
 export interface WorkshopIncident {
   id: number;
+  user_id: number;
   shift: IncidentShift;
   line_id: number;
   line_number: string;

@@ -33,9 +33,22 @@ export function canPerform(
 
   switch (action) {
     case 'requestEdit':
-      return role === 'OPERATOR' && isActiveIncident(incident);
+      // OPERATOR can only correct their own declaration.
+      return (
+        role === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
     case 'requestCancel':
-      return role === 'OPERATOR' && isActiveIncident(incident) && !incident.is_taken;
+      // OPERATOR can only cancel their own declaration, and only while untaken.
+      return (
+        role === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        !incident.is_taken &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
     case 'directEdit':
       return isActiveIncident(incident) && !incident.is_taken && (role === 'RESPONSABLE' || role === 'MAINTENANCE');
     case 'editAfterTake':

@@ -17,8 +17,12 @@ export function sendServiceError<T>(
 }
 
 export function parseIdParam(value: string): ServiceResult<number> {
-  const id = Number.parseInt(value, 10);
-  if (Number.isNaN(id)) {
+  if (!/^[1-9]\d*$/.test(value)) {
+    return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'Identifiant invalide.' };
+  }
+
+  const id = Number(value);
+  if (!Number.isSafeInteger(id)) {
     return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'Identifiant invalide.' };
   }
 

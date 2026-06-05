@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import pool from '../../db/pool';
 import { statusInSql } from '../../db/sql';
 import { ACTIVE_INCIDENT_STATUSES, isWorkshopRole } from '../../domain/constants';
@@ -17,12 +18,16 @@ export interface AccountDto {
   role: string;
   is_active: boolean;
   has_password: boolean;
+  has_password_setup_code: boolean;
+  password_setup_expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  password_setup_code?: string;
 }
 
 interface AccountRow extends AccountDto {
   password_hash?: string | null;
+  password_setup_token_hash?: string | null;
 }
 
 export interface AccountImpactDto {
@@ -31,15 +36,29 @@ export interface AccountImpactDto {
   active_taken_incidents: number;
 }
 
-export interface AccountUpdateResult {
-  account: AccountDto;
-  changes: Record<string, { old: unknown; new: unknown }>;
-}
-
 const accountSelect = `id, first_name, last_name, badge_number, role, is_active,
-  password_hash IS NOT NULL AS has_password, created_at, updated_at`;
+  password_hash IS NOT NULL AS has_password,
+  (
+    password_hash IS NULL
+    AND password_setup_token_hash IS NOT NULL
+    AND password_setup_expires_at > NOW()
+  ) AS has_password_setup_code,
+  password_setup_expires_at,
+  created_at, updated_at`;
 
 function toPublicAccount(row: AccountRow): AccountDto {
+  const hasPassword = typeof row.has_password === 'boolean'
+    ? row.has_password
+    : row.password_hash !== undefined && row.password_hash !== null;
+  const hasPasswordSetupCode = typeof row.has_password_setup_code === 'boolean'
+    ? row.has_password_setup_code
+    : Boolean(
+        !hasPassword &&
+        row.password_setup_token_hash &&
+        row.password_setup_expires_at &&
+        new Date(row.password_setup_expires_at).getTime() > Date.now()
+      );
+
   return {
     id: row.id,
     first_name: row.first_name,
@@ -47,7 +66,9 @@ function toPublicAccount(row: AccountRow): AccountDto {
     badge_number: row.badge_number,
     role: row.role,
     is_active: row.is_active,
-    has_password: row.password_hash !== null,
+    has_password: hasPassword,
+    has_password_setup_code: hasPasswordSetupCode,
+    password_setup_expires_at: row.password_setup_expires_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -92,12 +113,21 @@ export async function accountBadgeExists(badgeNumber: string, excludeUserId?: nu
   return rows.length > 0;
 }
 
-export async function createAccountData(input: CreateAccountInput): Promise<AccountDto> {
-  const { rows } = await pool.query<AccountDto>(
-    `INSERT INTO sentinel_users (first_name, last_name, badge_number, role)
-     VALUES ($1, $2, $3, $4)
+export async function createAccountData(
+  input: CreateAccountInput,
+  setupCodeHash: string,
+  setupExpiresAt: Date,
+  client?: PoolClient
+): Promise<AccountDto> {
+  const db = client ?? pool;
+  const { rows } = await db.query<AccountDto>(
+    `INSERT INTO sentinel_users (
+       first_name, last_name, badge_number, role,
+       password_setup_token_hash, password_setup_expires_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING ${accountSelect}`,
-    [input.firstName, input.lastName, input.badgeNumber, input.role]
+    [input.firstName, input.lastName, input.badgeNumber, input.role, setupCodeHash, setupExpiresAt]
   );
 
   return rows[0];
@@ -114,8 +144,14 @@ export async function getAccountData(id: number): Promise<AccountDto | null> {
   return rows[0] ?? null;
 }
 
-export async function updateAccountData(id: number, updates: UpdateAccountInput): Promise<AccountUpdateResult | null> {
-  const { rows: existing } = await pool.query<AccountRow>(
+export async function updateAccountData(
+  id: number,
+  updates: UpdateAccountInput,
+  client?: PoolClient
+): Promise<AccountDto | null> {
+  const db = client ?? pool;
+
+  const { rows: existing } = await db.query<AccountRow>(
     'SELECT * FROM sentinel_users WHERE id = $1 AND is_deleted = FALSE',
     [id]
   );
@@ -124,46 +160,42 @@ export async function updateAccountData(id: number, updates: UpdateAccountInput)
   const current = existing[0];
   const setClauses: string[] = ['updated_at = NOW()'];
   const params: unknown[] = [];
-  const changes: Record<string, { old: unknown; new: unknown }> = {};
 
   if (updates.firstName !== undefined && updates.firstName !== current.first_name) {
     params.push(updates.firstName);
     setClauses.push(`first_name = $${params.length}`);
-    changes.firstName = { old: current.first_name, new: updates.firstName };
   }
   if (updates.lastName !== undefined && updates.lastName !== current.last_name) {
     params.push(updates.lastName);
     setClauses.push(`last_name = $${params.length}`);
-    changes.lastName = { old: current.last_name, new: updates.lastName };
   }
   if (updates.badgeNumber !== undefined && updates.badgeNumber !== current.badge_number) {
     params.push(updates.badgeNumber);
     setClauses.push(`badge_number = $${params.length}`);
-    changes.badgeNumber = { old: current.badge_number, new: updates.badgeNumber };
   }
   if (updates.role !== undefined && updates.role !== current.role) {
     params.push(updates.role);
     setClauses.push(`role = $${params.length}`);
-    changes.role = { old: current.role, new: updates.role };
   }
 
-  if (Object.keys(changes).length === 0) {
-    return { account: toPublicAccount(current), changes };
+  if (params.length === 0) {
+    return toPublicAccount(current);
   }
 
   params.push(id);
-  const { rows } = await pool.query<AccountDto>(
+  const { rows } = await db.query<AccountDto>(
     `UPDATE sentinel_users SET ${setClauses.join(', ')}
      WHERE id = $${params.length}
      RETURNING ${accountSelect}`,
     params
   );
 
-  return { account: rows[0], changes };
+  return rows[0] ?? null;
 }
 
-export async function setAccountActive(id: number, isActive: boolean): Promise<AccountDto | null> {
-  const { rows } = await pool.query<AccountDto>(
+export async function setAccountActive(id: number, isActive: boolean, client?: PoolClient): Promise<AccountDto | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<AccountDto>(
     `UPDATE sentinel_users SET is_active = $2, updated_at = NOW()
      WHERE id = $1 AND is_deleted = FALSE
      RETURNING ${accountSelect}`,
@@ -173,8 +205,9 @@ export async function setAccountActive(id: number, isActive: boolean): Promise<A
   return rows[0] ?? null;
 }
 
-export async function softDeleteAccount(id: number): Promise<boolean> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function softDeleteAccount(id: number, client?: PoolClient): Promise<boolean> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE sentinel_users
      SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
      WHERE id = $1 AND is_deleted = FALSE
@@ -204,13 +237,22 @@ export async function getAccountImpactData(id: number): Promise<AccountImpactDto
   };
 }
 
-export async function resetAccountPasswordData(id: number): Promise<AccountDto | null> {
-  const { rows } = await pool.query<AccountDto>(
+export async function resetAccountPasswordData(
+  id: number,
+  setupCodeHash: string,
+  setupExpiresAt: Date,
+  client?: PoolClient
+): Promise<AccountDto | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<AccountDto>(
     `UPDATE sentinel_users
-     SET password_hash = NULL, updated_at = NOW()
+     SET password_hash = NULL,
+         password_setup_token_hash = $2,
+         password_setup_expires_at = $3,
+         updated_at = NOW()
      WHERE id = $1 AND is_deleted = FALSE
      RETURNING ${accountSelect}`,
-    [id]
+    [id, setupCodeHash, setupExpiresAt]
   );
 
   return rows[0] ?? null;

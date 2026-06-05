@@ -7,6 +7,7 @@ import { WorkshopIncident } from '../../types';
 function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
   return {
     id: 1,
+    user_id: 1,
     shift: 'MATIN',
     line_id: 1,
     line_number: 'L01',

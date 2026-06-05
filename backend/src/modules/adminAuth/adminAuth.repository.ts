@@ -23,3 +23,11 @@ export async function getAdminPasswordHash(adminId: number): Promise<string | nu
 
   return rows[0]?.password_hash ?? null;
 }
+
+export async function updateAdminPasswordHash(adminId: number, passwordHash: string): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE admin_accounts SET password_hash = $1 WHERE id = $2',
+    [passwordHash, adminId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}

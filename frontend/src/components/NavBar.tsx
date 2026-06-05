@@ -6,10 +6,11 @@ const NAV_ITEMS = [
   { label: 'Utilisateurs', path: '/admin/users', match: ['/admin/users'] },
   { label: 'Lignes', path: '/admin/lines', match: ['/admin/lines'] },
   { label: 'Journal', path: '/admin/audit', match: ['/admin/audit'] },
+  { label: 'Support', path: '/admin/support', match: ['/admin/support'] },
 ];
 
 export default function NavBar() {
-  const { admin, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -50,7 +51,6 @@ export default function NavBar() {
         ))}
       </div>
       <div className="nav-actions">
-        {admin && <span className="nav-user">{admin.username}</span>}
         <button className="nav-logout" onClick={handleLogout}>
           Déconnexion
         </button>

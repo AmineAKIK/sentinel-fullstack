@@ -139,7 +139,14 @@ export async function getReferenceDashboardData(): Promise<ReferenceDashboardDto
   };
 }
 
-export async function getReferenceQualityData(): Promise<ReferenceQualityDto> {
+export interface ReferenceQualityRawDto {
+  users_without_password: ReferenceUserDto[];
+  inactive_users: ReferenceUserDto[];
+  inactive_lines: ReferenceInactiveLineDto[];
+  all_lines: ReferenceQualityLineDto[];
+}
+
+export async function getReferenceQualityRawData(): Promise<ReferenceQualityRawDto> {
   const [usersWithoutPassword, inactiveUsers, inactiveLines, lineIssues] = await Promise.all([
     pool.query<ReferenceUserDto>(
       `SELECT id, first_name, last_name, badge_number, role
@@ -167,46 +174,11 @@ export async function getReferenceQualityData(): Promise<ReferenceQualityDto> {
     ),
   ]);
 
-  const malformedMachines: MalformedMachineDto[] = [];
-  const machineOwners = new Map<string, string[]>();
-
-  for (const line of lineIssues.rows) {
-    const machines = Array.isArray(line.machines) ? line.machines : [];
-    if (line.is_active && machines.length === 0) {
-      malformedMachines.push({
-        line_id: line.id,
-        line_number: line.line_number,
-        machine_id: '-',
-        issue: 'Ligne active sans machine',
-      });
-    }
-    for (const machine of machines) {
-      const id = String(machine.machineId || '').trim();
-      if (!id || !String(machine.brand || '').trim()) {
-        malformedMachines.push({
-          line_id: line.id,
-          line_number: line.line_number,
-          machine_id: id || '-',
-          issue: 'Machine incomplète',
-        });
-      }
-      if (id) {
-        const key = id.toLowerCase();
-        machineOwners.set(key, [...(machineOwners.get(key) || []), line.line_number]);
-      }
-    }
-  }
-
-  const duplicateMachines = Array.from(machineOwners.entries())
-    .filter(([, owners]) => owners.length > 1)
-    .map(([machine_id, line_numbers]) => ({ machine_id, line_numbers }));
-
   return {
     users_without_password: usersWithoutPassword.rows,
     inactive_users: inactiveUsers.rows,
     inactive_lines: inactiveLines.rows,
-    malformed_machines: malformedMachines,
-    duplicate_machines: duplicateMachines,
+    all_lines: lineIssues.rows,
   };
 }
 

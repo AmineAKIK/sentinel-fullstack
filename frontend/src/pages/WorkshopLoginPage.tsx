@@ -7,6 +7,7 @@ import { useWorkshopAuth } from '../routes/WorkshopAuthContext';
 export default function WorkshopLoginPage() {
   const [badgeNumber, setBadgeNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [setupCode, setSetupCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [requiresPasswordSetup, setRequiresPasswordSetup] = useState(false);
@@ -33,6 +34,10 @@ export default function WorkshopLoginPage() {
       return;
     }
     if (requiresPasswordSetup) {
+      if (!setupCode.trim()) {
+        setError('Veuillez renseigner le code temporaire.');
+        return;
+      }
       if (newPassword.length < 6) {
         setError('Le mot de passe doit contenir au moins 6 caractères.');
         return;
@@ -48,19 +53,22 @@ export default function WorkshopLoginPage() {
       const response = await workshopLogin(
         badgeNumber.trim(),
         requiresPassword ? password : undefined,
-        requiresPasswordSetup ? newPassword : undefined
+        requiresPasswordSetup ? newPassword : undefined,
+        requiresPasswordSetup ? setupCode : undefined
       );
 
       if ('requiresPasswordSetup' in response) {
         setRequiresPasswordSetup(true);
         setRequiresPassword(false);
         setPassword('');
+        setSetupCode('');
         return;
       }
       if ('requiresPassword' in response) {
         setRequiresPassword(true);
         setRequiresPasswordSetup(false);
         setPassword('');
+        setSetupCode('');
         return;
       }
 
@@ -68,6 +76,7 @@ export default function WorkshopLoginPage() {
       navigate('/workshop/dashboard', { replace: true });
       setRequiresPasswordSetup(false);
       setRequiresPassword(false);
+      setSetupCode('');
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
     } finally {
@@ -105,7 +114,21 @@ export default function WorkshopLoginPage() {
             {requiresPasswordSetup ? (
               <>
                 <div className="notice">
-                  Première connexion détectée. Choisissez votre mot de passe.
+                  Première connexion détectée. Saisissez le code temporaire remis par l’administrateur puis choisissez votre mot de passe.
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="workshopSetupCode">Code temporaire</label>
+                  <input
+                    id="workshopSetupCode"
+                    className="form-input"
+                    type="text"
+                    value={setupCode}
+                    onChange={(e) => setSetupCode(e.target.value)}
+                    disabled={loading}
+                    autoComplete="one-time-code"
+                    placeholder="ABC123DEF4"
+                    maxLength={20}
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="newWorkshopPassword">Nouveau mot de passe</label>
@@ -149,23 +172,6 @@ export default function WorkshopLoginPage() {
                 />
               </div>
             ) : null}
-            {(requiresPassword || requiresPasswordSetup) && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setRequiresPassword(false);
-                  setRequiresPasswordSetup(false);
-                  setPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                  setError('');
-                }}
-                disabled={loading}
-              >
-                Changer de badge
-              </button>
-            )}
             {error && <div className="error-message">{error}</div>}
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading

@@ -1,9 +1,8 @@
 import { Response } from 'express';
+import { SESSION_DURATION_MS } from './session';
 
 export const ADMIN_AUTH_COOKIE = 'sentinel_admin_token';
 export const WORKSHOP_AUTH_COOKIE = 'sentinel_workshop_token';
-
-export const AUTH_COOKIE_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
 export const authCookieOptions = {
   httpOnly: true,
@@ -13,7 +12,7 @@ export const authCookieOptions = {
 
 export const persistentAuthCookieOptions = {
   ...authCookieOptions,
-  maxAge: AUTH_COOKIE_MAX_AGE_MS,
+  maxAge: SESSION_DURATION_MS,
 };
 
 export function setAuthCookie(res: Response, name: string, token: string): void {

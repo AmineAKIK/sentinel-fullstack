@@ -288,9 +288,9 @@ export default function UserListPage() {
               onChange={(e) => setDraftRole(e.target.value as Role | '')}
             >
               <option value="">Tous</option>
-              <option value="OPERATOR">Operateur</option>
-              <option value="MAINTENANCE">Maintenance</option>
-              <option value="RESPONSABLE">Responsable</option>
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
           </div>
           <div className="form-group">

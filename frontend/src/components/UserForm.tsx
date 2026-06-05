@@ -1,4 +1,5 @@
 import { Role } from '../types';
+import { ROLE_LABELS } from '../utils/labels';
 
 export interface UserFormData {
   firstName: string;
@@ -16,11 +17,9 @@ interface UserFormProps {
   badgeError?: string;
 }
 
-const ROLES: { value: Role; label: string }[] = [
-  { value: 'OPERATOR', label: 'Opérateur' },
-  { value: 'MAINTENANCE', label: 'Maintenance' },
-  { value: 'RESPONSABLE', label: 'Responsable' },
-];
+const ROLES: { value: Role; label: string }[] = Object.entries(ROLE_LABELS).map(
+  ([value, label]) => ({ value: value as Role, label })
+);
 
 export default function UserForm({
   data,

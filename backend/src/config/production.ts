@@ -14,10 +14,12 @@ const REQUIRED_PRODUCTION_ENV = [
   'CLIENT_ORIGIN',
 ] as const;
 
+const MIN_SECRET_LENGTH = 24;
+
 function isWeakSecret(value: string | undefined): boolean {
   if (!value) return true;
   if (DEFAULT_SECRET_VALUES.has(value)) return true;
-  return value.length < 24;
+  return value.length < MIN_SECRET_LENGTH;
 }
 
 export function assertProductionConfig(): void {

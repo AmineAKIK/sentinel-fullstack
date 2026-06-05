@@ -31,6 +31,10 @@ jest.mock('../lines.policy', () => ({
   getLineEventType: jest.fn().mockReturnValue('LINE_UPDATED'),
 }));
 
+jest.mock('../../../db/transaction', () => ({
+  withTransaction: jest.fn((fn: (client: null) => Promise<unknown>) => fn(null)),
+}));
+
 import * as repo from '../lines.repository';
 import * as events from '../lines.events';
 
@@ -148,7 +152,7 @@ describe('createLineService', () => {
     const result = await createLineService(validCreateInput, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(line);
-    expect(events.createLineAuditEvent).toHaveBeenCalledWith(line.id, 1, 'LINE_CREATED', expect.any(Object));
+    expect(events.createLineAuditEvent).toHaveBeenCalledWith(line.id, 1, 'LINE_CREATED', expect.any(Object), null);
   });
 });
 
@@ -253,7 +257,7 @@ describe('deleteLineService', () => {
     const result = await deleteLineService(1, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.message).toBe('Ligne supprimée.');
-    expect(events.createLineAuditEvent).toHaveBeenCalledWith(1, 1, 'LINE_SOFT_DELETED', null);
+    expect(events.createLineAuditEvent).toHaveBeenCalledWith(1, 1, 'LINE_SOFT_DELETED', null, null);
   });
 });
 

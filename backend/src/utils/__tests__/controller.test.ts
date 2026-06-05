@@ -54,9 +54,8 @@ describe('parseIdParam', () => {
   });
 
   it('returns a 400 VALIDATION_ERROR for a float string', () => {
-    // parseInt('3.7') === 3, which is a valid integer – confirm this is accepted
     const result = parseIdParam('3.7');
-    expect(result).toEqual({ ok: true, data: 3 });
+    expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
   });
 
   it('returns a 400 VALIDATION_ERROR for "NaN"', () => {
