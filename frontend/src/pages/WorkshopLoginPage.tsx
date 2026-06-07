@@ -1,185 +1,230 @@
-import { FormEvent, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { workshopLogin } from '../api/workshopAuth';
+import { useState, FormEvent } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { unifiedLogin } from '../api/unifiedAuth';
+import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
-import { useWorkshopAuth } from '../routes/WorkshopAuthContext';
+
+type Mode = 'identifier' | 'password' | 'setup';
 
 export default function WorkshopLoginPage() {
-  const [badgeNumber, setBadgeNumber] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [setupCode, setSetupCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [requiresPasswordSetup, setRequiresPasswordSetup] = useState(false);
-  const [requiresPassword, setRequiresPassword] = useState(false);
+  const [mode, setMode] = useState<Mode>('identifier');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { user: sessionUser, setUser } = useWorkshopAuth();
-  const navigate = useNavigate();
 
-  if (sessionUser) {
-    return <Navigate to="/workshop/dashboard" replace />;
+  const { setSession } = useAppAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const reason = (location.state as { reason?: string } | null)?.reason;
+
+  function resetToIdentifier() {
+    setMode('identifier');
+    setPassword('');
+    setSetupCode('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (!badgeNumber.trim()) {
-      setError('Veuillez renseigner votre numéro de badge.');
+    if (!identifier.trim()) { setError('Renseignez votre identifiant.'); return; }
+
+    if (mode === 'identifier') {
+      setLoading(true);
+      try {
+        const response = await unifiedLogin(identifier.trim());
+        if ('requiresPasswordSetup' in response) {
+          setMode('setup');
+        } else if ('requiresPassword' in response) {
+          setMode('password');
+          setPassword('');
+        } else {
+          setError('Identifiant ou mot de passe incorrect.');
+        }
+      } catch {
+        setError('Identifiant ou mot de passe incorrect.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
-    if (requiresPassword && !password) {
-      setError('Veuillez renseigner votre mot de passe.');
+
+    if (mode === 'password') {
+      if (!password) { setError('Renseignez votre mot de passe.'); return; }
+      setLoading(true);
+      try {
+        const response = await unifiedLogin(identifier.trim(), password);
+        if ('requiresPassword' in response || 'requiresPasswordSetup' in response) {
+          setError('Identifiant ou mot de passe incorrect.');
+          return;
+        }
+        if (!('accountType' in response) || response.accountType !== 'workshop') {
+          setError('Identifiant ou mot de passe incorrect.');
+          return;
+        }
+        setSession({
+          accountType: 'workshop',
+          user: {
+            id: response.id,
+            first_name: response.first_name,
+            last_name: response.last_name,
+            badge_number: response.badge_number,
+            role: response.role,
+          },
+        });
+        navigate('/workshop/dashboard', { replace: true });
+      } catch (err) {
+        setError(err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
-    if (requiresPasswordSetup) {
-      if (!setupCode.trim()) {
-        setError('Veuillez renseigner le code temporaire.');
-        return;
-      }
-      if (newPassword.length < 6) {
-        setError('Le mot de passe doit contenir au moins 6 caractères.');
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        setError('Les mots de passe ne correspondent pas.');
-        return;
-      }
-    }
 
-    setLoading(true);
-    try {
-      const response = await workshopLogin(
-        badgeNumber.trim(),
-        requiresPassword ? password : undefined,
-        requiresPasswordSetup ? newPassword : undefined,
-        requiresPasswordSetup ? setupCode : undefined
-      );
-
-      if ('requiresPasswordSetup' in response) {
-        setRequiresPasswordSetup(true);
-        setRequiresPassword(false);
-        setPassword('');
-        setSetupCode('');
-        return;
+    if (mode === 'setup') {
+      if (!setupCode.trim()) { setError('Renseignez le code temporaire.'); return; }
+      if (newPassword.length < 6) { setError('Le mot de passe doit contenir au moins 6 caractères.'); return; }
+      if (newPassword !== confirmPassword) { setError('Les mots de passe ne correspondent pas.'); return; }
+      setLoading(true);
+      try {
+        const response = await unifiedLogin(identifier.trim(), undefined, newPassword, setupCode);
+        if (!('accountType' in response) || response.accountType !== 'workshop') {
+          setError('Code temporaire incorrect.');
+          return;
+        }
+        setSession({
+          accountType: 'workshop',
+          user: {
+            id: response.id,
+            first_name: response.first_name,
+            last_name: response.last_name,
+            badge_number: response.badge_number,
+            role: response.role,
+          },
+        });
+        navigate('/workshop/dashboard', { replace: true });
+      } catch (err) {
+        setError(err instanceof ApiResponseError ? err.message : 'Code temporaire incorrect.');
+      } finally {
+        setLoading(false);
       }
-      if ('requiresPassword' in response) {
-        setRequiresPassword(true);
-        setRequiresPasswordSetup(false);
-        setPassword('');
-        setSetupCode('');
-        return;
-      }
-
-      setUser(response);
-      navigate('/workshop/dashboard', { replace: true });
-      setRequiresPasswordSetup(false);
-      setRequiresPassword(false);
-      setSetupCode('');
-    } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
-    <div className="login-page workshop-login-page">
-      <div className="login-card">
-        <div className="login-title">
-          <h1>Workshop Sentinel</h1>
-          <p>
-            {requiresPasswordSetup
-              ? 'Choix du mot de passe'
-              : requiresPassword ? 'Saisie du mot de passe' : 'Connexion par numéro de badge'}
-          </p>
+    <main className="board-access-page" id="main-content">
+      <section className="board-access-card board-access-card-locked">
+        {mode !== 'identifier'
+          ? <button type="button" className="board-access-back" onClick={resetToIdentifier}>Retour</button>
+          : <Link to="/login" className="board-access-back">Retour</Link>
+        }
+
+        <div className="board-access-title">
+          <span>ACCÈS ATELIER</span>
+          <h1>{mode === 'setup' ? 'Première connexion' : 'Flux atelier'}</h1>
+          {mode === 'identifier' && <p>Saisissez votre identifiant ou numéro de badge.</p>}
+          {mode === 'setup' && <p>Saisissez votre code temporaire et choisissez un mot de passe.</p>}
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit} noValidate>
+        <form className="board-access-form" onSubmit={handleSubmit} noValidate>
+          {reason && <div className="notice">{reason}</div>}
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="identifier">Identifiant ou numéro de badge</label>
+            <input
+              id="identifier"
+              className="form-input"
+              type="text"
+              value={identifier}
+              onChange={(e) => { setIdentifier(e.target.value); resetToIdentifier(); }}
+              disabled={loading}
+              autoComplete="username"
+              autoFocus={mode === 'identifier'}
+              placeholder="B-0001"
+            />
+          </div>
+
+          {mode === 'password' && (
             <div className="form-group">
-              <label className="form-label" htmlFor="workshopBadge">Numéro de badge</label>
+              <label className="form-label" htmlFor="password">Mot de passe</label>
               <input
-                id="workshopBadge"
+                id="password"
                 className="form-input"
-                type="text"
-                value={badgeNumber}
-                onChange={(e) => setBadgeNumber(e.target.value)}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
+                autoComplete="current-password"
                 autoFocus
-                placeholder="B-0001"
-                maxLength={40}
+                placeholder="••••••••"
               />
             </div>
-            {requiresPasswordSetup ? (
-              <>
-                <div className="notice">
-                  Première connexion détectée. Saisissez le code temporaire remis par l’administrateur puis choisissez votre mot de passe.
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="workshopSetupCode">Code temporaire</label>
-                  <input
-                    id="workshopSetupCode"
-                    className="form-input"
-                    type="text"
-                    value={setupCode}
-                    onChange={(e) => setSetupCode(e.target.value)}
-                    disabled={loading}
-                    autoComplete="one-time-code"
-                    placeholder="ABC123DEF4"
-                    maxLength={20}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="newWorkshopPassword">Nouveau mot de passe</label>
-                  <input
-                    id="newWorkshopPassword"
-                    className="form-input"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    disabled={loading}
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="confirmWorkshopPassword">Confirmer le mot de passe</label>
-                  <input
-                    id="confirmWorkshopPassword"
-                    className="form-input"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={loading}
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </>
-            ) : requiresPassword ? (
+          )}
+
+          {mode === 'setup' && (
+            <>
               <div className="form-group">
-                <label className="form-label" htmlFor="workshopPassword">Mot de passe</label>
+                <label className="form-label" htmlFor="setupCode">Code temporaire</label>
                 <input
-                  id="workshopPassword"
+                  id="setupCode"
+                  className="form-input"
+                  type="text"
+                  value={setupCode}
+                  onChange={(e) => setSetupCode(e.target.value)}
+                  disabled={loading}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="ABC123DEF4"
+                  maxLength={20}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="newPassword">Nouveau mot de passe</label>
+                <input
+                  id="newPassword"
                   className="form-input"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
                   disabled={loading}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                 />
               </div>
-            ) : null}
-            {error && <div className="error-message">{error}</div>}
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading
-                ? <><span className="spinner" /> Connexion…</>
-                : requiresPasswordSetup ? 'Créer le mot de passe' : requiresPassword ? 'Se connecter' : 'Continuer'}
-            </button>
+              <div className="form-group">
+                <label className="form-label" htmlFor="confirmPassword">Confirmer le mot de passe</label>
+                <input
+                  id="confirmPassword"
+                  className="form-input"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={loading}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                />
+              </div>
+            </>
+          )}
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading
+              ? <><span className="spinner" /> Vérification...</>
+              : mode === 'setup' ? 'Créer le mot de passe'
+              : mode === 'password' ? 'Se connecter'
+              : 'Continuer'}
+          </button>
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

@@ -1,5 +1,6 @@
 import { Role } from '../types';
 import { ROLE_LABELS } from '../utils/labels';
+import SelectField from './ui/SelectField';
 
 export interface UserFormData {
   firstName: string;
@@ -78,18 +79,17 @@ export default function UserForm({
       </div>
       <div className="form-group">
         <label className="form-label" htmlFor="role">Rôle *</label>
-        <select
+        <SelectField
           id="role"
-          className="form-select"
           value={data.role}
-          onChange={(e) => handleChange('role', e.target.value)}
+          onChange={(value) => handleChange('role', value)}
           disabled={disabled}
-        >
-          <option value="">-- Sélectionner un rôle --</option>
-          {ROLES.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
+          ariaLabel="Rôle"
+          options={[
+            { value: '', label: '-- Sélectionner un rôle --' },
+            ...ROLES.map((role) => ({ value: role.value, label: role.label })),
+          ]}
+        />
       </div>
       {showStatus && (
         <div className="form-group">

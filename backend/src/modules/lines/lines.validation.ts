@@ -13,9 +13,9 @@ const doubleRobotMachineSchema = z.object({
   brand: z.string().trim().min(1, 'La marque est obligatoire.'),
   hasDoubleRobot: z.literal(true),
   leftRobotNumber: z.string().trim().min(1, 'Le numéro du robot gauche est obligatoire.'),
-  leftRobotHeads: z.coerce.number().int().min(1, 'Le nombre de têtes gauche doit être positif.'),
+  leftRobotHeads: z.coerce.number().int().min(1, 'Le nombre de têtes doit être positif.'),
   rightRobotNumber: z.string().trim().min(1, 'Le numéro du robot droit est obligatoire.'),
-  rightRobotHeads: z.coerce.number().int().min(1, 'Le nombre de têtes droit doit être positif.'),
+  rightRobotHeads: z.coerce.number().int().min(1, 'Le nombre de têtes doit être positif.'),
 });
 
 export const lineMachineSchema = z.discriminatedUnion('hasDoubleRobot', [

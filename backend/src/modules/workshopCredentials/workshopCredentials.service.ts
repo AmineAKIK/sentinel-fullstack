@@ -7,7 +7,7 @@ import { verifyWorkshopPasswordSetupCode } from '../../auth/setupCode';
 import {
   findActiveWorkshopUserByBadge,
   setWorkshopUserPassword,
-} from './workshopAuth.repository';
+} from './workshopCredentials.repository';
 
 export type LoginResult =
   | { kind: 'invalid_badge' }

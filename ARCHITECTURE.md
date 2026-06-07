@@ -101,9 +101,9 @@ backend/src/
 
 ## Authentification
 
-Sentinel a **deux systèmes d'authentification complètement séparés** avec des cookies distincts.
+Sentinel a une entree unifiee cote interface et trois espaces d'acces separes cote produit : Board, Administration et Workshop.
 
-### Auth Admin
+### Auth Administration
 - Login par username + mot de passe
 - Cookie HTTP-only nommé `sentinel_admin_session`
 - JWT vérifié à chaque requête par `adminAuth` middleware
@@ -256,9 +256,9 @@ frontend/src/
 ```
 
 ### Espaces séparés
-- **Espace Admin** (`/admin/...`) : protégé par `AdminAuthContext`
-- **Espace Workshop** (`/workshop/...`) : protégé par `WorkshopAuthContext`
-- **Board public** (`/workshop/board`) : accessible sans authentification
+- **Espace Administration** (`/admin/...`) : protege par `AdminRoute` et `AppAuthContext`
+- **Espace Workshop** (`/workshop/...`) : protege par `WorkshopRoute` et `AppAuthContext`
+- **Board** (`/board`) : acces par code local, cookie board HTTP-only, lecture seule
 
 ### Communication avec le backend
 - `fetch` natif avec cookies inclus automatiquement (`credentials: 'include'`)

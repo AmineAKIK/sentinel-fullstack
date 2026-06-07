@@ -3,6 +3,7 @@ import NavBar from '../components/NavBar';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import SelectField from '../components/ui/SelectField';
 import { listReferenceAudit } from '../api/admin';
 import { ReferenceAuditEvent } from '../types';
 import { formatDateTime } from '../utils/date';
@@ -136,6 +137,15 @@ export default function AdminAuditPage() {
     setQuery('');
   }
 
+
+  function toggleDateSort() {
+    setSortOrder((current) => (current === 'desc' ? 'asc' : 'desc'));
+  }
+
+  function dateSortLabel(): string {
+    return sortOrder === 'desc' ? 'Tri descendant' : 'Tri ascendant';
+  }
+
   const filterChips: FilterChip[] = [
     ...(query.trim() ? [{
       key: 'search',
@@ -198,35 +208,39 @@ export default function AdminAuditPage() {
             </div>
             <div className="filter-group">
               <span className="filter-label">Type d'action</span>
-              <select
-                className="form-select"
+              <SelectField
                 value={taskGroup}
-                onChange={(event) => setTaskGroup(event.target.value)}
-              >
-                {Object.entries(TASK_GROUPS).map(([value, group]) => (
-                  <option key={value} value={value}>{group.label}</option>
-                ))}
-              </select>
+                onChange={setTaskGroup}
+                options={Object.entries(TASK_GROUPS).map(([value, group]) => ({ value, label: group.label }))}
+              />
             </div>
             <div className="filter-group">
               <span className="filter-label">Référentiel</span>
-              <select className="form-select" value={scope} onChange={(event) => setScope(event.target.value)}>
-                <option value="all">Tout</option>
-                <option value="account">Utilisateurs</option>
-                <option value="line">Lignes</option>
-              </select>
+              <SelectField
+                value={scope}
+                onChange={setScope}
+                options={[
+                  { value: 'all', label: 'Tout' },
+                  { value: 'account', label: 'Utilisateurs' },
+                  { value: 'line', label: 'Lignes' },
+                ]}
+              />
             </div>
           </div>
           <div className="audit-filter-secondary">
             <div className="filter-group">
               <span className="filter-label">Période</span>
-              <select className="form-select" value={period} onChange={(event) => setPeriod(event.target.value)}>
-                <option value="today">Aujourd'hui</option>
-                <option value="7d">7 derniers jours</option>
-                <option value="30d">30 derniers jours</option>
-                <option value="all">Tout l'historique</option>
-                <option value="custom">Personnalisée</option>
-              </select>
+              <SelectField
+                value={period}
+                onChange={setPeriod}
+                options={[
+                  { value: 'today', label: "Aujourd'hui" },
+                  { value: '7d', label: '7 derniers jours' },
+                  { value: '30d', label: '30 derniers jours' },
+                  { value: 'all', label: "Tout l'historique" },
+                  { value: 'custom', label: 'Personnalisée' },
+                ]}
+              />
             </div>
             {period === 'custom' && (
               <>
@@ -240,13 +254,6 @@ export default function AdminAuditPage() {
                 </div>
               </>
             )}
-            <div className="filter-group">
-              <span className="filter-label">Tri</span>
-              <select className="form-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as 'desc' | 'asc')}>
-                <option value="desc">Plus récentes d'abord</option>
-                <option value="asc">Plus anciennes d'abord</option>
-              </select>
-            </div>
             <button className="btn btn-secondary audit-clear-btn" type="button" onClick={resetFilters}>
               Effacer les filtres
             </button>
@@ -261,7 +268,7 @@ export default function AdminAuditPage() {
           />
         </div>
 
-        <div className="card">
+        <div className="card user-list-panel">
           {loading ? (
             <EmptyState>Chargement...</EmptyState>
           ) : error ? (
@@ -269,30 +276,61 @@ export default function AdminAuditPage() {
           ) : filtered.length === 0 ? (
             <EmptyState>Aucun événement trouvé.</EmptyState>
           ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Référentiel</th>
-                    <th>Action</th>
-                    <th>Cible</th>
-                    <th>Champs modifiés</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((event) => (
-                    <tr key={`${event.scope}-${event.id}`}>
-                      <td>{formatDateTime(event.created_at)}</td>
-                      <td>{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</td>
-                      <td>{EVENT_LABELS[event.event_type] || event.event_type}</td>
-                      <td>{targetLabel(event)}</td>
-                      <td>{changesLabel(event.changes)}</td>
+            <>
+              <div className="table-wrapper audit-table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}>
+                        <button className="table-sort-button" type="button" onClick={toggleDateSort}>
+                          Date
+                          <span className="sr-only">{dateSortLabel()}</span>
+                        </button>
+                      </th>
+                      <th>Référentiel</th>
+                      <th>Action</th>
+                      <th>Cible</th>
+                      <th>Champs modifiés</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((event) => (
+                      <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
+                        <td>{formatDateTime(event.created_at)}</td>
+                        <td>{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</td>
+                        <td>{EVENT_LABELS[event.event_type] || event.event_type}</td>
+                        <td>{targetLabel(event)}</td>
+                        <td>{changesLabel(event.changes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="audit-card-list">
+                {filtered.map((event) => (
+                  <div className="user-card-row" key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
+                    <span className="user-card-main">
+                      <span className="user-card-name">
+                        {EVENT_LABELS[event.event_type] || event.event_type}
+                      </span>
+                      <span className="user-card-badge">{targetLabel(event)}</span>
+                    </span>
+                    <span className="user-card-meta">
+                      <span className="badge-role">{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</span>
+                      {event.changes && changesLabel(event.changes) !== '-' && (
+                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                          {changesLabel(event.changes)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="user-card-footer">
+                      <span>{formatDateTime(event.created_at)}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </main>

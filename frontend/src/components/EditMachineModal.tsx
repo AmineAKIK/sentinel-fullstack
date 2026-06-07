@@ -203,7 +203,7 @@ export default function EditMachineModal({
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="leftRobotHeads">Têtes gauche *</label>
+                <label className="form-label" htmlFor="leftRobotHeads">Nombre de têtes *</label>
                 <input
                   id="leftRobotHeads"
                   className="form-input"
@@ -234,7 +234,7 @@ export default function EditMachineModal({
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="rightRobotHeads">Têtes droit *</label>
+                <label className="form-label" htmlFor="rightRobotHeads">Nombre de têtes *</label>
                 <input
                   id="rightRobotHeads"
                   className="form-input"

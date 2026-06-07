@@ -34,7 +34,7 @@ Sentinel est utilisé par deux types de personnes :
 > Si la connexion est bloquée, contacter l'administrateur pour vérifier que le compte est actif et que le badge est correct.
 
 ### Espace Administration
-Aller sur `/admin/login`, saisir l'identifiant et le mot de passe administrateur.
+Aller sur `/login`, choisir Administration, puis saisir l'identifiant et le mot de passe administrateur.
 
 ---
 
@@ -163,7 +163,7 @@ C'est la mémoire des interventions réussies. On peut y rechercher par machine,
 
 ## LE BOARD GRAND ÉCRAN
 
-Accessible depuis le menu **Affichage** (ou directement sur `/workshop/board`). Conçu pour être affiché en permanence en atelier sur un grand écran. **Aucune connexion requise.**
+Accessible depuis le bloc **Board** du portail ou directement sur `/board`. Concu pour etre affiche en permanence en atelier sur un grand ecran. Code board requis, lecture seule.
 
 Il affiche les incidents actifs en tournant automatiquement entre trois vues : alertes (urgents / non pris), tous les incidents actifs, synthèse par ligne. Le mode d'affichage et les filtres peuvent être configurés par écran.
 

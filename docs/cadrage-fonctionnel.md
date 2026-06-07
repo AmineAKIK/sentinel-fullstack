@@ -69,7 +69,7 @@ Sentinel
 
 ### 2.1 Administrateur (Admin)
 
-Compte unique de niveau système, distinct des comptes atelier. Accessible via `/admin/login` avec identifiant et mot de passe.
+Compte unique de niveau système, distinct des comptes atelier. Accessible depuis le portail `/login` via le bloc Administration.
 
 **Responsabilités :**
 - Création, modification, activation/désactivation et suppression des comptes atelier
@@ -131,9 +131,9 @@ Encadrant atelier. Se connecte via badge + mot de passe.
 │  ┌──────────────────────┐   ┌──────────────────────────┐   │
 │  │    ESPACE ADMIN       │   │      ESPACE ATELIER       │   │
 │  │                      │   │                           │   │
-│  │  /admin/login        │   │  /workshop (login badge)  │   │
+│  │  /login portail      │   │  /board acces code      │   │
 │  │  /admin/accueil      │   │  /workshop/dashboard      │   │
-│  │  /admin/users        │   │  /workshop/board (public) │   │
+│  │  /admin/users        │   │  /board (code local) │   │
 │  │  /admin/users/:id    │   │  /workshop/history        │   │
 │  │  /admin/lines        │   │  /workshop/pilotage       │   │
 │  │  /admin/audit        │   │  /workshop/knowledge      │   │
@@ -401,13 +401,13 @@ Si l'utilisateur a déjà un mot de passe :
 
 ### 8.3 Session
 
-- Token JWT signé, transporté via cookie HTTP-only (`sentinel-workshop-auth`)
-- Validation de session via `GET /workshop/auth/me`
-- Déconnexion via `POST /workshop/auth/logout`
+- Token JWT signé, transporté via cookie HTTP-only (`sentinel_workshop_token`)
+- Validation de session via `GET /api/auth/me`
+- Déconnexion via `POST /api/auth/logout`
 
-### 8.4 Board public
+### 8.4 Board securise lecture seule
 
-La page `/workshop/board` est accessible **sans authentification**. Elle consomme `GET /workshop/board` qui est la seule route non protégée de l'espace atelier.
+La page `/board` est accessible apres saisie du code board local. Elle consomme `/api/board/data`, en lecture seule, sans ouvrir de droits admin ou workshop.
 
 ---
 
@@ -641,7 +641,7 @@ Le responsable peut réordonner manuellement les incidents prioritaires par drag
 
 ### 12.1 Accès
 
-**Aucune session requise.** Accessible depuis `/workshop/board`. Conçu pour un affichage permanent en atelier.
+Session board requise. Accessible depuis `/board`. Concu pour un affichage permanent en atelier, en lecture seule.
 
 ### 12.2 Modes d'affichage
 
@@ -961,58 +961,58 @@ line_audit_events
 
 | Méthode | Route | Description |
 |---|---|---|
-| `POST` | `/admin/auth/login` | Connexion admin |
-| `GET` | `/admin/auth/me` | Session courante |
-| `POST` | `/admin/auth/logout` | Déconnexion |
-| `POST` | `/admin/auth/verify-password` | Vérification mot de passe admin (avant action sensible) |
-| `PATCH` | `/admin/auth/password` | Changement du mot de passe admin |
-| `GET` | `/admin/dashboard` | Tableau de bord référentiel (synthèse) |
-| `GET` | `/admin/quality` | Indicateurs de qualité du référentiel |
-| `GET` | `/admin/audit` | Journal d'audit référentiel |
-| `GET` | `/admin/accounts` | Liste des utilisateurs |
-| `GET` | `/admin/accounts/check-badge` | Vérification disponibilité badge |
-| `POST` | `/admin/accounts` | Créer un utilisateur |
-| `GET` | `/admin/accounts/:id` | Détail utilisateur |
-| `GET` | `/admin/accounts/:id/impact` | Impact avant suppression |
-| `PATCH` | `/admin/accounts/:id` | Modifier un utilisateur |
-| `PATCH` | `/admin/accounts/:id/activate` | Activer |
-| `PATCH` | `/admin/accounts/:id/deactivate` | Désactiver |
-| `PATCH` | `/admin/accounts/:id/reset-password` | Réinitialiser mot de passe (génère un setup code) |
-| `DELETE` | `/admin/accounts/:id` | Supprimer (logique) |
-| `GET` | `/admin/lines` | Liste des lignes |
-| `GET` | `/admin/lines/check-line` | Vérification numéro de ligne |
-| `POST` | `/admin/lines/check-line-conflicts` | Vérification conflits machine |
-| `POST` | `/admin/lines` | Créer une ligne |
-| `GET` | `/admin/lines/:id` | Détail ligne |
-| `GET` | `/admin/lines/:id/impact` | Impact avant suppression |
-| `PATCH` | `/admin/lines/:id` | Modifier une ligne |
-| `DELETE` | `/admin/lines/:id` | Supprimer (logique) |
+| `POST` | `/api/auth/login` | Connexion unifiée admin ou atelier |
+| `GET` | `/api/auth/me` | Session courante admin ou atelier |
+| `POST` | `/api/auth/logout` | Déconnexion de la session courante |
+| `POST` | `/api/admin/security/verify-password` | Vérification mot de passe admin (avant action sensible) |
+| `PATCH` | `/api/admin/security/password` | Changement du mot de passe admin |
+| `GET` | `/api/admin/dashboard` | Tableau de bord référentiel (synthèse) |
+| `GET` | `/api/admin/quality` | Indicateurs de qualité du référentiel |
+| `GET` | `/api/admin/audit` | Journal d'audit référentiel |
+| `GET` | `/api/admin/accounts` | Liste des utilisateurs |
+| `GET` | `/api/admin/accounts/check-badge` | Vérification disponibilité badge |
+| `POST` | `/api/admin/accounts` | Créer un utilisateur |
+| `GET` | `/api/admin/accounts/:id` | Détail utilisateur |
+| `GET` | `/api/admin/accounts/:id/impact` | Impact avant suppression |
+| `PATCH` | `/api/admin/accounts/:id` | Modifier un utilisateur |
+| `PATCH` | `/api/admin/accounts/:id/activate` | Activer |
+| `PATCH` | `/api/admin/accounts/:id/deactivate` | Désactiver |
+| `PATCH` | `/api/admin/accounts/:id/reset-password` | Réinitialiser mot de passe (génère un setup code) |
+| `DELETE` | `/api/admin/accounts/:id` | Supprimer (logique) |
+| `GET` | `/api/admin/lines` | Liste des lignes |
+| `GET` | `/api/admin/lines/check-line` | Vérification numéro de ligne |
+| `POST` | `/api/admin/lines/check-line-conflicts` | Vérification conflits machine |
+| `POST` | `/api/admin/lines` | Créer une ligne |
+| `GET` | `/api/admin/lines/:id` | Détail ligne |
+| `GET` | `/api/admin/lines/:id/impact` | Impact avant suppression |
+| `PATCH` | `/api/admin/lines/:id` | Modifier une ligne |
+| `DELETE` | `/api/admin/lines/:id` | Supprimer (logique) |
 
 ### 19.2 Atelier
 
 | Méthode | Route | Auth | Description |
 |---|---|---|---|
-| `POST` | `/workshop/auth/login` | Aucune | Connexion badge (toutes étapes du flux) |
-| `POST` | `/workshop/auth/logout` | Aucune | Déconnexion |
-| `GET` | `/workshop/auth/me` | Session | Session courante |
-| `GET` | `/workshop/board` | **Aucune** | Données board public |
-| `GET` | `/workshop/lines` | Session | Lignes actives |
-| `GET` | `/workshop/incidents` | Session | Incidents actifs ; pour RESPONSABLE, inclut aussi les incidents terminaux suivis |
-| `POST` | `/workshop/incidents` | Session | Créer un incident |
-| `POST` | `/workshop/incidents/reorder` | Session | Réordonner atomiquement une liste d'incidents actifs |
-| `POST` | `/workshop/incidents/:id/follow` | Session | Suivre un incident (RESPONSABLE) |
-| `DELETE` | `/workshop/incidents/:id/follow` | Session | Arrêter le suivi d'un incident (RESPONSABLE) |
-| `POST` | `/workshop/incidents/:id/cancel` | Session | Annuler un incident |
-| `PATCH` | `/workshop/incidents/:id` | Session | Mettre à jour un incident (toutes actions de workflow) |
-| `DELETE` | `/workshop/incidents/:id` | Session | Annuler un incident (compatibilité API) |
-| `GET` | `/workshop/incidents/:id/events` | Session | Événements d'un incident |
-| `GET` | `/workshop/metrics` | Session | Métriques temps réel |
-| `GET` | `/workshop/analytics` | Session | Indicateurs pilotage |
-| `GET` | `/workshop/history/incidents` | Session | Historique incidents |
-| `GET` | `/workshop/history/incidents/:id` | Session | Détail incident historique |
-| `GET` | `/workshop/history/events` | Session | Journal d'événements |
-| `GET` | `/workshop/knowledge/incidents` | Session | Base de connaissance |
-| `GET` | `/workshop/knowledge/incidents/:id` | Session | Fiche connaissance |
+| `POST` | `/api/auth/login` | Aucune | Connexion unifiée admin/atelier |
+| `POST` | `/api/auth/logout` | Session | Déconnexion unifiée |
+| `GET` | `/api/auth/me` | Session | Session courante admin/atelier |
+| `GET` | `/api/board/data` | Session board ou atelier | Données board lecture seule |
+| `GET` | `/api/workshop/lines` | Session | Lignes actives |
+| `GET` | `/api/workshop/incidents` | Session | Incidents actifs ; pour RESPONSABLE, inclut aussi les incidents terminaux suivis |
+| `POST` | `/api/workshop/incidents` | Session | Créer un incident |
+| `POST` | `/api/workshop/incidents/reorder` | Session | Réordonner atomiquement une liste d'incidents actifs |
+| `POST` | `/api/workshop/incidents/:id/follow` | Session | Suivre un incident (RESPONSABLE) |
+| `DELETE` | `/api/workshop/incidents/:id/follow` | Session | Arrêter le suivi d'un incident (RESPONSABLE) |
+| `POST` | `/api/workshop/incidents/:id/cancel` | Session | Annuler un incident |
+| `PATCH` | `/api/workshop/incidents/:id` | Session | Mettre à jour un incident (toutes actions de workflow) |
+| `DELETE` | `/api/workshop/incidents/:id` | Session | Annuler un incident (compatibilité API) |
+| `GET` | `/api/workshop/incidents/:id/events` | Session | Événements d'un incident |
+| `GET` | `/api/workshop/metrics` | Session | Métriques temps réel |
+| `GET` | `/api/workshop/analytics` | Session | Indicateurs pilotage |
+| `GET` | `/api/workshop/history/incidents` | Session | Historique incidents |
+| `GET` | `/api/workshop/history/incidents/:id` | Session | Détail incident historique |
+| `GET` | `/api/workshop/history/events` | Session | Journal d'événements |
+| `GET` | `/api/workshop/knowledge/incidents` | Session | Base de connaissance |
+| `GET` | `/api/workshop/knowledge/incidents/:id` | Session | Fiche connaissance |
 
 ---
 
@@ -1067,15 +1067,15 @@ Les champs `is_taken`, `taken_by_user_id` et `taken_at` sont contraints par la b
 
 ### 21.1 Sessions
 
-- Deux systèmes de sessions indépendants : admin (`sentinel-admin-auth`) et atelier (`sentinel-workshop-auth`)
+- Deux sessions applicatives indépendantes : admin (`sentinel_admin_token`) et atelier (`sentinel_workshop_token`)
 - Tokens JWT, transportés exclusivement via **cookies HTTP-only** (non accessible en JavaScript)
 - Secrets JWT configurés via variables d'environnement
 
 ### 21.2 Protection des routes backend
 
-- `adminAuthMiddleware` : valide le token admin sur toutes les routes `/admin/**` (sauf login, logout)
-- `workshopAuthMiddleware` : valide le token atelier sur toutes les routes `/workshop/**` (sauf login, logout et board)
-- La route `/workshop/board` est intentionnellement publique
+- `adminAuthMiddleware` : valide le token admin sur les routes `/api/admin/**` et `/api/admin/security/**`
+- `workshopAuthMiddleware` : valide le token atelier sur les routes `/api/workshop/**`
+- La route `/api/board/data` est lecture seule et protégée par session board ou session atelier valide
 
 ### 21.3 Mots de passe
 
@@ -1092,11 +1092,11 @@ Les champs `is_taken`, `taken_by_user_id` et `taken_at` sont contraints par la b
 
 ### 21.5 Protection des actions sensibles admin
 
-La route `POST /admin/auth/verify-password` permet de confirmer le mot de passe admin avant les opérations destructives (suppression utilisateur, suppression ligne) sans rouvrir de session.
+La route `POST /api/admin/security/verify-password` permet de confirmer le mot de passe admin avant les opérations destructives (suppression utilisateur, suppression ligne) sans rouvrir de session.
 
 ### 21.6 Limitation du débit (rate limiting)
 
-Les endpoints de connexion (`/admin/auth/login`, `/workshop/auth/login`) sont protégés par un middleware de limitation du débit pour prévenir les attaques par force brute.
+L'endpoint de connexion unifié (`/api/auth/login`) et l'ouverture de session board (`/api/board/session`) sont protégés par un middleware de limitation du débit.
 
 ---
 

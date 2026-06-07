@@ -45,23 +45,39 @@ export default function Modal({
     onClose?.();
   }
 
+  const focusableSelector = [
+    'button:not([disabled])',
+    '[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(',');
+
+  // Focus the first input (not the close button) on mount only
   useEffect(() => {
     const previousActiveElement = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
-    const focusableSelector = [
-      'button:not([disabled])',
-      '[href]',
-      'input:not([disabled])',
-      'select:not([disabled])',
-      'textarea:not([disabled])',
-      '[tabindex]:not([tabindex="-1"])',
-    ].join(',');
+
+    const inputs = modalRef.current?.querySelectorAll<HTMLElement>(
+      '[role="combobox"]:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    );
+    const firstInput = inputs?.[0];
     const firstFocusable = modalRef.current?.querySelector<HTMLElement>(focusableSelector);
+
     window.setTimeout(() => {
-      firstFocusable?.focus();
+      (firstInput ?? firstFocusable)?.focus();
     }, 0);
 
+    return () => {
+      previousActiveElement?.focus();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keyboard trap (Escape + Tab) — re-registers when close behaviour changes
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && escapeEnabled) {
         requestClose();
@@ -88,7 +104,6 @@ export default function Modal({
     document.addEventListener('keydown', handler);
     return () => {
       document.removeEventListener('keydown', handler);
-      previousActiveElement?.focus();
     };
   }, [canClose, escapeEnabled, isDirty, isLoading, onClose]);
 

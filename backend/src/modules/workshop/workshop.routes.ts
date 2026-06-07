@@ -4,7 +4,6 @@ import {
 	createIncident,
 	deleteIncident,
 	followIncident,
-	getBoardData,
 	getHistoryIncident,
 	getIncidentMetrics,
 	getKnowledgeIncident,
@@ -22,7 +21,6 @@ import {
 
 const router = Router();
 
-router.get('/board', getBoardData);
 
 router.use(workshopAuthMiddleware);
 router.get('/lines', listWorkshopLines);

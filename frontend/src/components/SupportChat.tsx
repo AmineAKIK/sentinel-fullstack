@@ -80,6 +80,7 @@ function inlineFormat(text: string): React.ReactNode {
   });
 }
 
+
 export default function SupportChat({ onSend }: Props) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -87,15 +88,20 @@ export default function SupportChat({ onSend }: Props) {
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const suggestions = [
-    'Comment créer et suivre un incident atelier ?',
-    'Que peut faire chaque rôle dans Sentinel ?',
-    'Comment interpréter les statuts OPEN, PENDING et CLOSED ?',
-  ];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history, loading]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = el.scrollHeight;
+    const max = 156;
+    el.style.height = `${Math.min(next, max)}px`;
+    el.style.overflowY = next > max ? 'auto' : 'hidden';
+  }, [input]);
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -150,21 +156,6 @@ export default function SupportChat({ onSend }: Props) {
               <p className="support-empty-sub">
                 Posez une question précise sur les incidents, les rôles ou les workflows atelier.
               </p>
-            </div>
-            <div className="support-suggestions" aria-label="Suggestions de questions">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  className="support-suggestion"
-                  onClick={() => {
-                    setInput(suggestion);
-                    textareaRef.current?.focus();
-                  }}
-                >
-                  {suggestion}
-                </button>
-              ))}
             </div>
           </div>
         )}

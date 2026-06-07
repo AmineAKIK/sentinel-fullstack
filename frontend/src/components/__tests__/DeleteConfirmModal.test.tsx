@@ -10,12 +10,12 @@ vi.mock('../../api/accounts', () => ({
   deleteAccount: vi.fn(),
 }));
 
-vi.mock('../../api/auth', () => ({
+vi.mock('../../api/adminSecurity', () => ({
   verifyAdminPassword: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../routes/AuthContext', () => ({
-  useAuth: vi.fn().mockReturnValue({ logout: vi.fn() }),
+vi.mock('../../routes/AppAuthContext', () => ({
+  useAppAuth: vi.fn().mockReturnValue({ logout: vi.fn() }),
 }));
 
 import * as accountsApi from '../../api/accounts';
@@ -113,7 +113,7 @@ describe('DeleteConfirmModal – état bloqué', () => {
 
 describe('DeleteConfirmModal – suppression réussie', () => {
   it('appelle deleteAccount et onSuccess après confirmation', async () => {
-    const { verifyAdminPassword } = await import('../../api/auth');
+    const { verifyAdminPassword } = await import('../../api/adminSecurity');
     vi.mocked(verifyAdminPassword).mockResolvedValue({} as never);
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
     vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined as never);
@@ -156,7 +156,7 @@ describe('DeleteConfirmModal – bouton annuler', () => {
 
 describe('DeleteConfirmModal – vérification admin password', () => {
   it('verifyAdminPassword est appelé avec le bon mot de passe', async () => {
-    const { verifyAdminPassword } = await import('../../api/auth');
+    const { verifyAdminPassword } = await import('../../api/adminSecurity');
     vi.mocked(verifyAdminPassword).mockResolvedValue({} as never);
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
     vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined as never);

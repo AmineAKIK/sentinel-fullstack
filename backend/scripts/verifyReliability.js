@@ -19,9 +19,16 @@ function includesInOrder(source, first, second) {
   return firstIndex !== -1 && secondIndex !== -1 && firstIndex < secondIndex;
 }
 
-check('Board API is public and detailed workshop APIs are protected', () => {
+check('Board API requires board or workshop session and detailed workshop APIs are protected', () => {
   const routes = read('backend/src/modules/workshop/workshop.routes.ts');
-  return includesInOrder(routes, "router.get('/board', getBoardData)", 'router.use(workshopAuthMiddleware)')
+  const board = read('backend/src/modules/board/board.auth.ts');
+  const server = read('backend/src/server.ts');
+  return !routes.includes("router.get('/board'")
+    && board.includes('BOARD_AUTH_COOKIE')
+    && board.includes("boardRouter.post('/session'")
+    && board.includes("boardRouter.get('/data', boardReadAuthMiddleware, getBoardData)")
+    && server.includes("app.use('/api/board/session', loginRateLimit)")
+    && server.includes("app.use('/api/board', boardRouter)")
     && includesInOrder(routes, 'router.use(workshopAuthMiddleware)', "router.get('/incidents', listIncidents)")
     && includesInOrder(routes, 'router.use(workshopAuthMiddleware)', "router.get('/history/incidents', listHistoryIncidents)")
     && includesInOrder(routes, 'router.use(workshopAuthMiddleware)', "router.get('/history/events', listHistoryEvents)")
@@ -78,13 +85,17 @@ check('Canceled and invalidated incidents are preserved but excluded from operat
     && repository.includes("nonTerminalRejectedWorkshopIncidentStatusSql");
 });
 
-check('Board frontend consumes only the public board endpoint', () => {
+check('Board frontend consumes only the secured board endpoint', () => {
   const board = read('frontend/src/pages/WorkshopBoardPage.tsx');
-  const api = read('frontend/src/api/workshop.ts');
-  return board.includes('getWorkshopBoardData')
+  const api = read('frontend/src/api/board.ts');
+  const workshopApi = read('frontend/src/api/workshop.ts');
+  return board.includes('getBoardData')
+    && !board.includes('getWorkshopBoardData')
     && !board.includes('listWorkshopIncidents')
     && !board.includes('getIncidentMetrics')
-    && api.includes("'/api/workshop/board'");
+    && api.includes("'/api/board/data'")
+    && !workshopApi.includes('getWorkshopBoardData')
+    && !workshopApi.includes("'/api/board/data'");
 });
 
 check('Board respects responsible manual ordering after priority', () => {
@@ -104,15 +115,70 @@ check('Board settings are scoped per display screen', () => {
     && !board.includes("storageKey.endsWith('.default')");
 });
 
-check('Routing keeps board public and workshop workspaces protected', () => {
+check('Routing exposes a three-space portal and protects admin/workshop workspaces', () => {
   const app = read('frontend/src/App.tsx');
-  return app.includes('path="/workshop/board"')
-    && app.includes('<WorkshopBoardPage />')
-    && app.includes('path="/workshop/dashboard"')
-    && app.includes('<WorkshopProtectedRoute>')
-    && app.includes('path="/workshop/pilotage"')
-    && app.includes('path="/workshop/history"')
-    && app.includes('path="/workshop/knowledge"');
+  const login = read('frontend/src/pages/LoginPage.tsx');
+  const authContext = read('frontend/src/routes/AppAuthContext.tsx');
+  return app.includes('path="/login"')
+    && app.includes('path="/board"')
+    && app.includes('<BoardAccessPage />')
+    && app.includes('path="/admin/login"')
+    && app.includes('<AdminLoginPage />')
+    && app.includes('path="/workshop/login"')
+    && app.includes('<WorkshopLoginPage />')
+    && app.includes('<AdminRoute>')
+    && app.includes('<WorkshopRoute>')
+    && login.includes('/admin/login')
+    && login.includes('/workshop/login')
+    && login.includes('Tableau')
+    && login.includes('Administration')
+    && login.includes('Atelier')
+    && login.includes('login-space-grid')
+    && authContext.includes("'/login'")
+    && authContext.includes("'/board'")
+    && authContext.includes("'/admin/login'")
+    && authContext.includes("'/workshop/login'")
+    && !app.includes('<WorkshopProtectedRoute>')
+    && !app.includes('<PublicRoute>')
+    && !app.includes('path="/admin/acceuil"')
+    && !app.includes('path="/workshop"')
+    && !app.includes('path="/workshop/board"');
+});
+
+check('Workshop navigation excludes board display', () => {
+  const nav = read('frontend/src/components/WorkshopNavBar.tsx');
+  return !nav.includes('Affichage')
+    && !nav.includes('/workshop/board')
+    && nav.includes('/workshop/dashboard')
+    && nav.includes('/workshop/support');
+});
+
+check('Official auth API exposes only the unified session entry', () => {
+  const server = read('backend/src/server.ts');
+  const adminSecurityRoutes = read('backend/src/modules/adminSecurity/adminSecurity.routes.ts');
+  return server.includes("app.use('/api/auth', authRoutes)")
+    && server.includes("app.use('/api/admin/security', adminSecurityRoutes)")
+    && !server.includes("app.use('/api/admin/auth'")
+    && !server.includes('adminAuthRoutes')
+    && !server.includes("app.use('/api/workshop/auth'")
+    && !adminSecurityRoutes.includes("router.post('/login'")
+    && !adminSecurityRoutes.includes("router.get('/me'")
+    && !adminSecurityRoutes.includes("router.post('/logout'");
+});
+
+check('Legacy auth surfaces are removed', () => {
+  const files = [
+    'frontend/src/routes/AuthContext.tsx',
+    'frontend/src/routes/ProtectedRoute.tsx',
+    'frontend/src/routes/PublicRoute.tsx',
+    'frontend/src/routes/WorkshopAuthContext.tsx',
+    'frontend/src/routes/WorkshopProtectedRoute.tsx',
+    'frontend/src/api/auth.ts',
+    'frontend/src/api/workshopAuth.ts',
+    'backend/src/modules/adminAuth',
+    'backend/src/modules/workshopAuth',
+  ];
+  return files.every((relativePath) => !fs.existsSync(path.join(repoRoot, relativePath)));
 });
 
 check('Workshop history, pilotage, and knowledge are separated pages', () => {

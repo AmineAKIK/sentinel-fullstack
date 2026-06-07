@@ -50,6 +50,7 @@ export default function AdminHomePage() {
       quality.malformed_machines.length +
       quality.duplicate_machines.length
     : 0;
+  const recentEvents = dashboard?.recent_events.slice(0, 5) ?? [];
 
   return (
     <>
@@ -61,29 +62,53 @@ export default function AdminHomePage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        <div className="kpi-grid">
+        <div className="kpi-grid kpi-grid--4">
           <KpiCard label="Utilisateurs actifs" value={dashboard?.users_active ?? '-'} sub={`${dashboard?.users_inactive ?? '-'} inactifs`} />
           <KpiCard label="Sans mot de passe" value={dashboard?.users_without_password ?? '-'} sub="Comptes à finaliser" />
           <KpiCard label="Lignes actives" value={dashboard?.lines_active ?? '-'} sub={`${dashboard?.machines_total ?? '-'} machines référencées`} />
           <KpiCard label="Points à vérifier" value={quality ? qualityCount : '-'} sub="Qualité des référentiels" />
         </div>
 
-        <div className="admin-home-grid">
-          <button className="admin-tile" onClick={() => navigate('/admin/users')}>
-            <span className="admin-tile-title">Utilisateurs</span>
-            <span className="admin-tile-text">Gérer les comptes Sentinel et leurs statuts.</span>
-          </button>
-
-          <button className="admin-tile" onClick={() => navigate('/admin/lines')}>
-            <span className="admin-tile-title">Lignes</span>
-            <span className="admin-tile-text">Accéder à la gestion des lignes.</span>
-          </button>
-        </div>
-
-        <div className="admin-dashboard-grid">
-          <section className="card">
+        <div className="admin-overview-grid">
+          <section className="card admin-action-card">
             <div className="card-body">
-              <h2 style={{ marginBottom: 12 }}>Contrôle qualité</h2>
+              <div className="admin-section-header">
+                <div>
+                  <h2>Accès rapides</h2>
+                  <span>Référentiels opérationnels</span>
+                </div>
+              </div>
+
+              <div className="admin-action-list">
+                <button className="admin-action-row" onClick={() => navigate('/admin/users')}>
+                  <span>
+                    <strong>Utilisateurs</strong>
+                    <small>{dashboard ? `${dashboard.users_total} compte(s), ${dashboard.users_active} actif(s)` : 'Chargement...'}</small>
+                  </span>
+                </button>
+
+                <button className="admin-action-row" onClick={() => navigate('/admin/lines')}>
+                  <span>
+                    <strong>Lignes</strong>
+                    <small>{dashboard ? `${dashboard.lines_total} ligne(s), ${dashboard.machines_total} machine(s)` : 'Chargement...'}</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="card admin-quality-card">
+            <div className="card-body">
+              <div className="admin-section-header">
+                <div>
+                  <h2>Contrôle qualité</h2>
+                  <span>Points à traiter dans les référentiels</span>
+                </div>
+                <strong className={qualityCount > 0 ? 'admin-status-badge warning' : 'admin-status-badge'}>
+                  {quality ? qualityCount : '-'}
+                </strong>
+              </div>
+
               {!quality ? (
                 <EmptyState style={{ padding: 24 }}>Chargement...</EmptyState>
               ) : qualityCount === 0 ? (
@@ -94,6 +119,12 @@ export default function AdminHomePage() {
                     <button className="quality-item" onClick={() => navigate('/admin/users')}>
                       <strong>{quality.users_without_password.length}</strong>
                       <span>utilisateur(s) actif(s) sans mot de passe</span>
+                    </button>
+                  )}
+                  {quality.inactive_users.length > 0 && (
+                    <button className="quality-item" onClick={() => navigate('/admin/users')}>
+                      <strong>{quality.inactive_users.length}</strong>
+                      <span>utilisateur(s) inactif(s)</span>
                     </button>
                   )}
                   {quality.inactive_lines.length > 0 && (
@@ -119,19 +150,30 @@ export default function AdminHomePage() {
             </div>
           </section>
 
-          <section className="card">
+          <section className="card admin-activity-card">
             <div className="card-body">
-              <h2 style={{ marginBottom: 12 }}>Derniers changements</h2>
+              <div className="admin-section-header">
+                <div>
+                  <h2>Derniers changements</h2>
+                  <span>Aperçu du journal d'administration</span>
+                </div>
+                <button className="admin-header-link" onClick={() => navigate('/admin/audit')}>
+                  Journal
+                </button>
+              </div>
+
               {!dashboard ? (
                 <EmptyState style={{ padding: 24 }}>Chargement...</EmptyState>
               ) : dashboard.recent_events.length === 0 ? (
                 <EmptyState style={{ padding: 24 }}>Aucun changement tracé.</EmptyState>
               ) : (
-                <div className="audit-list">
-                  {dashboard.recent_events.map((event) => (
+                <div className="audit-list admin-activity-list">
+                  {recentEvents.map((event) => (
                     <div className="audit-item" key={`${event.scope}-${event.id}`}>
-                      <strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong>
-                      <span>{eventTarget(event)}</span>
+                      <div>
+                        <strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong>
+                        <span>{eventTarget(event)}</span>
+                      </div>
                       <small>{formatDateTime(event.created_at)}</small>
                     </div>
                   ))}

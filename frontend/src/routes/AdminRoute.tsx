@@ -1,9 +1,9 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAppAuth } from './AppAuthContext';
 
-export default function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { admin, loading } = useAuth();
+export default function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAppAuth();
 
   if (loading) {
     return (
@@ -13,8 +13,8 @@ export default function PublicRoute({ children }: { children: React.ReactNode })
     );
   }
 
-  if (admin) {
-    return <Navigate to="/admin/accueil" replace />;
+  if (!session || session.accountType !== 'admin') {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

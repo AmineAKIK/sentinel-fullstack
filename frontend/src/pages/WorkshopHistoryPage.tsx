@@ -10,6 +10,7 @@ import {
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopHistoryEvent, WorkshopIncident, WorkshopIncidentEvent } from '../types';
 import {
@@ -264,66 +265,58 @@ export default function WorkshopHistoryPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Statut</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={statusFilter}
-                  onChange={(event) => {
-                    const value = readHistoryStatusFilter(event.target.value);
+                  onChange={(nextValue) => {
+                    const value = readHistoryStatusFilter(nextValue);
                     setStatusFilter(value);
                     updateSearchFilter('status', value);
                   }}
-                >
-                  <option value="all">Tous</option>
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Tous' },
+                    ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Ligne</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={lineFilter}
-                  onChange={(event) => updateLineFilter(event.target.value)}
-                >
-                  <option value="all">Toutes</option>
-                  {lines.map((line) => (
-                    <option key={line.id} value={line.id}>{line.line_number}</option>
-                  ))}
-                </select>
+                  onChange={updateLineFilter}
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Machine</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={machineFilter}
-                  onChange={(event) => {
-                    setMachineFilter(event.target.value);
-                    updateSearchFilter('machine', event.target.value);
+                  onChange={(value) => {
+                    setMachineFilter(value);
+                    updateSearchFilter('machine', value);
                   }}
                   disabled={lineFilter === 'all'}
-                >
-                  <option value="all">Toutes</option>
-                  {machineOptions.map((machine) => (
-                    <option key={machine.id} value={machine.id}>{machine.label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    ...machineOptions.map((machine) => ({ value: machine.id, label: machine.label })),
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Type d'anomalie</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={stateFilter}
-                  onChange={(event) => {
-                    setStateFilter(event.target.value);
-                    updateSearchFilter('state', event.target.value);
+                  onChange={(value) => {
+                    setStateFilter(value);
+                    updateSearchFilter('state', value);
                   }}
-                >
-                  <option value="all">Tous</option>
-                  {Object.entries(STATE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Tous' },
+                    ...Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label })),
+                  ]}
+                />
               </div>
             </div>
             <FilterSummary
@@ -479,19 +472,17 @@ export default function WorkshopHistoryPage() {
             <div className="history-event-filter">
               <div className="form-group">
                 <label className="form-label">Type d’action</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={eventTypeFilter}
-                  onChange={(event) => {
-                    setEventTypeFilter(event.target.value);
-                    updateSearchFilter('event', event.target.value);
+                  onChange={(value) => {
+                    setEventTypeFilter(value);
+                    updateSearchFilter('event', value);
                   }}
-                >
-                  <option value="all">Toutes les actions</option>
-                  {eventTypeOptions.map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Toutes les actions' },
+                    ...eventTypeOptions.map(([value, label]) => ({ value, label })),
+                  ]}
+                />
               </div>
               <FilterSummary
                 count={historyEvents.length}

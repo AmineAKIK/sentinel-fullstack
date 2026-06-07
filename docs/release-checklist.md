@@ -42,7 +42,7 @@ Executer la checklist `docs/manual-tests.md` sur un environnement frais.
 
 Scenarios bloquants:
 
-- Board public accessible sans session, sans actions sensibles.
+- Board inaccessible sans code/session board, puis accessible en lecture seule sans actions sensibles.
 - Routes admin et workshop protegees sans cookie.
 - Connexion/deconnexion admin.
 - Connexion/deconnexion workshop avec creation du premier mot de passe.

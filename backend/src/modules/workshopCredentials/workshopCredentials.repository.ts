@@ -1,6 +1,6 @@
 import pool from '../../db/pool';
 
-export interface WorkshopAuthUser {
+export interface WorkshopCredentialUser {
   id: number;
   first_name: string;
   last_name: string;
@@ -11,10 +11,10 @@ export interface WorkshopAuthUser {
   password_setup_expires_at: Date | null;
 }
 
-export type WorkshopSessionUser = Pick<WorkshopAuthUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>;
+export type WorkshopSessionUser = Pick<WorkshopCredentialUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>;
 
-export async function findActiveWorkshopUserByBadge(badgeNumber: string): Promise<WorkshopAuthUser | null> {
-  const { rows } = await pool.query<WorkshopAuthUser>(
+export async function findActiveWorkshopUserByBadge(badgeNumber: string): Promise<WorkshopCredentialUser | null> {
+  const { rows } = await pool.query<WorkshopCredentialUser>(
     `SELECT id, first_name, last_name, badge_number, role, password_hash,
             password_setup_token_hash, password_setup_expires_at
      FROM sentinel_users

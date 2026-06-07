@@ -1,13 +1,13 @@
 import pool from '../../db/pool';
 
-export interface AdminAuthAccount {
+export interface AdminCredentialAccount {
   id: number;
   username: string;
   password_hash: string;
 }
 
-export async function findAdminByUsername(username: string): Promise<AdminAuthAccount | null> {
-  const { rows } = await pool.query<AdminAuthAccount>(
+export async function findAdminByUsername(username: string): Promise<AdminCredentialAccount | null> {
+  const { rows } = await pool.query<AdminCredentialAccount>(
     'SELECT id, username, password_hash FROM admin_accounts WHERE username = $1',
     [username]
   );

@@ -53,6 +53,11 @@ function renderModal(
   );
 }
 
+function chooseOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -72,7 +77,8 @@ describe('CreateIncidentModal – rendu', () => {
 
   it('affiche L01 dans la liste des lignes', () => {
     renderModal([mockLine({ line_number: 'L01' })]);
-    expect(screen.getByText('L01')).toBeDefined();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Ligne' }));
+    expect(screen.getByRole('option', { name: 'L01' })).toBeDefined();
   });
 });
 
@@ -89,11 +95,10 @@ describe('CreateIncidentModal – isDirty', () => {
 
   it('isDirty est vrai quand un shift est sélectionné', async () => {
     renderModal();
-    const shiftSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(shiftSelect, { target: { value: 'MORNING' } });
+    chooseOption('Équipe', 'Matin');
+    fireEvent.click(screen.getByRole('button', { name: /Fermer/i }));
     await waitFor(() => {
-      const overlay = document.querySelector('.modal-confirm-overlay');
-      expect(overlay).toBeNull();
+      expect(screen.getByText('Quitter sans enregistrer ?')).toBeDefined();
     });
   });
 });
@@ -118,13 +123,29 @@ describe('CreateIncidentModal – soumission réussie', () => {
     vi.mocked(workshopApi.createWorkshopIncident).mockResolvedValue({ id: 1 } as never);
     renderModal([mockLine()], onClose, onSuccess);
 
-    // Sélectionner le shift
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[0], { target: { value: 'MATIN' } });
+    chooseOption('Équipe', 'Matin');
+    chooseOption('Ligne', 'L01');
+    chooseOption('Machine', 'M01 · Fanuc');
+    chooseOption('Robot', 'R01');
+    chooseOption('Tête', '1');
+    chooseOption('État', 'Dégradée');
 
-    // Attendre que le formulaire soit rendu avec les lignes
+    fireEvent.click(screen.getByRole('button', { name: /Aperçu/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Valider la création/i }));
+
     await waitFor(() => {
-      expect(screen.getByText('L01')).toBeDefined();
+      expect(workshopApi.createWorkshopIncident).toHaveBeenCalledWith({
+        shift: 'MATIN',
+        lineId: 1,
+        machineId: 'M01',
+        robotLabel: 'R01',
+        headNumber: 1,
+        state: 'DEGRADEE',
+        comment: '',
+        currentProduct: '',
+        requestOnly: undefined,
+      });
+      expect(onSuccess).toHaveBeenCalledWith({ id: 1 });
     });
   });
 

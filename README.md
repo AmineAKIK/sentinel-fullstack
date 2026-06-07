@@ -1,6 +1,6 @@
 # Sentinel
 
-Application full-stack de pilotage Sentinel : administration des comptes et lignes, exploitation atelier, suivi des incidents, affichage grand écran, historique, pilotage et base de connaissance.
+Application full-stack de pilotage Sentinel organisee autour de trois espaces : Board, Administration et Workshop.
 
 ## Stack
 
@@ -19,7 +19,9 @@ docker compose up --build
 
 - Frontend : http://localhost:5173
 - Backend API : http://localhost:3000
-- Admin local par défaut : `admin` / `admin123`
+- Portail : http://localhost:5173/login
+- Board : http://localhost:5173/board
+- Admin local par defaut : `admin` / `admin123`
 
 Pour une publication, copier `.env.release.example` vers `.env` sur l'hôte de déploiement et remplacer toutes les valeurs sensibles avant de lancer Docker Compose. En `NODE_ENV=production`, le backend refuse de démarrer si les secrets ou l'origine client restent sur des valeurs de démonstration.
 
@@ -100,23 +102,39 @@ frontend/
 
 ## Routes Principales
 
-Admin :
+Portail :
 
-- `/admin/login`
+- `/login` — entree unique en trois blocs : Board, Administration, Workshop
+- `/admin/login` — connexion administration depuis le portail
+- `/workshop/login` — connexion atelier depuis le portail
+
+Board :
+
+- `/board` — affichage atelier lecture seule protege par code local
+
+Administration :
+
 - `/admin/accueil`
 - `/admin/users`
 - `/admin/users/:id`
 - `/admin/lines`
 - `/admin/audit`
+- `/admin/support`
 
-Atelier :
+Workshop :
 
-- `/workshop`
 - `/workshop/dashboard`
-- `/workshop/board`
-- `/workshop/history`
 - `/workshop/pilotage`
+- `/workshop/history`
 - `/workshop/knowledge`
+- `/workshop/support`
+
+API :
+
+- `/api/auth` — session unifiee admin/workshop
+- `/api/board` — session board et donnees lecture seule
+- `/api/admin` — administration protegee
+- `/api/workshop` — atelier protege
 
 ## Variables D'environnement
 

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getWorkshopBoardData } from '../api/workshop';
+import { getBoardData, logoutBoardSession } from '../api/board';
 import Modal from '../components/Modal';
-import { useWorkshopAuth } from '../routes/WorkshopAuthContext';
+import SelectField from '../components/ui/SelectField';
+import { useAppAuth } from '../routes/AppAuthContext';
 import { WorkshopBoardIncident, WorkshopBoardLine } from '../types';
 import { STATE_LABELS } from '../utils/labels';
 
@@ -134,7 +135,8 @@ function saveBoardSettings(storageKey: string, settings: BoardSettings) {
 export default function WorkshopBoardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useWorkshopAuth();
+  const { session } = useAppAuth();
+  const user = session?.accountType === 'workshop' ? session.user : null;
   const screenParam = searchParams.get('screen');
   const screenId = normalizeScreenId(screenParam || getOrCreateSessionScreenId());
   const storageKey = getBoardSettingsKey(screenId);
@@ -165,7 +167,7 @@ export default function WorkshopBoardPage() {
 
   async function refreshBoard() {
     try {
-      const boardData = await getWorkshopBoardData();
+      const boardData = await getBoardData();
       setIncidents(boardData.incidents);
       setLines(boardData.lines);
       setLastUpdated(new Date());
@@ -307,6 +309,11 @@ export default function WorkshopBoardPage() {
     setSettings(nextSettings);
     saveBoardSettings(storageKey, nextSettings);
     setShowSettings(false);
+  }
+
+  async function closeBoardAccess() {
+    await logoutBoardSession().catch(() => {});
+    navigate('/login', { replace: true });
   }
 
   function handleLineToggle(lineId: string) {
@@ -451,9 +458,13 @@ export default function WorkshopBoardPage() {
           <button className="board-exit" onClick={() => setShowSettings(true)}>
             Paramètres
           </button>
-          {user && (
+          {user ? (
             <button className="board-exit" onClick={() => navigate('/workshop/dashboard')}>
-              Dashboard
+              Tableau de bord
+            </button>
+          ) : (
+            <button className="board-exit" onClick={closeBoardAccess}>
+              Fermer l’accès
             </button>
           )}
         </div>
@@ -549,16 +560,16 @@ export default function WorkshopBoardPage() {
               </div>
               <div className="form-group">
               <label className="form-label">Type d’écran</label>
-              <select
-                className="form-select"
+              <SelectField
                 value={draftSettings.preset}
-                onChange={(event) => setDraftSettings(applyPreset(event.target.value as BoardPreset))}
-              >
-                <option value="default">{PRESET_LABELS.default} · rotation complète</option>
-                <option value="maintenance">{PRESET_LABELS.maintenance} · alertes à traiter</option>
-                <option value="responsable">{PRESET_LABELS.responsable} · situation par ligne</option>
-                <option value="custom">{PRESET_LABELS.custom} · filtres avancés</option>
-              </select>
+                onChange={(value) => setDraftSettings(applyPreset(value as BoardPreset))}
+                options={[
+                  { value: 'default', label: `${PRESET_LABELS.default} · rotation complète` },
+                  { value: 'maintenance', label: `${PRESET_LABELS.maintenance} · alertes à traiter` },
+                  { value: 'responsable', label: `${PRESET_LABELS.responsable} · situation par ligne` },
+                  { value: 'custom', label: `${PRESET_LABELS.custom} · filtres avancés` },
+                ]}
+              />
             </div>
             </section>
 

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAppAuth } from './AppAuthContext';
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { admin, loading } = useAuth();
+export default function WorkshopRoute({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAppAuth();
 
   if (loading) {
     return (
@@ -13,8 +13,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
   }
 
-  if (!admin) {
-    return <Navigate to="/admin/login" replace />;
+  if (!session || session.accountType !== 'workshop') {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

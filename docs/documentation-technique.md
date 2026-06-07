@@ -75,11 +75,15 @@ backend/
 │   │   ├── serviceResult.ts         Type ServiceResult<T> (ok/error)
 │   │   └── controller.ts            Helpers contrôleur (parseIdParam, sendServiceError, formatZodError)
 │   └── modules/
-│       ├── adminAuth/               Authentification admin
+│       ├── auth/                    Connexion unifiée admin/atelier
+│       ├── adminCredentials/        Accès aux identifiants admin
+│       ├── adminSecurity/           Confirmation/changement mot de passe admin
 │       ├── admin/                   Dashboard et qualité référentiel
 │       ├── accounts/                CRUD comptes atelier
+│       ├── board/                   Session board lecture seule
 │       ├── lines/                   CRUD lignes de production
-│       ├── workshopAuth/            Authentification atelier
+│       ├── support/                 Assistant support admin/atelier
+│       ├── workshopCredentials/     Credentials atelier internes
 │       └── workshop/                Incidents, board, historique, pilotage, connaissance
 ├── migrations/                      021 fichiers SQL numérotés
 ├── scripts/                         Scripts utilitaires (seed demo, verifyReliability)
@@ -100,18 +104,19 @@ frontend/
 │   │   └── index.ts                 Tous les types partagés (Role, WorkshopIncident, Analytics…)
 │   ├── api/
 │   │   ├── client.ts                fetch wrapper (base URL, credentials, gestion erreurs)
-│   │   ├── auth.ts                  API admin auth
-│   │   ├── workshopAuth.ts          API atelier auth
+│   │   ├── unifiedAuth.ts           API session unifiée admin/atelier
+│   │   ├── adminSecurity.ts         API sécurité administration
+│   │   ├── board.ts                 API session board lecture seule
 │   │   ├── accounts.ts              API CRUD comptes
 │   │   ├── lines.ts                 API CRUD lignes
-│   │   ├── workshop.ts              API incidents, board, historique, pilotage, connaissance
+│   │   ├── workshop.ts              API incidents, historique, pilotage, connaissance
+│   │   ├── support.ts               API support admin/atelier
 │   │   └── admin.ts                 API dashboard et qualité référentiel
 │   ├── routes/
-│   │   ├── AuthContext.tsx          Contexte session admin (React Context)
-│   │   ├── WorkshopAuthContext.tsx  Contexte session atelier
-│   │   ├── ProtectedRoute.tsx       Guard admin (redirige vers /admin/login)
-│   │   ├── PublicRoute.tsx          Redirige vers /admin/accueil si déjà connecté
-│   │   └── WorkshopProtectedRoute.tsx Guard atelier (redirige vers /workshop)
+│   │   ├── AppAuthContext.tsx       Contexte session unifie admin/workshop
+│   │   ├── AdminRoute.tsx           Guard administration
+│   │   ├── WorkshopRoute.tsx        Guard workshop
+│   │   └── GuestRoute.tsx           Guard des pages de connexion
 │   ├── pages/                       12 pages (voir §10.2)
 │   ├── components/                  ~40 composants (modales, cartes, formulaires, UI)
 │   └── utils/
@@ -484,15 +489,15 @@ app.use(express.json())
 app.use(cookieParser(COOKIE_SECRET))
 
 // Rate limiting appliqué AVANT le routing sur les endpoints de login
-app.use('/api/admin/auth/login',    loginRateLimit)
-app.use('/api/workshop/auth/login', loginRateLimit)
+app.use('/api/auth/login',      loginRateLimit)
+app.use('/api/board/session',  loginRateLimit)
 
 // Routing
-app.use('/api/admin/auth',      adminAuthRoutes)
+app.use('/api/admin/security',  adminSecurityRoutes)
 app.use('/api/admin',           adminRoutes)         ← dashboard, quality, audit
 app.use('/api/admin/accounts',  accountsRoutes)
 app.use('/api/admin/lines',     linesRoutes)
-app.use('/api/workshop/auth',   workshopAuthRoutes)
+app.use('/api/board',           boardRouter)
 app.use('/api/workshop',        workshopRoutes)
 
 app.get('/api/health', ...)        ← healthcheck public
@@ -671,7 +676,7 @@ Appliqués sur toutes les réponses backend :
 
 ### 8.8 Vérification du mot de passe admin pour actions sensibles
 
-`POST /api/admin/auth/verify-password` permet de confirmer le mot de passe admin avant une opération destructive (suppression d'utilisateur, suppression de ligne) sans rouvrir de session.
+`POST /api/admin/security/verify-password` permet de confirmer le mot de passe admin avant une opération destructive (suppression d'utilisateur, suppression de ligne) sans rouvrir de session.
 
 **Protection anti-bruteforce intégrée :** au bout de 3 échecs consécutifs (dans une fenêtre de 30 min), la session admin est invalidée et le cookie effacé.
 
@@ -679,11 +684,13 @@ Appliqués sur toutes les réponses backend :
 
 ## 9. Backend — Modules
 
-### 9.1 Module `adminAuth`
+### 9.1 Module `auth` et `adminSecurity`
 
-**Routes :** `POST /login`, `GET /me`, `POST /logout`, `POST /verify-password`, `PATCH /password`
+**Routes auth unifiees :** `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
 
-**`login` :** cherche l'admin par username → vérifie bcrypt → signe JWT → pose cookie.
+**Routes sécurité admin :** `POST /api/admin/security/verify-password`, `PATCH /api/admin/security/password`
+
+**`unifiedLoginService` :** cherche d'abord un admin par username, sinon un utilisateur workshop par badge, puis pose le cookie correspondant via le contrôleur auth unifié.
 
 **`changePassword` :** vérifie le mot de passe actuel → hache le nouveau (bcrypt ×12, min 12 car.) → met à jour en DB → **efface le cookie** (l'admin doit se reconnecter).
 
@@ -749,7 +756,7 @@ La détection du type de modification est faite en service (`lines.service.ts`) 
 - Seul l'ordre des machines → `LINE_PLAN_UPDATED`
 - Tout autre cas → `LINE_UPDATED`
 
-### 9.5 Module `workshopAuth`
+### 9.5 Module `workshopCredentials`
 
 **Flux de connexion (service) :**
 
@@ -769,11 +776,11 @@ loginWorkshopUserService(badgeNumber, password?, newPassword?, setupCode?)
          └─ valide → { kind: 'success' }
 ```
 
-Le contrôleur traduit ce résultat en réponses HTTP et pose/efface le cookie JWT.
+Ce service est interne au login unifié ; aucune route publique `/api/workshop/auth/*` n’est exposée.
 
 ### 9.6 Module `workshop`
 
-C'est le module central. Il couvre les incidents, le board, les métriques, l'historique, le pilotage et la connaissance.
+C'est le module central du Workshop. Il couvre les incidents, les métriques, l'historique, le pilotage et la connaissance. Le board est exposé séparément par `/api/board`.
 
 #### Validation Zod
 
@@ -847,40 +854,37 @@ Tableau de dispatch des actions :
 ### 10.1 Routing (`App.tsx`)
 
 ```
-/                         → redirect /admin/login
-/admin/login              LoginPage             (PublicRoute)
+/                         → redirect /login
+/login                    LoginPage             (GuestRoute, portail 3 blocs)
+/admin/login              AdminLoginPage        (GuestRoute)
+/workshop/login           WorkshopLoginPage     (GuestRoute)
 /admin                    → redirect /admin/accueil
-/admin/accueil            AdminHomePage         (ProtectedRoute)
-/admin/users              UserListPage          (ProtectedRoute)
-/admin/users/:id          UserDetailPage        (ProtectedRoute)
-/admin/lines              LinesPage             (ProtectedRoute)
-/admin/audit              AdminAuditPage        (ProtectedRoute)
-/workshop                 WorkshopLoginPage
-/workshop/dashboard       WorkshopDashboardPage (WorkshopProtectedRoute)
-/workshop/board           WorkshopBoardPage     (public — aucune auth)
-/workshop/pilotage        WorkshopPilotagePage  (WorkshopProtectedRoute)
-/workshop/history         WorkshopHistoryPage   (WorkshopProtectedRoute)
-/workshop/knowledge       WorkshopKnowledgePage (WorkshopProtectedRoute)
-*                         → redirect /admin/login
+/admin/accueil            AdminHomePage         (AdminRoute)
+/admin/users              UserListPage          (AdminRoute)
+/admin/users/:id          UserDetailPage        (AdminRoute)
+/admin/lines              LinesPage             (AdminRoute)
+/admin/audit              AdminAuditPage        (AdminRoute)
+/board                    BoardAccessPage       (code board)
+/workshop/dashboard       WorkshopDashboardPage (WorkshopRoute)
+/workshop/pilotage        WorkshopPilotagePage  (WorkshopRoute)
+/workshop/history         WorkshopHistoryPage   (WorkshopRoute)
+/workshop/knowledge       WorkshopKnowledgePage (WorkshopRoute)
+/workshop/support         WorkshopSupportPage   (WorkshopRoute)
+*                         → redirect /login
 ```
 
 ### 10.2 Contextes d'authentification
 
-**`AuthContext` (admin) :**
-- État : `admin: AdminInfo | null`, `isLoading: boolean`
-- Initialisation : appel `GET /api/admin/auth/me` au montage
-- Expose : `login()`, `logout()`
+**`AppAuthContext` :**
+- État : session unifiée admin ou workshop, `loading: boolean`
+- Initialisation : appel `GET /api/auth/me` au montage
+- Expose : `setSession()`, `logout()`
 
-**`WorkshopAuthContext` (atelier) :**
-- État : `workshopUser: WorkshopUser | null`, `isLoading: boolean`
-- Initialisation : appel `GET /api/workshop/auth/me` au montage
-- Expose : `login()`, `logout()`
+**`AdminRoute` :** si session absente ou non admin → `<Navigate to="/login" />`
 
-**`ProtectedRoute` :** si `!admin && !isLoading` → `<Navigate to="/admin/login" />`
+**`WorkshopRoute` :** si session absente ou non workshop → `<Navigate to="/login" />`
 
-**`WorkshopProtectedRoute` :** si `!workshopUser && !isLoading` → `<Navigate to="/workshop" />`
-
-**`PublicRoute` :** si `admin && !isLoading` → `<Navigate to="/admin/accueil" />`
+**`GuestRoute` :** redirige une session existante vers son espace.
 
 ### 10.3 Client API (`api/client.ts`)
 
@@ -893,15 +897,17 @@ Wrapper `fetch` centralisé :
 
 | Page | Route | Description |
 |---|---|---|
-| `LoginPage` | `/admin/login` | Formulaire connexion admin |
+| `LoginPage` | `/login` | Portail 3 blocs Board / Administration / Workshop |
+| `AdminLoginPage` | `/admin/login` | Connexion administration |
+| `WorkshopLoginPage` | `/workshop/login` | Connexion atelier |
 | `AdminHomePage` | `/admin/accueil` | Dashboard référentiel + indicateurs qualité |
 | `UserListPage` | `/admin/users` | Liste des comptes atelier avec filtres |
 | `UserDetailPage` | `/admin/users/:id` | Détail et actions sur un compte |
 | `LinesPage` | `/admin/lines` | Liste et gestion des lignes de production |
 | `AdminAuditPage` | `/admin/audit` | Journal d'audit référentiel |
-| `WorkshopLoginPage` | `/workshop` | Flux de connexion badge (3 étapes) |
+| `BoardAccessPage` | `/board` | Acces board par code local |
 | `WorkshopDashboardPage` | `/workshop/dashboard` | Dashboard incidents actifs |
-| `WorkshopBoardPage` | `/workshop/board` | Board grand écran public |
+| `WorkshopBoardPage` | `/board` apres code | Board grand ecran lecture seule |
 | `WorkshopPilotagePage` | `/workshop/pilotage` | KPI et analytics |
 | `WorkshopHistoryPage` | `/workshop/history` | Historique incidents et événements |
 | `WorkshopKnowledgePage` | `/workshop/knowledge` | Base de connaissance |
@@ -921,7 +927,7 @@ type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED'
 
 **`WorkshopIncident` :** objet incident complet retourné par `GET /workshop/incidents`. Contient les champs de l'incident, les informations du déclarant (`first_name`, `last_name`, `badge_number`, `role`), les informations du technicien (`taken_by_first_name`, `taken_by_last_name`, `taken_by_role`), et les champs de suivi (`is_followed`, `followed_at`).
 
-**`WorkshopBoardData` :** objet retourné par `GET /workshop/board` (route publique). Contient uniquement `lines`, `incidents` (format allégé `WorkshopBoardIncident`) et `metrics`.
+**`WorkshopBoardData` :** objet retourné par `GET /api/board/data` (route lecture seule protegee). Contient uniquement `lines`, `incidents` (format allégé `WorkshopBoardIncident`) et `metrics`.
 
 **`WorkshopAnalytics` :** objet complet retourné par `GET /workshop/analytics`. Contient les KPI numériques, les délais médians/moyens, les classements (`by_state`, `by_line`, `by_machine`) et les données de tendance (`trend[]`).
 
@@ -974,7 +980,7 @@ Cette fonction est appelée dans les composants de carte d'incident pour affiche
 
 **Localisation des tests :** `src/**/__tests__/*.test.ts`
 
-Modules couverts : `config/`, `domain/`, `modules/accounts/`, `modules/lines/`, `modules/workshop/`, `modules/workshopAuth/`, `utils/`.
+Modules couverts : `config/`, `domain/`, `modules/accounts/`, `modules/lines/`, `modules/workshop/`, `modules/workshopCredentials/`, `utils/`.
 
 **Commandes :**
 ```bash
@@ -1024,7 +1030,7 @@ Le compte admin est créé s'il n'existe pas (ADMIN_USERNAME / ADMIN_PASSWORD).
 Accès :
 - Frontend : http://localhost:5173
 - Backend API : http://localhost:3000
-- Admin : http://localhost:5173/admin/login
+- Portail : http://localhost:5173/login
 
 ### 14.3 En local sans Docker
 

@@ -4,15 +4,11 @@ import {
   MIN_PASSWORD_LENGTH_ADMIN,
   verifyPassword as verifyPwd,
 } from '../../auth/bcrypt';
-import { ADMIN_AUTH_COOKIE, clearAuthCookie, setAuthCookie } from '../../auth/authCookies';
-import {
-  sendInvalidServerConfig,
-  sendUnauthenticated,
-} from '../../auth/authResponses';
-import { signAuthToken } from '../../auth/jwt';
+import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
+import { sendUnauthenticated } from '../../auth/authResponses';
 import { sendError } from '../../utils/errors';
 import { handleControllerError } from '../../utils/controller';
-import { findAdminByUsername, getAdminPasswordHash, updateAdminPasswordHash } from './adminAuth.repository';
+import { getAdminPasswordHash, updateAdminPasswordHash } from '../adminCredentials/adminCredentials.repository';
 
 const VERIFY_FAILURE_TTL_MS = 30 * 60 * 1000;
 const VERIFY_FAILURE_MAX = 3;
@@ -38,53 +34,6 @@ function incrementFailureCount(adminId: number): number {
   const count = getFailureCount(adminId) + 1;
   verifyFailures.set(adminId, { count, lastAttemptAt: Date.now() });
   return count;
-}
-
-export async function login(req: Request, res: Response): Promise<void> {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant et mot de passe requis.');
-    return;
-  }
-
-  try {
-    const admin = await findAdminByUsername(username);
-    if (!admin) {
-      sendError(res, 401, 'UNAUTHORIZED', 'Identifiants incorrects.');
-      return;
-    }
-
-    const valid = await verifyPwd(password, admin.password_hash);
-    if (!valid) {
-      sendError(res, 401, 'UNAUTHORIZED', 'Identifiants incorrects.');
-      return;
-    }
-
-    const token = signAuthToken({ adminId: admin.id, username: admin.username });
-    if (!token) {
-      sendInvalidServerConfig(res);
-      return;
-    }
-
-    setAuthCookie(res, ADMIN_AUTH_COOKIE, token);
-    res.json({ id: admin.id, username: admin.username });
-  } catch (err) {
-    handleControllerError(res, 'adminLogin', err);
-  }
-}
-
-export async function me(req: Request, res: Response): Promise<void> {
-  if (!req.admin) {
-    sendUnauthenticated(res);
-    return;
-  }
-  res.json({ id: req.admin.adminId, username: req.admin.username });
-}
-
-export async function logout(_req: Request, res: Response): Promise<void> {
-  clearAuthCookie(res, ADMIN_AUTH_COOKIE);
-  res.json({ message: 'Déconnecté.' });
 }
 
 export async function changePassword(req: Request, res: Response): Promise<void> {

@@ -5,6 +5,7 @@ import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import KpiCard from '../components/ui/KpiCard';
+import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopAnalytics } from '../types';
 import { formatShortDate } from '../utils/date';
@@ -182,13 +183,17 @@ export default function WorkshopPilotagePage() {
             <div className="history-grid">
               <div className="form-group">
                 <label className="form-label">Période</label>
-                <select className="form-select" value={period} onChange={(event) => setPeriod(event.target.value as HistoryPeriod)}>
-                  <option value="today">Aujourd'hui</option>
-                  <option value="7d">7 derniers jours</option>
-                  <option value="30d">30 derniers jours</option>
-                  <option value="lifetime">Tout l'historique</option>
-                  <option value="custom">Personnalisée</option>
-                </select>
+                <SelectField
+                  value={period}
+                  onChange={(value) => setPeriod(value as HistoryPeriod)}
+                  options={[
+                    { value: 'today', label: "Aujourd'hui" },
+                    { value: '7d', label: '7 derniers jours' },
+                    { value: '30d', label: '30 derniers jours' },
+                    { value: 'lifetime', label: "Tout l'historique" },
+                    { value: 'custom', label: 'Personnalisée' },
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Début</label>
@@ -200,28 +205,29 @@ export default function WorkshopPilotagePage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Ligne</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={lineFilter}
-                  onChange={(event) => {
-                    setLineFilter(event.target.value);
+                  onChange={(value) => {
+                    setLineFilter(value);
                     setMachineFilter('all');
                   }}
-                >
-                  <option value="all">Toutes</option>
-                  {lines.map((line) => (
-                    <option key={line.id} value={line.id}>{line.line_number}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Machine</label>
-                <select className="form-select" value={machineFilter} onChange={(event) => setMachineFilter(event.target.value)} disabled={lineFilter === 'all'}>
-                  <option value="all">Toutes</option>
-                  {machineOptions.map((machine) => (
-                    <option key={machine.id} value={machine.id}>{machine.label}</option>
-                  ))}
-                </select>
+                <SelectField
+                  value={machineFilter}
+                  onChange={setMachineFilter}
+                  disabled={lineFilter === 'all'}
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    ...machineOptions.map((machine) => ({ value: machine.id, label: machine.label })),
+                  ]}
+                />
               </div>
             </div>
             <FilterSummary
@@ -243,7 +249,7 @@ export default function WorkshopPilotagePage() {
             </div>
           </div>
 
-          <div className="kpi-grid pilotage-live-grid">
+          <div className="kpi-grid kpi-grid--5 pilotage-live-grid">
             <KpiCard label="Cas actifs" value={loading ? '...' : activeLoad} sub="Ouverts + en attente" />
             <KpiCard label="Non pris" value={loading ? '...' : analytics?.not_taken ?? 0} sub="À affecter rapidement" />
             <KpiCard label="Urgences non prises" value={loading ? '...' : urgentNotTaken} sub="Risque immédiat" />

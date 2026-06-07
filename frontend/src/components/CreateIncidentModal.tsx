@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import Modal from './Modal';
+import SelectField from './ui/SelectField';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
 import { ApiResponseError } from '../api/client';
 import {
@@ -218,112 +219,107 @@ export default function CreateIncidentModal({
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentShift">Équipe *</label>
-        <select
+        <SelectField
           id="incidentShift"
-          className="form-select"
           value={shift}
-          onChange={(e) => setShift(e.target.value as IncidentShift)}
+          onChange={(value) => setShift(value as IncidentShift)}
           disabled={loading}
-        >
-          <option value="">-- Sélectionner --</option>
-          {SHIFTS.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
+          ariaLabel="Équipe"
+          options={[
+            { value: '', label: '-- Sélectionner --' },
+            ...SHIFTS.map((item) => ({ value: item.value, label: item.label })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentLine">Ligne *</label>
-        <select
+        <SelectField
           id="incidentLine"
-          className="form-select"
           value={lineId}
-          onChange={(e) => {
-            setLineId(e.target.value);
+          onChange={(value) => {
+            setLineId(value);
             setMachineId('');
             setRobotLabel('');
             setHeadNumber('');
           }}
           disabled={loading || !hasLineReferences}
-        >
-          <option value="">{hasLineReferences ? '-- Ligne du référentiel --' : '-- Aucune ligne active --'}</option>
-          {lines.map((line) => (
-            <option key={line.id} value={line.id}>{line.line_number}</option>
-          ))}
-        </select>
+          ariaLabel="Ligne"
+          options={[
+            { value: '', label: hasLineReferences ? '-- Ligne du référentiel --' : '-- Aucune ligne active --' },
+            ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentMachine">Machine *</label>
-        <select
+        <SelectField
           id="incidentMachine"
-          className="form-select"
           value={machineId}
-          onChange={(e) => {
-            setMachineId(e.target.value);
+          onChange={(value) => {
+            setMachineId(value);
             setRobotLabel('');
             setHeadNumber('');
           }}
           disabled={loading || !selectedLine}
-        >
-          <option value="">{selectedLine ? '-- Machine du référentiel --' : '-- Sélectionnez une ligne d’abord --'}</option>
-          {selectedLine?.machines.map((machine) => (
-            <option key={machine.machineId} value={machine.machineId}>
-              {machine.machineId} · {machine.brand}
-            </option>
-          ))}
-        </select>
+          ariaLabel="Machine"
+          options={[
+            { value: '', label: selectedLine ? '-- Machine du référentiel --' : '-- Sélectionnez une ligne d’abord --' },
+            ...(selectedLine?.machines.map((machine) => ({
+              value: machine.machineId,
+              label: `${machine.machineId} · ${machine.brand}`,
+            })) ?? []),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentRobot">Robot *</label>
-        <select
+        <SelectField
           id="incidentRobot"
-          className="form-select"
           value={robotLabel}
-          onChange={(e) => {
-            setRobotLabel(e.target.value);
+          onChange={(value) => {
+            setRobotLabel(value);
             setHeadNumber('');
           }}
           disabled={loading || !selectedMachine}
-        >
-          <option value="">{selectedMachine ? '-- Robot du référentiel --' : '-- Sélectionnez une machine d’abord --'}</option>
-          {robots.map((robot) => (
-            <option key={robot.label} value={robot.label}>{robot.label}</option>
-          ))}
-        </select>
+          ariaLabel="Robot"
+          options={[
+            { value: '', label: selectedMachine ? '-- Robot du référentiel --' : '-- Sélectionnez une machine d’abord --' },
+            ...robots.map((robot) => ({ value: robot.label, label: robot.label })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentHead">Tête *</label>
-        <select
+        <SelectField
           id="incidentHead"
-          className="form-select"
           value={headNumber}
-          onChange={(e) => setHeadNumber(e.target.value)}
+          onChange={setHeadNumber}
           disabled={loading || !selectedRobot}
-        >
-          <option value="">{selectedRobot ? '-- Tête disponible --' : '-- Sélectionnez un robot d’abord --'}</option>
-          {heads.map((head) => (
-            <option key={head} value={head}>{head}</option>
-          ))}
-        </select>
+          ariaLabel="Tête"
+          options={[
+            { value: '', label: selectedRobot ? '-- Tête disponible --' : '-- Sélectionnez un robot d’abord --' },
+            ...heads.map((head) => ({ value: String(head), label: String(head) })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentState">État *</label>
-        <select
+        <SelectField
           id="incidentState"
-          className="form-select"
           value={state}
-          onChange={(e) => setState(e.target.value as IncidentState)}
+          onChange={(value) => setState(value as IncidentState)}
           disabled={loading}
-        >
-          <option value="">-- Sélectionner --</option>
-          {STATES.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
+          ariaLabel="État"
+          options={[
+            { value: '', label: '-- Sélectionner --' },
+            ...STATES.map((item) => ({ value: item.value, label: item.label })),
+          ]}
+        />
       </div>
 
       <div className="form-group">

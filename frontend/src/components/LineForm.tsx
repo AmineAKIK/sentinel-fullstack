@@ -191,7 +191,7 @@ export default function LineForm({
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor={`leftRobotHeads-${index}`}>Têtes gauche *</label>
+                  <label className="form-label" htmlFor={`leftRobotHeads-${index}`}>Nombre de têtes *</label>
                   <input
                     id={`leftRobotHeads-${index}`}
                     className="form-input"
@@ -227,7 +227,7 @@ export default function LineForm({
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor={`rightRobotHeads-${index}`}>Têtes droit *</label>
+                  <label className="form-label" htmlFor={`rightRobotHeads-${index}`}>Nombre de têtes *</label>
                   <input
                     id={`rightRobotHeads-${index}`}
                     className="form-input"

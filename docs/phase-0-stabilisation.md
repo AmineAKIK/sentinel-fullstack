@@ -56,17 +56,17 @@ Valider ces parcours avant chaque grande phase de refactor.
 
 ### Accès Et Sessions
 
-- Admin : ouvrir `/admin/login`.
+- Portail : ouvrir `/login`, puis choisir Administration.
 - Admin : se connecter avec les identifiants de dev.
 - Admin : vérifier `/admin/accueil`.
 - Admin : se déconnecter.
-- Atelier : ouvrir `/workshop`.
+- Atelier : ouvrir `/login`, puis choisir Workshop.
 - Atelier : connexion badge sans mot de passe si applicable.
 - Atelier : connexion badge + mot de passe si applicable.
 - Atelier : redirection vers `/workshop/dashboard`.
 - Atelier : déconnexion depuis la navigation.
-- Board public : ouvrir `/workshop/board`.
-- Board public : vérifier qu'aucune connexion n'est demandée sur l'écran public.
+- Board : ouvrir `/board`.
+- Board : verifier que le code board est demande avant affichage.
 
 ### Administration Utilisateurs
 

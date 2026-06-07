@@ -4,7 +4,6 @@ import {
   IncidentShift,
   IncidentState,
   ProductionLine,
-  WorkshopBoardData,
   WorkshopHistoryEvent,
   WorkshopIncident,
   WorkshopIncidentEvent,
@@ -25,10 +24,6 @@ export interface CreateIncidentPayload {
 
 export async function listWorkshopLines(): Promise<ProductionLine[]> {
   return api.get<ProductionLine[]>('/api/workshop/lines');
-}
-
-export async function getWorkshopBoardData(): Promise<WorkshopBoardData> {
-  return api.get<WorkshopBoardData>('/api/workshop/board');
 }
 
 export async function listWorkshopIncidents(): Promise<WorkshopIncident[]> {

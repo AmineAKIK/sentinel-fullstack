@@ -28,7 +28,7 @@ import {
   unfollowWorkshopIncident,
   updateWorkshopIncident,
 } from '../api/workshop';
-import { useWorkshopAuth } from '../routes/WorkshopAuthContext';
+import { useAppAuth } from '../routes/AppAuthContext';
 import { ProductionLine, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
 import { formatDateTime } from '../utils/date';
 import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
@@ -41,7 +41,8 @@ function isWithinLastDays(iso: string, days: number): boolean {
 }
 
 export default function WorkshopDashboardPage() {
-  const { user } = useWorkshopAuth();
+  const { session } = useAppAuth();
+  const user = session?.accountType === 'workshop' ? session.user : null;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [lines, setLines] = useState<ProductionLine[]>([]);
@@ -929,7 +930,7 @@ export default function WorkshopDashboardPage() {
       <WorkshopNavBar />
       <main id="main-content" className="page-container workshop-page">
       <div className="page-header">
-        <h1>Dashboard atelier</h1>
+        <h1>Tableau de bord atelier</h1>
         <div className="action-bar" style={{ marginTop: 0 }}>
           {user && (
             <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
@@ -937,7 +938,7 @@ export default function WorkshopDashboardPage() {
             </button>
           )}
           {!user && (
-            <button className="btn btn-secondary" onClick={() => navigate('/workshop')}>
+            <button className="btn btn-secondary" onClick={() => navigate('/login')}>
               Se connecter
             </button>
           )}

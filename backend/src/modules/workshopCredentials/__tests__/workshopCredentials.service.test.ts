@@ -1,6 +1,6 @@
-import { loginWorkshopUserService } from '../workshopAuth.service';
+import { loginWorkshopUserService } from '../workshopCredentials.service';
 
-jest.mock('../workshopAuth.repository', () => ({
+jest.mock('../workshopCredentials.repository', () => ({
   findActiveWorkshopUserByBadge: jest.fn(),
   setWorkshopUserPassword: jest.fn(),
 }));
@@ -15,7 +15,7 @@ jest.mock('../../../auth/setupCode', () => ({
   verifyWorkshopPasswordSetupCode: jest.fn(),
 }));
 
-import * as repo from '../workshopAuth.repository';
+import * as repo from '../workshopCredentials.repository';
 import * as bcrypt from '../../../auth/bcrypt';
 import * as setupCode from '../../../auth/setupCode';
 

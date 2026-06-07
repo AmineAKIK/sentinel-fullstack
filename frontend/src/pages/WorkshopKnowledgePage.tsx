@@ -9,6 +9,7 @@ import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import KpiCard from '../components/ui/KpiCard';
+import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
@@ -147,7 +148,7 @@ export default function WorkshopKnowledgePage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        <div className="kpi-grid">
+        <div className="kpi-grid kpi-grid--3">
           <KpiCard label="Cas exploitables" value={loading ? '...' : incidents.length} />
           <KpiCard label="Machines concernées" value={loading ? '...' : machineCount} />
           <KpiCard
@@ -174,49 +175,43 @@ export default function WorkshopKnowledgePage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Ligne</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={lineFilter}
-                  onChange={(event) => updateLineFilter(event.target.value)}
-                >
-                  <option value="all">Toutes</option>
-                  {lines.map((line) => (
-                    <option key={line.id} value={line.id}>{line.line_number}</option>
-                  ))}
-                </select>
+                  onChange={updateLineFilter}
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Machine</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={machineFilter}
-                  onChange={(event) => {
-                    setMachineFilter(event.target.value);
-                    updateSearchFilter('machine', event.target.value);
+                  onChange={(value) => {
+                    setMachineFilter(value);
+                    updateSearchFilter('machine', value);
                   }}
                   disabled={lineFilter === 'all'}
-                >
-                  <option value="all">Toutes</option>
-                  {machineOptions.map((machine) => (
-                    <option key={machine.id} value={machine.id}>{machine.label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    ...machineOptions.map((machine) => ({ value: machine.id, label: machine.label })),
+                  ]}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Type d'anomalie</label>
-                <select
-                  className="form-select"
+                <SelectField
                   value={stateFilter}
-                  onChange={(event) => {
-                    setStateFilter(event.target.value);
-                    updateSearchFilter('state', event.target.value);
+                  onChange={(value) => {
+                    setStateFilter(value);
+                    updateSearchFilter('state', value);
                   }}
-                >
-                  <option value="all">Tous</option>
-                  {Object.entries(STATE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'Tous' },
+                    ...Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label })),
+                  ]}
+                />
               </div>
             </div>
             <FilterSummary

@@ -9,9 +9,9 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 
 | # | Action | Résultat attendu |
 |---|--------|-----------------|
-| 1.1 | Ouvrir `/workshop/board` sans être connecté au workshop | La page affiche le tableau de bord public (incidents OPEN/PENDING) **sans** bouton d'action |
+| 1.1 | Ouvrir `/board` sans session board | La page demande le code board et n'expose aucune donnee atelier |
 | 1.2 | Vérifier l'absence de tout bouton « Prendre en charge », « Clore », etc. | Aucun bouton d'action visible |
-| 1.3 | Vérifier les métriques (total, open, pending, en retard) | Chiffres cohérents avec la base |
+| 1.3 | Saisir le code board puis vérifier les métriques (total, open, pending, en retard) | Chiffres cohérents avec la base |
 | 1.4 | Filtrer par ligne (si filtre disponible en public) | Liste filtrée sans erreur |
 | 1.5 | Appeler `/api/workshop/incidents` directement sans cookie | Retour `401 UNAUTHORIZED` |
 
@@ -21,13 +21,13 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 
 | # | Action | Résultat attendu |
 |---|--------|-----------------|
-| 2.1 | Aller sur `/login` | Formulaire de connexion admin affiché |
+| 2.1 | Aller sur `/login` puis choisir Administration | Formulaire admin affiché sur `/admin/login` |
 | 2.2 | Soumettre des identifiants incorrects | Message d'erreur, aucun cookie posé |
-| 2.3 | Soumettre les bons identifiants | Redirection vers `/` (tableau de bord admin), cookie `auth_token` posé |
+| 2.3 | Soumettre les bons identifiants | Redirection vers `/admin/accueil`, cookie admin HTTP-only posé |
 | 2.4 | Rafraîchir la page | Toujours connecté (cookie valide) |
 | 2.5 | Cliquer sur « Déconnexion » | Redirection vers `/login`, cookie supprimé |
-| 2.6 | Accéder à `/` sans cookie | Redirection automatique vers `/login` |
-| 2.7 | Appeler `/api/admin/auth/me` sans cookie | `401 UNAUTHORIZED` |
+| 2.6 | Accéder à `/admin/accueil` sans cookie | Redirection automatique vers `/login` |
+| 2.7 | Appeler `/api/auth/me` sans cookie | `401 UNAUTHORIZED` |
 
 ---
 
@@ -35,14 +35,14 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 
 | # | Action | Résultat attendu |
 |---|--------|-----------------|
-| 3.1 | Ouvrir `/workshop/login` | Formulaire badge affiché |
+| 3.1 | Ouvrir `/login` puis choisir Workshop | Formulaire badge affiché sur `/workshop/login` |
 | 3.2 | Saisir un badge inexistant | Message d'erreur approprié |
 | 3.3 | Saisir un badge sans mot de passe défini | Réponse `requiresPasswordSetup: true` → étape de création de mot de passe |
-| 3.4 | Créer un nouveau mot de passe et valider | Connecté, cookie workshop posé |
-| 3.5 | Se déconnecter | Cookie supprimé, retour sur `/workshop/login` |
+| 3.4 | Créer un nouveau mot de passe et valider | Connecté, cookie workshop HTTP-only posé |
+| 3.5 | Se déconnecter | Cookie supprimé, retour sur `/login` |
 | 3.6 | Se reconnecter avec le mot de passe créé | Connexion réussie |
 | 3.7 | Saisir un mauvais mot de passe | `requiresPassword: true` + message d'erreur |
-| 3.8 | Accéder à `/workshop/pilotage` sans cookie | Redirection vers `/workshop/login` |
+| 3.8 | Acceder a `/workshop/pilotage` sans cookie | Redirection vers `/login` |
 
 ---
 
