@@ -125,3 +125,18 @@ export function emptyToString(value: number | undefined): string {
   if (!value) return '';
   return String(value);
 }
+
+export interface RobotOption {
+  label: string;
+  heads: number;
+}
+
+export function getRobotOptions(machine: LineMachine): RobotOption[] {
+  if (machine.hasDoubleRobot) {
+    return [
+      { label: `Gauche ${machine.leftRobotNumber}`, heads: machine.leftRobotHeads },
+      { label: `Droite ${machine.rightRobotNumber}`, heads: machine.rightRobotHeads },
+    ];
+  }
+  return [{ label: machine.robotNumber, heads: machine.robotHeads }];
+}

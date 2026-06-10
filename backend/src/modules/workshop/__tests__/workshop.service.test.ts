@@ -628,6 +628,7 @@ describe('getIncidentMetricsService', () => {
       followed: 2,
       followed_resolved: 1,
       open_over_7d: 0,
+      closed_today: 0,
     };
     jest.mocked(repo.getIncidentMetrics).mockResolvedValue(metrics);
     const result = await getIncidentMetricsService(7);

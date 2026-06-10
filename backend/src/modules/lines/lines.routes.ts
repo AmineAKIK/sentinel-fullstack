@@ -13,11 +13,13 @@ import {
 
 const router = Router();
 
-router.use(adminAuthMiddleware);
-
-router.get('/', listLines);
+// Routes de validation sans authentification (appelées depuis les formulaires de création/édition)
 router.get('/check-line', checkLineAvailability);
 router.post('/check-line-conflicts', checkLineConflicts);
+
+// Routes CRUD protégées
+router.use(adminAuthMiddleware);
+router.get('/', listLines);
 router.post('/', createLine);
 router.get('/:id', getLine);
 router.get('/:id/impact', getLineImpact);

@@ -113,7 +113,20 @@ export default function EditMachineModal({
     onClose();
   }
 
-  const isDirty = JSON.stringify(normalizeLineMachine(form)) !== JSON.stringify(normalizeLineMachine(line.machines[machineIndex]));
+  const original = normalizeLineMachine(line.machines[machineIndex]);
+  const normalized = normalizeLineMachine(form);
+  const isDirty = normalized.machineId !== original.machineId
+    || normalized.brand !== original.brand
+    || normalized.hasDoubleRobot !== original.hasDoubleRobot
+    || (normalized.hasDoubleRobot && original.hasDoubleRobot
+        ? normalized.leftRobotNumber !== original.leftRobotNumber
+          || normalized.leftRobotHeads !== original.leftRobotHeads
+          || normalized.rightRobotNumber !== original.rightRobotNumber
+          || normalized.rightRobotHeads !== original.rightRobotHeads
+        : !normalized.hasDoubleRobot && !original.hasDoubleRobot
+          ? normalized.robotNumber !== original.robotNumber
+            || normalized.robotHeads !== original.robotHeads
+          : true);
 
   return (
     <Modal

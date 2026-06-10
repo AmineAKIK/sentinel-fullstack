@@ -23,6 +23,19 @@ import {
 } from './accounts.repository';
 import { CreateAccountInput, UpdateAccountInput } from './accounts.validation';
 
+async function guardNoActiveTakenIncidents(userId: number, action: string): Promise<ServiceResult<never> | null> {
+  const count = await getActiveTakenIncidentCountForUser(userId);
+  if (count > 0) {
+    return {
+      ok: false,
+      status: 409,
+      code: 'RESOURCE_IN_USE',
+      message: `Impossible de ${action} : ${count} incident(s) actif(s) sont encore pris en charge par cet utilisateur.`,
+    };
+  }
+  return null;
+}
+
 export async function listAccountsService(filters: ListAccountsFilters): Promise<AccountDto[]> {
   return listAccountsData(filters);
 }
@@ -80,15 +93,8 @@ export async function updateAccountService(
   }
 
   if (updates.role !== undefined && updates.role !== current.role) {
-    const activeTakenIncidents = await getActiveTakenIncidentCountForUser(id);
-    if (activeTakenIncidents > 0) {
-      return {
-        ok: false,
-        status: 409,
-        code: 'RESOURCE_IN_USE',
-        message: `Impossible de changer le rôle : ${activeTakenIncidents} incident(s) actif(s) sont encore pris en charge par cet utilisateur.`,
-      };
-    }
+    const guard = await guardNoActiveTakenIncidents(id, 'changer le rôle');
+    if (guard) return guard;
   }
 
   const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -128,15 +134,8 @@ export async function activateAccountService(id: number, adminId: number): Promi
 }
 
 export async function deactivateAccountService(id: number, adminId: number): Promise<ServiceResult<AccountDto>> {
-  const activeTakenIncidents = await getActiveTakenIncidentCountForUser(id);
-  if (activeTakenIncidents > 0) {
-    return {
-      ok: false,
-      status: 409,
-      code: 'RESOURCE_IN_USE',
-      message: `Impossible de désactiver cet utilisateur : ${activeTakenIncidents} incident(s) actif(s) sont encore pris en charge par lui.`,
-    };
-  }
+  const guard = await guardNoActiveTakenIncidents(id, 'désactiver cet utilisateur');
+  if (guard) return guard;
 
   const account = await withTransaction(async (client) => {
     const updated = await setAccountActive(id, false, client);
@@ -153,15 +152,8 @@ export async function deactivateAccountService(id: number, adminId: number): Pro
 }
 
 export async function deleteAccountService(id: number, adminId: number): Promise<ServiceResult<{ message: string }>> {
-  const activeTakenIncidents = await getActiveTakenIncidentCountForUser(id);
-  if (activeTakenIncidents > 0) {
-    return {
-      ok: false,
-      status: 409,
-      code: 'RESOURCE_IN_USE',
-      message: `Impossible de supprimer cet utilisateur : ${activeTakenIncidents} incident(s) actif(s) sont encore pris en charge par lui.`,
-    };
-  }
+  const guard = await guardNoActiveTakenIncidents(id, 'supprimer cet utilisateur');
+  if (guard) return guard;
 
   const deleted = await withTransaction(async (client) => {
     const ok = await softDeleteAccount(id, client);

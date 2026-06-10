@@ -7,28 +7,11 @@ import KpiCard from '../components/ui/KpiCard';
 import { getReferenceDashboard, getReferenceQuality } from '../api/admin';
 import { ReferenceDashboard, ReferenceQuality } from '../types';
 import { formatDateTime } from '../utils/date';
-
-function eventTarget(event: ReferenceDashboard['recent_events'][number]): string {
-  if (event.scope === 'line') return event.line_number || 'Ligne supprimée';
-  return `${event.first_name || ''} ${event.last_name || ''}`.trim() || event.badge_number || 'Utilisateur';
-}
-
-const EVENT_LABELS: Record<string, string> = {
-  USER_CREATED: 'Utilisateur créé',
-  USER_UPDATED: 'Utilisateur modifié',
-  USER_ACTIVATED: 'Utilisateur activé',
-  USER_DEACTIVATED: 'Utilisateur désactivé',
-  USER_SOFT_DELETED: 'Utilisateur supprimé',
-  USER_PASSWORD_RESET: 'Mot de passe utilisateur réinitialisé',
-  LINE_CREATED: 'Ligne créée',
-  LINE_UPDATED: 'Ligne mise à jour',
-  LINE_SUMMARY_UPDATED: 'Informations ligne modifiées',
-  LINE_MACHINE_UPDATED: 'Machine modifiée',
-  LINE_PLAN_UPDATED: 'Ordre machines modifié',
-  LINE_SOFT_DELETED: 'Ligne supprimée',
-};
+import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function AdminHomePage() {
+  usePageTitle('Accueil administration');
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<ReferenceDashboard | null>(null);
   const [quality, setQuality] = useState<ReferenceQuality | null>(null);
@@ -171,8 +154,8 @@ export default function AdminHomePage() {
                   {recentEvents.map((event) => (
                     <div className="audit-item" key={`${event.scope}-${event.id}`}>
                       <div>
-                        <strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong>
-                        <span>{eventTarget(event)}</span>
+                        <strong>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</strong>
+                        <span>{formatAuditEventTarget(event)}</span>
                       </div>
                       <small>{formatDateTime(event.created_at)}</small>
                     </div>

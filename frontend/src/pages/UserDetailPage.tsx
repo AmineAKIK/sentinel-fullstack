@@ -10,11 +10,13 @@ import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
 import { formatDateTime } from '../utils/date';
 import { ROLE_LABELS } from '../utils/labels';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [user, setUser] = useState<SentinelUser | null>(null);
+  usePageTitle(user ? `${user.first_name} ${user.last_name}` : 'Fiche utilisateur');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');

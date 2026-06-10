@@ -36,7 +36,6 @@ router.get('/analytics', getWorkshopAnalytics);
 router.post('/incidents', createIncident);
 router.post('/incidents/reorder', reorderIncidents);
 router.post('/incidents/:id/follow', followIncident);
-router.post('/incidents/:id/cancel', deleteIncident);
 router.patch('/incidents/:id', updateIncident);
 router.delete('/incidents/:id/follow', unfollowIncident);
 router.delete('/incidents/:id', deleteIncident);

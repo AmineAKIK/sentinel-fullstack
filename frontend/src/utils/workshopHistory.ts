@@ -1,35 +1,9 @@
-import { AnalyticsParams } from '../api/workshop';
 import { WorkshopIncidentEvent } from '../types';
 export { formatDateTime, formatSeconds } from './date';
 export { STATE_LABELS, STATUS_LABELS } from './labels';
+export { WORKSHOP_EVENT_LABELS as EVENT_LABELS } from './labels';
 
 export type HistoryPeriod = 'today' | '7d' | '30d' | 'lifetime' | 'custom';
-
-export const EVENT_LABELS: Record<string, string> = {
-  INCIDENT_CREATED: 'Signalement créé',
-  INCIDENT_TAKEN: 'Prise en charge',
-  INCIDENT_SET_PENDING: 'Mis en attente',
-  INCIDENT_RESUMED: 'Reprise en cours',
-  INCIDENT_CLOSED: 'Clôturé',
-  INCIDENT_CANCELED: 'Signalement annulé',
-  INCIDENT_INVALIDATED: 'Cas clôturé invalidé',
-  INCIDENT_FOLLOWED: 'Suivi ajouté',
-  INCIDENT_UNFOLLOWED: 'Suivi retiré',
-  INCIDENT_UPDATED: 'Incident modifié',
-  INCIDENT_REORDERED: 'Réordonnancement',
-  EDIT_REQUESTED: 'Correction demandée',
-  EDIT_APPLIED: 'Correction appliquée',
-  EDIT_REJECTED: 'Correction refusée',
-  CANCEL_REQUESTED: 'Annulation demandée',
-  CANCEL_REQUEST_REJECTED: 'Annulation refusée',
-  DELETE_REQUESTED: 'Annulation demandée',
-  DELETE_REQUEST_REJECTED: 'Annulation refusée',
-  PRIORITY_CHANGED: 'Priorité modifiée',
-  ORDER_CHANGED: 'Réordonnancement',
-  RESPONSIBLE_COMMENT_UPDATED: 'Consigne responsable',
-};
-
-import { STATUS_LABELS } from './labels';
 
 export function formatEventActor(event: WorkshopIncidentEvent): string {
   if (!event.first_name) return 'Systeme';
@@ -69,37 +43,3 @@ export function formatEventDetail(event: WorkshopIncidentEvent): string {
   return '';
 }
 
-export function buildAnalyticsParams(
-  period: HistoryPeriod,
-  customStart: string,
-  customEnd: string,
-  lineFilter: string,
-  machineFilter: string
-): AnalyticsParams {
-  const params: AnalyticsParams = {};
-  const endDate = new Date();
-
-  if (period === 'today') {
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0);
-    params.start = startDate.toISOString();
-    params.end = endDate.toISOString();
-  }
-  if (period === '7d' || period === '30d') {
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - (period === '7d' ? 7 : 30));
-    params.start = startDate.toISOString();
-    params.end = endDate.toISOString();
-  }
-  if (period === 'custom') {
-    if (customStart) params.start = new Date(customStart).toISOString();
-    if (customEnd) {
-      const customEndDate = new Date(customEnd);
-      customEndDate.setHours(23, 59, 59, 999);
-      params.end = customEndDate.toISOString();
-    }
-  }
-  if (lineFilter !== 'all') params.lineId = Number(lineFilter);
-  if (machineFilter !== 'all') params.machineId = machineFilter;
-  return params;
-}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getWorkshopKnowledgeIncident,
@@ -8,11 +8,12 @@ import {
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import KpiCard from '../components/ui/KpiCard';
 import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
+import { SHIFT_LABELS } from '../utils/labels';
+import { formatDuration } from '../utils/durationFormat';
 import {
   buildIncidentWorkspaceParams,
   getWorkshopMachineOptions,
@@ -23,8 +24,163 @@ import {
   withWorkshopLineFilter,
   withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
+import { usePageTitle } from '../hooks/usePageTitle';
 
+// ── Couleurs par type d'anomalie ───────────────────────────────────
+const STATE_TONE: Record<string, string> = {
+  SKIPEE_PAR_MACHINE:    'kb-state-machine',
+  SKIPEE_PAR_CONDUCTEUR: 'kb-state-conducteur',
+  DEGRADEE:              'kb-state-degradee',
+  INDISPONIBLE:          'kb-state-indisponible',
+};
+
+function stateToneClass(state: string): string {
+  return STATE_TONE[state] ?? 'kb-state-default';
+}
+
+
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+// ── Composant carte liste ──────────────────────────────────────────
+type KnowledgeCardProps = {
+  incident: WorkshopIncident;
+  active: boolean;
+  onClick: () => void;
+};
+
+function KnowledgeCard({ incident, active, onClick }: KnowledgeCardProps) {
+  const preview = incident.intervention_note || incident.diagnostic || incident.comment;
+  return (
+    <button
+      type="button"
+      className={`kb-card${active ? ' kb-card-active' : ''}`}
+      onClick={onClick}
+    >
+      <div className="kb-card-top">
+        <span className={`kb-state-badge ${stateToneClass(incident.state)}`}>
+          {STATE_LABELS[incident.state] || incident.state}
+        </span>
+        <span className="kb-card-date">{shortDate(incident.updated_at)}</span>
+      </div>
+      <span className="kb-card-title">
+        Ligne {incident.line_number} · {incident.machine_id}
+      </span>
+      <span className="kb-card-context">
+        {incident.robot_label} · Tête {incident.head_number}
+        {incident.current_product ? ` · ${incident.current_product}` : ''}
+      </span>
+      {preview && (
+        <span className="kb-card-preview">{preview}</span>
+      )}
+    </button>
+  );
+}
+
+// ── Composant détail ───────────────────────────────────────────────
+type KnowledgeDetailProps = {
+  incident: WorkshopIncident;
+  onViewHistory: () => void;
+  onCopyLink: () => void;
+  copied: boolean;
+};
+
+function KnowledgeDetail({ incident, onViewHistory, onCopyLink, copied }: KnowledgeDetailProps) {
+  const resTime = formatDuration(incident.created_at, incident.updated_at);
+  const technician = incident.taken_by_first_name
+    ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
+    : null;
+
+  return (
+    <article className="kb-detail">
+      {/* En-tête */}
+      <div className="kb-detail-header">
+        <div className="kb-detail-header-left">
+          <span className="detail-field-label">Fiche intervention</span>
+          <h2 className="kb-detail-title">
+            Ligne {incident.line_number} · {incident.machine_id}
+          </h2>
+        </div>
+        <span className={`kb-state-badge kb-state-badge-lg ${stateToneClass(incident.state)}`}>
+          {STATE_LABELS[incident.state] || incident.state}
+        </span>
+      </div>
+
+      {/* Méta-données */}
+      <div className="kb-meta-grid">
+        <div className="kb-meta-item">
+          <span className="detail-field-label">Équipement</span>
+          <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
+          <span className="kb-meta-sub">{incident.machine_brand}</span>
+        </div>
+        <div className="kb-meta-item">
+          <span className="detail-field-label">Produit</span>
+          <strong>{incident.current_product || '—'}</strong>
+        </div>
+        <div className="kb-meta-item">
+          <span className="detail-field-label">Shift</span>
+          <strong>{SHIFT_LABELS[incident.shift] || incident.shift || '—'}</strong>
+        </div>
+        <div className="kb-meta-item">
+          <span className="detail-field-label">Résolu le</span>
+          <strong>{formatDateTime(incident.updated_at)}</strong>
+        </div>
+        <div className="kb-meta-item">
+          <span className="detail-field-label">Durée résolution</span>
+          <strong>{resTime}</strong>
+        </div>
+        <div className="kb-meta-item">
+          <span className="detail-field-label">Technicien</span>
+          <strong>{technician || '—'}</strong>
+        </div>
+      </div>
+
+      {/* Contenu principal */}
+      <div className="kb-sections">
+        {incident.comment && (
+          <div className="kb-section">
+            <span className="detail-field-label">Symptôme observé</span>
+            <p>{incident.comment}</p>
+          </div>
+        )}
+
+        {incident.diagnostic && (
+          <div className="kb-section">
+            <span className="detail-field-label">Diagnostic</span>
+            <p>{incident.diagnostic}</p>
+          </div>
+        )}
+
+        <div className="kb-section kb-section-solution">
+          <span className="detail-field-label">Solution / intervention validée</span>
+          <p>{incident.intervention_note || '—'}</p>
+        </div>
+
+        {incident.responsible_comment && (
+          <div className="kb-section kb-section-instruction">
+            <span className="detail-field-label">Consigne responsable</span>
+            <p>{incident.responsible_comment}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="kb-actions">
+        <button type="button" className="btn btn-secondary" onClick={onViewHistory}>
+          Trace historique
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={onCopyLink}>
+          {copied ? 'Lien copié !' : 'Copier le lien'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+// ── Page principale ────────────────────────────────────────────────
 export default function WorkshopKnowledgePage() {
+  usePageTitle('Base de connaissance');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
@@ -36,6 +192,8 @@ export default function WorkshopKnowledgePage() {
   const [machineFilter, setMachineFilter] = useState(searchParams.get('machine') || 'all');
   const [stateFilter, setStateFilter] = useState(searchParams.get('state') || 'all');
   const [selectedId, setSelectedId] = useState('');
+  const [copied, setCopied] = useState(false);
+  const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     listWorkshopLines()
@@ -55,13 +213,11 @@ export default function WorkshopKnowledgePage() {
     setLoading(true);
     setError('');
     listWorkshopKnowledgeIncidents(params)
-      .then((incidentData) => {
-        setIncidents(incidentData);
-        setSelectedId((currentId) => {
-          if (incidentData.length === 0) return '';
-          return incidentData.some((incident) => String(incident.id) === currentId)
-            ? currentId
-            : String(incidentData[0].id);
+      .then((data) => {
+        setIncidents(data);
+        setSelectedId((cur) => {
+          if (data.length === 0) return '';
+          return data.some((i) => String(i.id) === cur) ? cur : String(data[0].id);
         });
       })
       .catch(() => setError('Impossible de charger la base de connaissance.'))
@@ -69,49 +225,51 @@ export default function WorkshopKnowledgePage() {
   }, [query, stateFilter, lineFilter, machineFilter]);
 
   useEffect(() => {
-    const requestedIncidentId = searchParams.get('incident');
-    if (!requestedIncidentId) return;
-    if (incidents.some((incident) => String(incident.id) === requestedIncidentId)) {
-      setSelectedId(requestedIncidentId);
+    const requestedId = searchParams.get('incident');
+    if (!requestedId) return;
+    if (incidents.some((i) => String(i.id) === requestedId)) {
+      setSelectedId(requestedId);
       return;
     }
-
-    const parsedId = Number(requestedIncidentId);
+    const parsedId = Number(requestedId);
     if (!Number.isInteger(parsedId) || parsedId <= 0) return;
     getWorkshopKnowledgeIncident(parsedId)
       .then((incident) => {
-        setIncidents((current) => current.some((item) => item.id === incident.id) ? current : [incident, ...current]);
+        setIncidents((cur) => cur.some((i) => i.id === incident.id) ? cur : [incident, ...cur]);
         setSelectedId(String(incident.id));
       })
-      .catch(() => setError('Cette fiche connaissance n’est pas disponible.'));
+      .catch(() => setError("Cette fiche connaissance n'est pas disponible."));
   }, [searchParams, incidents]);
 
   const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
-
-  const machineCount = new Set(incidents.map((incident) => incident.machine_id)).size;
+  const machineCount = new Set(incidents.map((i) => i.machine_id)).size;
   const lastItem = incidents[0];
-  const selectedIncident = incidents.find((incident) => String(incident.id) === selectedId);
+  const selectedIncident = incidents.find((i) => String(i.id) === selectedId);
+
+  // Chips de filtres actifs
   const filterChips: FilterChip[] = [
-    ...searchFilterChip(query, () => {
-      setQuery('');
-      updateSearchFilter('q', '', '');
-    }),
+    ...searchFilterChip(query, () => { setQuery(''); updateSearchFilter('q', '', ''); }),
     ...lineFilterChip(lines, lineFilter, () => updateLineFilter('all')),
-    ...machineFilterChip(machineFilter, () => {
-      setMachineFilter('all');
-      updateSearchFilter('machine', 'all');
-    }),
-    ...stateFilterChip(stateFilter, () => {
-      setStateFilter('all');
-      updateSearchFilter('state', 'all');
-    }),
+    ...machineFilterChip(machineFilter, () => { setMachineFilter('all'); updateSearchFilter('machine', 'all'); }),
+    ...stateFilterChip(stateFilter, () => { setStateFilter('all'); updateSearchFilter('state', 'all'); }),
   ];
 
-  function selectKnowledgeIncident(id: number): void {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('incident', String(id));
-    setSearchParams(nextParams);
+  // Suggestion de filtre à supprimer pour état vide
+  const emptyHint = !loading && incidents.length === 0
+    ? filterChips.length > 0
+      ? 'Essayez de supprimer un filtre actif.'
+      : 'Aucune intervention documentée pour le moment.'
+    : null;
+
+  function selectIncident(id: number): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('incident', String(id));
+    setSearchParams(next);
     setSelectedId(String(id));
+    // Scroll vers le détail sur mobile
+    setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
@@ -129,9 +287,17 @@ export default function WorkshopKnowledgePage() {
     setLineFilter('all');
     setMachineFilter('all');
     setStateFilter('all');
-    const nextParams = new URLSearchParams();
-    if (selectedId) nextParams.set('incident', selectedId);
-    setSearchParams(nextParams);
+    const next = new URLSearchParams();
+    if (selectedId) next.set('incident', selectedId);
+    setSearchParams(next);
+  }
+
+  function copyLink(): void {
+    const url = `${window.location.origin}${window.location.pathname}?incident=${selectedId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   return (
@@ -148,16 +314,7 @@ export default function WorkshopKnowledgePage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        <div className="kpi-grid kpi-grid--3">
-          <KpiCard label="Cas exploitables" value={loading ? '...' : incidents.length} />
-          <KpiCard label="Machines concernées" value={loading ? '...' : machineCount} />
-          <KpiCard
-            label="Dernière fiche"
-            value={lastItem ? formatDateTime(lastItem.updated_at) : '-'}
-            valueClassName="kpi-value-small"
-          />
-        </div>
-
+        {/* ── Filtres ── */}
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-body">
             <div className="history-grid">
@@ -167,10 +324,7 @@ export default function WorkshopKnowledgePage() {
                   className="form-input"
                   placeholder="Symptôme, solution, machine, produit..."
                   value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    updateSearchFilter('q', event.target.value, '');
-                  }}
+                  onChange={(e) => { setQuery(e.target.value); updateSearchFilter('q', e.target.value, ''); }}
                 />
               </div>
               <div className="form-group">
@@ -180,7 +334,7 @@ export default function WorkshopKnowledgePage() {
                   onChange={updateLineFilter}
                   options={[
                     { value: 'all', label: 'Toutes' },
-                    ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+                    ...lines.map((l) => ({ value: String(l.id), label: l.line_number })),
                   ]}
                 />
               </div>
@@ -188,14 +342,11 @@ export default function WorkshopKnowledgePage() {
                 <label className="form-label">Machine</label>
                 <SelectField
                   value={machineFilter}
-                  onChange={(value) => {
-                    setMachineFilter(value);
-                    updateSearchFilter('machine', value);
-                  }}
+                  onChange={(v) => { setMachineFilter(v); updateSearchFilter('machine', v); }}
                   disabled={lineFilter === 'all'}
                   options={[
                     { value: 'all', label: 'Toutes' },
-                    ...machineOptions.map((machine) => ({ value: machine.id, label: machine.label })),
+                    ...machineOptions.map((m) => ({ value: m.id, label: m.label })),
                   ]}
                 />
               </div>
@@ -203,13 +354,10 @@ export default function WorkshopKnowledgePage() {
                 <label className="form-label">Type d'anomalie</label>
                 <SelectField
                   value={stateFilter}
-                  onChange={(value) => {
-                    setStateFilter(value);
-                    updateSearchFilter('state', value);
-                  }}
+                  onChange={(v) => { setStateFilter(v); updateSearchFilter('state', v); }}
                   options={[
                     { value: 'all', label: 'Tous' },
-                    ...Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label })),
+                    ...Object.entries(STATE_LABELS).map(([v, label]) => ({ value: v, label })),
                   ]}
                 />
               </div>
@@ -225,99 +373,68 @@ export default function WorkshopKnowledgePage() {
           </div>
         </div>
 
-        <div className="knowledge-layout">
-          <div className="card">
-            <div className="card-body">
-              <div className="detail-field">
-                <span className="detail-field-label">Fiches disponibles</span>
-                <strong>{loading ? '...' : incidents.length}</strong>
-              </div>
-              <div className="knowledge-card-list">
-                {loading ? (
-                  <EmptyState>Chargement...</EmptyState>
-                ) : incidents.length === 0 ? (
-                  <EmptyState>Aucune fiche exploitable.</EmptyState>
-                ) : (
-                  incidents.map((incident) => (
-                    <button
-                      key={incident.id}
-                      type="button"
-                      className={`knowledge-card-item ${String(incident.id) === selectedId ? 'active' : ''}`}
-                      onClick={() => selectKnowledgeIncident(incident.id)}
-                    >
-                      <span className="knowledge-card-title">Ligne {incident.line_number} · {incident.machine_id}</span>
-                      <span className="knowledge-card-context">
-                        {incident.robot_label} · Tête {incident.head_number} · {STATE_LABELS[incident.state] || incident.state}
-                      </span>
-                      <span className="knowledge-card-preview">{incident.comment || incident.diagnostic || incident.intervention_note}</span>
-                    </button>
-                  ))
+        {/* ── Layout master-detail ── */}
+        <div className="kb-layout">
+
+          {/* Colonne liste */}
+          <div className="kb-list-col">
+            <div className="kb-list-header">
+              <span className="detail-field-label">
+                {loading ? 'Chargement…' : `${incidents.length} fiche${incidents.length !== 1 ? 's' : ''}`}
+              </span>
+              <div className="kb-list-meta">
+                {!loading && incidents.length > 0 && (
+                  <>
+                    <span>{machineCount} machine{machineCount !== 1 ? 's' : ''}</span>
+                    {lastItem && <span>Dernière : {shortDate(lastItem.updated_at)}</span>}
+                  </>
                 )}
               </div>
             </div>
-          </div>
 
-          <div className="card">
-            <div className="card-body">
-              {selectedIncident ? (
-                <article className="knowledge-detail">
-                  <div className="knowledge-detail-header">
-                    <div>
-                      <span className="detail-field-label">Fiche intervention</span>
-                      <h2>Ligne {selectedIncident.line_number} · {selectedIncident.machine_id}</h2>
-                    </div>
-                    <span className="status-pill">{STATE_LABELS[selectedIncident.state] || selectedIncident.state}</span>
-                  </div>
-
-                  <div className="knowledge-meta-grid">
-                    <div>
-                      <span className="detail-field-label">Équipement</span>
-                      <strong>{selectedIncident.robot_label} · Tête {selectedIncident.head_number}</strong>
-                      <p>{selectedIncident.machine_brand}</p>
-                    </div>
-                    <div>
-                      <span className="detail-field-label">Produit</span>
-                      <strong>{selectedIncident.current_product || '-'}</strong>
-                    </div>
-                    <div>
-                      <span className="detail-field-label">Clôture</span>
-                      <strong>{formatDateTime(selectedIncident.updated_at)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="knowledge-section">
-                    <span className="detail-field-label">Symptôme observé</span>
-                    <p>{selectedIncident.comment || '-'}</p>
-                  </div>
-                  <div className="knowledge-section">
-                    <span className="detail-field-label">Diagnostic</span>
-                    <p>{selectedIncident.diagnostic || '-'}</p>
-                  </div>
-                  <div className="knowledge-section knowledge-section-primary">
-                    <span className="detail-field-label">Solution / intervention validée</span>
-                    <p>{selectedIncident.intervention_note || '-'}</p>
-                  </div>
-                  {selectedIncident.responsible_comment && (
-                    <div className="knowledge-section">
-                      <span className="detail-field-label">Consigne responsable</span>
-                      <p>{selectedIncident.responsible_comment}</p>
-                    </div>
-                  )}
-                  <div className="knowledge-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => navigate(`/workshop/history?incident=${selectedIncident.id}`)}
-                    >
-                      Voir la trace historique
-                    </button>
-                  </div>
-                </article>
+            <div className="kb-list">
+              {loading ? (
+                <EmptyState>Chargement...</EmptyState>
+              ) : incidents.length === 0 ? (
+                <div className="kb-empty">
+                  <p>Aucune fiche trouvée.</p>
+                  {emptyHint && <p className="kb-empty-hint">{emptyHint}</p>}
+                </div>
               ) : (
-                <EmptyState>Sélectionnez une fiche.</EmptyState>
+                incidents.map((incident) => (
+                  <KnowledgeCard
+                    key={incident.id}
+                    incident={incident}
+                    active={String(incident.id) === selectedId}
+                    onClick={() => selectIncident(incident.id)}
+                  />
+                ))
               )}
             </div>
           </div>
+
+          {/* Colonne détail */}
+          <div className="kb-detail-col" ref={detailRef}>
+            {selectedIncident ? (
+              <div className="card">
+                <div className="card-body">
+                  <KnowledgeDetail
+                    incident={selectedIncident}
+                    onViewHistory={() => navigate(`/workshop/history?incident=${selectedIncident.id}`)}
+                    onCopyLink={copyLink}
+                    copied={copied}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="card">
+                <div className="card-body">
+                  <EmptyState>Sélectionnez une fiche dans la liste.</EmptyState>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </main>
     </>

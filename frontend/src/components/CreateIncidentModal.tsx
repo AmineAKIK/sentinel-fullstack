@@ -6,10 +6,10 @@ import { ApiResponseError } from '../api/client';
 import {
   IncidentShift,
   IncidentState,
-  LineMachine,
   ProductionLine,
   WorkshopIncident,
 } from '../types';
+import { getRobotOptions } from '../utils/lineMachines';
 
 interface CreateIncidentModalProps {
   lines: ProductionLine[];
@@ -17,11 +17,6 @@ interface CreateIncidentModalProps {
   requestOnly?: boolean;
   onClose: () => void;
   onSuccess: (incident: WorkshopIncident) => void;
-}
-
-interface RobotOption {
-  label: string;
-  heads: number;
 }
 
 const SHIFTS: { value: IncidentShift; label: string }[] = [
@@ -37,17 +32,6 @@ const STATES: { value: IncidentState; label: string }[] = [
   { value: 'DEGRADEE', label: 'Dégradée' },
   { value: 'INDISPONIBLE', label: 'Indisponible' },
 ];
-
-function robotOptions(machine?: LineMachine): RobotOption[] {
-  if (!machine) return [];
-  if (machine.hasDoubleRobot) {
-    return [
-      { label: `Gauche ${machine.leftRobotNumber}`, heads: machine.leftRobotHeads },
-      { label: `Droite ${machine.rightRobotNumber}`, heads: machine.rightRobotHeads },
-    ];
-  }
-  return [{ label: machine.robotNumber, heads: machine.robotHeads }];
-}
 
 export default function CreateIncidentModal({
   lines,
@@ -74,7 +58,7 @@ export default function CreateIncidentModal({
     [lines, lineId]
   );
   const selectedMachine = selectedLine?.machines.find((machine) => machine.machineId === machineId);
-  const robots = robotOptions(selectedMachine);
+  const robots = selectedMachine ? getRobotOptions(selectedMachine) : [];
   const selectedRobot = robots.find((robot) => robot.label === robotLabel);
   const heads = selectedRobot ? Array.from({ length: selectedRobot.heads }, (_, i) => i + 1) : [];
 
@@ -152,7 +136,7 @@ export default function CreateIncidentModal({
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? <><span className="spinner" /> Enregistrement…</> : isEditing ? 'Valider la modification' : 'Valider la création'}
+              {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : isEditing ? 'Valider la modification' : 'Valider la création'}
             </button>
           </>
         ) : (
@@ -207,7 +191,7 @@ export default function CreateIncidentModal({
               </tbody>
             </table>
           </div>
-          {error && <div className="error-message">{error}</div>}
+          {error && <div id="create-incident-error-preview" className="error-message" role="alert">{error}</div>}
         </>
       ) : (
         <>
@@ -332,6 +316,8 @@ export default function CreateIncidentModal({
           disabled={loading}
           rows={3}
           placeholder="Ajouter un commentaire"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? 'create-incident-error' : undefined}
         />
       </div>
 
@@ -344,10 +330,12 @@ export default function CreateIncidentModal({
           onChange={(e) => setCurrentProduct(e.target.value)}
           disabled={loading}
           placeholder="Référence produit"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? 'create-incident-error' : undefined}
         />
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div id="create-incident-error" className="error-message" role="alert">{error}</div>}
         </>
       )}
     </Modal>

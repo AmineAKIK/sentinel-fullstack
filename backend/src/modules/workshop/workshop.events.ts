@@ -1,5 +1,6 @@
 import { PoolClient } from 'pg';
 import pool from '../../db/pool';
+import logger from '../../logger';
 
 export type IncidentEventType =
   | 'INCIDENT_CREATED'
@@ -16,6 +17,7 @@ export type IncidentEventType =
   | 'EDIT_REQUESTED'
   | 'EDIT_APPLIED'
   | 'EDIT_REJECTED'
+  | 'EDIT_REQUEST_WITHDRAWN'
   | 'CANCEL_REQUESTED'
   | 'CANCEL_REQUEST_REJECTED'
   | 'PRIORITY_CHANGED'
@@ -38,7 +40,7 @@ export async function logIncidentEvent(
       [incidentId, actorUserId, eventType, payload ? JSON.stringify(payload) : null]
     );
   } catch (err) {
-    console.error(`[audit] Failed to log event ${eventType} for incident ${incidentId}:`, err);
+    logger.error({ err, eventType, incidentId }, 'Failed to log incident event');
     throw err;
   }
 }

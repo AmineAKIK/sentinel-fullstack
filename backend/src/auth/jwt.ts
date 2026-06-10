@@ -2,7 +2,9 @@ import jwt from 'jsonwebtoken';
 import { SESSION_DURATION_JWT } from './session';
 
 export function getJwtSecret(): string | null {
-  return process.env.JWT_SECRET || null;
+  const secret = process.env.JWT_SECRET || null;
+  if (secret !== null && secret.length === 0) return null;
+  return secret;
 }
 
 export function signAuthToken(payload: object): string | null {

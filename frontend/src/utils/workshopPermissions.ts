@@ -4,6 +4,7 @@ export type WorkshopAction =
   | 'requestEdit'
   | 'directEdit'
   | 'editAfterTake'
+  | 'responsableEdit'
   | 'requestCancel'
   | 'cancel'
   | 'approveEdit'
@@ -17,7 +18,8 @@ export type WorkshopAction =
   | 'setPriority'
   | 'reorder'
   | 'responsibleComment'
-  | 'invalidateClosed';
+  | 'invalidateClosed'
+  | 'withdrawEdit';
 
 function isActiveIncident(incident: WorkshopIncident): boolean {
   return incident.status !== 'CLOSED' && incident.status !== 'CANCELED' && incident.status !== 'INVALIDATED';
@@ -40,6 +42,14 @@ export function canPerform(
         actorId !== undefined &&
         incident.user_id === actorId
       );
+    case 'withdrawEdit':
+      return (
+        role === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        incident.edit_request != null &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
     case 'requestCancel':
       // OPERATOR can only cancel their own declaration, and only while untaken.
       return (
@@ -51,6 +61,8 @@ export function canPerform(
       );
     case 'directEdit':
       return isActiveIncident(incident) && !incident.is_taken && (role === 'RESPONSABLE' || role === 'MAINTENANCE');
+    case 'responsableEdit':
+      return role === 'RESPONSABLE' && isActiveIncident(incident);
     case 'editAfterTake':
       return (
         role === 'MAINTENANCE' &&
@@ -60,6 +72,9 @@ export function canPerform(
         incident.taken_by_user_id === actorId
       );
     case 'cancel':
+      if (incident.status === 'PENDING') {
+        return role === 'RESPONSABLE';
+      }
       return isActiveIncident(incident) && !incident.is_taken && (role === 'RESPONSABLE' || role === 'MAINTENANCE');
     case 'approveEdit':
     case 'rejectEdit':

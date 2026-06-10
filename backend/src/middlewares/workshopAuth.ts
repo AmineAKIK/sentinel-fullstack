@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { clearAuthCookie, WORKSHOP_AUTH_COOKIE } from '../auth/authCookies';
 import {
+  handleJwtError,
   sendInvalidServerConfig,
-  sendInvalidSession,
   sendMissingAuth,
 } from '../auth/authResponses';
-import { getJwtSecret, isJwtSessionError, verifyAuthToken } from '../auth/jwt';
+import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
 import pool from '../db/pool';
 import { sendError } from '../utils/errors';
 
@@ -79,12 +79,7 @@ async function authenticateWorkshopRequest(
     };
     next();
   } catch (err) {
-    if (isJwtSessionError(err)) {
-      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
-      sendInvalidSession(res);
-      return;
-    }
-    console.error('Workshop auth middleware error:', err);
-    sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');
+    clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+    handleJwtError(err, res);
   }
 }

@@ -3,8 +3,10 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { unifiedLogin } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function AdminLoginPage() {
+  usePageTitle('Connexion administration');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -91,6 +93,8 @@ export default function AdminLoginPage() {
               autoComplete="username"
               autoFocus
               placeholder="admin"
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'admin-login-error' : undefined}
             />
           </div>
 
@@ -107,15 +111,17 @@ export default function AdminLoginPage() {
                 autoComplete="current-password"
                 autoFocus
                 placeholder="••••••••"
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? 'admin-login-error' : undefined}
               />
             </div>
           )}
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div id="admin-login-error" className="error-message" role="alert">{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading
-              ? <><span className="spinner" /> Vérification...</>
+              ? <><span className="spinner" aria-hidden="true" /> Vérification...</>
               : showPassword ? 'Se connecter' : 'Continuer'}
           </button>
         </form>

@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import pool from './pool';
+import { withTransaction } from './transaction';
+import logger from '../logger';
 
 async function runMigrations(): Promise<void> {
   const client = await pool.connect();
@@ -26,29 +28,24 @@ async function runMigrations(): Promise<void> {
       );
 
       if (rows.length > 0) {
-        console.log(`Migration already applied: ${file}`);
+        logger.debug({ file }, 'Migration already applied');
         continue;
       }
 
       const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
-      console.log(`Applying migration: ${file}`);
+      logger.info({ file }, 'Applying migration');
 
-      await client.query('BEGIN');
-      try {
-        await client.query(sql);
-        await client.query(
+      await withTransaction(async (txClient) => {
+        await txClient.query(sql);
+        await txClient.query(
           'INSERT INTO schema_migrations (filename) VALUES ($1)',
           [file]
         );
-        await client.query('COMMIT');
-        console.log(`Migration applied: ${file}`);
-      } catch (err) {
-        await client.query('ROLLBACK');
-        throw err;
-      }
+      });
+      logger.info({ file }, 'Migration applied');
     }
 
-    console.log('All migrations complete.');
+    logger.info('All migrations complete.');
   } finally {
     client.release();
   }
@@ -60,7 +57,7 @@ if (require.main === module) {
   runMigrations()
     .then(() => process.exit(0))
     .catch((err) => {
-      console.error('Migration failed:', err);
+      logger.error({ err }, 'Migration failed');
       process.exit(1);
     });
 }

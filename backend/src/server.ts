@@ -4,6 +4,8 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import pinoHttp from 'pino-http';
+import logger from './logger';
 import { assertProductionConfig } from './config/production';
 import pool from './db/pool';
 import runMigrations from './db/migrate';
@@ -16,7 +18,7 @@ import workshopRoutes from './modules/workshop/workshop.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import { adminRouter as adminSupportRoutes, workshopRouter as workshopSupportRoutes } from './modules/support/support.routes';
 import { securityHeaders } from './middlewares/securityHeaders';
-import { loginRateLimit } from './middlewares/loginRateLimit';
+import { loginRateLimit, globalApiRateLimit } from './middlewares/loginRateLimit';
 import { boardRouter } from './modules/board/board.auth';
 
 const app = express();
@@ -37,10 +39,25 @@ app.use(
   })
 );
 
+app.use(
+  pinoHttp({
+    logger,
+    // Log 5xx at error, 4xx at warn, everything else at info
+    customLogLevel: (_req, res, err) => {
+      if (err || res.statusCode >= 500) return 'error';
+      if (res.statusCode >= 400) return 'warn';
+      return 'info';
+    },
+    // Redact sensitive fields from request logs
+    redact: ['req.headers.cookie', 'req.headers.authorization'],
+  })
+);
+
 app.use(securityHeaders);
-app.use(express.json());
+app.use(express.json({ limit: '50kb' }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
+app.use('/api', globalApiRateLimit);
 app.use('/api/auth/login', loginRateLimit);
 app.use('/api/board/session', loginRateLimit);
 app.use('/api/auth', authRoutes);
@@ -53,8 +70,13 @@ app.use('/api/workshop', workshopRoutes);
 app.use('/api/admin/support', adminSupportRoutes);
 app.use('/api/workshop/support', workshopSupportRoutes);
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'ok' });
+  } catch {
+    res.status(503).json({ status: 'error', db: 'unreachable' });
+  }
 });
 
 async function start(): Promise<void> {
@@ -63,18 +85,18 @@ async function start(): Promise<void> {
     await seedAdminAccount();
 
     const server = app.listen(PORT, () => {
-      console.log(`Sentinel backend listening on port ${PORT}`);
+      logger.info({ port: PORT }, 'Sentinel backend listening');
     });
 
     async function shutdown(signal: string): Promise<void> {
-      console.log(`${signal} received — shutting down gracefully`);
+      logger.info({ signal }, 'Shutting down gracefully');
       server.close(async () => {
         try {
           await pool.end();
-          console.log('Database pool closed');
+          logger.info('Database pool closed');
           process.exit(0);
         } catch (err) {
-          console.error('Error closing database pool:', err);
+          logger.error({ err }, 'Error closing database pool');
           process.exit(1);
         }
       });
@@ -83,7 +105,7 @@ async function start(): Promise<void> {
     process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
     process.on('SIGINT', () => { void shutdown('SIGINT'); });
   } catch (err) {
-    console.error('Startup error:', err);
+    logger.error({ err }, 'Startup error');
     process.exit(1);
   }
 }

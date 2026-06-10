@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 interface ModalProps {
   title: string;
@@ -29,6 +29,7 @@ export default function Modal({
 }: ModalProps) {
   const [confirmClose, setConfirmClose] = useState(false);
   const modalRef = useRef<HTMLDivElement | null>(null);
+  const confirmRef = useRef<HTMLDivElement | null>(null);
   const titleId = useMemo(() => `modal-title-${Math.random().toString(36).slice(2)}`, []);
   const canClose = Boolean(onClose) && !isLoading;
   const escapeEnabled = closeOnEscape ?? closeOnOverlay;
@@ -76,19 +77,18 @@ export default function Modal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keyboard trap (Escape + Tab) — re-registers when close behaviour changes
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && escapeEnabled) {
-        requestClose();
+  const trapFocus = useCallback((ref: React.RefObject<HTMLDivElement | null>, onEscape?: () => void) => {
+    return (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onEscape) {
+        onEscape();
         return;
       }
-      if (e.key !== 'Tab' || !modalRef.current) return;
-      const focusable = Array.from(modalRef.current.querySelectorAll<HTMLElement>(focusableSelector))
-        .filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null);
+      if (e.key !== 'Tab' || !ref.current) return;
+      const focusable = Array.from(ref.current.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
       if (focusable.length === 0) {
         e.preventDefault();
-        modalRef.current.focus();
+        ref.current.focus();
         return;
       }
       const first = focusable[0];
@@ -101,11 +101,31 @@ export default function Modal({
         first.focus();
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Focus trap for the main dialog
+  useEffect(() => {
+    if (confirmClose) return undefined;
+    const handler = trapFocus(modalRef, escapeEnabled ? requestClose : undefined);
     document.addEventListener('keydown', handler);
-    return () => {
-      document.removeEventListener('keydown', handler);
-    };
-  }, [canClose, escapeEnabled, isDirty, isLoading, onClose]);
+    return () => document.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canClose, escapeEnabled, isDirty, isLoading, onClose, confirmClose]);
+
+  // Focus trap for the confirmation sub-dialog — activates only when confirmClose is true
+  useEffect(() => {
+    if (!confirmClose) return undefined;
+    const handler = trapFocus(confirmRef, () => setConfirmClose(false));
+    // Focus the first focusable element inside the confirm dialog
+    window.setTimeout(() => {
+      const first = confirmRef.current?.querySelector<HTMLElement>(focusableSelector);
+      first?.focus();
+    }, 0);
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmClose]);
 
   return (
     <div
@@ -127,7 +147,7 @@ export default function Modal({
           <span className="modal-title" id={titleId}>{title}</span>
           {canClose && (
             <button className="btn btn-ghost btn-sm" onClick={requestClose} aria-label="Fermer">
-              ✕
+              <span aria-hidden="true">✕</span>
             </button>
           )}
         </div>
@@ -136,11 +156,11 @@ export default function Modal({
       </div>
       {confirmClose && (
         <div className="modal-confirm-overlay" role="presentation">
-          <div className="modal modal-sm modal-confirm" role="dialog" aria-modal="true" aria-label="Quitter sans enregistrer">
+          <div className="modal modal-sm modal-confirm" role="dialog" aria-modal="true" aria-label="Quitter sans enregistrer" ref={confirmRef} tabIndex={-1}>
             <div className="modal-header">
               <span className="modal-title">Quitter sans enregistrer ?</span>
               <button className="btn btn-ghost btn-sm" onClick={() => setConfirmClose(false)} aria-label="Fermer">
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
             <div className="modal-body">

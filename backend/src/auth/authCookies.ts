@@ -4,10 +4,12 @@ import { SESSION_DURATION_MS } from './session';
 export const ADMIN_AUTH_COOKIE = 'sentinel_admin_token';
 export const WORKSHOP_AUTH_COOKIE = 'sentinel_workshop_token';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const authCookieOptions = {
   httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  sameSite: (isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+  secure: isProduction,
 };
 
 export const persistentAuthCookieOptions = {

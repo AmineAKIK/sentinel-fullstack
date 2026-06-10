@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import logger from '../../logger';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
@@ -21,7 +22,7 @@ function loadFunctionalDoc(): string {
     cachedDoc = fs.readFileSync(docPath, 'utf-8');
   } catch {
     cachedDoc = '(Documentation non disponible.)';
-    console.warn('[support] cadrage-fonctionnel.md introuvable à', docPath);
+    logger.warn({ docPath }, 'Support knowledge file not found');
   }
 
   return cachedDoc;
@@ -86,7 +87,7 @@ export async function askSupport(
 
   if (!response.ok) {
     const text = await response.text();
-    console.error('[support] DeepSeek API error', response.status, text);
+    logger.error({ status: response.status }, 'DeepSeek API error');
     throw new Error('DeepSeek API error');
   }
 

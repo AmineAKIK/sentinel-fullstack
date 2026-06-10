@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useId, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 export type NavItem = {
   label: string;
@@ -83,14 +83,14 @@ export default function ResponsiveNavBar({
           {items.map((item) => {
             const active = isActive(item.match);
             return (
-              <button
+              <NavLink
                 key={item.path}
-                className={`nav-link ${active ? 'active' : ''}`}
+                to={item.path}
+                className={() => `nav-link ${active ? 'active' : ''}`}
                 aria-current={active ? 'page' : undefined}
-                onClick={() => navigateTo(item.path)}
               >
                 {item.label}
-              </button>
+              </NavLink>
             );
           })}
         </div>

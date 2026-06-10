@@ -11,6 +11,7 @@ function setProductionEnv(overrides: NodeJS.ProcessEnv = {}): void {
     COOKIE_SECRET: '12345678901234567890123456789012',
     JWT_SECRET: 'abcdefghijklmnopqrstuvwxyz123456',
     CLIENT_ORIGIN: 'https://sentinel.example.com',
+    BOARD_ACCESS_CODE_HASH: '0315b4020af3eccab7706679580ac87a710d82970733b8719e70af9b57e7b9e6',
     ...overrides,
   };
 }
@@ -36,5 +37,17 @@ describe('assertProductionConfig', () => {
     setProductionEnv({ CLIENT_ORIGIN: 'http://localhost:5173' });
 
     expect(() => assertProductionConfig()).toThrow('CLIENT_ORIGIN');
+  });
+
+  it('rejects missing board access hash', () => {
+    setProductionEnv({ BOARD_ACCESS_CODE_HASH: '' });
+
+    expect(() => assertProductionConfig()).toThrow('BOARD_ACCESS_CODE_HASH');
+  });
+
+  it('rejects invalid board access hash', () => {
+    setProductionEnv({ BOARD_ACCESS_CODE_HASH: 'replace_with_sha256_of_board_code' });
+
+    expect(() => assertProductionConfig()).toThrow('BOARD_ACCESS_CODE_HASH');
   });
 });

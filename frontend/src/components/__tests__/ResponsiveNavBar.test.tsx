@@ -26,7 +26,7 @@ describe('ResponsiveNavBar', () => {
   it('marks the active item', () => {
     renderNav('/admin/users');
 
-    expect(screen.getByRole('button', { name: 'Utilisateurs' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Utilisateurs' })).toHaveAttribute(
       'aria-current',
       'page'
     );

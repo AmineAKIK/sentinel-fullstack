@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { ZodError } from 'zod';
 import { sendError } from './errors';
 import { ServiceResult } from './serviceResult';
+import logger from '../logger';
 
 export function formatZodError(err: ZodError): string {
   return err.errors.map((e) => e.message).join(' ');
@@ -30,6 +31,6 @@ export function parseIdParam(value: string): ServiceResult<number> {
 }
 
 export function handleControllerError(res: Response, label: string, err: unknown): void {
-  console.error(`${label} error:`, err);
+  logger.error({ err, label }, 'Controller error');
   sendError(res, 500, 'SERVER_ERROR', 'Erreur interne du serveur.');
 }

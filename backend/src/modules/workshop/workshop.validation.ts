@@ -33,6 +33,7 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   applyEditRequest: z.boolean().optional(),
   rejectEditRequest: z.boolean().optional(),
   rejectDeleteRequest: z.boolean().optional(),
+  withdrawEditRequest: z.boolean().optional(),
 });
 
 export const incidentWorkspaceQuerySchema = z.object({

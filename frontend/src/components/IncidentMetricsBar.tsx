@@ -19,6 +19,89 @@ interface IncidentMetricsBarProps {
   onSetFilters: (value: any) => void;
 }
 
+const RESET = { status: 'all', aging: 'all', priority: 'all', taken: 'all', scope: 'all' };
+
+interface MetricConfig {
+  key: string;
+  label: string;
+  getValue: (m: WorkshopIncidentMetrics, extra?: number) => React.ReactNode;
+  isActive: (f: Filters) => boolean;
+  getFilter: (f: Filters) => Partial<Filters>;
+  roles?: string[];
+}
+
+const METRIC_CONFIGS: MetricConfig[] = [
+  {
+    key: 'total',
+    label: 'Total',
+    getValue: (m) => m.total,
+    isActive: (f) => f.status === 'all' && f.aging === 'all' && f.priority === 'all' && f.taken === 'all' && (f.scope ?? 'all') === 'all',
+    getFilter: () => RESET,
+  },
+  {
+    key: 'open',
+    label: 'Ouverts',
+    getValue: (m) => m.open,
+    isActive: (f) => f.status === 'OPEN',
+    getFilter: () => ({ ...RESET, status: 'OPEN' }),
+  },
+  {
+    key: 'pending',
+    label: 'En attente',
+    getValue: (m) => m.pending,
+    isActive: (f) => f.status === 'PENDING',
+    getFilter: () => ({ ...RESET, status: 'PENDING' }),
+  },
+  {
+    key: 'over_7d',
+    label: 'Ouverts > 7j',
+    getValue: (m) => m.open_over_7d,
+    isActive: (f) => f.aging === 'over_7d',
+    getFilter: () => ({ ...RESET, aging: 'over_7d' }),
+  },
+  {
+    key: 'priority',
+    label: 'Urgents',
+    getValue: (m) => m.priority,
+    isActive: (f) => f.priority === 'urgent',
+    getFilter: (f) => ({ ...RESET, priority: f.priority === 'urgent' ? 'all' : 'urgent' }),
+  },
+  {
+    key: 'not_taken',
+    label: 'Non pris',
+    getValue: (m) => m.not_taken,
+    isActive: (f) => f.taken === 'not_taken',
+    getFilter: (f) => ({ ...RESET, taken: f.taken === 'not_taken' ? 'all' : 'not_taken' }),
+  },
+];
+
+const ROLE_METRIC_CONFIGS: MetricConfig[] = [
+  {
+    key: 'created_by_me',
+    label: 'Créés par moi',
+    getValue: (_m, extra = 0) => extra,
+    isActive: (f) => f.scope === 'created_by_me',
+    getFilter: (f) => ({ ...RESET, scope: f.scope === 'created_by_me' ? 'all' : 'created_by_me' }),
+    roles: ['OPERATOR'],
+  },
+  {
+    key: 'assigned_to_me',
+    label: 'Pris par moi',
+    getValue: (m) => m.assigned_to_me ?? 0,
+    isActive: (f) => f.scope === 'assigned_to_me',
+    getFilter: (f) => ({ ...RESET, scope: f.scope === 'assigned_to_me' ? 'all' : 'assigned_to_me' }),
+    roles: ['MAINTENANCE'],
+  },
+  {
+    key: 'followed',
+    label: 'Suivis',
+    getValue: (m) => m.followed ?? 0,
+    isActive: (f) => f.scope === 'followed',
+    getFilter: (f) => ({ ...RESET, scope: f.scope === 'followed' ? 'all' : 'followed' }),
+    roles: ['RESPONSABLE'],
+  },
+];
+
 export default function IncidentMetricsBar({
   metricsLoading,
   metrics,
@@ -27,138 +110,50 @@ export default function IncidentMetricsBar({
   createdByMeCount = 0,
   onSetFilters,
 }: IncidentMetricsBarProps) {
-  const isOperator = role === 'OPERATOR';
-  const isResponsable = role === 'RESPONSABLE';
-  const isMaintenance = role === 'MAINTENANCE';
-
   return (
     <div className="workshop-metrics">
+      {!metricsLoading && metrics && (
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {`${metrics.priority} urgent${metrics.priority !== 1 ? 's' : ''}, ${metrics.not_taken} non pris`}
+        </div>
+      )}
       {metricsLoading ? (
         <div className="workshop-metric workshop-metric-loading">
-          <span className="spinner" />
+          <span className="spinner" aria-hidden="true" />
         </div>
       ) : metrics ? (
         <>
-          <button
-            className={`workshop-metric ${
-              filters.status === 'all' &&
-              filters.aging === 'all' &&
-              filters.priority === 'all' &&
-              filters.taken === 'all' &&
-              (filters.scope ?? 'all') === 'all'
-                ? 'active'
-                : ''
-            }`}
-            onClick={() => onSetFilters((prev: Filters) => ({ ...prev, status: 'all', aging: 'all', priority: 'all', taken: 'all', scope: 'all' }))}
-            type="button"
-          >
-            <span>Total</span>
-            <strong>{metrics.total}</strong>
-          </button>
-          <button
-            className={`workshop-metric ${filters.status === 'OPEN' ? 'active' : ''}`}
-            onClick={() => onSetFilters((prev: Filters) => ({ ...prev, status: 'OPEN', aging: 'all', priority: 'all', taken: 'all', scope: 'all' }))}
-            type="button"
-          >
-            <span>Ouverts</span>
-            <strong>{metrics.open}</strong>
-          </button>
-          <button
-            className={`workshop-metric ${filters.status === 'PENDING' ? 'active' : ''}`}
-            onClick={() => onSetFilters((prev: Filters) => ({ ...prev, status: 'PENDING', aging: 'all', priority: 'all', taken: 'all', scope: 'all' }))}
-            type="button"
-          >
-            <span>En attente</span>
-            <strong>{metrics.pending}</strong>
-          </button>
-          <button
-            className={`workshop-metric ${filters.aging === 'over_7d' ? 'active' : ''}`}
-            onClick={() => onSetFilters((prev: Filters) => ({ ...prev, status: 'all', aging: 'over_7d', priority: 'all', taken: 'all', scope: 'all' }))}
-            type="button"
-          >
-            <span>Ouverts &gt; 7j</span>
-            <strong>{metrics.open_over_7d}</strong>
-          </button>
-          <button
-            className={`workshop-metric ${filters.priority === 'urgent' ? 'active' : ''}`}
-            onClick={() => onSetFilters((prev: Filters) => ({
-              ...prev,
-              status: 'all',
-              aging: 'all',
-              scope: 'all',
-              priority: prev.priority === 'urgent' ? 'all' : 'urgent',
-            }))}
-            type="button"
-          >
-            <span>Urgents</span>
-            <strong>{metrics.priority}</strong>
-          </button>
-          <button
-            className={`workshop-metric ${filters.taken === 'not_taken' ? 'active' : ''}`}
-            onClick={() => onSetFilters((prev: Filters) => ({
-              ...prev,
-              status: 'all',
-              aging: 'all',
-              scope: 'all',
-              taken: prev.taken === 'not_taken' ? 'all' : 'not_taken',
-            }))}
-            type="button"
-          >
-            <span>Non pris</span>
-            <strong>{metrics.not_taken}</strong>
-          </button>
-          {isOperator && (
+          {METRIC_CONFIGS.map((cfg) => (
             <button
-              className={`workshop-metric ${filters.scope === 'created_by_me' ? 'active' : ''}`}
-              onClick={() => onSetFilters((prev: Filters) => ({
-                ...prev,
-                status: 'all',
-                aging: 'all',
-                priority: 'all',
-                taken: 'all',
-                scope: prev.scope === 'created_by_me' ? 'all' : 'created_by_me',
-              }))}
+              key={cfg.key}
+              className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}`}
+              onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
               type="button"
             >
-              <span>Créés par moi</span>
-              <strong>{createdByMeCount}</strong>
+              <span>{cfg.label}</span>
+              <strong>{cfg.getValue(metrics, createdByMeCount)}</strong>
             </button>
+          ))}
+          {(metrics.closed_today ?? 0) > 0 && (
+            <div className="workshop-metric">
+              <span>Clôturés aujourd'hui</span>
+              <strong>{metrics.closed_today}</strong>
+            </div>
           )}
-          {isMaintenance && (
+          {ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? '')).map((cfg) => (
             <button
-              className={`workshop-metric ${filters.scope === 'assigned_to_me' ? 'active' : ''}`}
-              onClick={() => onSetFilters((prev: Filters) => ({
-                ...prev,
-                status: 'all',
-                aging: 'all',
-                priority: 'all',
-                taken: 'all',
-                scope: prev.scope === 'assigned_to_me' ? 'all' : 'assigned_to_me',
-              }))}
+              key={cfg.key}
+              className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}`}
+              onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
               type="button"
             >
-              <span>Pris par moi</span>
-              <strong>{metrics.assigned_to_me ?? 0}</strong>
+              <span>{cfg.label}</span>
+              <strong>{cfg.getValue(metrics, createdByMeCount)}</strong>
+              {cfg.key === 'followed' && (metrics.followed_resolved ?? 0) > 0 && (
+                <small>{metrics.followed_resolved} clôturé(s)</small>
+              )}
             </button>
-          )}
-          {isResponsable && (
-            <button
-              className={`workshop-metric ${filters.scope === 'followed' ? 'active' : ''}`}
-              onClick={() => onSetFilters((prev: Filters) => ({
-                ...prev,
-                status: 'all',
-                aging: 'all',
-                priority: 'all',
-                taken: 'all',
-                scope: prev.scope === 'followed' ? 'all' : 'followed',
-              }))}
-              type="button"
-            >
-              <span>Suivis</span>
-              <strong>{metrics.followed ?? 0}</strong>
-              {(metrics.followed_resolved ?? 0) > 0 && <small>{metrics.followed_resolved} clôturé(s)</small>}
-            </button>
-          )}
+          ))}
         </>
       ) : (
         <div className="workshop-metric">

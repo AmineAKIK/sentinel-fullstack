@@ -7,21 +7,8 @@ import SelectField from '../components/ui/SelectField';
 import { listReferenceAudit } from '../api/admin';
 import { ReferenceAuditEvent } from '../types';
 import { formatDateTime } from '../utils/date';
-
-const EVENT_LABELS: Record<string, string> = {
-  USER_CREATED: 'Utilisateur créé',
-  USER_UPDATED: 'Utilisateur modifié',
-  USER_ACTIVATED: 'Utilisateur activé',
-  USER_DEACTIVATED: 'Utilisateur désactivé',
-  USER_SOFT_DELETED: 'Utilisateur supprimé',
-  USER_PASSWORD_RESET: 'Mot de passe réinitialisé',
-  LINE_CREATED: 'Ligne créée',
-  LINE_UPDATED: 'Ligne mise à jour',
-  LINE_SUMMARY_UPDATED: 'Informations ligne modifiées',
-  LINE_MACHINE_UPDATED: 'Machine modifiée',
-  LINE_PLAN_UPDATED: 'Ordre machines modifié',
-  LINE_SOFT_DELETED: 'Ligne supprimée',
-};
+import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   all: { label: 'Tous les changements', events: [] },
@@ -35,11 +22,6 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   access: { label: 'Accès utilisateurs', events: ['USER_PASSWORD_RESET'] },
 };
 
-function targetLabel(event: ReferenceAuditEvent): string {
-  if (event.scope === 'line') return event.line_number || 'Ligne supprimée';
-  const name = `${event.first_name || ''} ${event.last_name || ''}`.trim();
-  return event.badge_number ? `${name || 'Utilisateur'} (${event.badge_number})` : name || 'Utilisateur';
-}
 
 function changesLabel(changes: Record<string, unknown> | null): string {
   if (!changes) return '-';
@@ -87,6 +69,7 @@ function dateBoundary(period: string, customStart: string, customEnd: string) {
 }
 
 export default function AdminAuditPage() {
+  usePageTitle("Journal d'administration");
   const [scope, setScope] = useState('all');
   const [taskGroup, setTaskGroup] = useState('all');
   const [period, setPeriod] = useState('all');
@@ -177,6 +160,7 @@ export default function AdminAuditPage() {
       onRemove: () => setSortOrder('desc'),
     }] : []),
   ];
+  const hasActiveFilters = filterChips.length > 0;
 
   return (
     <>
@@ -187,12 +171,21 @@ export default function AdminAuditPage() {
         </div>
 
         <div className="audit-context">
-          <span>Journal des changements administratifs sur les utilisateurs et les lignes.</span>
-          <strong>{filtered.length}</strong>
-          <span>résultat(s)</span>
-          <span className="audit-context-divider" />
-          <span>{summary.accountCount} utilisateur(s)</span>
-          <span>{summary.lineCount} ligne(s)</span>
+          <span className="audit-context-text">Journal des changements administratifs sur les utilisateurs et les lignes.</span>
+          <span className="audit-context-stats" aria-label="Résumé du journal">
+            <span className="audit-context-stat">
+              <span>résultats</span>
+              <strong>{filtered.length}</strong>
+            </span>
+            <span className="audit-context-stat">
+              <span>utilisateurs</span>
+              <strong>{summary.accountCount}</strong>
+            </span>
+            <span className="audit-context-stat">
+              <span>lignes</span>
+              <strong>{summary.lineCount}</strong>
+            </span>
+          </span>
         </div>
 
         <div className="audit-filter-panel">
@@ -254,7 +247,7 @@ export default function AdminAuditPage() {
                 </div>
               </>
             )}
-            <button className="btn btn-secondary audit-clear-btn" type="button" onClick={resetFilters}>
+            <button className="btn btn-secondary audit-clear-btn" type="button" onClick={resetFilters} disabled={!hasActiveFilters}>
               Effacer les filtres
             </button>
           </div>
@@ -262,7 +255,6 @@ export default function AdminAuditPage() {
             count={filtered.length}
             countLabel="événement(s) affiché(s)"
             chips={filterChips}
-            onClear={resetFilters}
             emptyText="Journal complet"
             className="filter-summary-embedded"
           />
@@ -281,16 +273,16 @@ export default function AdminAuditPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}>
+                      <th scope="col" aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}>
                         <button className="table-sort-button" type="button" onClick={toggleDateSort}>
                           Date
                           <span className="sr-only">{dateSortLabel()}</span>
                         </button>
                       </th>
-                      <th>Référentiel</th>
-                      <th>Action</th>
-                      <th>Cible</th>
-                      <th>Champs modifiés</th>
+                      <th scope="col">Référentiel</th>
+                      <th scope="col">Action</th>
+                      <th scope="col">Cible</th>
+                      <th scope="col">Champs modifiés</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -298,8 +290,8 @@ export default function AdminAuditPage() {
                       <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
                         <td>{formatDateTime(event.created_at)}</td>
                         <td>{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</td>
-                        <td>{EVENT_LABELS[event.event_type] || event.event_type}</td>
-                        <td>{targetLabel(event)}</td>
+                        <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
+                        <td>{formatAuditEventTarget(event, true)}</td>
                         <td>{changesLabel(event.changes)}</td>
                       </tr>
                     ))}
@@ -312,9 +304,9 @@ export default function AdminAuditPage() {
                   <div className="user-card-row" key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
                     <span className="user-card-main">
                       <span className="user-card-name">
-                        {EVENT_LABELS[event.event_type] || event.event_type}
+                        {ADMIN_EVENT_LABELS[event.event_type] || event.event_type}
                       </span>
-                      <span className="user-card-badge">{targetLabel(event)}</span>
+                      <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
                     </span>
                     <span className="user-card-meta">
                       <span className="badge-role">{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</span>

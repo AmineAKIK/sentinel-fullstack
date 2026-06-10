@@ -12,10 +12,25 @@ import { listAccounts } from '../api/accounts';
 import { SentinelUser, Role, SortOrder } from '../types';
 import { formatDate } from '../utils/date';
 import { ROLE_LABELS } from '../utils/labels';
+import { makeSortCodec } from '../utils/sortCodec';
+import { UserSortField, compareUsers } from '../utils/userSort';
+import { usePageTitle } from '../hooks/usePageTitle';
 
-type UserSortField = 'name' | 'badge' | 'role' | 'status' | 'created_at';
+const userSortCodec = makeSortCodec([
+  { key: 'alpha_asc',    sort: 'name',       order: 'asc'  },
+  { key: 'alpha_desc',   sort: 'name',       order: 'desc' },
+  { key: 'badge_asc',    sort: 'badge',      order: 'asc'  },
+  { key: 'badge_desc',   sort: 'badge',      order: 'desc' },
+  { key: 'role_asc',     sort: 'role',       order: 'asc'  },
+  { key: 'role_desc',    sort: 'role',       order: 'desc' },
+  { key: 'status_asc',   sort: 'status',     order: 'asc'  },
+  { key: 'status_desc',  sort: 'status',     order: 'desc' },
+  { key: 'created_asc',  sort: 'created_at', order: 'asc'  },
+  { key: 'created_desc', sort: 'created_at', order: 'desc' },
+]);
 
 export default function UserListPage() {
+  usePageTitle('Gestion des comptes');
   const navigate = useNavigate();
   const [users, setUsers] = useState<SentinelUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,29 +66,13 @@ export default function UserListPage() {
   }, [fetchUsers]);
 
   function handleSortChange(value: string) {
-    if (value === 'alpha_asc') { setSort('name'); setOrder('asc'); }
-    else if (value === 'alpha_desc') { setSort('name'); setOrder('desc'); }
-    else if (value === 'badge_asc') { setSort('badge'); setOrder('asc'); }
-    else if (value === 'badge_desc') { setSort('badge'); setOrder('desc'); }
-    else if (value === 'role_asc') { setSort('role'); setOrder('asc'); }
-    else if (value === 'role_desc') { setSort('role'); setOrder('desc'); }
-    else if (value === 'status_asc') { setSort('status'); setOrder('asc'); }
-    else if (value === 'status_desc') { setSort('status'); setOrder('desc'); }
-    else if (value === 'created_asc') { setSort('created_at'); setOrder('asc'); }
-    else { setSort('created_at'); setOrder('desc'); }
+    const { sort: s, order: o } = userSortCodec.decode(value);
+    setSort(s as UserSortField);
+    setOrder(o as SortOrder);
   }
 
   function getSortValue(): string {
-    if (sort === 'name' && order === 'asc') return 'alpha_asc';
-    if (sort === 'name' && order === 'desc') return 'alpha_desc';
-    if (sort === 'badge' && order === 'asc') return 'badge_asc';
-    if (sort === 'badge' && order === 'desc') return 'badge_desc';
-    if (sort === 'role' && order === 'asc') return 'role_asc';
-    if (sort === 'role' && order === 'desc') return 'role_desc';
-    if (sort === 'status' && order === 'asc') return 'status_asc';
-    if (sort === 'status' && order === 'desc') return 'status_desc';
-    if (sort === 'created_at' && order === 'asc') return 'created_asc';
-    return 'created_desc';
+    return userSortCodec.encode({ sort, order });
   }
 
   const filteredUsers = useMemo(() => {
@@ -235,27 +234,27 @@ export default function UserListPage() {
               <table>
                 <thead>
                   <tr>
-                    <th aria-sort={headerAriaSort('name')}>
+                    <th scope="col" aria-sort={headerAriaSort('name')}>
                       <button className="table-sort-button" type="button" onClick={() => toggleTableSort('name')}>
                         Nom Prénom
                         <span className="sr-only">{headerSortLabel('name')}</span>
                       </button>
                     </th>
-                    <th>Badge</th>
-                    <th>Rôle</th>
-                    <th aria-sort={headerAriaSort('status')}>
+                    <th scope="col">Badge</th>
+                    <th scope="col">Rôle</th>
+                    <th scope="col" aria-sort={headerAriaSort('status')}>
                       <button className="table-sort-button" type="button" onClick={() => toggleTableSort('status')}>
                         Statut
                         <span className="sr-only">{headerSortLabel('status')}</span>
                       </button>
                     </th>
-                    <th aria-sort={headerAriaSort('created_at')}>
+                    <th scope="col" aria-sort={headerAriaSort('created_at')}>
                       <button className="table-sort-button" type="button" onClick={() => toggleTableSort('created_at')}>
                         Date création
                         <span className="sr-only">{headerSortLabel('created_at')}</span>
                       </button>
                     </th>
-                    <th></th>
+                    <th scope="col" aria-label="Actions"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -409,31 +408,6 @@ export default function UserListPage() {
   );
 }
 
-function compareUsers(a: SentinelUser, b: SentinelUser, field: UserSortField, order: SortOrder): number {
-  const direction = order === 'asc' ? 1 : -1;
-  let result = 0;
-
-  if (field === 'name') {
-    result = userName(a).localeCompare(userName(b), 'fr', { sensitivity: 'base' });
-  } else if (field === 'badge') {
-    result = a.badge_number.localeCompare(b.badge_number, 'fr', { numeric: true, sensitivity: 'base' });
-  } else if (field === 'role') {
-    result = (ROLE_LABELS[a.role] || a.role).localeCompare(ROLE_LABELS[b.role] || b.role, 'fr', { sensitivity: 'base' });
-  } else if (field === 'status') {
-    result = Number(b.is_active) - Number(a.is_active);
-  } else {
-    result = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-  }
-
-  if (result === 0) {
-    result = userName(a).localeCompare(userName(b), 'fr', { sensitivity: 'base' });
-  }
-  return result * direction;
-}
-
-function userName(user: SentinelUser): string {
-  return `${user.last_name} ${user.first_name}`.trim();
-}
 
 function sortFieldLabel(field: UserSortField): string {
   if (field === 'name') return 'nom';

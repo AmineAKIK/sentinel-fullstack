@@ -75,7 +75,7 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
-              {loading ? <><span className="spinner" /> Enregistrement…</> : 'Confirmer'}
+              {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Confirmer'}
             </button>
           </>
         ) : (

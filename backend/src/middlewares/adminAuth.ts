@@ -1,17 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { ADMIN_AUTH_COOKIE } from '../auth/authCookies';
 import {
+  handleJwtError,
   sendInvalidServerConfig,
   sendInvalidSession,
   sendMissingAuth,
 } from '../auth/authResponses';
-import { getJwtSecret, isJwtSessionError, verifyAuthToken } from '../auth/jwt';
-import pool from '../db/pool';
-import { sendError } from '../utils/errors';
+import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
+import { getAdminSessionVersion } from '../modules/adminCredentials/adminCredentials.repository';
 
 export interface AdminPayload {
   adminId: number;
   username: string;
+  sessionVersion?: number;
 }
 
 declare global {
@@ -54,12 +55,16 @@ async function authenticateAdminRequest(
       return;
     }
 
-    const { rows } = await pool.query(
-      `SELECT id FROM admin_accounts WHERE id = $1`,
-      [payload.adminId]
-    );
+    const currentVersion = await getAdminSessionVersion(payload.adminId);
+    if (currentVersion === null) {
+      sendInvalidSession(res);
+      return;
+    }
 
-    if (rows.length === 0) {
+    // If the token carries a version, reject it if it doesn't match the current one.
+    // Tokens without sessionVersion (issued before migration 022) are still accepted
+    // until they naturally expire.
+    if (payload.sessionVersion !== undefined && payload.sessionVersion !== currentVersion) {
       sendInvalidSession(res);
       return;
     }
@@ -67,11 +72,6 @@ async function authenticateAdminRequest(
     req.admin = payload;
     next();
   } catch (err) {
-    if (isJwtSessionError(err)) {
-      sendInvalidSession(res);
-      return;
-    }
-    console.error('Admin auth middleware error:', err);
-    sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');
+    handleJwtError(err, res);
   }
 }

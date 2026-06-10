@@ -7,6 +7,7 @@ import { getJwtSecret, isJwtSessionError, verifyAuthToken } from '../../auth/jwt
 import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
 import { getBoardData } from '../workshop/workshop.controller';
+import logger from '../../logger';
 
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
 const BOARD_ACCESS_CODE_HASH = process.env.BOARD_ACCESS_CODE_HASH || '';
@@ -104,12 +105,19 @@ export async function boardReadAuthMiddleware(req: Request, res: Response, next:
       sendInvalidSession(res);
       return;
     }
-    console.error('Board auth middleware error:', err);
+    logger.error({ err }, 'Board auth middleware error');
     sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');
   }
 }
 
 export const boardRouter = Router();
+
+boardRouter.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 boardRouter.get('/me', async (req, res) => {
   if (!getJwtSecret()) {
@@ -131,7 +139,7 @@ boardRouter.get('/me', async (req, res) => {
       sendInvalidSession(res);
       return;
     }
-    console.error('Board me error:', err);
+    logger.error({ err }, 'Board me error');
     sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');
   }
 });

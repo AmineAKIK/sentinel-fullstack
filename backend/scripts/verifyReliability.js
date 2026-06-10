@@ -23,12 +23,16 @@ check('Board API requires board or workshop session and detailed workshop APIs a
   const routes = read('backend/src/modules/workshop/workshop.routes.ts');
   const board = read('backend/src/modules/board/board.auth.ts');
   const server = read('backend/src/server.ts');
+  const production = read('backend/src/config/production.ts');
   return !routes.includes("router.get('/board'")
     && board.includes('BOARD_AUTH_COOKIE')
+    && board.includes("res.setHeader('Cache-Control', 'no-store')")
     && board.includes("boardRouter.post('/session'")
     && board.includes("boardRouter.get('/data', boardReadAuthMiddleware, getBoardData)")
     && server.includes("app.use('/api/board/session', loginRateLimit)")
     && server.includes("app.use('/api/board', boardRouter)")
+    && production.includes("'BOARD_ACCESS_CODE_HASH'")
+    && production.includes('SHA256_HEX_PATTERN')
     && includesInOrder(routes, 'router.use(workshopAuthMiddleware)', "router.get('/incidents', listIncidents)")
     && includesInOrder(routes, 'router.use(workshopAuthMiddleware)', "router.get('/history/incidents', listHistoryIncidents)")
     && includesInOrder(routes, 'router.use(workshopAuthMiddleware)', "router.get('/history/events', listHistoryEvents)")

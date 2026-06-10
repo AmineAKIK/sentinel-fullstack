@@ -8,33 +8,10 @@ import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
 import { sendUnauthenticated } from '../../auth/authResponses';
 import { sendError } from '../../utils/errors';
 import { handleControllerError } from '../../utils/controller';
-import { getAdminPasswordHash, updateAdminPasswordHash } from '../adminCredentials/adminCredentials.repository';
+import { getAdminPasswordHash, incrementAdminSessionVersion, updateAdminPasswordHash } from '../adminCredentials/adminCredentials.repository';
+import { createRateLimit } from '../../utils/inMemoryRateLimit';
 
-const VERIFY_FAILURE_TTL_MS = 30 * 60 * 1000;
-const VERIFY_FAILURE_MAX = 3;
-
-interface VerifyFailureEntry {
-  count: number;
-  lastAttemptAt: number;
-}
-
-const verifyFailures = new Map<number, VerifyFailureEntry>();
-
-function getFailureCount(adminId: number): number {
-  const entry = verifyFailures.get(adminId);
-  if (!entry) return 0;
-  if (Date.now() - entry.lastAttemptAt > VERIFY_FAILURE_TTL_MS) {
-    verifyFailures.delete(adminId);
-    return 0;
-  }
-  return entry.count;
-}
-
-function incrementFailureCount(adminId: number): number {
-  const count = getFailureCount(adminId) + 1;
-  verifyFailures.set(adminId, { count, lastAttemptAt: Date.now() });
-  return count;
-}
+const verifyFailures = createRateLimit(3, 30 * 60 * 1000);
 
 export async function changePassword(req: Request, res: Response): Promise<void> {
   if (!req.admin) {
@@ -68,6 +45,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 
     const newHash = await hashAdminPassword(newPassword);
     await updateAdminPasswordHash(req.admin.adminId, newHash);
+    await incrementAdminSessionVersion(req.admin.adminId);
 
     clearAuthCookie(res, ADMIN_AUTH_COOKIE);
     res.json({ message: 'Mot de passe modifié. Reconnectez-vous.' });
@@ -97,9 +75,9 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
 
     const valid = await verifyPwd(password, passwordHash);
     if (!valid) {
-      const attempts = incrementFailureCount(req.admin.adminId);
-      if (attempts >= VERIFY_FAILURE_MAX) {
-        verifyFailures.delete(req.admin.adminId);
+      verifyFailures.increment(req.admin.adminId);
+      if (verifyFailures.isExceeded(req.admin.adminId)) {
+        verifyFailures.reset(req.admin.adminId);
         clearAuthCookie(res, ADMIN_AUTH_COOKIE);
         sendError(res, 401, 'UNAUTHORIZED', 'Session expirée après trop de tentatives incorrectes.');
         return;
@@ -108,7 +86,7 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
       return;
     }
 
-    verifyFailures.delete(req.admin.adminId);
+    verifyFailures.reset(req.admin.adminId);
     res.json({ valid: true });
   } catch (err) {
     handleControllerError(res, 'verifyPassword', err);

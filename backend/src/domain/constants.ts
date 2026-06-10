@@ -36,6 +36,8 @@ export const INCIDENT_ACTIONS = [
   'RESPONSIBLE_COMMENT',
   'INVALIDATE_CLOSED',
   'EDIT_AFTER_TAKE',
+  'RESPONSABLE_EDIT',
+  'WITHDRAW_EDIT',
 ] as const;
 export type IncidentAction = (typeof INCIDENT_ACTIONS)[number];
 

@@ -31,3 +31,19 @@ export async function updateAdminPasswordHash(adminId: number, passwordHash: str
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+export async function getAdminSessionVersion(adminId: number): Promise<number | null> {
+  const { rows } = await pool.query<{ session_version: number }>(
+    'SELECT session_version FROM admin_accounts WHERE id = $1',
+    [adminId]
+  );
+  return rows[0]?.session_version ?? null;
+}
+
+export async function incrementAdminSessionVersion(adminId: number): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE admin_accounts SET session_version = session_version + 1 WHERE id = $1',
+    [adminId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}

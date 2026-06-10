@@ -6,6 +6,19 @@ import SelectField from '../components/ui/SelectField';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { WorkshopBoardIncident, WorkshopBoardLine } from '../types';
 import { STATE_LABELS } from '../utils/labels';
+import { sortIncidents } from '../utils/incidentSort';
+import {
+  ageLabel,
+  formatClock,
+  formatTime,
+  getOrCreateSessionScreenId,
+  isOpenOverSevenDays,
+  normalizeScreenId,
+  paginate,
+  statusLabel,
+  BOARD_SESSION_SCREEN_KEY,
+} from '../utils/boardUtils';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const VIEW_DURATION_MS = 12000;
 const ROWS_PER_PAGE = 9;
@@ -23,7 +36,6 @@ type BoardSettings = {
   lineIds: string[];
 };
 const BOARD_SETTINGS_KEY = 'sentinel.board.settings.v1';
-const BOARD_SESSION_SCREEN_KEY = 'sentinel.board.sessionScreenId.v1';
 const NO_LINES_SELECTED = '__none__';
 const DEFAULT_SETTINGS: BoardSettings = {
   preset: 'default',
@@ -49,65 +61,6 @@ type LineGroup = {
   machines: string[];
 };
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatClock(date: Date): string {
-  return date.toLocaleString('fr-FR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function statusLabel(incident: WorkshopBoardIncident): string {
-  if (incident.status === 'PENDING') return 'En attente';
-  return incident.is_taken ? 'Pris en charge' : 'Non pris';
-}
-
-function ageLabel(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const hours = Math.max(0, Math.floor(diffMs / 3600000));
-  if (hours < 1) return '< 1h';
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}j`;
-}
-
-function isOpenOverSevenDays(incident: WorkshopBoardIncident): boolean {
-  return incident.status === 'OPEN' && Date.now() - new Date(incident.created_at).getTime() > 7 * 24 * 60 * 60 * 1000;
-}
-
-function paginate<T>(items: T[], size: number): T[][] {
-  if (items.length === 0) return [[]];
-  const pages: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    pages.push(items.slice(index, index + size));
-  }
-  return pages;
-}
-
-function normalizeScreenId(value: string | null): string {
-  const normalized = (value || 'default').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-  return normalized || 'default';
-}
-
-function getOrCreateSessionScreenId(): string {
-  try {
-    const existing = window.sessionStorage.getItem(BOARD_SESSION_SCREEN_KEY);
-    if (existing) return existing;
-    const generated = `ecran-${Math.random().toString(36).slice(2, 8)}`;
-    window.sessionStorage.setItem(BOARD_SESSION_SCREEN_KEY, generated);
-    return generated;
-  } catch {
-    return 'ecran-local';
-  }
-}
 
 function getBoardSettingsKey(screenId: string): string {
   return `${BOARD_SETTINGS_KEY}.${screenId}`;
@@ -133,6 +86,7 @@ function saveBoardSettings(storageKey: string, settings: BoardSettings) {
 }
 
 export default function WorkshopBoardPage() {
+  usePageTitle('Tableau temps réel');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAppAuth();
@@ -196,20 +150,15 @@ export default function WorkshopBoardPage() {
   }, [storageKey]);
 
   const activeIncidents = useMemo(() => {
-    return incidents
+    const filtered = incidents
       .filter((incident) => {
         if (settings.lineIds.length === 0) return true;
         if (settings.lineIds.includes(NO_LINES_SELECTED)) return false;
         return settings.lineIds.includes(String(incident.line_id));
       })
       .filter((incident) => !settings.onlyPriority || incident.is_priority)
-      .filter((incident) => !settings.onlyNotTaken || !incident.is_taken)
-      .sort((a, b) => {
-        if (a.is_priority !== b.is_priority) return a.is_priority ? -1 : 1;
-        if (a.display_order !== b.display_order) return b.display_order - a.display_order;
-        if (a.is_taken !== b.is_taken) return a.is_taken ? 1 : -1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
+      .filter((incident) => !settings.onlyNotTaken || !incident.is_taken);
+    return sortIncidents(filtered);
   }, [incidents, settings.lineIds, settings.onlyNotTaken, settings.onlyPriority]);
 
   const priorityCount = activeIncidents.filter((incident) => incident.is_priority).length;

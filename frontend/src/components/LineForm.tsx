@@ -1,5 +1,6 @@
 import { LineMachine } from '../types';
 import { emptyMachine, switchMachineRobotMode } from '../utils/lineMachines';
+import RobotFieldsGroup from './RobotFieldsGroup';
 
 export interface LineFormData {
   lineNumber: string;
@@ -172,117 +173,36 @@ export default function LineForm({
 
             {machine.hasDoubleRobot ? (
               <div className="line-machine-grid">
-                <div className="form-group">
-                  <label className="form-label" htmlFor={`leftRobotNumber-${index}`}>Robot gauche *</label>
-                  <input
-                    id={`leftRobotNumber-${index}`}
-                    className="form-input"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={2}
-                    value={machine.leftRobotNumber}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      updateMachineField(index, 'leftRobotNumber', next);
-                    }}
-                    disabled={disabled}
-                    placeholder=""
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor={`leftRobotHeads-${index}`}>Nombre de têtes *</label>
-                  <input
-                    id={`leftRobotHeads-${index}`}
-                    className="form-input"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={2}
-                    value={machine.leftRobotHeads ? String(machine.leftRobotHeads) : ''}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      updateMachineField(index, 'leftRobotHeads', next === '' ? 0 : Number(next));
-                    }}
-                    disabled={disabled}
-                    placeholder=""
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor={`rightRobotNumber-${index}`}>Robot droit *</label>
-                  <input
-                    id={`rightRobotNumber-${index}`}
-                    className="form-input"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={2}
-                    value={machine.rightRobotNumber}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      updateMachineField(index, 'rightRobotNumber', next);
-                    }}
-                    disabled={disabled}
-                    placeholder=""
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor={`rightRobotHeads-${index}`}>Nombre de têtes *</label>
-                  <input
-                    id={`rightRobotHeads-${index}`}
-                    className="form-input"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={2}
-                    value={machine.rightRobotHeads ? String(machine.rightRobotHeads) : ''}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      updateMachineField(index, 'rightRobotHeads', next === '' ? 0 : Number(next));
-                    }}
-                    disabled={disabled}
-                    placeholder=""
-                  />
-                </div>
+                <RobotFieldsGroup
+                  side="left"
+                  idPrefix={`left-${index}`}
+                  robotNumber={machine.leftRobotNumber}
+                  robotHeads={machine.leftRobotHeads}
+                  disabled={disabled}
+                  onChangeNumber={(v) => updateMachineField(index, 'leftRobotNumber', v)}
+                  onChangeHeads={(v) => updateMachineField(index, 'leftRobotHeads', v)}
+                />
+                <RobotFieldsGroup
+                  side="right"
+                  idPrefix={`right-${index}`}
+                  robotNumber={machine.rightRobotNumber}
+                  robotHeads={machine.rightRobotHeads}
+                  disabled={disabled}
+                  onChangeNumber={(v) => updateMachineField(index, 'rightRobotNumber', v)}
+                  onChangeHeads={(v) => updateMachineField(index, 'rightRobotHeads', v)}
+                />
               </div>
             ) : (
               <div className="line-machine-grid">
-                <div className="form-group">
-                  <label className="form-label" htmlFor={`robotNumber-${index}`}>Numéro de robot *</label>
-                  <input
-                    id={`robotNumber-${index}`}
-                    className="form-input"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={2}
-                    value={machine.robotNumber}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      updateMachineField(index, 'robotNumber', next);
-                    }}
-                    disabled={disabled}
-                    placeholder=""
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor={`robotHeads-${index}`}>Nombre de têtes *</label>
-                  <input
-                    id={`robotHeads-${index}`}
-                    className="form-input"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={2}
-                    value={machine.robotHeads ? String(machine.robotHeads) : ''}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      updateMachineField(index, 'robotHeads', next === '' ? 0 : Number(next));
-                    }}
-                    disabled={disabled}
-                    placeholder=""
-                  />
-                </div>
+                <RobotFieldsGroup
+                  side="single"
+                  idPrefix={`single-${index}`}
+                  robotNumber={machine.robotNumber}
+                  robotHeads={machine.robotHeads}
+                  disabled={disabled}
+                  onChangeNumber={(v) => updateMachineField(index, 'robotNumber', v)}
+                  onChangeHeads={(v) => updateMachineField(index, 'robotHeads', v)}
+                />
               </div>
             )}
           </div>

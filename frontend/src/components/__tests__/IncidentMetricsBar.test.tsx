@@ -13,6 +13,7 @@ function mockMetrics(overrides: Partial<WorkshopIncidentMetrics> = {}): Workshop
     taken: 4,
     not_taken: 6,
     open_over_7d: 1,
+    closed_today: 0,
     ...overrides,
   };
 }

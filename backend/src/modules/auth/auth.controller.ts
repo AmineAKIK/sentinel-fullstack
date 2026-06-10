@@ -4,10 +4,9 @@ import { signAuthToken, verifyAuthToken, isJwtSessionError } from '../../auth/jw
 import { sendError } from '../../utils/errors';
 import { sendInvalidServerConfig } from '../../auth/authResponses';
 import { handleControllerError } from '../../utils/controller';
-import { unifiedLoginService } from './auth.service';
+import { unifiedLoginService, verifyAdminSession, verifyWorkshopSession } from './auth.service';
 import { AdminPayload } from '../../middlewares/adminAuth';
 import { WorkshopPayload } from '../../middlewares/workshopAuth';
-import pool from '../../db/pool';
 
 export async function login(req: Request, res: Response): Promise<void> {
   const { identifier, password, newPassword, setupCode } = req.body;
@@ -51,7 +50,7 @@ export async function login(req: Request, res: Response): Promise<void> {
         return;
 
       case 'admin_success': {
-        const token = signAuthToken({ adminId: result.admin.id, username: result.admin.username });
+        const token = signAuthToken({ adminId: result.admin.id, username: result.admin.username, sessionVersion: result.admin.sessionVersion });
         if (!token) { sendInvalidServerConfig(res); return; }
         setAuthCookie(res, ADMIN_AUTH_COOKIE, token);
         res.json({ accountType: 'admin', id: result.admin.id, username: result.admin.username });
@@ -90,12 +89,9 @@ export async function me(req: Request, res: Response): Promise<void> {
     if (adminToken) {
       const payload = verifyAuthToken<AdminPayload>(adminToken);
       if (payload) {
-        const { rows } = await pool.query(
-          'SELECT id, username FROM admin_accounts WHERE id = $1',
-          [payload.adminId]
-        );
-        if (rows.length > 0) {
-          res.json({ accountType: 'admin', id: rows[0].id, username: rows[0].username });
+        const admin = await verifyAdminSession(payload.adminId);
+        if (admin) {
+          res.json({ accountType: 'admin', id: admin.id, username: admin.username });
           return;
         }
         clearAuthCookie(res, ADMIN_AUTH_COOKIE);
@@ -105,15 +101,9 @@ export async function me(req: Request, res: Response): Promise<void> {
     if (workshopToken) {
       const payload = verifyAuthToken<WorkshopPayload>(workshopToken);
       if (payload) {
-        const { rows } = await pool.query(
-          `SELECT id, first_name, last_name, badge_number, role
-           FROM sentinel_users
-           WHERE id = $1 AND badge_number = $2 AND is_active = TRUE AND is_deleted = FALSE AND password_hash IS NOT NULL`,
-          [payload.userId, payload.badgeNumber]
-        );
-        if (rows.length > 0) {
-          const u = rows[0];
-          res.json({ accountType: 'workshop', id: u.id, first_name: u.first_name, last_name: u.last_name, badge_number: u.badge_number, role: u.role });
+        const user = await verifyWorkshopSession(payload.userId, payload.badgeNumber);
+        if (user) {
+          res.json({ accountType: 'workshop', id: user.id, first_name: user.first_name, last_name: user.last_name, badge_number: user.badge_number, role: user.role });
           return;
         }
         clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);

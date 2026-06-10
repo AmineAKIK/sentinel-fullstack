@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
@@ -15,7 +15,7 @@ import UnfollowIncidentConfirmModal from '../components/UnfollowIncidentConfirmM
 import DeleteResponsibleCommentConfirmModal from '../components/DeleteResponsibleCommentConfirmModal';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import InvalidateIncidentModal from '../components/InvalidateIncidentModal';
-import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import FilterSummary from '../components/FilterSummary';
 import DetailField from '../components/ui/DetailField';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import {
@@ -33,6 +33,10 @@ import { ProductionLine, WorkshopIncident, WorkshopIncidentMetrics } from '../ty
 import { formatDateTime } from '../utils/date';
 import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
+import { sortIncidents } from '../utils/incidentSort';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { useDashboardFilters, DashboardFilters } from '../hooks/useDashboardFilters';
+import { useDragDrop } from '../hooks/useDragDrop';
 
 function isWithinLastDays(iso: string, days: number): boolean {
   const createdAt = new Date(iso).getTime();
@@ -41,6 +45,7 @@ function isWithinLastDays(iso: string, days: number): boolean {
 }
 
 export default function WorkshopDashboardPage() {
+  usePageTitle('Tableau de bord atelier');
   const { session } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const navigate = useNavigate();
@@ -59,10 +64,14 @@ export default function WorkshopDashboardPage() {
   const [unfollowConfirmIncident, setUnfollowConfirmIncident] = useState<WorkshopIncident | null>(null);
   const [deleteResponsibleCommentIncident, setDeleteResponsibleCommentIncident] = useState<WorkshopIncident | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [draggedIncidentId, setDraggedIncidentId] = useState<number | null>(null);
-  const [dragOverIncidentId, setDragOverIncidentId] = useState<number | null>(null);
-  const scrollFrameRef = useRef<number | null>(null);
-  const scrollSpeedRef = useRef(0);
+  const {
+    draggedIncidentId,
+    dragOverIncidentId,
+    setDraggedIncidentId,
+    scheduleAutoScroll,
+    setDropTarget,
+    resetDragState,
+  } = useDragDrop();
   const [maintenanceDeleteMode, setMaintenanceDeleteMode] = useState<'direct' | 'approve' | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
   const [reviewIncident, setReviewIncident] = useState<WorkshopIncident | null>(null);
@@ -72,14 +81,14 @@ export default function WorkshopDashboardPage() {
   const [responsibleDrafts, setResponsibleDrafts] = useState<Record<number, string>>({});
   const [metrics, setMetrics] = useState<WorkshopIncidentMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    lineId: 'all',
+  const [filters, setFilters] = useState<DashboardFilters>({
+    lineId: searchParams.get('line') || 'all',
     status: 'all',
-    priority: 'all',
-    taken: 'all',
+    priority: searchParams.get('priority') || 'all',
+    taken: searchParams.get('taken') || 'all',
     scope: 'all',
     query: '',
-    aging: 'all',
+    aging: searchParams.get('age') || 'all',
   });
   const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
   const [loading, setLoading] = useState(true);
@@ -90,27 +99,7 @@ export default function WorkshopDashboardPage() {
   const isResponsable = user?.role === 'RESPONSABLE';
   const selectedIncidentParam = searchParams.get('incident');
 
-  const secondaryFilterCount = [
-    filters.lineId !== 'all',
-    filters.priority !== 'all',
-    filters.taken !== 'all',
-  ].filter(Boolean).length;
-  const hasQuickFilter = filters.status !== 'all' || filters.aging !== 'all';
-  const hasScopeFilter = filters.scope !== 'all';
-  const hasSearchFilter = filters.query.trim().length > 0;
-  const activeFilterCount = secondaryFilterCount + (hasQuickFilter ? 1 : 0) + (hasScopeFilter ? 1 : 0) + (hasSearchFilter ? 1 : 0);
-
-  function clearAllFilters() {
-    setFilters({
-      lineId: 'all',
-      status: 'all',
-      priority: 'all',
-      taken: 'all',
-      scope: 'all',
-      query: '',
-      aging: 'all',
-    });
-  }
+  const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({ filters, setFilters, lines });
 
   function setIncidentUrlParam(id: number | null, replace = false) {
     const nextParams = new URLSearchParams(searchParams);
@@ -125,141 +114,6 @@ export default function WorkshopDashboardPage() {
   function clearSelectedIncident(replace = true) {
     setSelectedIncident(null);
     setIncidentUrlParam(null, replace);
-  }
-
-  function selectedLineLabel(): string {
-    return lines.find((line) => String(line.id) === filters.lineId)?.line_number || filters.lineId;
-  }
-
-  const filterChips: FilterChip[] = [
-    ...(hasSearchFilter ? [{
-      key: 'search',
-      label: `Recherche: ${filters.query.trim()}`,
-      onRemove: () => setFilters((prev) => ({ ...prev, query: '' })),
-    }] : []),
-    ...(filters.status === 'OPEN' ? [{
-      key: 'status-open',
-      label: 'Ouverts',
-      onRemove: () => setFilters((prev) => ({ ...prev, status: 'all' })),
-    }] : []),
-    ...(filters.status === 'PENDING' ? [{
-      key: 'status-pending',
-      label: 'En attente',
-      onRemove: () => setFilters((prev) => ({ ...prev, status: 'all' })),
-    }] : []),
-    ...(filters.status === 'CLOSED' ? [{
-      key: 'status-closed',
-      label: 'Clôturés 7j',
-      onRemove: () => setFilters((prev) => ({ ...prev, status: 'all' })),
-    }] : []),
-    ...(filters.aging === 'over_7d' ? [{
-      key: 'aging',
-      label: 'Ouverts > 7j',
-      onRemove: () => setFilters((prev) => ({ ...prev, aging: 'all' })),
-    }] : []),
-    ...(filters.lineId !== 'all' ? [{
-      key: 'line',
-      label: `Ligne ${selectedLineLabel()}`,
-      onRemove: () => setFilters((prev) => ({ ...prev, lineId: 'all' })),
-    }] : []),
-    ...(filters.priority !== 'all' ? [{
-      key: 'priority',
-      label: filters.priority === 'urgent' ? 'Urgents' : 'Non urgents',
-      onRemove: () => setFilters((prev) => ({ ...prev, priority: 'all' })),
-    }] : []),
-    ...(filters.taken !== 'all' ? [{
-      key: 'taken',
-      label: filters.taken === 'taken' ? 'Pris en charge' : 'Non pris',
-      onRemove: () => setFilters((prev) => ({ ...prev, taken: 'all' })),
-    }] : []),
-    ...(filters.scope === 'followed' ? [{
-      key: 'followed',
-      label: 'Suivis',
-      onRemove: () => setFilters((prev) => ({ ...prev, scope: 'all' })),
-    }] : []),
-    ...(filters.scope === 'assigned_to_me' ? [{
-      key: 'assigned_to_me',
-      label: 'Pris par moi',
-      onRemove: () => setFilters((prev) => ({ ...prev, scope: 'all' })),
-    }] : []),
-    ...(filters.scope === 'created_by_me' ? [{
-      key: 'created_by_me',
-      label: 'Créés par moi',
-      onRemove: () => setFilters((prev) => ({ ...prev, scope: 'all' })),
-    }] : []),
-  ];
-
-  function stopAutoScroll() {
-    scrollSpeedRef.current = 0;
-    if (scrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(scrollFrameRef.current);
-      scrollFrameRef.current = null;
-    }
-  }
-
-  function scheduleAutoScroll(clientY: number) {
-    const edgeSize = 120;
-    const maxStep = 16;
-    const viewportHeight = window.innerHeight;
-    let nextSpeed = 0;
-
-    if (clientY < edgeSize) {
-      const intensity = (edgeSize - clientY) / edgeSize;
-      nextSpeed = -Math.ceil(maxStep * intensity);
-    } else if (clientY > viewportHeight - edgeSize) {
-      const intensity = (clientY - (viewportHeight - edgeSize)) / edgeSize;
-      nextSpeed = Math.ceil(maxStep * intensity);
-    }
-
-    scrollSpeedRef.current = nextSpeed;
-    if (nextSpeed === 0) {
-      stopAutoScroll();
-      return;
-    }
-
-    if (scrollFrameRef.current !== null) return;
-    const tick = () => {
-      if (scrollSpeedRef.current === 0) {
-        scrollFrameRef.current = null;
-        return;
-      }
-      window.scrollBy(0, scrollSpeedRef.current);
-      scrollFrameRef.current = window.requestAnimationFrame(tick);
-    };
-    scrollFrameRef.current = window.requestAnimationFrame(tick);
-  }
-
-  useEffect(() => {
-    return () => {
-      stopAutoScroll();
-    };
-  }, []);
-
-  function resetDragState() {
-    setDraggedIncidentId(null);
-    setDragOverIncidentId(null);
-    stopAutoScroll();
-  }
-
-  function setDropTarget(id: number) {
-    if (dragOverIncidentId !== id) {
-      setDragOverIncidentId(id);
-    }
-  }
-
-  function sortIncidents(items: WorkshopIncident[]): WorkshopIncident[] {
-    return [...items].sort((a, b) => {
-      if (a.is_priority !== b.is_priority) {
-        return a.is_priority ? -1 : 1;
-      }
-      if (a.display_order !== b.display_order) {
-        return b.display_order - a.display_order;
-      }
-      if (a.is_taken !== b.is_taken) {
-        return a.is_taken ? 1 : -1;
-      }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
   }
 
   async function persistManualOrder(ordered: WorkshopIncident[]) {
@@ -619,6 +473,8 @@ export default function WorkshopDashboardPage() {
   if (selectedIncident) {
     const canRequestEdit = canPerform(user?.role, 'requestEdit', selectedIncident, user?.id);
     const canDirectEdit = canPerform(user?.role, 'directEdit', selectedIncident);
+    const canResponsableEdit = canPerform(user?.role, 'responsableEdit', selectedIncident);
+    const canWithdrawEdit = canPerform(user?.role, 'withdrawEdit', selectedIncident, user?.id);
     const canRequestCancel = canPerform(user?.role, 'requestCancel', selectedIncident, user?.id);
     const canCancel = canPerform(user?.role, 'cancel', selectedIncident);
     const canTake = canPerform(user?.role, 'take', selectedIncident);
@@ -649,12 +505,20 @@ export default function WorkshopDashboardPage() {
                   {selectedIncident.is_followed ? 'Retirer du suivi' : 'Suivre'}
                 </button>
               )}
-              {(canRequestEdit || canDirectEdit) && (
+              {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
                 <button
                   className="btn btn-secondary"
                   onClick={() => setShowEdit(true)}
                 >
                   {canRequestEdit ? 'Demander une correction' : 'Modifier'}
+                </button>
+              )}
+              {canWithdrawEdit && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => patchIncident(selectedIncident.id, { withdrawEditRequest: true })}
+                >
+                  Retirer ma demande
                 </button>
               )}
               {canTake && (
@@ -1014,7 +878,7 @@ export default function WorkshopDashboardPage() {
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }} />
+          <span className="spinner" aria-hidden="true" style={{ width: 24, height: 24, borderWidth: 3 }} />
         </div>
       ) : sortedIncidents.length === 0 ? (
         <div className="card">

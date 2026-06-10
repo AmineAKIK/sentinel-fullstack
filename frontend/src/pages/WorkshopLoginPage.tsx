@@ -3,10 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { unifiedLogin } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 type Mode = 'identifier' | 'password' | 'setup';
 
 export default function WorkshopLoginPage() {
+  usePageTitle('Connexion atelier');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [setupCode, setSetupCode] = useState('');
@@ -147,7 +149,9 @@ export default function WorkshopLoginPage() {
               disabled={loading}
               autoComplete="username"
               autoFocus={mode === 'identifier'}
-              placeholder="B-0001"
+              placeholder="0001"
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'workshop-login-error' : undefined}
             />
           </div>
 
@@ -164,6 +168,8 @@ export default function WorkshopLoginPage() {
                 autoComplete="current-password"
                 autoFocus
                 placeholder="••••••••"
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? 'workshop-login-error' : undefined}
               />
             </div>
           )}
@@ -183,6 +189,8 @@ export default function WorkshopLoginPage() {
                   autoFocus
                   placeholder="ABC123DEF4"
                   maxLength={20}
+                  aria-invalid={Boolean(error) || undefined}
+                  aria-describedby={error ? 'workshop-login-error' : undefined}
                 />
               </div>
               <div className="form-group">
@@ -196,6 +204,8 @@ export default function WorkshopLoginPage() {
                   disabled={loading}
                   autoComplete="new-password"
                   placeholder="••••••••"
+                  aria-invalid={Boolean(error) || undefined}
+                  aria-describedby={error ? 'workshop-login-error' : undefined}
                 />
               </div>
               <div className="form-group">
@@ -209,16 +219,18 @@ export default function WorkshopLoginPage() {
                   disabled={loading}
                   autoComplete="new-password"
                   placeholder="••••••••"
+                  aria-invalid={Boolean(error) || undefined}
+                  aria-describedby={error ? 'workshop-login-error' : undefined}
                 />
               </div>
             </>
           )}
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div id="workshop-login-error" className="error-message" role="alert">{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading
-              ? <><span className="spinner" /> Vérification...</>
+              ? <><span className="spinner" aria-hidden="true" /> Vérification...</>
               : mode === 'setup' ? 'Créer le mot de passe'
               : mode === 'password' ? 'Se connecter'
               : 'Continuer'}

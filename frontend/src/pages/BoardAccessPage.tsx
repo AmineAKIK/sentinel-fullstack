@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { createBoardSession, getBoardAccess } from '../api/board';
 import { ApiResponseError } from '../api/client';
 import WorkshopBoardPage from './WorkshopBoardPage';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 type AccessState = 'checking' | 'locked' | 'ready';
 
 export default function BoardAccessPage() {
+  usePageTitle("Tableau d'atelier");
   const [state, setState] = useState<AccessState>('checking');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +46,7 @@ export default function BoardAccessPage() {
     return (
       <main className="board-access-page" id="main-content">
         <section className="board-access-card" aria-live="polite">
-          <span className="spinner" />
+          <span className="spinner" aria-hidden="true" />
           <p>Vérification de l’accès au tableau...</p>
         </section>
       </main>
@@ -78,13 +80,15 @@ export default function BoardAccessPage() {
               autoFocus
               disabled={loading}
               placeholder="Code du tableau"
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'board-access-error' : undefined}
             />
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div id="board-access-error" className="error-message" role="alert">{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? <><span className="spinner" /> Ouverture…</> : 'Ouvrir le tableau'}
+            {loading ? <><span className="spinner" aria-hidden="true" /> Ouverture…</> : 'Ouvrir le tableau'}
           </button>
         </form>
       </section>

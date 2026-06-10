@@ -1,39 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import NavBar from '../components/NavBar';
 import CreateLineModal from '../components/CreateLineModal';
-import EditLineModal from '../components/EditLineModal';
-import DeleteLineConfirmModal from '../components/DeleteLineConfirmModal';
-import EditMachineModal from '../components/EditMachineModal';
-import LinePlanModal from '../components/LinePlanModal';
+import LineDetailView from '../components/LineDetailView';
 import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
-import DetailField from '../components/ui/DetailField';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import SelectField from '../components/ui/SelectField';
 import Spinner from '../components/ui/Spinner';
 import { listLines } from '../api/lines';
-import { LineMachine, ProductionLine } from '../types';
+import { ProductionLine } from '../types';
 import { formatDate } from '../utils/date';
+import { makeSortCodec } from '../utils/sortCodec';
+import { usePageTitle } from '../hooks/usePageTitle';
+
+const lineSortCodec = makeSortCodec([
+  { key: 'line_asc',     sort: 'line_number', order: 'asc'  },
+  { key: 'line_desc',    sort: 'line_number', order: 'desc' },
+  { key: 'status_asc',   sort: 'status',      order: 'asc'  },
+  { key: 'status_desc',  sort: 'status',      order: 'desc' },
+  { key: 'created_asc',  sort: 'created_at',  order: 'asc'  },
+  { key: 'created_desc', sort: 'created_at',  order: 'desc' },
+]);
 
 type LineSortField = 'line_number' | 'machines' | 'status' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
-function robotLabel(machine: LineMachine): string {
-  if (machine.hasDoubleRobot) {
-    return `Gauche ${machine.leftRobotNumber} (${machine.leftRobotHeads} têtes) / Droite ${machine.rightRobotNumber} (${machine.rightRobotHeads} têtes)`;
-  }
-  return `${machine.robotNumber} (${machine.robotHeads} têtes)`;
-}
-
 export default function LinesPage() {
+  usePageTitle('Gestion des lignes');
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [selected, setSelected] = useState<ProductionLine | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [editMachineIndex, setEditMachineIndex] = useState<number | null>(null);
-  const [showPlan, setShowPlan] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -55,21 +52,13 @@ export default function LinesPage() {
   }, []);
 
   function getSortValue(): string {
-    if (sort === 'line_number' && order === 'asc') return 'line_asc';
-    if (sort === 'line_number' && order === 'desc') return 'line_desc';
-    if (sort === 'status' && order === 'asc') return 'status_asc';
-    if (sort === 'status' && order === 'desc') return 'status_desc';
-    if (sort === 'created_at' && order === 'asc') return 'created_asc';
-    return 'created_desc';
+    return lineSortCodec.encode({ sort, order });
   }
 
   function applySortValue(value: string) {
-    if (value === 'line_asc') { setSort('line_number'); setOrder('asc'); }
-    else if (value === 'line_desc') { setSort('line_number'); setOrder('desc'); }
-    else if (value === 'status_asc') { setSort('status'); setOrder('asc'); }
-    else if (value === 'status_desc') { setSort('status'); setOrder('desc'); }
-    else if (value === 'created_asc') { setSort('created_at'); setOrder('asc'); }
-    else { setSort('created_at'); setOrder('desc'); }
+    const { sort: s, order: o } = lineSortCodec.decode(value);
+    setSort(s as LineSortField);
+    setOrder(o as SortOrder);
   }
 
   function openFilters() {
@@ -150,125 +139,24 @@ export default function LinesPage() {
   // ── Detail view ────────────────────────────────────────────────────────────
   if (selected) {
     return (
-      <>
-        <NavBar />
-        <main id="main-content" className="page-container">
-          <button className="back-link" onClick={() => setSelected(null)}>
-            Retour à la liste
-          </button>
-
-          <div className="page-header">
-            <h1>Ligne {selected.line_number}</h1>
-            <div className="action-bar" style={{ marginTop: 0 }}>
-              <button className="btn btn-secondary" onClick={() => setShowPlan(true)}>Plan de la ligne</button>
-              <button className="btn btn-secondary" onClick={() => setShowEdit(true)}>Modifier</button>
-              <button className="btn btn-danger" onClick={() => setShowDelete(true)}>Supprimer</button>
-            </div>
-          </div>
-
-          {successMsg && <div className="success-message" style={{ marginBottom: 16 }}>{successMsg}</div>}
-          {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
-
-          <div className="card">
-            <div className="card-body">
-              <div className="detail-grid" style={{ marginBottom: 20 }}>
-                <DetailField label="Numéro de ligne">{selected.line_number}</DetailField>
-                <DetailField label="Machines">{selected.machines.length}</DetailField>
-                <DetailField label="Statut">
-                  <span className={`badge-status ${selected.is_active ? 'active' : 'inactive'}`}>
-                    {selected.is_active ? 'Actif' : 'Inactif'}
-                  </span>
-                </DetailField>
-                <DetailField label="Date de création">{formatDate(selected.created_at)}</DetailField>
-              </div>
-
-              <div className="notice" style={{ marginBottom: 16 }}>
-                Ordre d'affichage : de la SPI vers le four.
-              </div>
-
-              <div className="line-detail-list">
-                {selected.machines.map((machine, index) => (
-                  <div
-                    className="line-detail-item"
-                    key={`${machine.machineId}-${index}`}
-                    onClick={() => setEditMachineIndex(index)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditMachineIndex(index); } }}
-                  >
-                    <span className="line-detail-order">{index + 1}</span>
-                    <div>
-                      <strong>{machine.machineId}</strong>
-                      <div className="line-detail-meta">
-                        {machine.brand} · {machine.hasDoubleRobot ? 'Double robot' : 'Robot unique'} · {robotLabel(machine)}
-                      </div>
-                    </div>
-                    <span className="line-detail-edit" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41L18.37 3.29c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
-                      </svg>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </main>
-
-        {showEdit && (
-          <EditLineModal
-            line={selected}
-            onClose={() => setShowEdit(false)}
-            onSuccess={(updated) => {
-              setShowEdit(false);
-              setSelected(updated);
-              setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-              setSuccessMsg(`Ligne ${updated.line_number} modifiée avec succès.`);
-              setTimeout(() => setSuccessMsg(''), 4000);
-            }}
-          />
-        )}
-        {showDelete && (
-          <DeleteLineConfirmModal
-            line={selected}
-            onClose={() => setShowDelete(false)}
-            onSuccess={() => {
-              setShowDelete(false);
-              setLines((prev) => prev.filter((l) => l.id !== selected.id));
-              setSelected(null);
-              setSuccessMsg(`Ligne ${selected.line_number} supprimée avec succès.`);
-              setTimeout(() => setSuccessMsg(''), 4000);
-            }}
-          />
-        )}
-        {showPlan && (
-          <LinePlanModal
-            line={selected}
-            onClose={() => setShowPlan(false)}
-            onSuccess={(updated) => {
-              setShowPlan(false);
-              setSelected(updated);
-              setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-              setSuccessMsg('Ordre des machines mis à jour.');
-              setTimeout(() => setSuccessMsg(''), 4000);
-            }}
-          />
-        )}
-        {editMachineIndex !== null && (
-          <EditMachineModal
-            line={selected}
-            machineIndex={editMachineIndex}
-            onClose={() => setEditMachineIndex(null)}
-            onSuccess={(updated) => {
-              setEditMachineIndex(null);
-              setSelected(updated);
-              setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-              setSuccessMsg('Machine modifiée avec succès.');
-              setTimeout(() => setSuccessMsg(''), 4000);
-            }}
-          />
-        )}
-      </>
+      <LineDetailView
+        line={selected}
+        successMsg={successMsg}
+        error={error}
+        onBack={() => setSelected(null)}
+        onLineUpdated={(updated, message) => {
+          setSelected(updated);
+          setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+          setSuccessMsg(message);
+          setTimeout(() => setSuccessMsg(''), 4000);
+        }}
+        onLineDeleted={(line) => {
+          setLines((prev) => prev.filter((l) => l.id !== line.id));
+          setSelected(null);
+          setSuccessMsg(`Ligne ${line.line_number} supprimée avec succès.`);
+          setTimeout(() => setSuccessMsg(''), 4000);
+        }}
+      />
     );
   }
 
@@ -327,28 +215,28 @@ export default function LinesPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th aria-sort={headerAriaSort('line_number')}>
+                      <th scope="col" aria-sort={headerAriaSort('line_number')}>
                         <button className="table-sort-button" type="button" onClick={() => toggleTableSort('line_number')}>
                           Numéro de ligne
                           <span className="sr-only">{headerSortLabel('line_number')}</span>
                         </button>
                       </th>
-                      <th>Machines</th>
-                      <th>Première machine</th>
-                      <th>Dernière machine</th>
-                      <th aria-sort={headerAriaSort('status')}>
+                      <th scope="col">Machines</th>
+                      <th scope="col">Première machine</th>
+                      <th scope="col">Dernière machine</th>
+                      <th scope="col" aria-sort={headerAriaSort('status')}>
                         <button className="table-sort-button" type="button" onClick={() => toggleTableSort('status')}>
                           Statut
                           <span className="sr-only">{headerSortLabel('status')}</span>
                         </button>
                       </th>
-                      <th aria-sort={headerAriaSort('created_at')}>
+                      <th scope="col" aria-sort={headerAriaSort('created_at')}>
                         <button className="table-sort-button" type="button" onClick={() => toggleTableSort('created_at')}>
                           Date création
                           <span className="sr-only">{headerSortLabel('created_at')}</span>
                         </button>
                       </th>
-                      <th></th>
+                      <th scope="col" aria-label="Actions"></th>
                     </tr>
                   </thead>
                   <tbody>

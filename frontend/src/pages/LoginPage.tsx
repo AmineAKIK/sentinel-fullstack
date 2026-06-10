@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function LoginPage() {
+  usePageTitle('Accueil');
   return (
     <main className="login-hub-page" id="main-content">
       <section className="login-hub-shell">

@@ -29,15 +29,16 @@ export default function WorkshopNavBar() {
       actions={
         <>
           {user && (
-            <span className="nav-user">
-              {user.first_name} {user.last_name}
-            </span>
+            <div className="workshop-nav-session">
+              <span className="nav-user workshop-nav-user">
+                {user.first_name} {user.last_name}
+              </span>
+              <button className="nav-logout workshop-nav-logout" onClick={handleLogout}>
+                Déconnexion
+              </button>
+            </div>
           )}
-          {user ? (
-            <button className="nav-logout" onClick={handleLogout}>
-              Déconnexion
-            </button>
-          ) : (
+          {!user && (
             <button className="nav-logout" onClick={() => navigate('/login')}>
               Connexion
             </button>

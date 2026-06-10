@@ -92,7 +92,7 @@ export default function EditLineSummaryModal({
             Retour
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={loading || changes.length === 0}>
-            {loading ? <><span className="spinner" /> Enregistrement…</> : 'Enregistrer'}
+            {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
           </button>
         </>
       }
