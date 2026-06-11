@@ -34,6 +34,12 @@ export default function LoginPage() {
             </div>
           </Link>
         </div>
+
+        <footer className="login-hub-footer">
+          <Link to="/confidentialite" className="login-hub-footer-link">
+            Confidentialité des données
+          </Link>
+        </footer>
       </section>
     </main>
   );

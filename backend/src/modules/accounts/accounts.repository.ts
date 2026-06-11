@@ -173,11 +173,22 @@ export async function setAccountActive(id: number, isActive: boolean, client?: P
   return rows[0] ?? null;
 }
 
+// RGPD : la suppression anonymise les données personnelles (nom, prénom, badge)
+// et détruit les credentials dans la même requête. L'id est conservé pour
+// l'intégrité référentielle des incidents et de l'audit trail (pseudonymisation).
 export async function softDeleteAccount(id: number, client?: PoolClient): Promise<boolean> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE sentinel_users
-     SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
+     SET is_deleted = TRUE,
+         deleted_at = NOW(),
+         updated_at = NOW(),
+         first_name = 'Utilisateur',
+         last_name = 'Supprimé',
+         badge_number = 'ANON-' || id,
+         password_hash = NULL,
+         password_setup_token_hash = NULL,
+         password_setup_expires_at = NULL
      WHERE id = $1 AND is_deleted = FALSE
      RETURNING id`,
     [id]
