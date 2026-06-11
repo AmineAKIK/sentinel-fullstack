@@ -59,7 +59,7 @@ export async function setPendingIncidentService(
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
     if (!canPerform(actorRole, 'SET_PENDING', current)) return { kind: 'forbidden' as const };
-    if (!diagnostic?.trim() && !current.diagnostic) return { kind: 'bad_request' as const, msg: 'Diagnostic obligatoire avant mise en attente.' };
+    if (!diagnostic?.trim() && !current.diagnostic) return { kind: 'bad_request' as const, msg: 'Diagnostic obligatoire avant suspension.' };
 
     const id = await workshopRepository.updateIncidentData({
       incidentId, current,
@@ -79,7 +79,7 @@ export async function setPendingIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
-  if (result.kind === 'forbidden') return forbidden('Mise en attente non autorisée pour ce rôle ou ce statut.');
+  if (result.kind === 'forbidden') return forbidden('Suspension non autorisée pour ce rôle ou ce statut.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
@@ -186,7 +186,7 @@ export async function invalidateIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
-  if (result.kind === 'forbidden') return forbidden('Seul le responsable peut invalider un cas clôturé.');
+  if (result.kind === 'forbidden') return forbidden('Seul le responsable peut invalider un incident clôturé.');
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 

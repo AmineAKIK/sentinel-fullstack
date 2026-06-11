@@ -34,7 +34,7 @@ export default function MaintenanceDeleteConfirmModal({
       }
     >
       <div className="notice">
-        {message || "Cette action annule le signalement et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon."}
+        {message || "Cette action annule l’incident et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon."}
       </div>
       <div className="detail-grid" style={{ marginTop: 12 }}>
         <div className="detail-field">

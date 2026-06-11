@@ -75,7 +75,7 @@ export default function IncidentCard({
     >
       {isResolvedFollowed && (
         <div className="incident-followed-resolved-banner">
-          <strong>{incident.status === 'CLOSED' ? 'Cas clôturé' : 'Cas annulé'}</strong>
+          <strong>{incident.status === 'CLOSED' ? 'Incident clôturé' : 'Incident annulé'}</strong>
           <span>Conservé dans vos suivis</span>
           <button
             type="button"
@@ -173,7 +173,7 @@ export default function IncidentCard({
 
       {incident.status === 'PENDING' && incident.diagnostic && (
         <div className="notice" style={{ marginTop: 12 }}>
-          Attente justifiée : {incident.diagnostic}
+          Suspension justifiée : {incident.diagnostic}
         </div>
       )}
       {incident.responsible_comment && (

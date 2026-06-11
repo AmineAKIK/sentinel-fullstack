@@ -81,7 +81,7 @@ export default function ReviewIncidentRequestModal({
           onClick={onApproveDelete}
           disabled={loading || deleteApprovalDisabled}
         >
-          {loading ? 'Annulation…' : 'Annuler le signalement'}
+          {loading ? 'Annulation…' : "Annuler l'incident"}
         </button>
       )}
     </>

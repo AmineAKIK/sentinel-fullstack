@@ -721,7 +721,7 @@ export async function getIncidentMetrics(userId: number): Promise<WorkshopIncide
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql} AND taken_by_user_id = $1)::int AS assigned_to_me_count,
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql}
          AND NOW() - created_at > INTERVAL ${INCIDENT_CRITICAL_AGE})::int AS open_over_7d,
-       COUNT(*) FILTER (WHERE status = 'CLOSED' AND is_deleted = FALSE
+       COUNT(*) FILTER (WHERE status = 'CLOSED'
          AND updated_at >= CURRENT_DATE AND updated_at < CURRENT_DATE + INTERVAL '1 day')::int AS closed_today
      FROM workshop_incidents`,
     [userId]

@@ -6,6 +6,7 @@ export interface UseDragDropReturn {
   setDraggedIncidentId: React.Dispatch<React.SetStateAction<number | null>>;
   scheduleAutoScroll: (clientY: number) => void;
   setDropTarget: (id: number) => void;
+  clearDropTarget: (id: number) => void;
   resetDragState: () => void;
 }
 
@@ -73,12 +74,19 @@ export function useDragDrop(): UseDragDropReturn {
     }
   }
 
+  function clearDropTarget(id: number) {
+    if (dragOverIncidentId === id) {
+      setDragOverIncidentId(null);
+    }
+  }
+
   return {
     draggedIncidentId,
     dragOverIncidentId,
     setDraggedIncidentId,
     scheduleAutoScroll,
     setDropTarget,
+    clearDropTarget,
     resetDragState,
   };
 }

@@ -550,7 +550,7 @@ export default function WorkshopPilotagePage() {
               onClick={oldCases.length > 0 ? () => goToDashboard({ age: 'over_7d' }) : undefined}
               disabled={oldCases.length === 0}
             >
-              <span className="pilotage-hero-stat-label">Cas &gt; 7 jours</span>
+              <span className="pilotage-hero-stat-label">Incidents &gt; 7 jours</span>
               <div className="pilotage-hero-stat-body">
                 <strong className="pilotage-hero-stat-value pilotage-hero-stat-value-critical">
                   {realtimeLoading ? '…' : oldCases.length}
@@ -668,7 +668,7 @@ export default function WorkshopPilotagePage() {
               </div>
               <FilterSummary
                 count={analytics?.total ?? 0}
-                countLabel="signalement(s) dans le périmètre"
+                countLabel="incident(s) dans le périmètre"
                 chips={filterChips}
                 onClear={clearFilters}
                 emptyText="Périmètre par défaut — 7 derniers jours, toutes lignes"
@@ -681,19 +681,19 @@ export default function WorkshopPilotagePage() {
             <EmptyState>Chargement des indicateurs…</EmptyState>
           ) : !hasAnalyticsData ? (
             <p className="muted" style={{ margin: '16px 0', fontSize: 14 }}>
-              Aucun signalement sur cette période — ajustez les filtres.
+              Aucun incident sur cette période — ajustez les filtres.
             </p>
           ) : (
             <>
               {/* KPI row analytics */}
               <div className="pilotage-analytics-kpis">
                 {[
-                  { label: 'Total signalements', value: analytics?.total ?? 0, sub: 'Sur la période' },
+                  { label: 'Total incidents', value: analytics?.total ?? 0, sub: 'Sur la période' },
                   { label: 'Taux de clôture', value: `${closureRate}%`, sub: `${trendSummary.closed} clôturés / ${trendSummary.created} créés`, tone: closureRate < 50 ? 'tension' : closureRate < 80 ? 'watch' : 'stable' },
                   { label: 'Solde', value: signedNumber(backlogDelta), sub: 'Créés − clôturés', tone: backlogDelta > 4 ? 'tension' : backlogDelta > 0 ? 'watch' : 'stable' },
                   { label: 'Médiane prise en charge', value: formatDuration(analytics?.median_take_seconds ?? null), sub: 'Avant 1ère action' },
                   { label: 'Médiane clôture', value: formatDuration(analytics?.median_close_seconds ?? null), sub: 'Durée typique' },
-                  { label: 'Cas > 24 h', value: analytics?.open_over_24h ?? 0, sub: 'Actifs qui vieillissent', tone: (analytics?.open_over_24h ?? 0) > 0 ? 'watch' : 'stable' },
+                  { label: 'Incidents > 24 h', value: analytics?.open_over_24h ?? 0, sub: 'Actifs qui vieillissent', tone: (analytics?.open_over_24h ?? 0) > 0 ? 'watch' : 'stable' },
                 ].map(({ label, value, sub, tone }) => (
                   <div key={label} className={`pilotage-analytics-kpi${tone ? ` pilotage-analytics-kpi-${tone}` : ''}`}>
                     <span className="pilotage-analytics-kpi-label">{label}</span>

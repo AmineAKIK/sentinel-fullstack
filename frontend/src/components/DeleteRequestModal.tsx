@@ -12,9 +12,9 @@ export default function DeleteRequestModal({ incident, onClose, onConfirm }: Del
     <TextConfirmModal
       title="Demande d’annulation"
       variant="danger"
-      notice={<>Vous demandez l’annulation de l'incident {incident.line_number} · {incident.machine_id}. Le signalement restera tracé dans l’historique.</>}
+      notice={<>Vous demandez l’annulation de l’incident {incident.line_number} · {incident.machine_id}. L’incident restera tracé dans l’historique.</>}
       label="Motif d’annulation *"
-      placeholder="Erreur de signalement, doublon, mauvais équipement..."
+      placeholder="Erreur de saisie, doublon, mauvais équipement..."
       confirmLabel="Envoyer la demande"
       loadingLabel="Envoi…"
       requiredMessage="Merci de renseigner le motif d’annulation."

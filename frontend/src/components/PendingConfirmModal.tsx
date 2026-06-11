@@ -10,14 +10,14 @@ interface PendingConfirmModalProps {
 export default function PendingConfirmModal({ incident, onClose, onConfirm }: PendingConfirmModalProps) {
   return (
     <TextConfirmModal
-      title="Mettre en attente"
-      notice={<>Vous allez mettre en attente l'incident {incident.line_number} · {incident.machine_id}.</>}
+      title="Suspendre l'incident"
+      notice={<>Vous allez suspendre l'incident {incident.line_number} · {incident.machine_id}.</>}
       label="Justification *"
-      placeholder="Expliquez la raison de la mise en attente"
-      confirmLabel="Mettre en attente"
+      placeholder="Expliquez la raison de la suspension"
+      confirmLabel="Suspendre"
       loadingLabel="Confirmation…"
       requiredMessage="Merci de renseigner la justification."
-      failureMessage="Impossible de mettre l'incident en attente."
+      failureMessage="Impossible de suspendre l'incident."
       textareaId="pendingReason"
       onClose={onClose}
       onConfirm={onConfirm}

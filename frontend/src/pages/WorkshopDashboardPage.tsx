@@ -35,7 +35,7 @@ import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils
 import { canPerform } from '../utils/workshopPermissions';
 import { sortIncidents } from '../utils/incidentSort';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useDashboardFilters, DashboardFilters } from '../hooks/useDashboardFilters';
+import { useDashboardFilters, DashboardFilters as DashboardFiltersState } from '../hooks/useDashboardFilters';
 import { useDragDrop } from '../hooks/useDragDrop';
 
 function isWithinLastDays(iso: string, days: number): boolean {
@@ -70,6 +70,7 @@ export default function WorkshopDashboardPage() {
     setDraggedIncidentId,
     scheduleAutoScroll,
     setDropTarget,
+    clearDropTarget,
     resetDragState,
   } = useDragDrop();
   const [maintenanceDeleteMode, setMaintenanceDeleteMode] = useState<'direct' | 'approve' | null>(null);
@@ -81,7 +82,7 @@ export default function WorkshopDashboardPage() {
   const [responsibleDrafts, setResponsibleDrafts] = useState<Record<number, string>>({});
   const [metrics, setMetrics] = useState<WorkshopIncidentMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [filters, setFilters] = useState<DashboardFilters>({
+  const [filters, setFilters] = useState<DashboardFiltersState>({
     lineId: searchParams.get('line') || 'all',
     status: 'all',
     priority: searchParams.get('priority') || 'all',
@@ -292,7 +293,7 @@ export default function WorkshopDashboardPage() {
       void refreshMetrics();
       closeReview();
     } catch (err) {
-      setReviewError("Impossible d’annuler l'incident.");
+      setReviewError("Impossible d'annuler l'incident.");
     } finally {
       setReviewLoading(false);
     }
@@ -307,7 +308,7 @@ export default function WorkshopDashboardPage() {
       upsertIncident(updated);
       closeReview();
     } catch (err) {
-      setReviewError("Impossible de refuser l’annulation.");
+      setReviewError("Impossible de refuser l'annulation.");
     } finally {
       setReviewLoading(false);
     }
@@ -588,7 +589,7 @@ export default function WorkshopDashboardPage() {
               <div className="notice" style={{ marginTop: 16 }}>Demande de modification opérateur en attente.</div>
             )}
             {selectedIncident.cancel_request && (
-              <div className="notice" style={{ marginTop: 16 }}>Demande d’annulation opérateur en attente.</div>
+              <div className="notice" style={{ marginTop: 16 }}>Demande d'annulation opérateur en attente.</div>
             )}
           </div>
         </div>
@@ -608,7 +609,7 @@ export default function WorkshopDashboardPage() {
                 )}
                 {canSetPending && (
                   <button className="btn btn-secondary" onClick={() => setShowPendingConfirm(true)}>
-                    Mettre en attente
+                    Suspendre
                   </button>
                 )}
                 {canClose && (
@@ -741,7 +742,7 @@ export default function WorkshopDashboardPage() {
             deleteApprovalDisabled={!canPerform(user?.role, 'approveCancel', reviewIncident)}
             deleteWarning={
               canPerform(user?.role, 'approveCancel', reviewIncident)
-                ? "L’annulation conserve le signalement dans l’historique avec sa trace de décision."
+                ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
                 : undefined
             }
             allowEditApply={canPerform(user?.role, 'approveEdit', reviewIncident)}
@@ -758,10 +759,10 @@ export default function WorkshopDashboardPage() {
         {showMaintenanceDeleteConfirm && (selectedIncident || reviewIncident) && (
           <MaintenanceDeleteConfirmModal
             incident={maintenanceDeleteMode === 'approve' ? reviewIncident! : selectedIncident!}
-            title={maintenanceDeleteMode === 'approve' ? 'Valider l’annulation' : 'Annuler le signalement'}
+            title={maintenanceDeleteMode === 'approve' ? "Valider l'annulation" : "Annuler l'incident"}
             message={maintenanceDeleteMode === 'approve'
-              ? 'Cette validation annule le signalement demandé par l’opérateur et conserve la trace dans l’historique.'
-              : 'Cette action annule le signalement et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon.'}
+              ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
+              : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."}
             onClose={() => {
               setShowMaintenanceDeleteConfirm(false);
               setMaintenanceDeleteMode(null);
@@ -872,7 +873,7 @@ export default function WorkshopDashboardPage() {
       />
       {isResponsable && sortedIncidents.length > 1 && sortOrder === 'default' && (
         <div className="reorder-help">
-          Pour changer l’ordre de traitement, sélectionnez un incident puis glissez-le à la position voulue.
+          Pour changer l'ordre de traitement, sélectionnez un incident puis glissez-le à la position voulue.
         </div>
       )}
 
@@ -908,7 +909,7 @@ export default function WorkshopDashboardPage() {
                 }
               }}
               onDragLeave={(id) => {
-                if (dragOverIncidentId === id) setDragOverIncidentId(null);
+                clearDropTarget(id);
               }}
               onDrop={(_event, id) => {
                 void reorderDraggedIncident(id);

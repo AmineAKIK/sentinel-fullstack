@@ -48,7 +48,7 @@ const DEFAULT_SETTINGS: BoardSettings = {
 };
 const PRESET_LABELS: Record<BoardPreset, string> = {
   default: 'Standard',
-  maintenance: 'Maintenance',
+  maintenance: 'Technicien',
   responsable: 'Responsables',
   custom: 'Personnalisé',
 };
@@ -182,10 +182,10 @@ export default function WorkshopBoardPage() {
       ? `${activeIncidents.length} cas ouvert${activeIncidents.length > 1 ? 's' : ''} dans le périmètre`
       : 'Aucun incident ouvert';
   const boardModeDetail = boardMode === 'critical'
-    ? 'Les urgences et les cas non pris restent affichés en priorité.'
+    ? 'Les urgences et les incidents non pris restent affichés en priorité.'
     : boardMode === 'watch'
-      ? 'L’écran suit les cas ouverts et fait tourner les vues utiles automatiquement.'
-      : 'Le périmètre affiché ne contient aucun cas actif.';
+      ? 'L’écran suit les incidents ouverts et fait tourner les vues utiles automatiquement.'
+      : 'Le périmètre affiché ne contient aucun incident actif.';
   const noLineScope = settings.lineIds.includes(NO_LINES_SELECTED);
   const alertIncidents = activeIncidents.filter((incident) =>
     incident.is_priority || !incident.is_taken || incident.status === 'PENDING'
@@ -296,9 +296,9 @@ export default function WorkshopBoardPage() {
   function renderIncidentRows(items: WorkshopBoardIncident[]) {
     if (items.length === 0) {
       return renderEmptyState(
-        activeView === 'alerts' ? 'Aucune alerte prioritaire' : 'Aucun cas visible',
+        activeView === 'alerts' ? 'Aucune alerte prioritaire' : 'Aucun incident visible',
         activeView === 'alerts'
-          ? 'Les cas ouverts sans urgence restent visibles dans les autres vues configurées.'
+          ? 'Les incidents ouverts sans urgence restent visibles dans les autres vues configurées.'
           : 'Le filtrage de cet écran ne retourne aucun incident.'
       );
     }
@@ -385,7 +385,7 @@ export default function WorkshopBoardPage() {
   const viewTitle = activeView === 'alerts'
     ? 'Alertes à traiter'
     : activeView === 'all'
-      ? 'Tous les cas ouverts'
+      ? 'Tous les incidents ouverts'
       : 'Situation par ligne';
   const profileLabel = PRESET_LABELS[settings.preset];
   const screenLabel = screenId.replace(/^ecran[-_]/i, '').toUpperCase();
@@ -542,7 +542,7 @@ export default function WorkshopBoardPage() {
                     checked={draftSettings.showOpenCases}
                     onChange={(event) => updateDraftSettings({ showOpenCases: event.target.checked })}
                   />
-                  Tous les cas ouverts
+                  Tous les incidents ouverts
                 </label>
                 <label className="board-line-option">
                   <input
@@ -558,7 +558,7 @@ export default function WorkshopBoardPage() {
             <section className="board-settings-section">
               <div>
                 <h3>Filtres</h3>
-                <p>Réduit les cas visibles sur cet écran uniquement.</p>
+                <p>Réduit les incidents visibles sur cet écran uniquement.</p>
               </div>
               <div className="board-setting-options">
                 <label className="board-line-option">

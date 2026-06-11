@@ -1,6 +1,6 @@
 export const ROLE_LABELS: Record<string, string> = {
   OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
+  MAINTENANCE: 'Technicien',
   RESPONSABLE: 'Responsable',
 };
 
@@ -57,13 +57,13 @@ export function formatAuditEventTarget(event: AuditEventTarget, includeBadge = f
 }
 
 export const WORKSHOP_EVENT_LABELS: Record<string, string> = {
-  INCIDENT_CREATED: 'Signalement créé',
+  INCIDENT_CREATED: 'Incident signalé',
   INCIDENT_TAKEN: 'Prise en charge',
-  INCIDENT_SET_PENDING: 'Mis en attente',
+  INCIDENT_SET_PENDING: 'Suspendu',
   INCIDENT_RESUMED: 'Reprise en cours',
   INCIDENT_CLOSED: 'Clôturé',
-  INCIDENT_CANCELED: 'Signalement annulé',
-  INCIDENT_INVALIDATED: 'Cas clôturé invalidé',
+  INCIDENT_CANCELED: 'Incident annulé',
+  INCIDENT_INVALIDATED: 'Incident invalidé',
   INCIDENT_FOLLOWED: 'Suivi ajouté',
   INCIDENT_UNFOLLOWED: 'Suivi retiré',
   INCIDENT_UPDATED: 'Incident modifié',

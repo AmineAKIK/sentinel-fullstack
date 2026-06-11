@@ -36,7 +36,7 @@ export function hasOnlyKeys(keys: string[], allowed: readonly string[]): boolean
 }
 
 export function unexpectedFieldsError(): ServiceResult<never> {
-  return badRequest('Payload de modification ambigu ou incompatible avec l'action demandée.');
+  return badRequest("Payload de modification ambigu ou incompatible avec l'action demandée.");
 }
 
 export function pickEditPayload(updates: UpdateIncidentInput): Pick<UpdateIncidentInput, (typeof EDIT_FIELD_KEYS)[number]> {

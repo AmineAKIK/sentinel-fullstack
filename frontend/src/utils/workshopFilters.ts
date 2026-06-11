@@ -76,7 +76,7 @@ export function stateFilterChip(stateFilter: string, onRemove: () => void): Filt
   if (stateFilter === 'all') return [];
   return [{
     key: 'state',
-    label: `Anomalie: ${STATE_LABELS[stateFilter] || stateFilter}`,
+    label: `État ligne : ${STATE_LABELS[stateFilter] || stateFilter}`,
     onRemove,
   }];
 }
