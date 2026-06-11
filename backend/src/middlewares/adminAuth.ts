@@ -1,10 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { sendError } from '../utils/errors';
+import { ADMIN_AUTH_COOKIE } from '../auth/authCookies';
+import {
+  handleJwtError,
+  sendInvalidServerConfig,
+  sendInvalidSession,
+  sendMissingAuth,
+} from '../auth/authResponses';
+import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
+import { getAdminSessionVersion } from '../modules/adminCredentials/adminCredentials.repository';
 
 export interface AdminPayload {
   adminId: number;
   username: string;
+  sessionVersion?: number;
 }
 
 declare global {
@@ -20,24 +28,50 @@ export function adminAuthMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  const token = req.cookies?.sentinel_admin_token;
+  void authenticateAdminRequest(req, res, next);
+}
+
+async function authenticateAdminRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const token = req.cookies?.[ADMIN_AUTH_COOKIE];
 
   if (!token) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Authentification requise.');
+    sendMissingAuth(res);
     return;
   }
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    sendError(res, 500, 'SERVER_ERROR', 'Configuration du serveur invalide.');
+  if (!getJwtSecret()) {
+    sendInvalidServerConfig(res);
     return;
   }
 
   try {
-    const payload = jwt.verify(token, secret) as AdminPayload;
+    const payload = verifyAuthToken<AdminPayload>(token);
+    if (!payload) {
+      sendInvalidServerConfig(res);
+      return;
+    }
+
+    const currentVersion = await getAdminSessionVersion(payload.adminId);
+    if (currentVersion === null) {
+      sendInvalidSession(res);
+      return;
+    }
+
+    // If the token carries a version, reject it if it doesn't match the current one.
+    // Tokens without sessionVersion (issued before migration 022) are still accepted
+    // until they naturally expire.
+    if (payload.sessionVersion !== undefined && payload.sessionVersion !== currentVersion) {
+      sendInvalidSession(res);
+      return;
+    }
+
     req.admin = payload;
     next();
-  } catch {
-    sendError(res, 401, 'UNAUTHORIZED', 'Session invalide ou expirée.');
+  } catch (err) {
+    handleJwtError(err, res);
   }
 }

@@ -1,5 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { clearAuthCookie, WORKSHOP_AUTH_COOKIE } from '../auth/authCookies';
+import {
+  handleJwtError,
+  sendInvalidServerConfig,
+  sendMissingAuth,
+} from '../auth/authResponses';
+import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
+import pool from '../db/pool';
 import { sendError } from '../utils/errors';
 
 export interface WorkshopPayload {
@@ -21,24 +28,58 @@ export function workshopAuthMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  const token = req.cookies?.sentinel_workshop_token;
+  void authenticateWorkshopRequest(req, res, next);
+}
+
+async function authenticateWorkshopRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const token = req.cookies?.[WORKSHOP_AUTH_COOKIE];
 
   if (!token) {
-    sendError(res, 401, 'UNAUTHORIZED', 'Authentification requise.');
+    sendMissingAuth(res);
     return;
   }
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    sendError(res, 500, 'SERVER_ERROR', 'Configuration du serveur invalide.');
+  if (!getJwtSecret()) {
+    sendInvalidServerConfig(res);
     return;
   }
 
   try {
-    const payload = jwt.verify(token, secret) as WorkshopPayload;
-    req.workshopUser = payload;
+    const payload = verifyAuthToken<WorkshopPayload>(token);
+    if (!payload) {
+      sendInvalidServerConfig(res);
+      return;
+    }
+    const { rows } = await pool.query(
+      `SELECT id, badge_number, role
+       FROM sentinel_users
+       WHERE id = $1
+         AND badge_number = $2
+         AND is_active = TRUE
+         AND is_deleted = FALSE
+         AND password_hash IS NOT NULL`,
+      [payload.userId, payload.badgeNumber]
+    );
+
+    if (rows.length === 0) {
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+      sendError(res, 401, 'UNAUTHORIZED', 'Utilisateur inactif ou introuvable.');
+      return;
+    }
+
+    const user = rows[0];
+    req.workshopUser = {
+      userId: user.id,
+      badgeNumber: user.badge_number,
+      role: user.role,
+    };
     next();
-  } catch {
-    sendError(res, 401, 'UNAUTHORIZED', 'Session invalide ou expirée.');
+  } catch (err) {
+    clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+    handleJwtError(err, res);
   }
 }

@@ -1,90 +1,40 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { login } from '../api/auth';
-import { useAuth } from '../routes/AuthContext';
-import { ApiResponseError } from '../api/client';
+import { Link } from 'react-router-dom';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { setAdmin } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const reason = (location.state as { reason?: string } | null)?.reason;
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError('');
-
-    if (!username.trim() || !password) {
-      setError('Veuillez renseigner votre identifiant et votre mot de passe.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const admin = await login(username.trim(), password);
-      setAdmin(admin);
-      navigate('/admin/accueil', { replace: true, state: null });
-    } catch (err) {
-      if (err instanceof ApiResponseError) {
-        setError(err.message);
-      } else {
-        setError('Une erreur inattendue est survenue.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  usePageTitle('Accueil');
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-title">
-          <h1>Administration Sentinel</h1>
-          <p>Gestion des comptes utilisateurs</p>
-        </div>
-        <form className="login-form" onSubmit={handleSubmit} noValidate>
-          {reason && (
-            <div className="notice" style={{ marginBottom: 12 }}>
-              {reason}
+    <main className="login-hub-page" id="main-content">
+      <section className="login-hub-shell">
+        <header className="login-hub-header">
+          <h1>Sentinel</h1>
+          <p>Votre espace de travail.</p>
+        </header>
+
+        <div className="login-space-grid" aria-label="Espaces Sentinel">
+          <Link to="/board" className="login-space-card login-space-board">
+            <span>Tableau</span>
+            <div className="login-space-card-body">
+              <strong>Tableau d'atelier</strong>
+              <p>Vue partagée de l'atelier en temps réel.</p>
             </div>
-          )}
-          <div className="form-group">
-            <label className="form-label" htmlFor="username">Identifiant</label>
-            <input
-              id="username"
-              className="form-input"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={loading}
-              autoComplete="username"
-              autoFocus
-              placeholder="admin"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Mot de passe</label>
-            <input
-              id="password"
-              className="form-input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              autoComplete="current-password"
-              placeholder="••••••••"
-            />
-          </div>
-          {error && <div className="error-message">{error}</div>}
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? <><span className="spinner" /> Connexion…</> : 'Se connecter'}
-          </button>
-        </form>
-      </div>
-    </div>
+          </Link>
+          <Link to="/admin/login" className="login-space-card">
+            <span>Administration</span>
+            <div className="login-space-card-body">
+              <strong>Pilotage interne</strong>
+              <p>Gestion des comptes, lignes et journal.</p>
+            </div>
+          </Link>
+          <Link to="/workshop/login" className="login-space-card">
+            <span>Atelier</span>
+            <div className="login-space-card-body">
+              <strong>Flux d'atelier</strong>
+              <p>Incidents, pilotage et suivi en temps réel.</p>
+            </div>
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }

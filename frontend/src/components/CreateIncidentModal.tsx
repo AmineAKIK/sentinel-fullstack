@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
 import Modal from './Modal';
+import SelectField from './ui/SelectField';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
 import { ApiResponseError } from '../api/client';
 import {
   IncidentShift,
   IncidentState,
-  LineMachine,
   ProductionLine,
   WorkshopIncident,
 } from '../types';
+import { getRobotOptions } from '../utils/lineMachines';
 
 interface CreateIncidentModalProps {
   lines: ProductionLine[];
@@ -16,11 +17,6 @@ interface CreateIncidentModalProps {
   requestOnly?: boolean;
   onClose: () => void;
   onSuccess: (incident: WorkshopIncident) => void;
-}
-
-interface RobotOption {
-  label: string;
-  heads: number;
 }
 
 const SHIFTS: { value: IncidentShift; label: string }[] = [
@@ -35,19 +31,7 @@ const STATES: { value: IncidentState; label: string }[] = [
   { value: 'SKIPEE_PAR_CONDUCTEUR', label: 'Skipée par conducteur' },
   { value: 'DEGRADEE', label: 'Dégradée' },
   { value: 'INDISPONIBLE', label: 'Indisponible' },
-  { value: 'AUTRE', label: 'Autre' },
 ];
-
-function robotOptions(machine?: LineMachine): RobotOption[] {
-  if (!machine) return [];
-  if (machine.hasDoubleRobot) {
-    return [
-      { label: `Gauche ${machine.leftRobotNumber}`, heads: machine.leftRobotHeads },
-      { label: `Droite ${machine.rightRobotNumber}`, heads: machine.rightRobotHeads },
-    ];
-  }
-  return [{ label: machine.robotNumber, heads: machine.robotHeads }];
-}
 
 export default function CreateIncidentModal({
   lines,
@@ -56,6 +40,7 @@ export default function CreateIncidentModal({
   onClose,
   onSuccess,
 }: CreateIncidentModalProps) {
+  const hasLineReferences = lines.length > 0;
   const [shift, setShift] = useState<IncidentShift | ''>(incident?.shift || '');
   const [lineId, setLineId] = useState(incident ? String(incident.line_id) : '');
   const [machineId, setMachineId] = useState(incident?.machine_id || '');
@@ -73,12 +58,16 @@ export default function CreateIncidentModal({
     [lines, lineId]
   );
   const selectedMachine = selectedLine?.machines.find((machine) => machine.machineId === machineId);
-  const robots = robotOptions(selectedMachine);
+  const robots = selectedMachine ? getRobotOptions(selectedMachine) : [];
   const selectedRobot = robots.find((robot) => robot.label === robotLabel);
   const heads = selectedRobot ? Array.from({ length: selectedRobot.heads }, (_, i) => i + 1) : [];
 
   function validate(): boolean {
     setError('');
+    if (!hasLineReferences) {
+      setError("Aucune ligne active n'est disponible dans le référentiel.");
+      return false;
+    }
     if (!shift || !lineId || !machineId || !robotLabel || !headNumber || !state) {
       setError('Veuillez renseigner tous les champs obligatoires.');
       return false;
@@ -120,10 +109,26 @@ export default function CreateIncidentModal({
     }
   }
 
+  const isEditing = Boolean(incident);
+  const isDirty = !showPreview && (
+    shift !== (incident?.shift || '') ||
+    lineId !== (incident ? String(incident.line_id) : '') ||
+    machineId !== (incident?.machine_id || '') ||
+    robotLabel !== (incident?.robot_label || '') ||
+    headNumber !== (incident ? String(incident.head_number) : '') ||
+    state !== (incident?.state || '') ||
+    comment !== (incident?.comment || '') ||
+    currentProduct !== (incident?.current_product || '')
+  );
+
   return (
     <Modal
       title={showPreview ? "Aperçu de l'incident" : incident ? "Modifier l'incident" : 'Créer un incident'}
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isDirty={isDirty}
+      isLoading={loading}
+      size="lg"
       footer={
         showPreview ? (
           <>
@@ -131,7 +136,7 @@ export default function CreateIncidentModal({
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? <><span className="spinner" /> Création…</> : 'Valider la création'}
+              {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : isEditing ? 'Valider la modification' : 'Valider la création'}
             </button>
           </>
         ) : (
@@ -186,118 +191,119 @@ export default function CreateIncidentModal({
               </tbody>
             </table>
           </div>
-          {error && <div className="error-message">{error}</div>}
+          {error && <div id="create-incident-error-preview" className="error-message" role="alert">{error}</div>}
         </>
       ) : (
         <>
+      <div className={hasLineReferences ? 'notice' : 'error-message'} style={{ marginBottom: 12 }}>
+        {hasLineReferences
+          ? 'Ligne, machine, robot et tête proviennent du référentiel actif créé dans l’administration.'
+          : "Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration avant de déclarer un incident."}
+      </div>
+
       <div className="form-group">
         <label className="form-label" htmlFor="incidentShift">Équipe *</label>
-        <select
+        <SelectField
           id="incidentShift"
-          className="form-select"
           value={shift}
-          onChange={(e) => setShift(e.target.value as IncidentShift)}
+          onChange={(value) => setShift(value as IncidentShift)}
           disabled={loading}
-        >
-          <option value="">-- Sélectionner --</option>
-          {SHIFTS.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
+          ariaLabel="Équipe"
+          options={[
+            { value: '', label: '-- Sélectionner --' },
+            ...SHIFTS.map((item) => ({ value: item.value, label: item.label })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentLine">Ligne *</label>
-        <select
+        <SelectField
           id="incidentLine"
-          className="form-select"
           value={lineId}
-          onChange={(e) => {
-            setLineId(e.target.value);
+          onChange={(value) => {
+            setLineId(value);
             setMachineId('');
             setRobotLabel('');
             setHeadNumber('');
           }}
-          disabled={loading}
-        >
-          <option value="">-- Sélectionner --</option>
-          {lines.map((line) => (
-            <option key={line.id} value={line.id}>{line.line_number}</option>
-          ))}
-        </select>
+          disabled={loading || !hasLineReferences}
+          ariaLabel="Ligne"
+          options={[
+            { value: '', label: hasLineReferences ? '-- Ligne du référentiel --' : '-- Aucune ligne active --' },
+            ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentMachine">Machine *</label>
-        <select
+        <SelectField
           id="incidentMachine"
-          className="form-select"
           value={machineId}
-          onChange={(e) => {
-            setMachineId(e.target.value);
+          onChange={(value) => {
+            setMachineId(value);
             setRobotLabel('');
             setHeadNumber('');
           }}
           disabled={loading || !selectedLine}
-        >
-          <option value="">-- Sélectionner --</option>
-          {selectedLine?.machines.map((machine) => (
-            <option key={machine.machineId} value={machine.machineId}>
-              {machine.machineId} - {machine.brand}
-            </option>
-          ))}
-        </select>
+          ariaLabel="Machine"
+          options={[
+            { value: '', label: selectedLine ? '-- Machine du référentiel --' : '-- Sélectionnez une ligne d’abord --' },
+            ...(selectedLine?.machines.map((machine) => ({
+              value: machine.machineId,
+              label: `${machine.machineId} · ${machine.brand}`,
+            })) ?? []),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentRobot">Robot *</label>
-        <select
+        <SelectField
           id="incidentRobot"
-          className="form-select"
           value={robotLabel}
-          onChange={(e) => {
-            setRobotLabel(e.target.value);
+          onChange={(value) => {
+            setRobotLabel(value);
             setHeadNumber('');
           }}
           disabled={loading || !selectedMachine}
-        >
-          <option value="">-- Sélectionner --</option>
-          {robots.map((robot) => (
-            <option key={robot.label} value={robot.label}>{robot.label}</option>
-          ))}
-        </select>
+          ariaLabel="Robot"
+          options={[
+            { value: '', label: selectedMachine ? '-- Robot du référentiel --' : '-- Sélectionnez une machine d’abord --' },
+            ...robots.map((robot) => ({ value: robot.label, label: robot.label })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentHead">Tête *</label>
-        <select
+        <SelectField
           id="incidentHead"
-          className="form-select"
           value={headNumber}
-          onChange={(e) => setHeadNumber(e.target.value)}
+          onChange={setHeadNumber}
           disabled={loading || !selectedRobot}
-        >
-          <option value="">-- Sélectionner --</option>
-          {heads.map((head) => (
-            <option key={head} value={head}>{head}</option>
-          ))}
-        </select>
+          ariaLabel="Tête"
+          options={[
+            { value: '', label: selectedRobot ? '-- Tête disponible --' : '-- Sélectionnez un robot d’abord --' },
+            ...heads.map((head) => ({ value: String(head), label: String(head) })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentState">État *</label>
-        <select
+        <SelectField
           id="incidentState"
-          className="form-select"
           value={state}
-          onChange={(e) => setState(e.target.value as IncidentState)}
+          onChange={(value) => setState(value as IncidentState)}
           disabled={loading}
-        >
-          <option value="">-- Sélectionner --</option>
-          {STATES.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
+          ariaLabel="État"
+          options={[
+            { value: '', label: '-- Sélectionner --' },
+            ...STATES.map((item) => ({ value: item.value, label: item.label })),
+          ]}
+        />
       </div>
 
       <div className="form-group">
@@ -310,6 +316,8 @@ export default function CreateIncidentModal({
           disabled={loading}
           rows={3}
           placeholder="Ajouter un commentaire"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? 'create-incident-error' : undefined}
         />
       </div>
 
@@ -322,10 +330,12 @@ export default function CreateIncidentModal({
           onChange={(e) => setCurrentProduct(e.target.value)}
           disabled={loading}
           placeholder="Référence produit"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? 'create-incident-error' : undefined}
         />
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div id="create-incident-error" className="error-message" role="alert">{error}</div>}
         </>
       )}
     </Modal>

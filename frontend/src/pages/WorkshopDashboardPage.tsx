@@ -1,58 +1,55 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
+import IncidentMetricsBar from '../components/IncidentMetricsBar';
+import DashboardFilters from '../components/DashboardFilters';
+import IncidentCard from '../components/IncidentCard';
 import DeleteRequestModal from '../components/DeleteRequestModal';
 import MaintenanceDeleteConfirmModal from '../components/MaintenanceDeleteConfirmModal';
 import ReviewIncidentRequestModal from '../components/ReviewIncidentRequestModal';
 import TakeChargeConfirmModal from '../components/TakeChargeConfirmModal';
 import PendingConfirmModal from '../components/PendingConfirmModal';
+import ResumeIncidentConfirmModal from '../components/ResumeIncidentConfirmModal';
 import CloseIncidentModal from '../components/CloseIncidentModal';
+import UnfollowIncidentConfirmModal from '../components/UnfollowIncidentConfirmModal';
+import DeleteResponsibleCommentConfirmModal from '../components/DeleteResponsibleCommentConfirmModal';
+import WorkshopNavBar from '../components/WorkshopNavBar';
+import InvalidateIncidentModal from '../components/InvalidateIncidentModal';
+import FilterSummary from '../components/FilterSummary';
+import DetailField from '../components/ui/DetailField';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import {
   deleteWorkshopIncident,
+  followWorkshopIncident,
   getIncidentMetrics,
   listWorkshopIncidents,
   listWorkshopLines,
+  reorderWorkshopIncidents,
+  unfollowWorkshopIncident,
   updateWorkshopIncident,
 } from '../api/workshop';
-import { useWorkshopAuth } from '../routes/WorkshopAuthContext';
+import { useAppAuth } from '../routes/AppAuthContext';
 import { ProductionLine, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
+import { formatDateTime } from '../utils/date';
+import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
+import { canPerform } from '../utils/workshopPermissions';
+import { sortIncidents } from '../utils/incidentSort';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { useDashboardFilters, DashboardFilters as DashboardFiltersState } from '../hooks/useDashboardFilters';
+import { useDragDrop } from '../hooks/useDragDrop';
 
-const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
-  RESPONSABLE: 'Responsable',
-};
-
-const SHIFT_LABELS: Record<string, string> = {
-  MATIN: 'Matin',
-  APRES_MIDI: 'Après midi',
-  NUIT: 'Nuit',
-  WEEKEND: 'Weekend',
-};
-
-const STATE_LABELS: Record<string, string> = {
-  SKIPEE_PAR_MACHINE: 'Skipée par machine',
-  SKIPEE_PAR_CONDUCTEUR: 'Skipée par conducteur',
-  DEGRADEE: 'Dégradée',
-  INDISPONIBLE: 'Indisponible',
-  AUTRE: 'Autre',
-};
-
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function isWithinLastDays(iso: string, days: number): boolean {
+  const createdAt = new Date(iso).getTime();
+  const limit = Date.now() - days * 24 * 60 * 60 * 1000;
+  return createdAt >= limit;
 }
 
-
 export default function WorkshopDashboardPage() {
-  const { user, logout } = useWorkshopAuth();
+  usePageTitle('Tableau de bord atelier');
+  const { session } = useAppAuth();
+  const user = session?.accountType === 'workshop' ? session.user : null;
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -60,8 +57,22 @@ export default function WorkshopDashboardPage() {
   const [showDeleteRequest, setShowDeleteRequest] = useState(false);
   const [showTakeChargeConfirm, setShowTakeChargeConfirm] = useState(false);
   const [showPendingConfirm, setShowPendingConfirm] = useState(false);
+  const [showResumeConfirm, setShowResumeConfirm] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showInvalidateConfirm, setShowInvalidateConfirm] = useState(false);
   const [showMaintenanceDeleteConfirm, setShowMaintenanceDeleteConfirm] = useState(false);
+  const [unfollowConfirmIncident, setUnfollowConfirmIncident] = useState<WorkshopIncident | null>(null);
+  const [deleteResponsibleCommentIncident, setDeleteResponsibleCommentIncident] = useState<WorkshopIncident | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const {
+    draggedIncidentId,
+    dragOverIncidentId,
+    setDraggedIncidentId,
+    scheduleAutoScroll,
+    setDropTarget,
+    clearDropTarget,
+    resetDragState,
+  } = useDragDrop();
   const [maintenanceDeleteMode, setMaintenanceDeleteMode] = useState<'direct' | 'approve' | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
   const [reviewIncident, setReviewIncident] = useState<WorkshopIncident | null>(null);
@@ -71,26 +82,72 @@ export default function WorkshopDashboardPage() {
   const [responsibleDrafts, setResponsibleDrafts] = useState<Record<number, string>>({});
   const [metrics, setMetrics] = useState<WorkshopIncidentMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    lineId: 'all',
+  const [filters, setFilters] = useState<DashboardFiltersState>({
+    lineId: searchParams.get('line') || 'all',
     status: 'all',
-    priority: 'all',
-    taken: 'all',
+    priority: searchParams.get('priority') || 'all',
+    taken: searchParams.get('taken') || 'all',
+    scope: 'all',
+    query: '',
+    aging: searchParams.get('age') || 'all',
   });
+  const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const canAct = Boolean(user);
   const isOperator = user?.role === 'OPERATOR';
   const isMaintenance = user?.role === 'MAINTENANCE';
   const isResponsable = user?.role === 'RESPONSABLE';
+  const selectedIncidentParam = searchParams.get('incident');
 
-  function sortIncidents(items: WorkshopIncident[]): WorkshopIncident[] {
-    return [...items].sort((a, b) => {
-      if (a.display_order !== b.display_order) {
-        return b.display_order - a.display_order;
-      }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({ filters, setFilters, lines });
+
+  function setIncidentUrlParam(id: number | null, replace = false) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (id === null) {
+      nextParams.delete('incident');
+    } else {
+      nextParams.set('incident', String(id));
+    }
+    setSearchParams(nextParams, { replace });
+  }
+
+  function clearSelectedIncident(replace = true) {
+    setSelectedIncident(null);
+    setIncidentUrlParam(null, replace);
+  }
+
+  async function persistManualOrder(ordered: WorkshopIncident[]) {
+    const baseOrder = ordered.length + 1;
+    const reorderedIds = new Set(ordered.map((item) => item.id));
+    const nextOrderById = new Map<number, number>();
+    ordered.forEach((item, orderIndex) => {
+      nextOrderById.set(item.id, baseOrder - orderIndex);
     });
+
+    setIncidents((prev) =>
+      sortIncidents(prev.map((item) => (
+        reorderedIds.has(item.id)
+          ? { ...item, display_order: nextOrderById.get(item.id) ?? item.display_order }
+          : item
+      )))
+    );
+
+    await reorderWorkshopIncidents(ordered.map((item) => item.id));
+  }
+
+  async function reorderDraggedIncident(targetId: number) {
+    if (!draggedIncidentId || draggedIncidentId === targetId) return;
+    const ordered = filteredIncidents;
+    const fromIndex = ordered.findIndex((item) => item.id === draggedIncidentId);
+    const toIndex = ordered.findIndex((item) => item.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const nextOrdered = [...ordered];
+    const [moved] = nextOrdered.splice(fromIndex, 1);
+    nextOrdered.splice(toIndex, 0, moved);
+    await persistManualOrder(nextOrdered);
+    resetDragState();
   }
 
   useEffect(() => {
@@ -105,17 +162,35 @@ export default function WorkshopDashboardPage() {
   }, []);
 
   useEffect(() => {
-    setMetricsLoading(true);
-    getIncidentMetrics()
-      .then(setMetrics)
-      .catch(() => setMetrics(null))
-      .finally(() => setMetricsLoading(false));
-  }, []);
+    if (!selectedIncidentParam) {
+      setSelectedIncident(null);
+      return;
+    }
+    const requestedIncident = incidents.find((incident) => String(incident.id) === selectedIncidentParam);
+    if (requestedIncident) {
+      setSelectedIncident(requestedIncident);
+      return;
+    }
+    if (!loading && incidents.length > 0) {
+      setIncidentUrlParam(null, true);
+    }
+  }, [selectedIncidentParam, incidents, loading]);
 
-  async function handleLogout() {
-    await logout();
-    navigate('/workshop', { replace: true });
+  async function refreshMetrics() {
+    setMetricsLoading(true);
+    try {
+      const nextMetrics = await getIncidentMetrics();
+      setMetrics(nextMetrics);
+    } catch {
+      setMetrics(null);
+    } finally {
+      setMetricsLoading(false);
+    }
   }
+
+  useEffect(() => {
+    void refreshMetrics();
+  }, []);
 
   async function patchIncident(id: number, payload: Parameters<typeof updateWorkshopIncident>[1]) {
     const updated = await updateWorkshopIncident(id, payload);
@@ -123,6 +198,7 @@ export default function WorkshopDashboardPage() {
       sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
     );
     setSelectedIncident(updated);
+    void refreshMetrics();
   }
 
   function upsertIncident(updated: WorkshopIncident) {
@@ -145,12 +221,6 @@ export default function WorkshopDashboardPage() {
     setReviewLoading(false);
   }
 
-  async function handleDeleteIncident(id: number) {
-    await deleteWorkshopIncident(id);
-    setIncidents((prev) => sortIncidents(prev.filter((item) => item.id !== id)));
-    setSelectedIncident(null);
-  }
-
   function openMaintenanceDeleteConfirm(mode: 'direct' | 'approve') {
     setMaintenanceDeleteMode(mode);
     setShowMaintenanceDeleteConfirm(true);
@@ -165,8 +235,8 @@ export default function WorkshopDashboardPage() {
   async function handleRequestDelete(reason: string) {
     if (!selectedIncident) return;
     const updated = await updateWorkshopIncident(selectedIncident.id, {
-      deleteRequest: true,
-      deleteRequestReason: reason,
+      cancelRequest: true,
+      cancelRequestReason: reason,
     });
     upsertIncident(updated);
     setShowDeleteRequest(false);
@@ -212,19 +282,18 @@ export default function WorkshopDashboardPage() {
 
   async function handleApproveDeleteRequest() {
     if (!reviewIncident) return;
-    if (isMaintenance && !reviewIncident.is_taken) {
-      openMaintenanceDeleteConfirm('approve');
-      return;
-    }
     setReviewLoading(true);
     setReviewError('');
     try {
       await deleteWorkshopIncident(reviewIncident.id);
-      setIncidents((prev) => sortIncidents(prev.filter((item) => item.id !== reviewIncident.id)));
-      if (selectedIncident?.id === reviewIncident.id) setSelectedIncident(null);
+      setIncidents((prev) => sortIncidents(prev.map((item) => (
+        item.id === reviewIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
+      ))));
+      if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
+      void refreshMetrics();
       closeReview();
     } catch (err) {
-      setReviewError('Impossible de supprimer l\'incident.');
+      setReviewError("Impossible d'annuler l'incident.");
     } finally {
       setReviewLoading(false);
     }
@@ -239,7 +308,7 @@ export default function WorkshopDashboardPage() {
       upsertIncident(updated);
       closeReview();
     } catch (err) {
-      setReviewError('Impossible de refuser la suppression.');
+      setReviewError("Impossible de refuser l'annulation.");
     } finally {
       setReviewLoading(false);
     }
@@ -254,12 +323,22 @@ export default function WorkshopDashboardPage() {
   async function handleResumeIncident() {
     if (!selectedIncident) return;
     await patchIncident(selectedIncident.id, { status: 'OPEN' });
+    setShowResumeConfirm(false);
   }
 
   async function handleCloseIncident(note: string) {
     if (!selectedIncident) return;
     await patchIncident(selectedIncident.id, { status: 'CLOSED', interventionNote: note.trim() });
     setShowCloseConfirm(false);
+  }
+
+  async function handleInvalidateIncident(reason: string) {
+    if (!selectedIncident) return;
+    await patchIncident(selectedIncident.id, {
+      status: 'INVALIDATED',
+      invalidationReason: reason.trim(),
+    });
+    setShowInvalidateConfirm(false);
   }
 
 
@@ -289,6 +368,7 @@ export default function WorkshopDashboardPage() {
   async function deleteResponsibleComment(incident: WorkshopIncident) {
     const updated = await updateWorkshopIncident(incident.id, { responsibleComment: '' });
     upsertIncident(updated);
+    setDeleteResponsibleCommentIncident(null);
     setResponsibleDrafts((prev) => {
       const next = { ...prev };
       delete next[incident.id];
@@ -301,98 +381,173 @@ export default function WorkshopDashboardPage() {
     upsertIncident(updated);
   }
 
-  async function moveIncident(id: number, direction: 'up' | 'down') {
-    const index = filteredIncidents.findIndex((item) => item.id === id);
-    if (index === -1) return;
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= filteredIncidents.length) return;
-    const current = filteredIncidents[index];
-    const target = filteredIncidents[targetIndex];
-    const currentOrder = current.display_order;
-    const targetOrder = target.display_order;
-
-    setIncidents((prev) =>
-      prev.map((item) => {
-        if (item.id === current.id) return { ...item, display_order: targetOrder };
-        if (item.id === target.id) return { ...item, display_order: currentOrder };
-        return item;
-      })
-    );
-
-    await updateWorkshopIncident(current.id, { displayOrder: targetOrder });
-    await updateWorkshopIncident(target.id, { displayOrder: currentOrder });
+  async function handleToggleFollow(incident: WorkshopIncident) {
+    if (
+      incident.is_followed &&
+      (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED') &&
+      unfollowConfirmIncident?.id !== incident.id
+    ) {
+      setUnfollowConfirmIncident(incident);
+      return;
+    }
+    const updated = incident.is_followed
+      ? await unfollowWorkshopIncident(incident.id)
+      : await followWorkshopIncident(incident.id);
+    upsertIncident(updated);
+    setUnfollowConfirmIncident(null);
+    void refreshMetrics();
   }
 
   const filteredIncidents = incidents.filter((incident) => {
+    const isResolved = incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED';
+    if (filters.scope === 'followed' && !incident.is_followed) return false;
+    if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
+    if (filters.scope === 'created_by_me' && incident.user_id !== user?.id) return false;
+    if (filters.scope !== 'followed' && (incident.status === 'CANCELED' || incident.status === 'INVALIDATED')) return false;
+    if (filters.scope !== 'followed' && filters.status === 'all' && filters.aging === 'all' && incident.status === 'CLOSED') return false;
+    if ((filters.scope === 'assigned_to_me' || filters.scope === 'created_by_me') && isResolved) return false;
     if (filters.lineId !== 'all' && String(incident.line_id) !== filters.lineId) return false;
     if (filters.status !== 'all' && incident.status !== filters.status) return false;
+    if (filters.status === 'CLOSED' && !isWithinLastDays(incident.updated_at || incident.created_at, 7)) return false;
+    if (filters.aging === 'over_7d' && (
+      incident.status === 'CLOSED' || isWithinLastDays(incident.created_at, 7)
+    )) return false;
     if (filters.priority === 'urgent' && !incident.is_priority) return false;
     if (filters.priority === 'normal' && incident.is_priority) return false;
     if (filters.taken === 'taken' && !incident.is_taken) return false;
     if (filters.taken === 'not_taken' && incident.is_taken) return false;
+    if (filters.query.trim()) {
+      const q = filters.query.trim().toLowerCase();
+      const haystack = [
+        incident.line_number,
+        incident.machine_id,
+        incident.robot_label,
+        incident.current_product,
+        incident.first_name,
+        incident.last_name,
+        incident.machine_brand,
+        incident.comment,
+        incident.diagnostic,
+        incident.responsible_comment,
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
     return true;
   });
+
+  const createdByMeCount = isOperator
+    ? incidents.filter((incident) => {
+        const isResolved = incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED';
+        return incident.user_id === user?.id && !isResolved;
+      }).length
+    : 0;
+
+  const sortedIncidents = sortOrder === 'default'
+    ? filteredIncidents
+    : [...filteredIncidents].sort((a, b) => {
+        const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return sortOrder === 'date_desc' ? diff : -diff;
+      });
 
   async function handleMaintenanceDeleteConfirm() {
     if (maintenanceDeleteMode === 'approve' && reviewIncident) {
       await deleteWorkshopIncident(reviewIncident.id);
-      setIncidents((prev) => sortIncidents(prev.filter((item) => item.id !== reviewIncident.id)));
-      if (selectedIncident?.id === reviewIncident.id) setSelectedIncident(null);
+      setIncidents((prev) => sortIncidents(prev.map((item) => (
+        item.id === reviewIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
+      ))));
+      if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
+      void refreshMetrics();
       closeReview();
     }
     if (maintenanceDeleteMode === 'direct' && selectedIncident) {
       await deleteWorkshopIncident(selectedIncident.id);
-      setIncidents((prev) => sortIncidents(prev.filter((item) => item.id !== selectedIncident.id)));
-      setSelectedIncident(null);
+      setIncidents((prev) => sortIncidents(prev.map((item) => (
+        item.id === selectedIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
+      ))));
+      clearSelectedIncident();
+      void refreshMetrics();
     }
     setShowMaintenanceDeleteConfirm(false);
     setMaintenanceDeleteMode(null);
   }
 
   if (selectedIncident) {
+    const canRequestEdit = canPerform(user?.role, 'requestEdit', selectedIncident, user?.id);
+    const canDirectEdit = canPerform(user?.role, 'directEdit', selectedIncident);
+    const canResponsableEdit = canPerform(user?.role, 'responsableEdit', selectedIncident);
+    const canWithdrawEdit = canPerform(user?.role, 'withdrawEdit', selectedIncident, user?.id);
+    const canRequestCancel = canPerform(user?.role, 'requestCancel', selectedIncident, user?.id);
+    const canCancel = canPerform(user?.role, 'cancel', selectedIncident);
+    const canTake = canPerform(user?.role, 'take', selectedIncident);
+    const canSetPending = canPerform(user?.role, 'setPending', selectedIncident);
+    const canResume = canPerform(user?.role, 'resume', selectedIncident);
+    const canClose = canPerform(user?.role, 'close', selectedIncident);
+    const canSetPriority = canPerform(user?.role, 'setPriority', selectedIncident);
+    const canEditResponsibleComment = canPerform(user?.role, 'responsibleComment', selectedIncident);
+    const canInvalidateClosed = canPerform(user?.role, 'invalidateClosed', selectedIncident);
+    const detailHasTreatmentActions = canSetPending || canResume || canClose || canSetPriority || canEditResponsibleComment;
     return (
-      <main className="page-container">
-        <button className="back-link" onClick={() => setSelectedIncident(null)}>
-          ← Retour au dashboard
-        </button>
+      <>
+        <WorkshopNavBar />
+        <main id="main-content" className="page-container workshop-page">
+          <button className="back-link" onClick={() => clearSelectedIncident()}>
+            Retour à la liste
+          </button>
 
         <div className="page-header">
           <h1>Incident {selectedIncident.line_number} · {selectedIncident.machine_id}</h1>
           {canAct && (
             <div className="action-bar" style={{ marginTop: 0 }}>
-              {(isMaintenance || isResponsable || isOperator) && (
+              {isResponsable && (
+                <button
+                  className={selectedIncident.is_followed ? 'btn btn-secondary' : 'btn btn-primary'}
+                  onClick={() => handleToggleFollow(selectedIncident)}
+                >
+                  {selectedIncident.is_followed ? 'Retirer du suivi' : 'Suivre'}
+                </button>
+              )}
+              {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
                 <button
                   className="btn btn-secondary"
                   onClick={() => setShowEdit(true)}
-                  disabled={isMaintenance && selectedIncident.is_taken}
                 >
-                  {isOperator ? 'Demander une modification' : 'Modifier'}
+                  {canRequestEdit ? 'Demander une correction' : 'Modifier'}
                 </button>
               )}
-              {isMaintenance && (
+              {canWithdrawEdit && (
                 <button
-                  className={selectedIncident.is_taken ? 'btn btn-secondary' : 'btn btn-primary'}
-                  onClick={() => setShowTakeChargeConfirm(true)}
-                  disabled={selectedIncident.is_taken}
+                  className="btn btn-secondary"
+                  onClick={() => patchIncident(selectedIncident.id, { withdrawEditRequest: true })}
                 >
-                  {selectedIncident.is_taken ? 'Pris en charge' : 'Prendre en charge'}
+                  Retirer ma demande
                 </button>
               )}
-              {(isMaintenance || isResponsable || isOperator) && (
+              {canTake && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowTakeChargeConfirm(true)}
+                >
+                  Prendre en charge
+                </button>
+              )}
+              {(canRequestCancel || canCancel) && (
                 <button
                   className="btn btn-danger"
                   onClick={() =>
-                    isResponsable
-                      ? handleDeleteIncident(selectedIncident.id)
-                      : isMaintenance
-                        ? (selectedIncident.is_taken
-                          ? undefined
-                          : openMaintenanceDeleteConfirm('direct'))
-                        : setShowDeleteRequest(true)
+                    canCancel
+                      ? openMaintenanceDeleteConfirm('direct')
+                      : setShowDeleteRequest(true)
                   }
-                  disabled={isMaintenance && selectedIncident.is_taken}
                 >
-                  {isResponsable ? 'Supprimer' : isMaintenance ? 'Supprimer' : 'Demander suppression'}
+                  {canCancel ? 'Annuler' : 'Demander annulation'}
+                </button>
+              )}
+              {canInvalidateClosed && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => setShowInvalidateConfirm(true)}
+                >
+                  Invalider
                 </button>
               )}
             </div>
@@ -401,67 +556,25 @@ export default function WorkshopDashboardPage() {
 
         <div className="card">
           <div className="card-body">
-            <div className="detail-grid">
-              <div className="detail-field">
-                <span className="detail-field-label">Utilisateur</span>
-                <span className="detail-field-value">{selectedIncident.first_name} {selectedIncident.last_name}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Badge</span>
-                <span className="detail-field-value">{selectedIncident.badge_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Équipe</span>
-                <span className="detail-field-value">{SHIFT_LABELS[selectedIncident.shift]}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">État</span>
-                <span className="detail-field-value">{STATE_LABELS[selectedIncident.state]}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Ligne</span>
-                <span className="detail-field-value">{selectedIncident.line_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Machine</span>
-                <span className="detail-field-value">{selectedIncident.machine_id} · {selectedIncident.machine_brand}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Robot</span>
-                <span className="detail-field-value">{selectedIncident.robot_label}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Tête</span>
-                <span className="detail-field-value">{selectedIncident.head_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Prise en charge</span>
-                <span className="detail-field-value">{selectedIncident.is_taken ? 'Oui' : 'Non'}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Pris en charge par</span>
-                <span className="detail-field-value">
+              <div className="detail-grid">
+                <DetailField label="Utilisateur">{selectedIncident.first_name} {selectedIncident.last_name}</DetailField>
+                <DetailField label="Rôle créateur">{ROLE_LABELS[selectedIncident.role] || selectedIncident.role}</DetailField>
+                <DetailField label="Équipe">{SHIFT_LABELS[selectedIncident.shift]}</DetailField>
+                <DetailField label="État">{STATE_LABELS[selectedIncident.state]}</DetailField>
+                <DetailField label="Ligne">{selectedIncident.line_number}</DetailField>
+                <DetailField label="Machine">{selectedIncident.machine_id} · {selectedIncident.machine_brand}</DetailField>
+                <DetailField label="Robot">{selectedIncident.robot_label}</DetailField>
+                <DetailField label="Tête">{selectedIncident.head_number}</DetailField>
+                <DetailField label="Prise en charge">{selectedIncident.is_taken ? 'Oui' : 'Non'}</DetailField>
+                <DetailField label="Pris en charge par">
                   {selectedIncident.taken_by_first_name
                     ? `${selectedIncident.taken_by_first_name} ${selectedIncident.taken_by_last_name || ''}`.trim()
                     : '-'}
-                </span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Priorité</span>
-                <span className="detail-field-value">{selectedIncident.is_priority ? 'Oui' : 'Non'}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Statut</span>
-                <span className="detail-field-value">{selectedIncident.status}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Produit en cours</span>
-                <span className="detail-field-value">{selectedIncident.current_product || '-'}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Création</span>
-                <span className="detail-field-value">{formatDateTime(selectedIncident.created_at)}</span>
-              </div>
+                </DetailField>
+                <DetailField label="Priorité">{selectedIncident.is_priority ? 'Oui' : 'Non'}</DetailField>
+                <DetailField label="Statut">{STATUS_LABELS[selectedIncident.status] || selectedIncident.status}</DetailField>
+                <DetailField label="Produit en cours">{selectedIncident.current_product || '-'}</DetailField>
+                <DetailField label="Création">{formatDateTime(selectedIncident.created_at)}</DetailField>
             </div>
             {selectedIncident.comment && (
               <p className="incident-comment">{selectedIncident.comment}</p>
@@ -475,50 +588,78 @@ export default function WorkshopDashboardPage() {
             {selectedIncident.edit_request && (
               <div className="notice" style={{ marginTop: 16 }}>Demande de modification opérateur en attente.</div>
             )}
-            {selectedIncident.delete_request && (
-              <div className="notice" style={{ marginTop: 16 }}>Demande de suppression opérateur en attente.</div>
+            {selectedIncident.cancel_request && (
+              <div className="notice" style={{ marginTop: 16 }}>Demande d'annulation opérateur en attente.</div>
             )}
           </div>
         </div>
 
 
-        {canAct && (isMaintenance || isResponsable) && (
+        {canAct && detailHasTreatmentActions && (
           <div className="card" style={{ marginTop: 16 }}>
             <div className="card-body">
+              <div className="detail-field" style={{ marginBottom: 12 }}>
+                <span className="detail-field-label">Coordination</span>
+              </div>
               <div className="action-bar">
-                {isMaintenance && (
-                  <>
-                    {selectedIncident.status === 'PENDING' ? (
-                      <button
-                        className="btn btn-secondary"
-                        onClick={handleResumeIncident}
-                        disabled={!selectedIncident.is_taken}
-                      >
-                        Reprendre
-                      </button>
-                    ) : (
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => setShowPendingConfirm(true)}
-                        disabled={!selectedIncident.is_taken}
-                      >
-                        Mettre en attente
-                      </button>
-                    )}
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => setShowCloseConfirm(true)}
-                      disabled={!selectedIncident.is_taken || selectedIncident.status === 'PENDING'}
-                    >
-                      Clôturer
-                    </button>
-                  </>
+                {canResume && (
+                  <button className="btn btn-secondary" onClick={() => setShowResumeConfirm(true)}>
+                    Reprendre
+                  </button>
+                )}
+                {canSetPending && (
+                  <button className="btn btn-secondary" onClick={() => setShowPendingConfirm(true)}>
+                    Suspendre
+                  </button>
+                )}
+                {canClose && (
+                  <button className="btn btn-primary" onClick={() => setShowCloseConfirm(true)}>
+                    Clôturer
+                  </button>
+                )}
+                {canSetPriority && (
+                  <button className={selectedIncident.is_priority ? 'btn btn-secondary' : 'btn btn-danger'} onClick={() => handleToggleUrgent(selectedIncident)}>
+                    {selectedIncident.is_priority ? 'Repasser normal' : 'Déclarer urgent'}
+                  </button>
                 )}
               </div>
+              {canEditResponsibleComment && (
+                <div className="incident-comment">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor={`responsible-comment-detail-${selectedIncident.id}`}>
+                      Consigne responsable
+                    </label>
+                    <textarea
+                      id={`responsible-comment-detail-${selectedIncident.id}`}
+                      className="form-input"
+                      rows={3}
+                      value={getResponsibleDraft(selectedIncident)}
+                      onChange={(event) => updateResponsibleDraft(selectedIncident.id, event.target.value)}
+                      placeholder="Consigne courte pour orienter le traitement"
+                    />
+                  </div>
+                  <div className="action-bar">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => saveResponsibleComment(selectedIncident)}
+                      disabled={!getResponsibleDraft(selectedIncident).trim()}
+                    >
+                      {selectedIncident.responsible_comment ? 'Mettre à jour' : 'Ajouter'}
+                    </button>
+                    {selectedIncident.responsible_comment && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setDeleteResponsibleCommentIncident(selectedIncident)}
+                      >
+                        Retirer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
-
         {showEdit && (
           <CreateIncidentModal
             lines={lines}
@@ -530,8 +671,9 @@ export default function WorkshopDashboardPage() {
               setIncidents((prev) =>
                 sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
               );
+              void refreshMetrics();
             }}
-            requestOnly={isOperator}
+            requestOnly={canRequestEdit}
           />
         )}
 
@@ -559,11 +701,27 @@ export default function WorkshopDashboardPage() {
           />
         )}
 
+        {showResumeConfirm && selectedIncident && (
+          <ResumeIncidentConfirmModal
+            incident={selectedIncident}
+            onClose={() => setShowResumeConfirm(false)}
+            onConfirm={handleResumeIncident}
+          />
+        )}
+
         {showCloseConfirm && selectedIncident && (
           <CloseIncidentModal
             incident={selectedIncident}
             onClose={() => setShowCloseConfirm(false)}
             onConfirm={handleCloseIncident}
+          />
+        )}
+
+        {showInvalidateConfirm && selectedIncident && (
+          <InvalidateIncidentModal
+            incident={selectedIncident}
+            onClose={() => setShowInvalidateConfirm(false)}
+            onConfirm={handleInvalidateIncident}
           />
         )}
 
@@ -579,20 +737,20 @@ export default function WorkshopDashboardPage() {
             onRejectEdit={handleRejectEditRequest}
             onApproveDelete={handleApproveDeleteRequest}
             onRejectDelete={handleRejectDeleteRequest}
-            allowDeleteApproval={isResponsable || isMaintenance}
-            allowDeleteReject={isResponsable}
-            deleteApprovalDisabled={isMaintenance && reviewIncident.is_taken}
+            allowDeleteApproval={canPerform(user?.role, 'approveCancel', reviewIncident)}
+            allowDeleteReject={canPerform(user?.role, 'rejectCancel', reviewIncident)}
+            deleteApprovalDisabled={!canPerform(user?.role, 'approveCancel', reviewIncident)}
             deleteWarning={
-              isMaintenance && !reviewIncident.is_taken
-                ? "Vous n'avez pas le droit de supprimer un signalement ou valider sa suppression sans prise en charge sauf erreur de signalement."
+              canPerform(user?.role, 'approveCancel', reviewIncident)
+                ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
                 : undefined
             }
-            allowEditApply={!(isMaintenance && reviewIncident.is_taken)}
-            allowEditReject={!(isMaintenance && reviewIncident.is_taken)}
-            editDisabled={isMaintenance && reviewIncident.is_taken}
+            allowEditApply={canPerform(user?.role, 'approveEdit', reviewIncident)}
+            allowEditReject={canPerform(user?.role, 'rejectEdit', reviewIncident)}
+            editDisabled={!canPerform(user?.role, 'approveEdit', reviewIncident)}
             editWarning={
-              isMaintenance && reviewIncident.is_taken
-                ? 'Modification interdite apres prise en charge.'
+              !canPerform(user?.role, 'approveEdit', reviewIncident)
+                ? 'Seul le responsable peut arbitrer une demande de correction active.'
                 : undefined
             }
           />
@@ -601,7 +759,10 @@ export default function WorkshopDashboardPage() {
         {showMaintenanceDeleteConfirm && (selectedIncident || reviewIncident) && (
           <MaintenanceDeleteConfirmModal
             incident={maintenanceDeleteMode === 'approve' ? reviewIncident! : selectedIncident!}
-            title={maintenanceDeleteMode === 'approve' ? 'Valider la suppression' : 'Supprimer l\'incident'}
+            title={maintenanceDeleteMode === 'approve' ? "Valider l'annulation" : "Annuler l'incident"}
+            message={maintenanceDeleteMode === 'approve'
+              ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
+              : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."}
             onClose={() => {
               setShowMaintenanceDeleteConfirm(false);
               setMaintenanceDeleteMode(null);
@@ -610,341 +771,164 @@ export default function WorkshopDashboardPage() {
             onConfirm={handleMaintenanceDeleteConfirm}
           />
         )}
-      </main>
+        {unfollowConfirmIncident && (
+          <UnfollowIncidentConfirmModal
+            incident={unfollowConfirmIncident}
+            onClose={() => setUnfollowConfirmIncident(null)}
+            onConfirm={() => handleToggleFollow(unfollowConfirmIncident)}
+          />
+        )}
+        {deleteResponsibleCommentIncident && (
+          <DeleteResponsibleCommentConfirmModal
+            incident={deleteResponsibleCommentIncident}
+            onClose={() => setDeleteResponsibleCommentIncident(null)}
+            onConfirm={() => deleteResponsibleComment(deleteResponsibleCommentIncident)}
+          />
+        )}
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="page-container">
+    <>
+      <WorkshopNavBar />
+      <main id="main-content" className="page-container workshop-page">
       <div className="page-header">
-        <h1>Workshop dashboard</h1>
+        <h1>Tableau de bord atelier</h1>
         <div className="action-bar" style={{ marginTop: 0 }}>
           {user && (
             <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
               + Créer un incident
             </button>
           )}
-          {user && (
-            <button className="btn btn-secondary" onClick={() => navigate('/workshop/history')}>
-              Historique
-            </button>
-          )}
-          {user ? (
-            <button className="btn btn-secondary" onClick={handleLogout}>
-              Se déconnecter
-            </button>
-          ) : (
-            <button className="btn btn-secondary" onClick={() => navigate('/workshop')}>
+          {!user && (
+            <button className="btn btn-secondary" onClick={() => navigate('/login')}>
               Se connecter
             </button>
           )}
         </div>
       </div>
 
-      {user ? (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-body">
-            <div className="detail-grid">
-              <div className="detail-field">
-                <span className="detail-field-label">Utilisateur</span>
-                <span className="detail-field-value">{user.first_name} {user.last_name}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Badge</span>
-                <span className="detail-field-value">{user.badge_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Rôle</span>
-                <span className="detail-field-value">
-                  <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
+      {!user && (
         <div className="notice" style={{ marginBottom: 20 }}>
           Lecture seule : connectez-vous pour créer ou agir sur un incident.
         </div>
       )}
 
-      {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
+      {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-body">
-          <div className="detail-grid">
-            {metricsLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-                <span className="spinner" style={{ width: 20, height: 20, borderWidth: 3 }} />
-              </div>
-            ) : metrics ? (
-              <>
-                <div className="detail-field">
-                  <span className="detail-field-label">Total</span>
-                  <span className="detail-field-value">{metrics.total}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Ouverts</span>
-                  <span className="detail-field-value">{metrics.open}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">En attente</span>
-                  <span className="detail-field-value">{metrics.pending}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Clotures</span>
-                  <span className="detail-field-value">{metrics.closed}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Ouverts &gt; 7j</span>
-                  <span className="detail-field-value">{metrics.open_over_7d}</span>
-                </div>
-                <div className="detail-field">
-                  <span className="detail-field-label">Mediane prise en charge</span>
-                  <span className="detail-field-value">
-                    {metrics.median_take_seconds
-                      ? `${Math.round(metrics.median_take_seconds / 3600)} h`
-                      : '-'}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div className="empty-state">KPI indisponibles.</div>
-            )}
-          </div>
+      <IncidentMetricsBar
+        metricsLoading={metricsLoading}
+        metrics={metrics}
+        filters={filters}
+        role={user?.role}
+        createdByMeCount={createdByMeCount}
+        onSetFilters={setFilters}
+      />
+
+      <div className="workshop-search-bar">
+        <div className="filter-group workshop-search-filter">
+          <span className="filter-label">Recherche</span>
+          <input
+            className="form-input"
+            value={filters.query}
+            onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+            placeholder="Ligne, machine, robot, produit..."
+          />
         </div>
+        <div className="sort-toggle-group">
+          <button
+            type="button"
+            className={`sort-toggle-btn${sortOrder === 'default' ? ' active' : ''}`}
+            onClick={() => setSortOrder('default')}
+          >
+            Par défaut
+          </button>
+          <button
+            type="button"
+            className={`sort-toggle-btn${sortOrder === 'date_desc' ? ' active' : ''}`}
+            onClick={() => setSortOrder('date_desc')}
+          >
+            Plus récent
+          </button>
+          <button
+            type="button"
+            className={`sort-toggle-btn${sortOrder === 'date_asc' ? ' active' : ''}`}
+            onClick={() => setSortOrder('date_asc')}
+          >
+            Plus ancien
+          </button>
+        </div>
+        <button className="btn btn-secondary workshop-filter-button" type="button" onClick={() => setShowFilters(true)}>
+          Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+        </button>
       </div>
 
-      <div className="filters-row" style={{ marginBottom: 16 }}>
-        <div className="filter-group">
-          <span className="filter-label">Ligne</span>
-          <select
-            className="form-select"
-            value={filters.lineId}
-            onChange={(event) => setFilters((prev) => ({ ...prev, lineId: event.target.value }))}
-          >
-            <option value="all">Toutes</option>
-            {lines.map((line) => (
-              <option key={line.id} value={String(line.id)}>
-                {line.line_number}
-              </option>
-            ))}
-          </select>
+      <FilterSummary
+        count={filteredIncidents.length}
+        countLabel="incident(s) affiché(s)"
+        chips={filterChips}
+        onClear={clearAllFilters}
+      />
+      {isResponsable && sortedIncidents.length > 1 && sortOrder === 'default' && (
+        <div className="reorder-help">
+          Pour changer l'ordre de traitement, sélectionnez un incident puis glissez-le à la position voulue.
         </div>
-        <div className="filter-group">
-          <span className="filter-label">Statut</span>
-          <select
-            className="form-select"
-            value={filters.status}
-            onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
-          >
-            <option value="all">Tous</option>
-            <option value="OPEN">Ouvert</option>
-            <option value="PENDING">En attente</option>
-            <option value="CLOSED">Cloture</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <span className="filter-label">Priorite</span>
-          <select
-            className="form-select"
-            value={filters.priority}
-            onChange={(event) => setFilters((prev) => ({ ...prev, priority: event.target.value }))}
-          >
-            <option value="all">Toutes</option>
-            <option value="urgent">Urgent</option>
-            <option value="normal">Normal</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <span className="filter-label">Prise en charge</span>
-          <select
-            className="form-select"
-            value={filters.taken}
-            onChange={(event) => setFilters((prev) => ({ ...prev, taken: event.target.value }))}
-          >
-            <option value="all">Toutes</option>
-            <option value="taken">Prises en charge</option>
-            <option value="not_taken">Non prises</option>
-          </select>
-        </div>
-      </div>
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }} />
+          <span className="spinner" aria-hidden="true" style={{ width: 24, height: 24, borderWidth: 3 }} />
         </div>
-      ) : filteredIncidents.length === 0 ? (
+      ) : sortedIncidents.length === 0 ? (
         <div className="card">
-          <div className="empty-state">Aucun incident créé.</div>
+          <div className="empty-state">
+            {activeFilterCount > 0 ? 'Aucun incident ne correspond aux filtres.' : 'Aucun incident à traiter.'}
+          </div>
         </div>
       ) : (
         <div className="incident-list">
-          {filteredIncidents.map((incident) => (
-            <article
-              className={`incident-card${incident.is_priority ? ' incident-card--urgent' : ''}`}
+          {sortedIncidents.map((incident) => (
+            <IncidentCard
               key={incident.id}
-              onClick={() => {
-                setSelectedIncident(incident);
-                if ((isResponsable || isMaintenance) && incident.delete_request) {
-                  openReview(incident, 'delete');
-                  return;
-                }
-                if ((isMaintenance || isResponsable) && incident.edit_request) {
-                  openReview(incident, 'edit');
+              incident={incident}
+              isDragging={draggedIncidentId === incident.id}
+              isDropTarget={dragOverIncidentId === incident.id && draggedIncidentId !== incident.id}
+              canReorder={sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)}
+              isResponsable={isResponsable}
+              isMaintenance={isMaintenance}
+              onToggleFollow={handleToggleFollow}
+              onDragStart={(event, id) => {
+                setDraggedIncidentId(id);
+              }}
+              onDragOver={(_event, id, clientY) => {
+                if (draggedIncidentId && draggedIncidentId !== id) {
+                  scheduleAutoScroll(clientY);
+                  setDropTarget(id);
                 }
               }}
-            >
-              <div className="incident-card-main">
-                <div>
-                  <span className="detail-field-label">Incident</span>
-                  <h2>{incident.line_number} · {incident.machine_id}</h2>
-                </div>
-                <span className="badge-role">{STATE_LABELS[incident.state] || incident.state}</span>
-              </div>
-              <div className="incident-tags">
-                {incident.is_priority && <span className="badge-status inactive">Prioritaire</span>}
-                {incident.is_taken && <span className="badge-status active">Pris en charge</span>}
-                {isResponsable && (
-                  <div className="incident-order-controls">
-                    <button
-                      type="button"
-                      className="incident-order-btn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void moveIncident(incident.id, 'up');
-                      }}
-                      disabled={filteredIncidents[0]?.id === incident.id}
-                      aria-label="Monter l'incident"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      className="incident-order-btn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void moveIncident(incident.id, 'down');
-                      }}
-                      disabled={filteredIncidents[filteredIncidents.length - 1]?.id === incident.id}
-                      aria-label="Descendre l'incident"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      className="incident-urgent-btn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleToggleUrgent(incident);
-                      }}
-                    >
-                      {incident.is_priority ? 'Urgent' : 'Déclarer urgent'}
-                    </button>
-                  </div>
-                )}
-                {(isMaintenance || isResponsable) && incident.edit_request && (
-                  <button
-                    type="button"
-                    className="request-badge request-badge-edit"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openReview(incident, 'edit');
-                    }}
-                  >
-                    Modification demandée
-                  </button>
-                )}
-                {(isResponsable || isMaintenance) && incident.delete_request && (
-                  <button
-                    type="button"
-                    className="request-badge request-badge-delete"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openReview(incident, 'delete');
-                    }}
-                  >
-                    Suppression demandée
-                  </button>
-                )}
-              </div>
-
-              <div className="incident-card-grid">
-                <div>
-                  <span className="detail-field-label">Utilisateur</span>
-                  <strong>{incident.first_name} {incident.last_name}</strong>
-                  <p>{incident.badge_number} · {ROLE_LABELS[incident.role] || incident.role}</p>
-                </div>
-                <div>
-                  <span className="detail-field-label">Équipe</span>
-                  <strong>{SHIFT_LABELS[incident.shift] || incident.shift}</strong>
-                  <p>{formatDateTime(incident.created_at)}</p>
-                </div>
-                <div>
-                  <span className="detail-field-label">Robot</span>
-                  <strong>{incident.robot_label}</strong>
-                  <p>Tête {incident.head_number}</p>
-                </div>
-                <div>
-                  <span className="detail-field-label">Produit</span>
-                  <strong>{incident.current_product || '-'}</strong>
-                  <p>{incident.machine_brand}</p>
-                </div>
-                <div>
-                  <span className="detail-field-label">Pris en charge par</span>
-                  <strong>
-                    {incident.taken_by_first_name
-                      ? `${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()
-                      : '-'}
-                  </strong>
-                  <p>{incident.taken_by_badge_number || '-'}</p>
-                </div>
-              </div>
-
-              {incident.status === 'PENDING' && incident.diagnostic && (
-                <div className="notice" style={{ marginTop: 12 }}>
-                  Attente justifiee : {incident.diagnostic}
-                </div>
-              )}
-
-              {isResponsable && (
-                <div className="incident-comment">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor={`responsible-comment-${incident.id}`}>
-                      Consigne responsable
-                    </label>
-                    <textarea
-                      id={`responsible-comment-${incident.id}`}
-                      className="form-input"
-                      rows={2}
-                      value={getResponsibleDraft(incident)}
-                      onChange={(event) => updateResponsibleDraft(incident.id, event.target.value)}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                  </div>
-                  <div className="action-bar" onClick={(event) => event.stopPropagation()}>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => saveResponsibleComment(incident)}
-                      disabled={!getResponsibleDraft(incident).trim()}
-                    >
-                      {incident.responsible_comment ? 'Mettre a jour' : 'Ajouter'}
-                    </button>
-                    {incident.responsible_comment && (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => deleteResponsibleComment(incident)}
-                      >
-                        Supprimer
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              {!isResponsable && incident.responsible_comment && (
-                <p className="incident-comment">{incident.responsible_comment}</p>
-              )}
-            </article>
+              onDragLeave={(id) => {
+                clearDropTarget(id);
+              }}
+              onDrop={(_event, id) => {
+                void reorderDraggedIncident(id);
+              }}
+              onDragEnd={resetDragState}
+              onClick={(inc) => {
+                setSelectedIncident(inc);
+                setIncidentUrlParam(inc.id);
+                if (isResponsable && inc.cancel_request) {
+                  openReview(inc, 'delete');
+                  return;
+                }
+                if (isResponsable && inc.edit_request) {
+                  openReview(inc, 'edit');
+                }
+              }}
+              onReviewEdit={(_event, inc) => openReview(inc, 'edit')}
+              onReviewDelete={(_event, inc) => openReview(inc, 'delete')}
+            />
           ))}
         </div>
       )}
@@ -955,10 +939,36 @@ export default function WorkshopDashboardPage() {
           onClose={() => setShowCreate(false)}
           onSuccess={(incident) => {
             setShowCreate(false);
-              setIncidents((prev) => sortIncidents([incident, ...prev]));
+            setIncidents((prev) => sortIncidents([incident, ...prev]));
+            void refreshMetrics();
           }}
         />
       )}
-    </main>
+      {showFilters && (
+        <DashboardFilters
+          lines={lines}
+          filters={filters}
+          onSetFilters={setFilters}
+          onClose={() => setShowFilters(false)}
+          filteredCount={filteredIncidents.length}
+          filterChips={filterChips}
+        />
+      )}
+      {unfollowConfirmIncident && (
+        <UnfollowIncidentConfirmModal
+          incident={unfollowConfirmIncident}
+          onClose={() => setUnfollowConfirmIncident(null)}
+          onConfirm={() => handleToggleFollow(unfollowConfirmIncident)}
+        />
+      )}
+      {deleteResponsibleCommentIncident && (
+        <DeleteResponsibleCommentConfirmModal
+          incident={deleteResponsibleCommentIncident}
+          onClose={() => setDeleteResponsibleCommentIncident(null)}
+          onConfirm={() => deleteResponsibleComment(deleteResponsibleCommentIncident)}
+        />
+      )}
+      </main>
+    </>
   );
 }

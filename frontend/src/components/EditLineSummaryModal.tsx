@@ -4,7 +4,7 @@ import { updateLine } from '../api/lines';
 import { ApiResponseError } from '../api/client';
 import { ProductionLine } from '../types';
 import { LineFormData } from './LineForm';
-import { normalizeLineMachine } from './CreateLineModal';
+import { normalizeLineMachine } from '../utils/lineMachines';
 
 interface EditLineSummaryModalProps {
   line: ProductionLine;
@@ -83,13 +83,16 @@ export default function EditLineSummaryModal({
     <Modal
       title="Récapitulatif des modifications"
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isLoading={loading}
+      size="lg"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onBack} disabled={loading}>
             Retour
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={loading || changes.length === 0}>
-            {loading ? <><span className="spinner" /> Enregistrement…</> : 'Enregistrer'}
+            {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
           </button>
         </>
       }

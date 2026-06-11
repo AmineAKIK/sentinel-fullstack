@@ -1,0 +1,10 @@
+{$CADDY_DOMAIN} {
+    # Frontend — toutes les requêtes sauf /api/*
+    handle /api/* {
+        reverse_proxy backend:3000
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}

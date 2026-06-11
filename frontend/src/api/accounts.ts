@@ -1,5 +1,6 @@
 import { api } from './client';
 import { SentinelUser, Role, SortField, SortOrder } from '../types';
+import { buildQuery, buildRequiredQuery } from '../utils/query';
 
 export interface ListAccountsParams {
   role?: Role | '';
@@ -22,12 +23,7 @@ export interface UpdateAccountPayload {
 }
 
 export async function listAccounts(params: ListAccountsParams = {}): Promise<SentinelUser[]> {
-  const qs = new URLSearchParams();
-  if (params.role) qs.set('role', params.role);
-  if (params.sort) qs.set('sort', params.sort);
-  if (params.order) qs.set('order', params.order);
-  const query = qs.toString() ? `?${qs.toString()}` : '';
-  return api.get<SentinelUser[]>(`/api/admin/accounts${query}`);
+  return api.get<SentinelUser[]>(`/api/admin/accounts${buildQuery(params)}`);
 }
 
 export async function getAccount(id: number): Promise<SentinelUser> {
@@ -39,7 +35,7 @@ export async function createAccount(payload: CreateAccountPayload): Promise<Sent
 }
 
 export async function checkBadgeAvailability(badgeNumber: string): Promise<{ exists: boolean }> {
-  const query = new URLSearchParams({ badgeNumber }).toString();
+  const query = buildRequiredQuery({ badgeNumber });
   return api.get<{ exists: boolean }>(`/api/admin/accounts/check-badge?${query}`);
 }
 
@@ -69,6 +65,7 @@ export async function deleteAccount(id: number): Promise<void> {
 export async function getAccountImpact(id: number): Promise<{
   reported_incidents: number;
   taken_incidents: number;
+  active_taken_incidents: number;
 }> {
   return api.get(`/api/admin/accounts/${id}/impact`);
 }

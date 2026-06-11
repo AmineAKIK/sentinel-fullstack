@@ -1,12 +1,8 @@
 import { useMemo } from 'react';
 import Modal from './Modal';
-import { IncidentShift, IncidentState, ProductionLine, WorkshopIncident } from '../types';
-
-interface ChangeRow {
-  label: string;
-  current: string;
-  requested: string;
-}
+import { ProductionLine, WorkshopIncident } from '../types';
+import { SHIFT_LABELS, STATE_LABELS } from '../utils/labels';
+import { computeIncidentDiff } from '../utils/incidentDiff';
 
 interface ReviewIncidentRequestModalProps {
   incident: WorkshopIncident;
@@ -23,48 +19,10 @@ interface ReviewIncidentRequestModalProps {
   editDisabled?: boolean;
   editWarning?: string;
   onClose: () => void;
-  onApplyEdit: () => void;
-  onRejectEdit: () => void;
-  onApproveDelete: () => void;
-  onRejectDelete: () => void;
-}
-
-const SHIFT_LABELS: Record<IncidentShift, string> = {
-  MATIN: 'Matin',
-  APRES_MIDI: 'Après midi',
-  NUIT: 'Nuit',
-  WEEKEND: 'Weekend',
-};
-
-const STATE_LABELS: Record<IncidentState, string> = {
-  SKIPEE_PAR_MACHINE: 'Skipée par machine',
-  SKIPEE_PAR_CONDUCTEUR: 'Skipée par conducteur',
-  DEGRADEE: 'Dégradée',
-  INDISPONIBLE: 'Indisponible',
-  AUTRE: 'Autre',
-};
-
-function formatValue(value: string | null | undefined): string {
-  if (!value) return '-';
-  return value;
-}
-
-function findLine(lines: ProductionLine[], lineId?: number) {
-  if (!lineId) return undefined;
-  return lines.find((line) => line.id === lineId);
-}
-
-function formatLineLabel(lines: ProductionLine[], lineId?: number): string {
-  const line = findLine(lines, lineId);
-  return line ? line.line_number : lineId ? String(lineId) : '-';
-}
-
-function formatMachineLabel(lines: ProductionLine[], lineId: number | undefined, machineId?: string): string {
-  if (!machineId) return '-';
-  const line = findLine(lines, lineId);
-  const machine = line?.machines.find((item) => item.machineId === machineId);
-  if (!machine) return machineId;
-  return `${machine.machineId} · ${machine.brand}`;
+  onApplyEdit?: () => void;
+  onRejectEdit?: () => void;
+  onApproveDelete?: () => void;
+  onRejectDelete?: () => void;
 }
 
 export default function ReviewIncidentRequestModal({
@@ -92,86 +50,10 @@ export default function ReviewIncidentRequestModal({
     return incident.edit_request as Record<string, unknown>;
   }, [incident.edit_request]);
 
-  const changeRows = useMemo<ChangeRow[]>(() => {
-    if (!requested) return [];
-
-    const rows: ChangeRow[] = [];
-    const requestedShift = requested.shift as IncidentShift | undefined;
-    const requestedLineId = requested.lineId as number | undefined;
-    const requestedMachineId = requested.machineId as string | undefined;
-    const requestedRobotLabel = requested.robotLabel as string | undefined;
-    const requestedHeadNumber = requested.headNumber as number | undefined;
-    const requestedState = requested.state as IncidentState | undefined;
-    const requestedComment = requested.comment as string | undefined;
-    const requestedProduct = requested.currentProduct as string | undefined;
-
-    if (requestedShift && requestedShift !== incident.shift) {
-      rows.push({
-        label: 'Équipe',
-        current: SHIFT_LABELS[incident.shift],
-        requested: SHIFT_LABELS[requestedShift] || requestedShift,
-      });
-    }
-
-    if (requestedLineId && requestedLineId !== incident.line_id) {
-      rows.push({
-        label: 'Ligne',
-        current: formatLineLabel(lines, incident.line_id),
-        requested: formatLineLabel(lines, requestedLineId),
-      });
-    }
-
-    if (requestedMachineId && requestedMachineId !== incident.machine_id) {
-      const lineId = requestedLineId ?? incident.line_id;
-      rows.push({
-        label: 'Machine',
-        current: formatMachineLabel(lines, incident.line_id, incident.machine_id),
-        requested: formatMachineLabel(lines, lineId, requestedMachineId),
-      });
-    }
-
-    if (requestedRobotLabel && requestedRobotLabel !== incident.robot_label) {
-      rows.push({
-        label: 'Robot',
-        current: incident.robot_label,
-        requested: requestedRobotLabel,
-      });
-    }
-
-    if (requestedHeadNumber && requestedHeadNumber !== incident.head_number) {
-      rows.push({
-        label: 'Tête',
-        current: String(incident.head_number),
-        requested: String(requestedHeadNumber),
-      });
-    }
-
-    if (requestedState && requestedState !== incident.state) {
-      rows.push({
-        label: 'État',
-        current: STATE_LABELS[incident.state],
-        requested: STATE_LABELS[requestedState] || requestedState,
-      });
-    }
-
-    if (requestedProduct !== undefined && requestedProduct !== (incident.current_product || '')) {
-      rows.push({
-        label: 'Produit en cours',
-        current: formatValue(incident.current_product || ''),
-        requested: formatValue(requestedProduct),
-      });
-    }
-
-    if (requestedComment !== undefined && requestedComment !== (incident.comment || '')) {
-      rows.push({
-        label: 'Commentaire',
-        current: formatValue(incident.comment || ''),
-        requested: formatValue(requestedComment),
-      });
-    }
-
-    return rows;
-  }, [incident, lines, requested]);
+  const changeRows = useMemo(
+    () => (requested ? computeIncidentDiff(incident, requested, lines) : []),
+    [incident, lines, requested]
+  );
 
   const footer = type === 'edit' ? (
     <>
@@ -199,7 +81,7 @@ export default function ReviewIncidentRequestModal({
           onClick={onApproveDelete}
           disabled={loading || deleteApprovalDisabled}
         >
-          {loading ? 'Suppression…' : 'Supprimer'}
+          {loading ? 'Annulation…' : "Annuler l'incident"}
         </button>
       )}
     </>
@@ -207,8 +89,12 @@ export default function ReviewIncidentRequestModal({
 
   return (
     <Modal
-      title={type === 'edit' ? 'Demande de modification' : 'Demande de suppression'}
+      title={type === 'edit' ? 'Demande de modification' : 'Demande d’annulation'}
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isLoading={loading}
+      variant={type === 'delete' ? 'danger' : 'default'}
+      size="lg"
       footer={footer}
     >
       <div className="detail-grid">
@@ -237,14 +123,14 @@ export default function ReviewIncidentRequestModal({
       {type === 'delete' && (
         <>
           <div className="notice">
-            <strong>Motif :</strong> {incident.delete_request_reason || 'Non renseigné'}
+            <strong>Motif :</strong> {incident.cancel_request_reason || 'Non renseigné'}
           </div>
           {deleteWarning && (
             <div className="notice" style={{ marginTop: 12 }}>{deleteWarning}</div>
           )}
           {deleteApprovalDisabled && (
             <div className="notice" style={{ marginTop: 12 }}>
-              Suppression impossible apres prise en charge.
+              Annulation impossible après prise en charge.
             </div>
           )}
         </>

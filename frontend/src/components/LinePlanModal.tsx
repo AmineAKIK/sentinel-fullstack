@@ -3,7 +3,7 @@ import Modal from './Modal';
 import { ProductionLine } from '../types';
 import { updateLine } from '../api/lines';
 import { ApiResponseError } from '../api/client';
-import { normalizeLineMachine } from './CreateLineModal';
+import { normalizeLineMachine } from '../utils/lineMachines';
 
 interface LinePlanModalProps {
   line: ProductionLine;
@@ -65,6 +65,9 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
       title={step === 'preview' ? 'Aperçu du plan' : 'Plan de la ligne'}
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
+      isDirty={step === 'plan' && hasChanges}
+      isLoading={loading}
+      size="lg"
       footer={
         step === 'preview' ? (
           <>
@@ -72,7 +75,7 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
-              {loading ? <><span className="spinner" /> Enregistrement…</> : 'Confirmer'}
+              {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Confirmer'}
             </button>
           </>
         ) : (

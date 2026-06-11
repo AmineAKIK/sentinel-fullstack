@@ -5,15 +5,15 @@ services:
     image: postgres:15-alpine
     container_name: sentinel_postgres
     environment:
-      POSTGRES_DB: sentinel
-      POSTGRES_USER: sentinel
-      POSTGRES_PASSWORD: sentinel_password
+      POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_password}
     volumes:
       - sentinel_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    networks:
+      - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinel} -d ${POSTGRES_DB:-sentinel}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,30 +23,68 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sentinel_backend
-    ports:
-      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     environment:
-      PORT: 3000
-      DATABASE_URL: postgres://sentinel:sentinel_password@postgres:5432/sentinel
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: admin123
-      COOKIE_SECRET: change_me_in_production
-      CLIENT_ORIGIN: http://localhost:5173
-      JWT_SECRET: jwt_secret_change_me_in_production
-      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:-postgres://sentinel:sentinel_password@postgres:5432/sentinel}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      COOKIE_SECRET: ${COOKIE_SECRET:-change_me_in_production}
+      JWT_SECRET: ${JWT_SECRET:-jwt_secret_change_me_in_production}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173}
+      BOARD_ACCESS_LABEL: ${BOARD_ACCESS_LABEL:-Board atelier}
+      BOARD_SESSION_TTL_HOURS: ${BOARD_SESSION_TTL_HOURS:-12}
+      BOARD_ACCESS_CODE_HASH: ${BOARD_ACCESS_CODE_HASH:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     container_name: sentinel_frontend
-    ports:
-      - "5173:80"
     depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: sentinel_caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+    depends_on:
+      - frontend
       - backend
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   sentinel_data:
+  caddy_data:
+  caddy_config:

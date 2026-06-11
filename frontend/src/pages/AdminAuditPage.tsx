@@ -1,22 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import NavBar from '../components/NavBar';
+import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import SelectField from '../components/ui/SelectField';
 import { listReferenceAudit } from '../api/admin';
 import { ReferenceAuditEvent } from '../types';
-
-const EVENT_LABELS: Record<string, string> = {
-  USER_CREATED: 'Utilisateur créé',
-  USER_UPDATED: 'Utilisateur modifié',
-  USER_ACTIVATED: 'Utilisateur activé',
-  USER_DEACTIVATED: 'Utilisateur désactivé',
-  USER_SOFT_DELETED: 'Utilisateur supprimé',
-  USER_PASSWORD_RESET: 'Mot de passe réinitialisé',
-  LINE_CREATED: 'Ligne créée',
-  LINE_UPDATED: 'Ligne mise à jour',
-  LINE_SUMMARY_UPDATED: 'Informations ligne modifiées',
-  LINE_MACHINE_UPDATED: 'Machine modifiée',
-  LINE_PLAN_UPDATED: 'Ordre machines modifié',
-  LINE_SOFT_DELETED: 'Ligne supprimée',
-};
+import { formatDateTime } from '../utils/date';
+import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   all: { label: 'Tous les changements', events: [] },
@@ -30,21 +22,6 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   access: { label: 'Accès utilisateurs', events: ['USER_PASSWORD_RESET'] },
 };
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function targetLabel(event: ReferenceAuditEvent): string {
-  if (event.scope === 'line') return event.line_number || 'Ligne supprimée';
-  const name = `${event.first_name || ''} ${event.last_name || ''}`.trim();
-  return event.badge_number ? `${name || 'Utilisateur'} (${event.badge_number})` : name || 'Utilisateur';
-}
 
 function changesLabel(changes: Record<string, unknown> | null): string {
   if (!changes) return '-';
@@ -92,6 +69,7 @@ function dateBoundary(period: string, customStart: string, customEnd: string) {
 }
 
 export default function AdminAuditPage() {
+  usePageTitle("Journal d'administration");
   const [scope, setScope] = useState('all');
   const [taskGroup, setTaskGroup] = useState('all');
   const [period, setPeriod] = useState('all');
@@ -104,39 +82,26 @@ export default function AdminAuditPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const { start, end } = dateBoundary(period, customStart, customEnd);
     setLoading(true);
     setError('');
-    listReferenceAudit(scope)
+    listReferenceAudit({
+      scope,
+      taskGroup,
+      q: query.trim(),
+      start: start?.toISOString(),
+      end: end?.toISOString(),
+      order: sortOrder,
+      limit: 250,
+    })
       .then(setEvents)
       .catch(() => setError('Impossible de charger le journal.'))
       .finally(() => setLoading(false));
-  }, [scope]);
+  }, [scope, taskGroup, period, customStart, customEnd, query, sortOrder]);
 
   const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const allowedTasks = TASK_GROUPS[taskGroup]?.events || [];
-    const { start, end } = dateBoundary(period, customStart, customEnd);
-
-    const result = events.filter((event) => {
-      if (allowedTasks.length > 0 && !allowedTasks.includes(event.event_type)) return false;
-      const createdAt = new Date(event.created_at);
-      if (start && createdAt < start) return false;
-      if (end && createdAt > end) return false;
-      if (!needle) return true;
-      const haystack = [
-        EVENT_LABELS[event.event_type] || event.event_type,
-        targetLabel(event),
-        event.scope,
-        changesLabel(event.changes),
-      ].join(' ').toLowerCase();
-      return haystack.includes(needle);
-    });
-
-    return result.sort((a, b) => {
-      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return sortOrder === 'asc' ? diff : -diff;
-    });
-  }, [events, query, taskGroup, period, customStart, customEnd, sortOrder]);
+    return events;
+  }, [events]);
 
   const summary = useMemo(() => {
     const accountCount = filtered.filter((event) => event.scope === 'account').length;
@@ -155,21 +120,72 @@ export default function AdminAuditPage() {
     setQuery('');
   }
 
+
+  function toggleDateSort() {
+    setSortOrder((current) => (current === 'desc' ? 'asc' : 'desc'));
+  }
+
+  function dateSortLabel(): string {
+    return sortOrder === 'desc' ? 'Tri descendant' : 'Tri ascendant';
+  }
+
+  const filterChips: FilterChip[] = [
+    ...(query.trim() ? [{
+      key: 'search',
+      label: `Recherche: ${query.trim()}`,
+      onRemove: () => setQuery(''),
+    }] : []),
+    ...(taskGroup !== 'all' ? [{
+      key: 'task',
+      label: `Action: ${TASK_GROUPS[taskGroup]?.label || taskGroup}`,
+      onRemove: () => setTaskGroup('all'),
+    }] : []),
+    ...(scope !== 'all' ? [{
+      key: 'scope',
+      label: `Référentiel: ${scope === 'account' ? 'Utilisateurs' : 'Lignes'}`,
+      onRemove: () => setScope('all'),
+    }] : []),
+    ...(period !== 'all' ? [{
+      key: 'period',
+      label: `Période: ${period === 'today' ? "Aujourd'hui" : period === '7d' ? '7 jours' : period === '30d' ? '30 jours' : 'Personnalisée'}`,
+      onRemove: () => {
+        setPeriod('all');
+        setCustomStart('');
+        setCustomEnd('');
+      },
+    }] : []),
+    ...(sortOrder !== 'desc' ? [{
+      key: 'sort',
+      label: 'Plus anciennes d’abord',
+      onRemove: () => setSortOrder('desc'),
+    }] : []),
+  ];
+  const hasActiveFilters = filterChips.length > 0;
+
   return (
     <>
       <NavBar />
-      <main className="page-container">
+      <main id="main-content" className="page-container">
         <div className="page-header">
           <h1>Journal d'administration</h1>
         </div>
 
         <div className="audit-context">
-          <span>Journal des changements administratifs sur les utilisateurs et les lignes.</span>
-          <strong>{filtered.length}</strong>
-          <span>résultat(s)</span>
-          <span className="audit-context-divider" />
-          <span>{summary.accountCount} utilisateur(s)</span>
-          <span>{summary.lineCount} ligne(s)</span>
+          <span className="audit-context-text">Journal des changements administratifs sur les utilisateurs et les lignes.</span>
+          <span className="audit-context-stats" aria-label="Résumé du journal">
+            <span className="audit-context-stat">
+              <span>résultats</span>
+              <strong>{filtered.length}</strong>
+            </span>
+            <span className="audit-context-stat">
+              <span>utilisateurs</span>
+              <strong>{summary.accountCount}</strong>
+            </span>
+            <span className="audit-context-stat">
+              <span>lignes</span>
+              <strong>{summary.lineCount}</strong>
+            </span>
+          </span>
         </div>
 
         <div className="audit-filter-panel">
@@ -185,35 +201,39 @@ export default function AdminAuditPage() {
             </div>
             <div className="filter-group">
               <span className="filter-label">Type d'action</span>
-              <select
-                className="form-select"
+              <SelectField
                 value={taskGroup}
-                onChange={(event) => setTaskGroup(event.target.value)}
-              >
-                {Object.entries(TASK_GROUPS).map(([value, group]) => (
-                  <option key={value} value={value}>{group.label}</option>
-                ))}
-              </select>
+                onChange={setTaskGroup}
+                options={Object.entries(TASK_GROUPS).map(([value, group]) => ({ value, label: group.label }))}
+              />
             </div>
             <div className="filter-group">
               <span className="filter-label">Référentiel</span>
-              <select className="form-select" value={scope} onChange={(event) => setScope(event.target.value)}>
-                <option value="all">Tout</option>
-                <option value="account">Utilisateurs</option>
-                <option value="line">Lignes</option>
-              </select>
+              <SelectField
+                value={scope}
+                onChange={setScope}
+                options={[
+                  { value: 'all', label: 'Tout' },
+                  { value: 'account', label: 'Utilisateurs' },
+                  { value: 'line', label: 'Lignes' },
+                ]}
+              />
             </div>
           </div>
           <div className="audit-filter-secondary">
             <div className="filter-group">
               <span className="filter-label">Période</span>
-              <select className="form-select" value={period} onChange={(event) => setPeriod(event.target.value)}>
-                <option value="today">Aujourd'hui</option>
-                <option value="7d">7 derniers jours</option>
-                <option value="30d">30 derniers jours</option>
-                <option value="all">Tout l'historique</option>
-                <option value="custom">Personnalisée</option>
-              </select>
+              <SelectField
+                value={period}
+                onChange={setPeriod}
+                options={[
+                  { value: 'today', label: "Aujourd'hui" },
+                  { value: '7d', label: '7 derniers jours' },
+                  { value: '30d', label: '30 derniers jours' },
+                  { value: 'all', label: "Tout l'historique" },
+                  { value: 'custom', label: 'Personnalisée' },
+                ]}
+              />
             </div>
             {period === 'custom' && (
               <>
@@ -227,51 +247,82 @@ export default function AdminAuditPage() {
                 </div>
               </>
             )}
-            <div className="filter-group">
-              <span className="filter-label">Tri</span>
-              <select className="form-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as 'desc' | 'asc')}>
-                <option value="desc">Plus récentes d'abord</option>
-                <option value="asc">Plus anciennes d'abord</option>
-              </select>
-            </div>
-            <button className="btn btn-secondary audit-clear-btn" type="button" onClick={resetFilters}>
+            <button className="btn btn-secondary audit-clear-btn" type="button" onClick={resetFilters} disabled={!hasActiveFilters}>
               Effacer les filtres
             </button>
           </div>
+          <FilterSummary
+            count={filtered.length}
+            countLabel="événement(s) affiché(s)"
+            chips={filterChips}
+            emptyText="Journal complet"
+            className="filter-summary-embedded"
+          />
         </div>
 
-        <div className="card">
+        <div className="card user-list-panel">
           {loading ? (
-            <div className="empty-state">Chargement...</div>
+            <EmptyState>Chargement...</EmptyState>
           ) : error ? (
-            <div className="error-message" style={{ margin: 20 }}>{error}</div>
+            <ErrorBanner style={{ margin: 20 }}>{error}</ErrorBanner>
           ) : filtered.length === 0 ? (
-            <div className="empty-state">Aucun événement trouvé.</div>
+            <EmptyState>Aucun événement trouvé.</EmptyState>
           ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Référentiel</th>
-                    <th>Action</th>
-                    <th>Cible</th>
-                    <th>Champs modifiés</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((event) => (
-                    <tr key={`${event.scope}-${event.id}`}>
-                      <td>{formatDateTime(event.created_at)}</td>
-                      <td>{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</td>
-                      <td>{EVENT_LABELS[event.event_type] || event.event_type}</td>
-                      <td>{targetLabel(event)}</td>
-                      <td>{changesLabel(event.changes)}</td>
+            <>
+              <div className="table-wrapper audit-table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col" aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}>
+                        <button className="table-sort-button" type="button" onClick={toggleDateSort}>
+                          Date
+                          <span className="sr-only">{dateSortLabel()}</span>
+                        </button>
+                      </th>
+                      <th scope="col">Référentiel</th>
+                      <th scope="col">Action</th>
+                      <th scope="col">Cible</th>
+                      <th scope="col">Champs modifiés</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((event) => (
+                      <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
+                        <td>{formatDateTime(event.created_at)}</td>
+                        <td>{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</td>
+                        <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
+                        <td>{formatAuditEventTarget(event, true)}</td>
+                        <td>{changesLabel(event.changes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="audit-card-list">
+                {filtered.map((event) => (
+                  <div className="user-card-row" key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
+                    <span className="user-card-main">
+                      <span className="user-card-name">
+                        {ADMIN_EVENT_LABELS[event.event_type] || event.event_type}
+                      </span>
+                      <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
+                    </span>
+                    <span className="user-card-meta">
+                      <span className="badge-role">{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</span>
+                      {event.changes && changesLabel(event.changes) !== '-' && (
+                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                          {changesLabel(event.changes)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="user-card-footer">
+                      <span>{formatDateTime(event.created_at)}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </main>

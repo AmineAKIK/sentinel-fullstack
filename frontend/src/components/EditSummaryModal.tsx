@@ -4,6 +4,7 @@ import { UserFormData } from './UserForm';
 import { SentinelUser, Role } from '../types';
 import { activateAccount, deactivateAccount, updateAccount } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
+import { ROLE_LABELS } from '../utils/labels';
 
 interface EditSummaryModalProps {
   user: SentinelUser;
@@ -19,12 +20,6 @@ const FIELD_LABELS: Record<string, string> = {
   badgeNumber: 'Numéro de badge',
   role: 'Rôle',
   isActive: 'Statut',
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
-  RESPONSABLE: 'Responsable',
 };
 
 function roleLabel(val: string): string {
@@ -102,13 +97,16 @@ export default function EditSummaryModal({
     <Modal
       title="Récapitulatif des modifications"
       onClose={loading ? undefined : onClose}
+      closeOnOverlay={false}
+      isLoading={loading}
+      size="lg"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onBack} disabled={loading}>
             Retour
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={loading || changes.length === 0}>
-            {loading ? <><span className="spinner" /> Enregistrement…</> : 'Enregistrer'}
+            {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
           </button>
         </>
       }

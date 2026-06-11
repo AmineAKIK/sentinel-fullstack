@@ -3,29 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import EditUserModal from '../components/EditUserModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DetailField from '../components/ui/DetailField';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import FullPageLoader from '../components/ui/FullPageLoader';
 import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
-
-const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Opérateur',
-  MAINTENANCE: 'Maintenance',
-  RESPONSABLE: 'Responsable',
-};
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatDateTime } from '../utils/date';
+import { ROLE_LABELS } from '../utils/labels';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [user, setUser] = useState<SentinelUser | null>(null);
+  usePageTitle(user ? `${user.first_name} ${user.last_name}` : 'Fiche utilisateur');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -53,13 +44,17 @@ export default function UserDetailPage() {
     setTimeout(() => setSuccessMsg(''), 4000);
   }
 
+  function passwordStatusLabel(account: SentinelUser): string {
+    if (account.has_password) return 'Défini';
+    if (account.has_password_setup_code) return 'Code temporaire actif';
+    return 'À réinitialiser';
+  }
+
   if (loading) {
     return (
       <>
         <NavBar />
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
-          <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
-        </div>
+        <FullPageLoader />
       </>
     );
   }
@@ -70,9 +65,9 @@ export default function UserDetailPage() {
         <NavBar />
         <div className="page-container">
           <button className="back-link" onClick={() => navigate('/admin/users')}>
-            ← Retour à la liste
+            Retour à la liste
           </button>
-          <div className="error-message">{error || 'Utilisateur introuvable.'}</div>
+          <ErrorBanner>{error || 'Utilisateur introuvable.'}</ErrorBanner>
         </div>
       </>
     );
@@ -83,7 +78,7 @@ export default function UserDetailPage() {
       <NavBar />
       <div className="page-container">
         <button className="back-link" onClick={() => navigate('/admin/users')}>
-          ← Retour à la liste
+          Retour à la liste
         </button>
 
         <div className="page-header">
@@ -104,38 +99,17 @@ export default function UserDetailPage() {
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-body">
             <div className="detail-grid">
-              <div className="detail-field">
-                <span className="detail-field-label">Nom</span>
-                <span className="detail-field-value">{user.last_name}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Prénom</span>
-                <span className="detail-field-value">{user.first_name}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Numéro de badge</span>
-                <span className="detail-field-value">{user.badge_number}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Rôle</span>
-                <span className="detail-field-value">
-                  <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
-                </span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Mot de passe workshop</span>
-                <span className="detail-field-value">
-                  {user.has_password ? 'Défini' : 'À définir'}
-                </span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Date de création</span>
-                <span className="detail-field-value">{formatDateTime(user.created_at)}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-field-label">Dernière modification</span>
-                <span className="detail-field-value">{formatDateTime(user.updated_at)}</span>
-              </div>
+              <DetailField label="Nom">{user.last_name}</DetailField>
+              <DetailField label="Prénom">{user.first_name}</DetailField>
+              <DetailField label="Numéro de badge">{user.badge_number}</DetailField>
+              <DetailField label="Rôle">
+                <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
+              </DetailField>
+              <DetailField label="Mot de passe workshop">
+                {passwordStatusLabel(user)}
+              </DetailField>
+              <DetailField label="Date de création">{formatDateTime(user.created_at)}</DetailField>
+              <DetailField label="Dernière modification">{formatDateTime(user.updated_at)}</DetailField>
             </div>
           </div>
         </div>

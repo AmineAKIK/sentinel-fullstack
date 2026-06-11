@@ -1,4 +1,4 @@
-import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
 import { WorkshopIncident } from '../types';
 
 interface TakeChargeConfirmModalProps {
@@ -13,23 +13,14 @@ export default function TakeChargeConfirmModal({
   onConfirm,
 }: TakeChargeConfirmModalProps) {
   return (
-    <Modal
+    <ConfirmModal
       title="Confirmer la prise en charge"
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose}>
-            Annuler
-          </button>
-          <button className="btn btn-primary" onClick={onConfirm}>
-            Confirmer
-          </button>
-        </>
-      }
+      onConfirm={onConfirm}
     >
       <div className="notice">
         Vous allez prendre en charge l'incident {incident.line_number} · {incident.machine_id}.
       </div>
-    </Modal>
+    </ConfirmModal>
   );
 }

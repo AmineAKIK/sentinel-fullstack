@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
 import { resetAccountPassword } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
 import { SentinelUser } from '../types';
+import { formatDateTime } from '../utils/date';
 
 interface ResetPasswordConfirmModalProps {
   user: SentinelUser;
@@ -17,52 +18,71 @@ export default function ResetPasswordConfirmModal({
 }: ResetPasswordConfirmModalProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [updatedUser, setUpdatedUser] = useState<SentinelUser | null>(null);
 
   async function handleConfirm() {
     setError('');
     setLoading(true);
     try {
       const updated = await resetAccountPassword(user.id);
-      onSuccess(updated);
+      setUpdatedUser(updated);
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+    } finally {
       setLoading(false);
     }
   }
 
+  function handleClose() {
+    if (updatedUser) {
+      onSuccess(updatedUser);
+      return;
+    }
+    onClose();
+  }
+
+  const hasPasswordOrSetupCode = user.has_password || user.has_password_setup_code;
+
   return (
-    <Modal
-      title="Réinitialiser le mot de passe"
-      onClose={loading ? undefined : onClose}
-      closeOnOverlay={!user.has_password}
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
-            Annuler
-          </button>
-          {user.has_password && (
-            <button className="btn btn-danger" onClick={handleConfirm} disabled={loading}>
-              {loading ? <><span className="spinner" /> Réinitialisation…</> : 'Confirmer'}
-            </button>
-          )}
-        </>
-      }
+    <ConfirmModal
+      title={updatedUser ? 'Code temporaire' : 'Réinitialiser le mot de passe'}
+      onClose={handleClose}
+      closeOnOverlay={false}
+      variant={hasPasswordOrSetupCode && !updatedUser ? 'danger' : 'default'}
+      onConfirm={updatedUser ? undefined : handleConfirm}
+      confirmLabel={hasPasswordOrSetupCode ? 'Réinitialiser' : 'Générer un code'}
+      cancelLabel={updatedUser ? 'Fermer' : 'Annuler'}
+      loading={loading}
+      loadingLabel="Réinitialisation…"
+      error={error}
     >
-      {user.has_password ? (
+      {updatedUser ? (
+        <div>
+          <div className="success-message" style={{ marginBottom: 16 }}>
+            Code temporaire généré pour {updatedUser.first_name} {updatedUser.last_name}.
+          </div>
+          <div className="detail-field" style={{ marginBottom: 14 }}>
+            <span className="detail-field-label">Code temporaire</span>
+            <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>
+              {updatedUser.password_setup_code}
+            </span>
+          </div>
+          <div className="notice">
+            Ce code est affiché une seule fois. Il expire le {updatedUser.password_setup_expires_at ? formatDateTime(updatedUser.password_setup_expires_at) : 'prochainement'}.
+          </div>
+        </div>
+      ) : (
         <>
           <p style={{ fontWeight: 500, marginBottom: 8 }}>
-            Réinitialiser le mot de passe de {user.first_name} {user.last_name} ?
+            Générer un code temporaire pour {user.first_name} {user.last_name} ?
           </p>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
-            L'utilisateur devra se reconnecter avec son badge puis choisir un nouveau mot de passe.
+            {hasPasswordOrSetupCode
+              ? "Le mot de passe actuel ou l'ancien code temporaire sera invalidé. L'utilisateur devra se connecter avec son badge, le nouveau code temporaire puis choisir son mot de passe."
+              : "L'utilisateur devra se connecter avec son badge, ce code temporaire puis choisir son mot de passe."}
           </p>
         </>
-      ) : (
-        <div className="success-message">
-          Aucun mot de passe n'est défini pour cet utilisateur.
-        </div>
       )}
-      {error && <div className="error-message">{error}</div>}
-    </Modal>
+    </ConfirmModal>
   );
 }

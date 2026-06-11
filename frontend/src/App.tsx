@@ -1,91 +1,150 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 import WorkshopLoginPage from './pages/WorkshopLoginPage';
 import WorkshopDashboardPage from './pages/WorkshopDashboardPage';
 import WorkshopHistoryPage from './pages/WorkshopHistoryPage';
+import WorkshopPilotagePage from './pages/WorkshopPilotagePage';
+import WorkshopKnowledgePage from './pages/WorkshopKnowledgePage';
+import BoardAccessPage from './pages/BoardAccessPage';
+import WorkshopSupportPage from './pages/WorkshopSupportPage';
 import AdminHomePage from './pages/AdminHomePage';
 import UserListPage from './pages/UserListPage';
 import UserDetailPage from './pages/UserDetailPage';
 import LinesPage from './pages/LinesPage';
 import AdminAuditPage from './pages/AdminAuditPage';
-import { AuthProvider } from './routes/AuthContext';
-import ProtectedRoute from './routes/ProtectedRoute';
-import PublicRoute from './routes/PublicRoute';
-import { WorkshopAuthProvider } from './routes/WorkshopAuthContext';
-import WorkshopProtectedRoute from './routes/WorkshopProtectedRoute';
+import AdminSupportPage from './pages/AdminSupportPage';
+import { AppAuthProvider } from './routes/AppAuthContext';
+import AdminRoute from './routes/AdminRoute';
+import WorkshopRoute from './routes/WorkshopRoute';
+import GuestRoute from './routes/GuestRoute';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <WorkshopAuthProvider>
-        <Routes>
-          <Route path="/" element={<Navigate to="/admin/login" replace />} />
-          <Route path="/workshop" element={<WorkshopLoginPage />} />
-          <Route
-            path="/workshop/dashboard"
-            element={
-              <WorkshopDashboardPage />
-            }
-          />
-          <Route
-            path="/workshop/history"
-            element={
-              <WorkshopHistoryPage />
-            }
-          />
-        <Route path="/admin" element={<Navigate to="/admin/accueil" replace />} />
-        <Route path="/admin/acceuil" element={<Navigate to="/admin/accueil" replace />} />
+    <AppAuthProvider>
+      <a className="skip-link" href="#main-content">Passer au contenu principal</a>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route
+          path="/login"
+          element={
+            <GuestRoute>
+              <LoginPage />
+            </GuestRoute>
+          }
+        />
+        <Route path="/board" element={<BoardAccessPage />} />
         <Route
           path="/admin/login"
           element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
+            <GuestRoute>
+              <AdminLoginPage />
+            </GuestRoute>
           }
         />
         <Route
+          path="/workshop/login"
+          element={
+            <GuestRoute>
+              <WorkshopLoginPage />
+            </GuestRoute>
+          }
+        />
+
+        {/* Workshop routes */}
+        <Route
+          path="/workshop/dashboard"
+          element={
+            <WorkshopRoute>
+              <WorkshopDashboardPage />
+            </WorkshopRoute>
+          }
+        />
+        <Route
+          path="/workshop/pilotage"
+          element={
+            <WorkshopRoute>
+              <WorkshopPilotagePage />
+            </WorkshopRoute>
+          }
+        />
+        <Route
+          path="/workshop/history"
+          element={
+            <WorkshopRoute>
+              <WorkshopHistoryPage />
+            </WorkshopRoute>
+          }
+        />
+        <Route
+          path="/workshop/knowledge"
+          element={
+            <WorkshopRoute>
+              <WorkshopKnowledgePage />
+            </WorkshopRoute>
+          }
+        />
+        <Route
+          path="/workshop/support"
+          element={
+            <WorkshopRoute>
+              <WorkshopSupportPage />
+            </WorkshopRoute>
+          }
+        />
+        {/* Admin routes */}
+        <Route path="/admin" element={<Navigate to="/admin/accueil" replace />} />
+        <Route
           path="/admin/accueil"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminHomePage />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/admin/users"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <UserListPage />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/admin/users/:id"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <UserDetailPage />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/admin/lines"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <LinesPage />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/admin/audit"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminAuditPage />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/admin/login" replace />} />
-        </Routes>
-      </WorkshopAuthProvider>
-    </AuthProvider>
+        <Route
+          path="/admin/support"
+          element={
+            <AdminRoute>
+              <AdminSupportPage />
+            </AdminRoute>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AppAuthProvider>
   );
 }

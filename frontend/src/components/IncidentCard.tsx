@@ -1,0 +1,184 @@
+import { WorkshopIncident } from '../types';
+import { formatDateTime } from '../utils/date';
+import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS } from '../utils/labels';
+
+interface IncidentCardProps {
+  incident: WorkshopIncident;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  canReorder: boolean;
+  isResponsable: boolean;
+  isMaintenance: boolean;
+  onDragStart: (event: React.DragEvent<HTMLElement>, incidentId: number) => void;
+  onDragOver: (event: React.DragEvent<HTMLElement>, incidentId: number, clientY: number) => void;
+  onDragLeave: (incidentId: number) => void;
+  onDrop: (event: React.DragEvent<HTMLElement>, incidentId: number) => void;
+  onDragEnd: () => void;
+  onClick: (incident: WorkshopIncident) => void;
+  onToggleFollow?: (incident: WorkshopIncident) => void;
+  onReviewEdit: (event: React.MouseEvent, incident: WorkshopIncident) => void;
+  onReviewDelete: (event: React.MouseEvent, incident: WorkshopIncident) => void;
+}
+
+export default function IncidentCard({
+  incident,
+  isDragging,
+  isDropTarget,
+  canReorder,
+  isResponsable,
+  isMaintenance,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+  onClick,
+  onToggleFollow,
+  onReviewEdit,
+  onReviewDelete,
+}: IncidentCardProps) {
+  const isResolvedFollowed = incident.is_followed &&
+    (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED');
+
+  return (
+    <article
+      className={`incident-card${incident.is_priority ? ' incident-card--urgent' : ''}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+      key={incident.id}
+      draggable={canReorder}
+      onDragStart={(event) => {
+        if (!canReorder) return;
+        onDragStart(event, incident.id);
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(incident.id));
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        onDragOver(event, incident.id, event.clientY);
+      }}
+      onDragLeave={() => onDragLeave(incident.id)}
+      onDrop={(event) => {
+        event.preventDefault();
+        onDrop(event, incident.id);
+      }}
+      onDragEnd={onDragEnd}
+      onClick={() => onClick(incident)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ouvrir incident ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick(incident);
+        }
+      }}
+    >
+      {isResolvedFollowed && (
+        <div className="incident-followed-resolved-banner">
+          <strong>{incident.status === 'CLOSED' ? 'Incident clôturé' : 'Incident annulé'}</strong>
+          <span>Conservé dans vos suivis</span>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleFollow?.(incident);
+            }}
+          >
+            Retirer du suivi
+          </button>
+        </div>
+      )}
+      <div className="incident-card-main">
+        <div>
+          <span className="detail-field-label">Incident</span>
+          <h2>Ligne {incident.line_number} · {incident.machine_id}</h2>
+        </div>
+        <div className="incident-card-status">
+          <span className="badge-role">{STATE_LABELS[incident.state] || incident.state}</span>
+          {incident.is_priority && <span className="badge-status inactive">Urgent</span>}
+          {incident.status === 'CLOSED' && <span className="badge-status neutral">Clôturé</span>}
+          {incident.status === 'CANCELED' && <span className="badge-status neutral">Annulé</span>}
+          {incident.status === 'INVALIDATED' && <span className="badge-status neutral">Invalidé</span>}
+          {incident.is_followed && <span className="badge-status followed">Suivi</span>}
+          {incident.is_taken ? (
+            <span className="badge-status active">Pris en charge</span>
+          ) : (
+            <span className="badge-status inactive">Non pris</span>
+          )}
+        </div>
+      </div>
+      <div className="incident-tags">
+        {isResponsable && !isResolvedFollowed && (
+          <button
+            type="button"
+            className={`request-badge ${incident.is_followed ? 'request-badge-followed' : ''}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleFollow?.(incident);
+            }}
+          >
+            {incident.is_followed ? 'Retirer du suivi' : 'Suivre'}
+          </button>
+        )}
+        {isResponsable && incident.edit_request && (
+          <button
+            type="button"
+            className="request-badge request-badge-edit"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReviewEdit(event, incident);
+            }}
+          >
+            Correction demandée
+          </button>
+        )}
+        {isResponsable && incident.cancel_request && (
+          <button
+            type="button"
+            className="request-badge request-badge-delete"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReviewDelete(event, incident);
+            }}
+          >
+            Annulation demandée
+          </button>
+        )}
+      </div>
+
+      <div className="incident-card-summary">
+        <div className="incident-summary-primary">
+          <span className="detail-field-label">Équipement</span>
+          <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
+          <p>{SHIFT_LABELS[incident.shift] || incident.shift} · {formatDateTime(incident.created_at)}</p>
+        </div>
+        <div className="incident-summary-primary">
+          <span className="detail-field-label">Produit</span>
+          <strong>{incident.current_product || '-'}</strong>
+          <p>Créé par {ROLE_LABELS[incident.role] || incident.role}</p>
+        </div>
+        {(isMaintenance || isResponsable) && (
+          <div className="incident-summary-primary">
+            <span className="detail-field-label">Traitement</span>
+            <strong>
+              {incident.taken_by_first_name
+                ? `${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()
+                : 'À prendre'}
+            </strong>
+            <p>{incident.taken_by_role ? ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role : '-'}</p>
+          </div>
+        )}
+      </div>
+
+      {incident.status === 'PENDING' && incident.diagnostic && (
+        <div className="notice" style={{ marginTop: 12 }}>
+          Suspension justifiée : {incident.diagnostic}
+        </div>
+      )}
+      {incident.responsible_comment && (
+        <p className="incident-comment">{incident.responsible_comment}</p>
+      )}
+    </article>
+  );
+}

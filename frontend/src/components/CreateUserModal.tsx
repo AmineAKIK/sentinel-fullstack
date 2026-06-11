@@ -1,79 +1,25 @@
 import { useState } from 'react';
 import Modal from './Modal';
-import UserForm, { UserFormData } from './UserForm';
-import { checkBadgeAvailability, createAccount } from '../api/accounts';
+import UserForm from './UserForm';
+import { createAccount } from '../api/accounts';
 import { SentinelUser, Role } from '../types';
 import { ApiResponseError } from '../api/client';
+import { formatDateTime } from '../utils/date';
+import { useUserForm } from '../hooks/useUserForm';
 
 interface CreateUserModalProps {
   onClose: () => void;
   onSuccess: (user: SentinelUser) => void;
 }
 
-const EMPTY: UserFormData = { firstName: '', lastName: '', badgeNumber: '', role: '' };
-
 export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalProps) {
-  const [form, setForm] = useState<UserFormData>(EMPTY);
+  const { form, setForm, error: formError, badgeError, setBadgeError, loading: formLoading, step, setStep, handlePreview, handleBack, isDirty } = useUserForm();
   const [error, setError] = useState('');
-  const [badgeError, setBadgeError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'form' | 'preview'>('form');
+  const [createdUser, setCreatedUser] = useState<SentinelUser | null>(null);
 
-  async function handlePreview() {
-    setError('');
-    setBadgeError('');
-
-    const issues: string[] = [];
-
-    if (!form.firstName.trim()) {
-      issues.push('Le prénom est obligatoire.');
-    } else if (form.firstName.trim().length < 2) {
-      issues.push('Le prénom doit contenir au moins 2 caractères.');
-    }
-
-    if (!form.lastName.trim()) {
-      issues.push('Le nom est obligatoire.');
-    } else if (form.lastName.trim().length < 2) {
-      issues.push('Le nom doit contenir au moins 2 caractères.');
-    }
-
-    if (!form.badgeNumber.trim()) {
-      issues.push('Le numéro de badge est obligatoire.');
-    } else if (form.badgeNumber.trim().length < 2) {
-      issues.push('Le numéro de badge doit contenir au moins 2 caractères.');
-    }
-
-    if (!form.role) {
-      issues.push('Veuillez sélectionner un rôle.');
-    }
-
-    if (issues.length > 1) {
-      setError('Merci de compléter les champs obligatoires.');
-      return;
-    }
-    if (issues.length === 1) {
-      setError(issues[0]);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const badgeCheck = await checkBadgeAvailability(form.badgeNumber.trim());
-      if (badgeCheck.exists) {
-        setBadgeError('Ce numéro de badge existe déjà.');
-        return;
-      }
-      setStep('preview');
-    } catch (err) {
-      if (err instanceof ApiResponseError) {
-        setError(err.message);
-      } else {
-        setError('Une erreur inattendue est survenue.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
+  const displayError = error || formError;
+  const isLoading = loading || formLoading;
 
   async function handleSubmit() {
     setError('');
@@ -87,7 +33,8 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
         badgeNumber: form.badgeNumber.trim(),
         role: form.role as Role,
       });
-      onSuccess(user);
+      setCreatedUser(user);
+      setStep('created');
     } catch (err) {
       if (err instanceof ApiResponseError) {
         if (err.code === 'BADGE_ALREADY_EXISTS') {
@@ -103,40 +50,63 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
     }
   }
 
-  function handleBack() {
-    setError('');
-    setBadgeError('');
-    setStep('form');
+  function handleClose() {
+    if (createdUser) {
+      onSuccess(createdUser);
+      return;
+    }
+    onClose();
   }
 
   return (
     <Modal
-      title={step === 'preview' ? 'Aperçu utilisateur' : 'Ajouter un utilisateur'}
-      onClose={loading ? undefined : onClose}
+      title={step === 'created' ? 'Code temporaire' : step === 'preview' ? 'Aperçu utilisateur' : 'Ajouter un utilisateur'}
+      onClose={isLoading ? undefined : handleClose}
       closeOnOverlay={false}
+      isDirty={isDirty}
+      isLoading={isLoading}
       footer={
-        step === 'preview' ? (
+        step === 'created' ? (
+          <button className="btn btn-primary" onClick={handleClose}>
+            Fermer
+          </button>
+        ) : step === 'preview' ? (
           <>
-            <button className="btn btn-secondary" onClick={handleBack} disabled={loading}>
+            <button className="btn btn-secondary" onClick={handleBack} disabled={isLoading}>
               Retour
             </button>
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? <><span className="spinner" /> Création…</> : 'Confirmer la création'}
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? <><span className="spinner" aria-hidden="true" /> Création…</> : 'Confirmer la création'}
             </button>
           </>
         ) : (
           <>
-            <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
+            <button className="btn btn-secondary" onClick={onClose} disabled={isLoading}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={handlePreview} disabled={loading}>
+            <button className="btn btn-primary" onClick={() => void handlePreview()} disabled={isLoading}>
               Aperçu
             </button>
           </>
         )
       }
     >
-      {step === 'preview' ? (
+      {step === 'created' && createdUser ? (
+        <div>
+          <div className="success-message" style={{ marginBottom: 16 }}>
+            Utilisateur créé. Communiquez ce code temporaire à {createdUser.first_name} {createdUser.last_name}.
+          </div>
+          <div className="detail-field" style={{ marginBottom: 14 }}>
+            <span className="detail-field-label">Code temporaire</span>
+            <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>
+              {createdUser.password_setup_code}
+            </span>
+          </div>
+          <div className="notice">
+            Ce code est affiché une seule fois. Il expire le {createdUser.password_setup_expires_at ? formatDateTime(createdUser.password_setup_expires_at) : 'prochainement'}.
+          </div>
+        </div>
+      ) : step === 'preview' ? (
         <div className="detail-grid">
           <div>
             <div className="detail-field">
@@ -167,13 +137,13 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
               if (next.badgeNumber !== form.badgeNumber) setBadgeError('');
               setForm(next);
             }}
-            disabled={loading}
+            disabled={isLoading}
             badgeError={badgeError}
           />
-          {error && <div className="error-message">{error}</div>}
+          {displayError && <div id="create-user-error" className="error-message" role="alert">{displayError}</div>}
         </>
       )}
-      {error && step === 'preview' && <div className="error-message">{error}</div>}
+      {displayError && step === 'preview' && <div id="create-user-error-preview" className="error-message" role="alert">{displayError}</div>}
     </Modal>
   );
 }
