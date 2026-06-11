@@ -8,6 +8,7 @@ import WorkshopPilotagePage from './pages/WorkshopPilotagePage';
 import WorkshopKnowledgePage from './pages/WorkshopKnowledgePage';
 import BoardAccessPage from './pages/BoardAccessPage';
 import WorkshopSupportPage from './pages/WorkshopSupportPage';
+import PrivacyPage from './pages/PrivacyPage';
 import AdminHomePage from './pages/AdminHomePage';
 import UserListPage from './pages/UserListPage';
 import UserDetailPage from './pages/UserDetailPage';
@@ -34,6 +35,7 @@ export default function App() {
           }
         />
         <Route path="/board" element={<BoardAccessPage />} />
+        <Route path="/confidentialite" element={<PrivacyPage />} />
         <Route
           path="/admin/login"
           element={
