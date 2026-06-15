@@ -92,29 +92,31 @@ export default function LineForm({
 
       {showStatus && (
         <div className="form-group">
-          <span className="form-label">Statut *</span>
-          <div className="radio-group">
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="lineStatus"
-                checked={data.isActive === true}
-                onChange={() => onChange({ ...data, isActive: true })}
-                disabled={disabled}
-              />
-              Actif
-            </label>
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="lineStatus"
-                checked={data.isActive === false}
-                onChange={() => onChange({ ...data, isActive: false })}
-                disabled={disabled}
-              />
-              Inactif
-            </label>
-          </div>
+          <fieldset className="radio-fieldset">
+            <legend className="form-label">Statut *</legend>
+            <div className="radio-group">
+              <label className="radio-row">
+                <input
+                  type="radio"
+                  name="lineStatus"
+                  checked={data.isActive === true}
+                  onChange={() => onChange({ ...data, isActive: true })}
+                  disabled={disabled}
+                />
+                Actif
+              </label>
+              <label className="radio-row">
+                <input
+                  type="radio"
+                  name="lineStatus"
+                  checked={data.isActive === false}
+                  onChange={() => onChange({ ...data, isActive: false })}
+                  disabled={disabled}
+                />
+                Inactif
+              </label>
+            </div>
+          </fieldset>
         </div>
       )}
 

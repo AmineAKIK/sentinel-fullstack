@@ -123,8 +123,9 @@ export default function WorkshopHistoryPage() {
           <div className="card-body">
             <div className="history-grid">
               <div className="form-group">
-                <label className="form-label">Recherche</label>
+                <label className="form-label" htmlFor="history-search">Recherche</label>
                 <input
+                  id="history-search"
                   className="form-input"
                   placeholder="Incident, machine, acteur, commentaire…"
                   value={query}
@@ -135,9 +136,10 @@ export default function WorkshopHistoryPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Statut</label>
+                <label className="form-label" aria-hidden="true">Statut</label>
                 <SelectField
                   value={statusFilter}
+                  ariaLabel="Statut"
                   onChange={(v) => {
                     const value = readHistoryStatusFilter(v);
                     setStatusFilter(value);
@@ -150,9 +152,10 @@ export default function WorkshopHistoryPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Ligne</label>
+                <label className="form-label" aria-hidden="true">Ligne</label>
                 <SelectField
                   value={lineFilter}
+                  ariaLabel="Ligne"
                   onChange={updateLineFilter}
                   options={[
                     { value: 'all', label: 'Toutes' },
@@ -161,9 +164,10 @@ export default function WorkshopHistoryPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Machine</label>
+                <label className="form-label" aria-hidden="true">Machine</label>
                 <SelectField
                   value={machineFilter}
+                  ariaLabel="Machine"
                   onChange={(v) => {
                     setMachineFilter(v);
                     updateSearchFilter('machine', v);
@@ -176,9 +180,10 @@ export default function WorkshopHistoryPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Type d'anomalie</label>
+                <label className="form-label" aria-hidden="true">Type d'anomalie</label>
                 <SelectField
                   value={stateFilter}
+                  ariaLabel="Type d'anomalie"
                   onChange={(v) => {
                     setStateFilter(v);
                     updateSearchFilter('state', v);

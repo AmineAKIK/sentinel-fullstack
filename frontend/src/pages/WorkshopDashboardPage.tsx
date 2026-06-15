@@ -269,8 +269,9 @@ export default function WorkshopDashboardPage() {
 
         <div className="workshop-search-bar">
           <div className="filter-group workshop-search-filter">
-            <span className="filter-label">Recherche</span>
+            <label className="filter-label" htmlFor="dashboard-search">Recherche</label>
             <input
+              id="dashboard-search"
               className="form-input"
               value={filters.query}
               onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}

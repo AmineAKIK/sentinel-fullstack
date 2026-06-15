@@ -337,9 +337,10 @@ export default function WorkshopPilotagePage() {
             <div className="card-body">
               <div className="history-grid">
                 <div className="form-group">
-                  <label className="form-label">Période</label>
+                  <label className="form-label" aria-hidden="true">Période</label>
                   <SelectField
                     value={period}
+                    ariaLabel="Période"
                     onChange={(v) => setPeriod(v as HistoryPeriod)}
                     options={[
                       { value: 'today', label: "Aujourd'hui" },
@@ -351,8 +352,9 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Début</label>
+                  <label className="form-label" htmlFor="pilotage-date-start">Début</label>
                   <input
+                    id="pilotage-date-start"
                     type="date"
                     className="form-input"
                     value={customStart}
@@ -361,8 +363,9 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Fin</label>
+                  <label className="form-label" htmlFor="pilotage-date-end">Fin</label>
                   <input
+                    id="pilotage-date-end"
                     type="date"
                     className="form-input"
                     value={customEnd}
@@ -371,9 +374,10 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Ligne</label>
+                  <label className="form-label" aria-hidden="true">Ligne</label>
                   <SelectField
                     value={lineFilter}
+                    ariaLabel="Ligne"
                     onChange={setLineFilter}
                     options={[
                       { value: 'all', label: 'Toutes' },
@@ -382,10 +386,11 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Machine</label>
+                  <label className="form-label" aria-hidden="true">Machine</label>
                   <div title={lineFilter === 'all' ? "Sélectionnez d'abord une ligne" : undefined}>
                     <SelectField
                       value={machineFilter}
+                      ariaLabel="Machine"
                       onChange={setMachineFilter}
                       disabled={lineFilter === 'all'}
                       options={[

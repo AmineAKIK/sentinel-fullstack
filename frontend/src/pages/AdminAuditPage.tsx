@@ -191,8 +191,9 @@ export default function AdminAuditPage() {
         <div className="audit-filter-panel">
           <div className="audit-filter-main">
             <div className="filter-group audit-search">
-              <span className="filter-label">Recherche</span>
+              <label className="filter-label" htmlFor="audit-search">Recherche</label>
               <input
+                id="audit-search"
                 className="form-input"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -200,18 +201,20 @@ export default function AdminAuditPage() {
               />
             </div>
             <div className="filter-group">
-              <span className="filter-label">Type d'action</span>
+              <span className="filter-label" aria-hidden="true">Type d'action</span>
               <SelectField
                 value={taskGroup}
                 onChange={setTaskGroup}
+                ariaLabel="Type d'action"
                 options={Object.entries(TASK_GROUPS).map(([value, group]) => ({ value, label: group.label }))}
               />
             </div>
             <div className="filter-group">
-              <span className="filter-label">Référentiel</span>
+              <span className="filter-label" aria-hidden="true">Référentiel</span>
               <SelectField
                 value={scope}
                 onChange={setScope}
+                ariaLabel="Référentiel"
                 options={[
                   { value: 'all', label: 'Tout' },
                   { value: 'account', label: 'Utilisateurs' },
@@ -222,10 +225,11 @@ export default function AdminAuditPage() {
           </div>
           <div className="audit-filter-secondary">
             <div className="filter-group">
-              <span className="filter-label">Période</span>
+              <span className="filter-label" aria-hidden="true">Période</span>
               <SelectField
                 value={period}
                 onChange={setPeriod}
+                ariaLabel="Période"
                 options={[
                   { value: 'today', label: "Aujourd'hui" },
                   { value: '7d', label: '7 derniers jours' },
@@ -238,12 +242,12 @@ export default function AdminAuditPage() {
             {period === 'custom' && (
               <>
                 <div className="filter-group">
-                  <span className="filter-label">Début</span>
-                  <input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
+                  <label className="filter-label" htmlFor="audit-date-start">Début</label>
+                  <input id="audit-date-start" className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
                 </div>
                 <div className="filter-group">
-                  <span className="filter-label">Fin</span>
-                  <input className="form-input" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
+                  <label className="filter-label" htmlFor="audit-date-end">Fin</label>
+                  <input id="audit-date-end" className="form-input" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
                 </div>
               </>
             )}
