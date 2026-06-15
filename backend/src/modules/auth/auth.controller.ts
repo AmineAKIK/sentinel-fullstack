@@ -30,7 +30,7 @@ export async function login(req: Request, res: Response): Promise<void> {
         return;
 
       case 'admin_requires_password':
-        res.status(200).json({ requiresPassword: true, username: result.username });
+        res.status(200).json({ requiresPassword: true });
         return;
 
       case 'workshop_requires_password_setup':

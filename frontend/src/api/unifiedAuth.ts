@@ -11,7 +11,6 @@ export interface WorkshopLoginSuccess extends WorkshopUser {
 
 export interface PasswordRequired {
   requiresPassword: true;
-  username?: string;
   badge_number?: string;
 }
 

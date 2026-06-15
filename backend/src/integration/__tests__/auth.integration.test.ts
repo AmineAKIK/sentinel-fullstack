@@ -113,9 +113,6 @@ describeIntegration('Admin login (real DB)', () => {
     await insertAdmin('admin_int', 'correct_password_123');
     const result = await unifiedLoginService('admin_int', undefined, undefined, undefined);
     expect(result.kind).toBe('admin_requires_password');
-    if (result.kind === 'admin_requires_password') {
-      expect(result.username).toBe('admin_int');
-    }
   });
 });
 

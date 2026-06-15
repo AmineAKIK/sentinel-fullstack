@@ -4,7 +4,7 @@ import { verifyPassword } from '../../auth/bcrypt';
 import pool from '../../db/pool';
 
 export type AuthLoginResult =
-  | { kind: 'admin_requires_password'; username: string }
+  | { kind: 'admin_requires_password' }
   | { kind: 'admin_success'; admin: { id: number; username: string; sessionVersion: number } }
   | { kind: 'workshop_requires_password_setup'; badgeNumber: string }
   | { kind: 'workshop_requires_password'; badgeNumber: string }
@@ -53,7 +53,7 @@ export async function unifiedLoginService(
   // Try admin first: admin accounts use alphanumeric usernames
   const admin = await findAdminByUsername(identifier);
   if (admin) {
-    if (!password) return { kind: 'admin_requires_password', username: admin.username };
+    if (!password) return { kind: 'admin_requires_password' };
     const passwordHash = await getAdminPasswordHash(admin.id);
     if (!passwordHash) return { kind: 'invalid_credentials' };
     const valid = await verifyPassword(password, passwordHash);

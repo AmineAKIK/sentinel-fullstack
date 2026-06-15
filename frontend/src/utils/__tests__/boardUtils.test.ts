@@ -90,9 +90,9 @@ describe('isOpenOverSevenDays', () => {
     expect(isOpenOverSevenDays(incident({ status: 'OPEN', created_at: old }))).toBe(true);
   });
 
-  it('retourne false si CLOSED même si ancien', () => {
+  it('retourne false si PENDING même si ancien', () => {
     const old = new Date(Date.now() - 1000 * 3600 * 24 * 10).toISOString();
-    expect(isOpenOverSevenDays(incident({ status: 'CLOSED', created_at: old }))).toBe(false);
+    expect(isOpenOverSevenDays(incident({ status: 'PENDING', created_at: old }))).toBe(false);
   });
 });
 
