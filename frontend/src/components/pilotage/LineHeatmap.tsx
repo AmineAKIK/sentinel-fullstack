@@ -1,0 +1,99 @@
+import { LineStatus } from '../../hooks/usePilotageData';
+
+function isOver7d(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() > 7 * 24 * 60 * 60 * 1000;
+}
+
+function isOver24h(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() > 24 * 60 * 60 * 1000;
+}
+
+function formatAge(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} h`;
+  return `${Math.floor(hours / 24)} j`;
+}
+
+interface LineHeatmapProps {
+  lineStatuses: LineStatus[];
+  onOpenLine: (lineId: number) => void;
+}
+
+export default function LineHeatmap({ lineStatuses, onOpenLine }: LineHeatmapProps) {
+  if (lineStatuses.length === 0) {
+    return (
+      <div className="pilotage-heatmap-empty">
+        <span className="pilotage-status-dot pilotage-status-dot-stable" aria-hidden="true" />
+        Toutes les lignes opérationnelles
+      </div>
+    );
+  }
+  return (
+    <div className="pilotage-heatmap-scroll">
+      <div className="pilotage-heatmap">
+        <div className="pilotage-heatmap-head">
+          <span>État</span>
+          <span>Ligne</span>
+          <span>Actifs</span>
+          <span>Urgents</span>
+          <span>Sans tech.</span>
+          <span>Ancienneté</span>
+        </div>
+        {lineStatuses.map((ls) => {
+          const oldest =
+            ls.incidents.length > 0
+              ? ls.incidents.reduce((a, b) =>
+                  new Date(a.created_at) < new Date(b.created_at) ? a : b
+                )
+              : null;
+          return (
+            <button
+              key={ls.line.id}
+              type="button"
+              className={`pilotage-heatmap-row pilotage-heatmap-row-${ls.tone}`}
+              onClick={() => onOpenLine(ls.line.id)}
+            >
+              <span className="pilotage-heatmap-state" aria-hidden="true">
+                <span className={`pilotage-status-dot pilotage-status-dot-${ls.tone}`} />
+              </span>
+              <span className="pilotage-heatmap-linename">{ls.line.line_number}</span>
+              <span
+                data-label="Act."
+                className={`pilotage-heatmap-cell${ls.incidents.length > 0 ? ' pilotage-heatmap-cell-active' : ''}`}
+              >
+                {ls.incidents.length}
+              </span>
+              <span
+                data-label="Urg."
+                className={`pilotage-heatmap-cell${ls.urgentNotTaken > 0 ? ' pilotage-heatmap-cell-critical' : ''}`}
+              >
+                {ls.urgentNotTaken > 0 ? ls.urgentNotTaken : '—'}
+              </span>
+              <span
+                data-label="S.tech"
+                className={`pilotage-heatmap-cell${ls.notTaken > 0 ? ' pilotage-heatmap-cell-warn' : ''}`}
+              >
+                {ls.notTaken > 0 ? ls.notTaken : '—'}
+              </span>
+              <span
+                data-label="Âge"
+                className={`pilotage-heatmap-cell${
+                  oldest && isOver7d(oldest.created_at)
+                    ? ' pilotage-heatmap-cell-critical'
+                    : oldest && isOver24h(oldest.created_at)
+                      ? ' pilotage-heatmap-cell-warn'
+                      : ''
+                }`}
+              >
+                {oldest ? formatAge(oldest.created_at) : '—'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
