@@ -1,0 +1,153 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg);
+  padding: 16px;
+}
+
+.login-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 380px;
+  padding: 36px 32px;
+}
+
+.login-title {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-title h1 {
+  font-size: 1.3rem;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.login-title p {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-board-entry {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: 10px;
+}
+
+.login-board-entry span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.login-board-button {
+  width: 100%;
+}
+
+
+.board-access-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  min-width: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 17, 31, 0.05), rgba(8, 17, 31, 0.11)),
+    var(--color-bg);
+}
+
+.board-access-card {
+  width: min(100%, 440px);
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+  display: grid;
+  gap: 22px;
+}
+
+.board-access-card:not(.board-access-card-locked) {
+  place-items: center;
+  min-height: 180px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.board-access-back {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.board-access-back:hover {
+  color: var(--color-text);
+}
+
+.board-access-title {
+  display: grid;
+  gap: 7px;
+}
+
+.board-access-title span {
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.board-access-title h1 {
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.board-access-title p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.board-access-form {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+@media (max-width: 420px) {
+  .login-card,
+  .board-access-card {
+    padding: 24px 20px;
+  }
+}
+
+.workshop-login-page {
+  background-color: var(--color-bg);
+}
+
+.workshop-session {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+

@@ -1,0 +1,250 @@
+/* Sentinel three-space login hub */
+.login-hub-page {
+  min-height: 100vh;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 30px;
+  overflow-x: hidden;
+  background:
+    linear-gradient(180deg, rgba(247, 250, 252, 0.92), rgba(241, 245, 249, 0.98)),
+    var(--color-bg);
+}
+
+.login-hub-shell {
+  width: min(860px, 100%);
+  min-width: 0;
+  display: grid;
+  gap: 28px;
+}
+
+.login-hub-header {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.login-hub-header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.login-hub-header h1 {
+  margin: 0;
+  font-size: clamp(3.4rem, 7vw, 5.5rem);
+  line-height: 1;
+  font-weight: 900;
+  color: var(--color-text);
+}
+
+.login-space-grid {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.login-space-card {
+  min-width: 0;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 26px;
+  text-align: left;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+.login-space-card:hover,
+.login-space-card:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 32px rgba(11, 18, 32, 0.13);
+  transform: translateY(-4px);
+}
+
+.login-space-board {
+  background:
+    linear-gradient(180deg, rgba(11, 18, 32, 0.08), rgba(11, 18, 32, 0.94)),
+    var(--color-nav);
+  color: var(--color-primary-text);
+}
+
+.login-space-card span {
+  color: inherit;
+  opacity: 0.6;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: auto;
+}
+
+.login-space-card-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.login-space-card strong {
+  font-size: 1.5rem;
+  line-height: 1.08;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.login-space-card p {
+  margin: 0;
+  color: inherit;
+  opacity: 0.65;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .login-hub-page {
+    place-items: start center;
+    padding: 24px;
+  }
+
+  .login-hub-shell {
+    gap: 22px;
+  }
+
+  .login-hub-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .login-hub-header p {
+    text-align: left;
+  }
+
+  .login-space-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .login-space-card {
+    min-height: 132px;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .login-hub-page {
+    padding: 18px 16px;
+  }
+
+  .login-hub-shell {
+    width: 100%;
+    gap: 18px;
+  }
+
+  .login-hub-header h1 {
+    font-size: clamp(2.9rem, 16vw, 3.7rem);
+  }
+
+  .login-hub-header p {
+    font-size: 14px;
+  }
+
+  .login-space-card {
+    min-height: 122px;
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .login-space-card span {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  .login-space-card strong {
+    font-size: 1.35rem;
+  }
+
+  .login-space-card p {
+    font-size: 13px;
+    line-height: 1.42;
+  }
+}
+
+/* ── Page Confidentialité & pied de portail ─────────────────────────────────── */
+
+.login-hub-footer {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.login-hub-footer-link {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.login-hub-footer-link:hover,
+.login-hub-footer-link:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.privacy-shell {
+  max-width: 720px;
+}
+
+.privacy-content {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 24px 28px;
+  text-align: left;
+}
+
+.privacy-content h2 {
+  color: var(--color-text);
+  font-size: 1.05rem;
+  margin: 20px 0 8px;
+}
+
+.privacy-content h2:first-child {
+  margin-top: 0;
+}
+
+.privacy-content p {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin: 0 0 4px;
+}
+
+.privacy-footer {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.privacy-back-link {
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.privacy-back-link:hover,
+.privacy-back-link:focus-visible {
+  text-decoration: underline;
+}
