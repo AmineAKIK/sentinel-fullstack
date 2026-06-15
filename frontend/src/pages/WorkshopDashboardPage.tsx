@@ -4,39 +4,24 @@ import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
 import DashboardFilters from '../components/DashboardFilters';
 import IncidentCard from '../components/IncidentCard';
-import DeleteRequestModal from '../components/DeleteRequestModal';
-import MaintenanceDeleteConfirmModal from '../components/MaintenanceDeleteConfirmModal';
-import ReviewIncidentRequestModal from '../components/ReviewIncidentRequestModal';
-import TakeChargeConfirmModal from '../components/TakeChargeConfirmModal';
-import PendingConfirmModal from '../components/PendingConfirmModal';
-import ResumeIncidentConfirmModal from '../components/ResumeIncidentConfirmModal';
-import CloseIncidentModal from '../components/CloseIncidentModal';
 import UnfollowIncidentConfirmModal from '../components/UnfollowIncidentConfirmModal';
 import DeleteResponsibleCommentConfirmModal from '../components/DeleteResponsibleCommentConfirmModal';
+import ReviewIncidentRequestModal from '../components/ReviewIncidentRequestModal';
 import WorkshopNavBar from '../components/WorkshopNavBar';
-import InvalidateIncidentModal from '../components/InvalidateIncidentModal';
 import FilterSummary from '../components/FilterSummary';
-import DetailField from '../components/ui/DetailField';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import {
-  deleteWorkshopIncident,
-  followWorkshopIncident,
-  getIncidentMetrics,
-  listWorkshopIncidents,
-  listWorkshopLines,
-  reorderWorkshopIncidents,
-  unfollowWorkshopIncident,
-  updateWorkshopIncident,
-} from '../api/workshop';
+import IncidentDetailPanel from '../components/IncidentDetailPanel';
+import { updateWorkshopIncident } from '../api/workshop';
 import { useAppAuth } from '../routes/AppAuthContext';
-import { ProductionLine, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
-import { formatDateTime } from '../utils/date';
-import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
+import { WorkshopIncident } from '../types';
 import { canPerform } from '../utils/workshopPermissions';
 import { sortIncidents } from '../utils/incidentSort';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useDashboardFilters, DashboardFilters as DashboardFiltersState } from '../hooks/useDashboardFilters';
 import { useDragDrop } from '../hooks/useDragDrop';
+import { useIncidentsData } from '../hooks/useIncidentsData';
+import { useModalState } from '../hooks/useModalState';
+import { useIncidentActions } from '../hooks/useIncidentActions';
 
 function isWithinLastDays(iso: string, days: number): boolean {
   const createdAt = new Date(iso).getTime();
@@ -50,20 +35,22 @@ export default function WorkshopDashboardPage() {
   const user = session?.accountType === 'workshop' ? session.user : null;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [lines, setLines] = useState<ProductionLine[]>([]);
-  const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
-  const [showCreate, setShowCreate] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [showDeleteRequest, setShowDeleteRequest] = useState(false);
-  const [showTakeChargeConfirm, setShowTakeChargeConfirm] = useState(false);
-  const [showPendingConfirm, setShowPendingConfirm] = useState(false);
-  const [showResumeConfirm, setShowResumeConfirm] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [showInvalidateConfirm, setShowInvalidateConfirm] = useState(false);
-  const [showMaintenanceDeleteConfirm, setShowMaintenanceDeleteConfirm] = useState(false);
-  const [unfollowConfirmIncident, setUnfollowConfirmIncident] = useState<WorkshopIncident | null>(null);
-  const [deleteResponsibleCommentIncident, setDeleteResponsibleCommentIncident] = useState<WorkshopIncident | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
+  const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
+  const [filters, setFilters] = useState<DashboardFiltersState>({
+    lineId: searchParams.get('line') ?? 'all',
+    status: 'all',
+    priority: searchParams.get('priority') ?? 'all',
+    taken: searchParams.get('taken') ?? 'all',
+    scope: 'all',
+    query: '',
+    aging: searchParams.get('age') ?? 'all',
+  });
+
+  const { lines, incidents, metrics, metricsLoading, loading, error, setIncidents, refreshMetrics, upsertIncident } =
+    useIncidentsData();
+  const modal = useModalState();
+  const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({ filters, setFilters, lines });
   const {
     draggedIncidentId,
     dragOverIncidentId,
@@ -73,34 +60,11 @@ export default function WorkshopDashboardPage() {
     clearDropTarget,
     resetDragState,
   } = useDragDrop();
-  const [maintenanceDeleteMode, setMaintenanceDeleteMode] = useState<'direct' | 'approve' | null>(null);
-  const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
-  const [reviewIncident, setReviewIncident] = useState<WorkshopIncident | null>(null);
-  const [reviewType, setReviewType] = useState<'edit' | 'delete' | null>(null);
-  const [reviewError, setReviewError] = useState('');
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [responsibleDrafts, setResponsibleDrafts] = useState<Record<number, string>>({});
-  const [metrics, setMetrics] = useState<WorkshopIncidentMetrics | null>(null);
-  const [metricsLoading, setMetricsLoading] = useState(false);
-  const [filters, setFilters] = useState<DashboardFiltersState>({
-    lineId: searchParams.get('line') || 'all',
-    status: 'all',
-    priority: searchParams.get('priority') || 'all',
-    taken: searchParams.get('taken') || 'all',
-    scope: 'all',
-    query: '',
-    aging: searchParams.get('age') || 'all',
-  });
-  const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const canAct = Boolean(user);
+
   const isOperator = user?.role === 'OPERATOR';
   const isMaintenance = user?.role === 'MAINTENANCE';
   const isResponsable = user?.role === 'RESPONSABLE';
   const selectedIncidentParam = searchParams.get('incident');
-
-  const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({ filters, setFilters, lines });
 
   function setIncidentUrlParam(id: number | null, replace = false) {
     const nextParams = new URLSearchParams(searchParams);
@@ -117,301 +81,45 @@ export default function WorkshopDashboardPage() {
     setIncidentUrlParam(null, replace);
   }
 
-  async function persistManualOrder(ordered: WorkshopIncident[]) {
-    const baseOrder = ordered.length + 1;
-    const reorderedIds = new Set(ordered.map((item) => item.id));
-    const nextOrderById = new Map<number, number>();
-    ordered.forEach((item, orderIndex) => {
-      nextOrderById.set(item.id, baseOrder - orderIndex);
-    });
-
-    setIncidents((prev) =>
-      sortIncidents(prev.map((item) => (
-        reorderedIds.has(item.id)
-          ? { ...item, display_order: nextOrderById.get(item.id) ?? item.display_order }
-          : item
-      )))
-    );
-
-    await reorderWorkshopIncidents(ordered.map((item) => item.id));
-  }
-
-  async function reorderDraggedIncident(targetId: number) {
-    if (!draggedIncidentId || draggedIncidentId === targetId) return;
-    const ordered = filteredIncidents;
-    const fromIndex = ordered.findIndex((item) => item.id === draggedIncidentId);
-    const toIndex = ordered.findIndex((item) => item.id === targetId);
-    if (fromIndex === -1 || toIndex === -1) return;
-
-    const nextOrdered = [...ordered];
-    const [moved] = nextOrdered.splice(fromIndex, 1);
-    nextOrdered.splice(toIndex, 0, moved);
-    await persistManualOrder(nextOrdered);
-    resetDragState();
-  }
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([listWorkshopLines(), listWorkshopIncidents()])
-      .then(([lineData, incidentData]) => {
-        setLines(lineData);
-        setIncidents(sortIncidents(incidentData));
-      })
-      .catch(() => setError('Impossible de charger le tableau de bord.'))
-      .finally(() => setLoading(false));
-  }, []);
-
   useEffect(() => {
     if (!selectedIncidentParam) {
       setSelectedIncident(null);
       return;
     }
-    const requestedIncident = incidents.find((incident) => String(incident.id) === selectedIncidentParam);
-    if (requestedIncident) {
-      setSelectedIncident(requestedIncident);
+    const found = incidents.find((inc) => String(inc.id) === selectedIncidentParam);
+    if (found) {
+      setSelectedIncident(found);
       return;
     }
     if (!loading && incidents.length > 0) {
       setIncidentUrlParam(null, true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIncidentParam, incidents, loading]);
 
-  async function refreshMetrics() {
-    setMetricsLoading(true);
-    try {
-      const nextMetrics = await getIncidentMetrics();
-      setMetrics(nextMetrics);
-    } catch {
-      setMetrics(null);
-    } finally {
-      setMetricsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void refreshMetrics();
-  }, []);
-
-  async function patchIncident(id: number, payload: Parameters<typeof updateWorkshopIncident>[1]) {
-    const updated = await updateWorkshopIncident(id, payload);
-    setIncidents((prev) =>
-      sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-    );
-    setSelectedIncident(updated);
-    void refreshMetrics();
-  }
-
-  function upsertIncident(updated: WorkshopIncident) {
-    setIncidents((prev) =>
-      sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-    );
-    setSelectedIncident((prev) => (prev?.id === updated.id ? updated : prev));
-  }
-
-  function openReview(incident: WorkshopIncident, type: 'edit' | 'delete') {
-    setReviewIncident(incident);
-    setReviewType(type);
-    setReviewError('');
-  }
-
-  function closeReview() {
-    setReviewIncident(null);
-    setReviewType(null);
-    setReviewError('');
-    setReviewLoading(false);
-  }
-
-  function openMaintenanceDeleteConfirm(mode: 'direct' | 'approve') {
-    setMaintenanceDeleteMode(mode);
-    setShowMaintenanceDeleteConfirm(true);
-  }
-
-  async function handleConfirmTakeCharge() {
-    if (!selectedIncident) return;
-    await patchIncident(selectedIncident.id, { isTaken: true });
-    setShowTakeChargeConfirm(false);
-  }
-
-  async function handleRequestDelete(reason: string) {
-    if (!selectedIncident) return;
-    const updated = await updateWorkshopIncident(selectedIncident.id, {
-      cancelRequest: true,
-      cancelRequestReason: reason,
-    });
-    upsertIncident(updated);
-    setShowDeleteRequest(false);
-  }
-
-  async function handleApplyEditRequest() {
-    if (!reviewIncident) return;
-    if (isMaintenance && reviewIncident.is_taken) {
-      setReviewError('Modification interdite apres prise en charge.');
-      return;
-    }
-    setReviewLoading(true);
-    setReviewError('');
-    try {
-      const updated = await updateWorkshopIncident(reviewIncident.id, { applyEditRequest: true });
-      upsertIncident(updated);
-      closeReview();
-    } catch (_err) {
-      setReviewError('Impossible d\'appliquer la modification.');
-    } finally {
-      setReviewLoading(false);
-    }
-  }
-
-  async function handleRejectEditRequest() {
-    if (!reviewIncident) return;
-    if (isMaintenance && reviewIncident.is_taken) {
-      setReviewError('Modification interdite apres prise en charge.');
-      return;
-    }
-    setReviewLoading(true);
-    setReviewError('');
-    try {
-      const updated = await updateWorkshopIncident(reviewIncident.id, { rejectEditRequest: true });
-      upsertIncident(updated);
-      closeReview();
-    } catch (_err) {
-      setReviewError('Impossible de refuser la modification.');
-    } finally {
-      setReviewLoading(false);
-    }
-  }
-
-  async function handleApproveDeleteRequest() {
-    if (!reviewIncident) return;
-    setReviewLoading(true);
-    setReviewError('');
-    try {
-      await deleteWorkshopIncident(reviewIncident.id);
-      setIncidents((prev) => sortIncidents(prev.map((item) => (
-        item.id === reviewIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
-      ))));
-      if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
-      void refreshMetrics();
-      closeReview();
-    } catch (_err) {
-      setReviewError("Impossible d'annuler l'incident.");
-    } finally {
-      setReviewLoading(false);
-    }
-  }
-
-  async function handleRejectDeleteRequest() {
-    if (!reviewIncident) return;
-    setReviewLoading(true);
-    setReviewError('');
-    try {
-      const updated = await updateWorkshopIncident(reviewIncident.id, { rejectDeleteRequest: true });
-      upsertIncident(updated);
-      closeReview();
-    } catch (_err) {
-      setReviewError("Impossible de refuser l'annulation.");
-    } finally {
-      setReviewLoading(false);
-    }
-  }
-
-  async function handleSetPending(reason: string) {
-    if (!selectedIncident) return;
-    await patchIncident(selectedIncident.id, { status: 'PENDING', diagnostic: reason.trim() });
-    setShowPendingConfirm(false);
-  }
-
-  async function handleResumeIncident() {
-    if (!selectedIncident) return;
-    await patchIncident(selectedIncident.id, { status: 'OPEN' });
-    setShowResumeConfirm(false);
-  }
-
-  async function handleCloseIncident(note: string) {
-    if (!selectedIncident) return;
-    await patchIncident(selectedIncident.id, { status: 'CLOSED', interventionNote: note.trim() });
-    setShowCloseConfirm(false);
-  }
-
-  async function handleInvalidateIncident(reason: string) {
-    if (!selectedIncident) return;
-    await patchIncident(selectedIncident.id, {
-      status: 'INVALIDATED',
-      invalidationReason: reason.trim(),
-    });
-    setShowInvalidateConfirm(false);
-  }
-
-
-  function getResponsibleDraft(incident: WorkshopIncident): string {
-    if (Object.prototype.hasOwnProperty.call(responsibleDrafts, incident.id)) {
-      return responsibleDrafts[incident.id] ?? '';
-    }
-    return incident.responsible_comment || '';
-  }
-
-  function updateResponsibleDraft(id: number, value: string) {
-    setResponsibleDrafts((prev) => ({ ...prev, [id]: value }));
-  }
-
-  async function saveResponsibleComment(incident: WorkshopIncident) {
-    const value = getResponsibleDraft(incident).trim();
-    if (!value) return;
-    const updated = await updateWorkshopIncident(incident.id, { responsibleComment: value });
-    upsertIncident(updated);
-    setResponsibleDrafts((prev) => {
-      const next = { ...prev };
-      delete next[incident.id];
-      return next;
-    });
-  }
-
-  async function deleteResponsibleComment(incident: WorkshopIncident) {
-    const updated = await updateWorkshopIncident(incident.id, { responsibleComment: '' });
-    upsertIncident(updated);
-    setDeleteResponsibleCommentIncident(null);
-    setResponsibleDrafts((prev) => {
-      const next = { ...prev };
-      delete next[incident.id];
-      return next;
-    });
-  }
-
-  async function handleToggleUrgent(incident: WorkshopIncident) {
-    const updated = await updateWorkshopIncident(incident.id, { isPriority: !incident.is_priority });
-    upsertIncident(updated);
-  }
-
-  async function handleToggleFollow(incident: WorkshopIncident) {
-    if (
-      incident.is_followed &&
-      (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED') &&
-      unfollowConfirmIncident?.id !== incident.id
-    ) {
-      setUnfollowConfirmIncident(incident);
-      return;
-    }
-    const updated = incident.is_followed
-      ? await unfollowWorkshopIncident(incident.id)
-      : await followWorkshopIncident(incident.id);
-    upsertIncident(updated);
-    setUnfollowConfirmIncident(null);
-    void refreshMetrics();
-  }
-
   const filteredIncidents = incidents.filter((incident) => {
-    const isResolved = incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED';
+    const isResolved =
+      incident.status === 'CLOSED' ||
+      incident.status === 'CANCELED' ||
+      incident.status === 'INVALIDATED';
     if (filters.scope === 'followed' && !incident.is_followed) return false;
     if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
     if (filters.scope === 'created_by_me' && incident.user_id !== user?.id) return false;
-    if (filters.scope !== 'followed' && (incident.status === 'CANCELED' || incident.status === 'INVALIDATED')) return false;
-    if (filters.scope !== 'followed' && filters.status === 'all' && filters.aging === 'all' && incident.status === 'CLOSED') return false;
+    if (filters.scope !== 'followed' && (incident.status === 'CANCELED' || incident.status === 'INVALIDATED'))
+      return false;
+    if (
+      filters.scope !== 'followed' &&
+      filters.status === 'all' &&
+      filters.aging === 'all' &&
+      incident.status === 'CLOSED'
+    )
+      return false;
     if ((filters.scope === 'assigned_to_me' || filters.scope === 'created_by_me') && isResolved) return false;
     if (filters.lineId !== 'all' && String(incident.line_id) !== filters.lineId) return false;
     if (filters.status !== 'all' && incident.status !== filters.status) return false;
-    if (filters.status === 'CLOSED' && !isWithinLastDays(incident.updated_at || incident.created_at, 7)) return false;
-    if (filters.aging === 'over_7d' && (
-      incident.status === 'CLOSED' || isWithinLastDays(incident.created_at, 7)
-    )) return false;
+    if (filters.status === 'CLOSED' && !isWithinLastDays(incident.updated_at ?? incident.created_at, 7)) return false;
+    if (filters.aging === 'over_7d' && (incident.status === 'CLOSED' || isWithinLastDays(incident.created_at, 7)))
+      return false;
     if (filters.priority === 'urgent' && !incident.is_priority) return false;
     if (filters.priority === 'normal' && incident.is_priority) return false;
     if (filters.taken === 'taken' && !incident.is_taken) return false;
@@ -429,362 +137,94 @@ export default function WorkshopDashboardPage() {
         incident.comment,
         incident.diagnostic,
         incident.responsible_comment,
-      ].filter(Boolean).join(' ').toLowerCase();
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       if (!haystack.includes(q)) return false;
     }
     return true;
   });
 
   const createdByMeCount = isOperator
-    ? incidents.filter((incident) => {
-        const isResolved = incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED';
-        return incident.user_id === user?.id && !isResolved;
+    ? incidents.filter((inc) => {
+        const isResolved =
+          inc.status === 'CLOSED' || inc.status === 'CANCELED' || inc.status === 'INVALIDATED';
+        return inc.user_id === user?.id && !isResolved;
       }).length
     : 0;
 
-  const sortedIncidents = sortOrder === 'default'
-    ? filteredIncidents
-    : [...filteredIncidents].sort((a, b) => {
-        const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        return sortOrder === 'date_desc' ? diff : -diff;
-      });
+  const sortedIncidents =
+    sortOrder === 'default'
+      ? filteredIncidents
+      : [...filteredIncidents].sort((a, b) => {
+          const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return sortOrder === 'date_desc' ? diff : -diff;
+        });
 
-  async function handleMaintenanceDeleteConfirm() {
-    if (maintenanceDeleteMode === 'approve' && reviewIncident) {
-      await deleteWorkshopIncident(reviewIncident.id);
-      setIncidents((prev) => sortIncidents(prev.map((item) => (
-        item.id === reviewIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
-      ))));
-      if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
-      void refreshMetrics();
-      closeReview();
-    }
-    if (maintenanceDeleteMode === 'direct' && selectedIncident) {
-      await deleteWorkshopIncident(selectedIncident.id);
-      setIncidents((prev) => sortIncidents(prev.map((item) => (
-        item.id === selectedIncident.id ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null } : item
-      ))));
-      clearSelectedIncident();
-      void refreshMetrics();
-    }
-    setShowMaintenanceDeleteConfirm(false);
-    setMaintenanceDeleteMode(null);
+  const actions = useIncidentActions({
+    selectedIncident,
+    clearSelectedIncident,
+    upsertIncident,
+    setIncidents,
+    refreshMetrics,
+    modal,
+    filteredIncidents,
+    draggedIncidentId,
+    resetDragState,
+    isMaintenance,
+    userRole: user?.role,
+  });
+
+  async function handleDeleteCommentConfirm(incident: WorkshopIncident) {
+    const updated = await updateWorkshopIncident(incident.id, { responsibleComment: '' });
+    upsertIncident(updated);
+    modal.setDeleteCommentConfirm(null);
   }
 
   if (selectedIncident) {
-    const canRequestEdit = canPerform(user?.role, 'requestEdit', selectedIncident, user?.id);
-    const canDirectEdit = canPerform(user?.role, 'directEdit', selectedIncident);
-    const canResponsableEdit = canPerform(user?.role, 'responsableEdit', selectedIncident);
-    const canWithdrawEdit = canPerform(user?.role, 'withdrawEdit', selectedIncident, user?.id);
-    const canRequestCancel = canPerform(user?.role, 'requestCancel', selectedIncident, user?.id);
-    const canCancel = canPerform(user?.role, 'cancel', selectedIncident);
-    const canTake = canPerform(user?.role, 'take', selectedIncident);
-    const canSetPending = canPerform(user?.role, 'setPending', selectedIncident);
-    const canResume = canPerform(user?.role, 'resume', selectedIncident);
-    const canClose = canPerform(user?.role, 'close', selectedIncident);
-    const canSetPriority = canPerform(user?.role, 'setPriority', selectedIncident);
-    const canEditResponsibleComment = canPerform(user?.role, 'responsibleComment', selectedIncident);
-    const canInvalidateClosed = canPerform(user?.role, 'invalidateClosed', selectedIncident);
-    const detailHasTreatmentActions = canSetPending || canResume || canClose || canSetPriority || canEditResponsibleComment;
     return (
       <>
         <WorkshopNavBar />
         <main id="main-content" className="page-container workshop-page">
-          <button className="back-link" onClick={() => clearSelectedIncident()}>
-            Retour à la liste
-          </button>
-
-        <div className="page-header">
-          <h1>Incident {selectedIncident.line_number} · {selectedIncident.machine_id}</h1>
-          {canAct && (
-            <div className="action-bar" style={{ marginTop: 0 }}>
-              {isResponsable && (
-                <button
-                  className={selectedIncident.is_followed ? 'btn btn-secondary' : 'btn btn-primary'}
-                  onClick={() => handleToggleFollow(selectedIncident)}
-                >
-                  {selectedIncident.is_followed ? 'Retirer du suivi' : 'Suivre'}
-                </button>
-              )}
-              {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowEdit(true)}
-                >
-                  {canRequestEdit ? 'Demander une correction' : 'Modifier'}
-                </button>
-              )}
-              {canWithdrawEdit && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => patchIncident(selectedIncident.id, { withdrawEditRequest: true })}
-                >
-                  Retirer ma demande
-                </button>
-              )}
-              {canTake && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setShowTakeChargeConfirm(true)}
-                >
-                  Prendre en charge
-                </button>
-              )}
-              {(canRequestCancel || canCancel) && (
-                <button
-                  className="btn btn-danger"
-                  onClick={() =>
-                    canCancel
-                      ? openMaintenanceDeleteConfirm('direct')
-                      : setShowDeleteRequest(true)
-                  }
-                >
-                  {canCancel ? 'Annuler' : 'Demander annulation'}
-                </button>
-              )}
-              {canInvalidateClosed && (
-                <button
-                  className="btn btn-danger"
-                  onClick={() => setShowInvalidateConfirm(true)}
-                >
-                  Invalider
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card-body">
-              <div className="detail-grid">
-                <DetailField label="Utilisateur">{selectedIncident.first_name} {selectedIncident.last_name}</DetailField>
-                <DetailField label="Rôle créateur">{ROLE_LABELS[selectedIncident.role] || selectedIncident.role}</DetailField>
-                <DetailField label="Équipe">{SHIFT_LABELS[selectedIncident.shift]}</DetailField>
-                <DetailField label="État">{STATE_LABELS[selectedIncident.state]}</DetailField>
-                <DetailField label="Ligne">{selectedIncident.line_number}</DetailField>
-                <DetailField label="Machine">{selectedIncident.machine_id} · {selectedIncident.machine_brand}</DetailField>
-                <DetailField label="Robot">{selectedIncident.robot_label}</DetailField>
-                <DetailField label="Tête">{selectedIncident.head_number}</DetailField>
-                <DetailField label="Prise en charge">{selectedIncident.is_taken ? 'Oui' : 'Non'}</DetailField>
-                <DetailField label="Pris en charge par">
-                  {selectedIncident.taken_by_first_name
-                    ? `${selectedIncident.taken_by_first_name} ${selectedIncident.taken_by_last_name || ''}`.trim()
-                    : '-'}
-                </DetailField>
-                <DetailField label="Priorité">{selectedIncident.is_priority ? 'Oui' : 'Non'}</DetailField>
-                <DetailField label="Statut">{STATUS_LABELS[selectedIncident.status] || selectedIncident.status}</DetailField>
-                <DetailField label="Produit en cours">{selectedIncident.current_product || '-'}</DetailField>
-                <DetailField label="Création">{formatDateTime(selectedIncident.created_at)}</DetailField>
-            </div>
-            {selectedIncident.comment && (
-              <p className="incident-comment">{selectedIncident.comment}</p>
-            )}
-            {selectedIncident.diagnostic && (
-              <p className="incident-comment"><strong>Diagnostic :</strong> {selectedIncident.diagnostic}</p>
-            )}
-            {selectedIncident.intervention_note && (
-              <p className="incident-comment"><strong>Intervention :</strong> {selectedIncident.intervention_note}</p>
-            )}
-            {selectedIncident.edit_request && (
-              <div className="notice" style={{ marginTop: 16 }}>Demande de modification opérateur en attente.</div>
-            )}
-            {selectedIncident.cancel_request && (
-              <div className="notice" style={{ marginTop: 16 }}>Demande d'annulation opérateur en attente.</div>
-            )}
-          </div>
-        </div>
-
-
-        {canAct && detailHasTreatmentActions && (
-          <div className="card" style={{ marginTop: 16 }}>
-            <div className="card-body">
-              <div className="detail-field" style={{ marginBottom: 12 }}>
-                <span className="detail-field-label">Coordination</span>
-              </div>
-              <div className="action-bar">
-                {canResume && (
-                  <button className="btn btn-secondary" onClick={() => setShowResumeConfirm(true)}>
-                    Reprendre
-                  </button>
-                )}
-                {canSetPending && (
-                  <button className="btn btn-secondary" onClick={() => setShowPendingConfirm(true)}>
-                    Suspendre
-                  </button>
-                )}
-                {canClose && (
-                  <button className="btn btn-primary" onClick={() => setShowCloseConfirm(true)}>
-                    Clôturer
-                  </button>
-                )}
-                {canSetPriority && (
-                  <button className={selectedIncident.is_priority ? 'btn btn-secondary' : 'btn btn-danger'} onClick={() => handleToggleUrgent(selectedIncident)}>
-                    {selectedIncident.is_priority ? 'Repasser normal' : 'Déclarer urgent'}
-                  </button>
-                )}
-              </div>
-              {canEditResponsibleComment && (
-                <div className="incident-comment">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor={`responsible-comment-detail-${selectedIncident.id}`}>
-                      Consigne responsable
-                    </label>
-                    <textarea
-                      id={`responsible-comment-detail-${selectedIncident.id}`}
-                      className="form-input"
-                      rows={3}
-                      value={getResponsibleDraft(selectedIncident)}
-                      onChange={(event) => updateResponsibleDraft(selectedIncident.id, event.target.value)}
-                      placeholder="Consigne courte pour orienter le traitement"
-                    />
-                  </div>
-                  <div className="action-bar">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => saveResponsibleComment(selectedIncident)}
-                      disabled={!getResponsibleDraft(selectedIncident).trim()}
-                    >
-                      {selectedIncident.responsible_comment ? 'Mettre à jour' : 'Ajouter'}
-                    </button>
-                    {selectedIncident.responsible_comment && (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setDeleteResponsibleCommentIncident(selectedIncident)}
-                      >
-                        Retirer
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        {showEdit && (
-          <CreateIncidentModal
-            lines={lines}
+          <IncidentDetailPanel
             incident={selectedIncident}
-            onClose={() => setShowEdit(false)}
-            onSuccess={(updated) => {
-              setShowEdit(false);
+            lines={lines}
+            modal={modal}
+            userRole={user?.role}
+            userId={user?.id}
+            isMaintenance={isMaintenance}
+            isResponsable={isResponsable}
+            onBack={() => clearSelectedIncident()}
+            onToggleFollow={actions.handleToggleFollow}
+            onToggleUrgent={actions.handleToggleUrgent}
+            onConfirmTakeCharge={actions.handleConfirmTakeCharge}
+            onRequestDelete={actions.handleRequestDelete}
+            onSetPending={actions.handleSetPending}
+            onResumeIncident={actions.handleResumeIncident}
+            onCloseIncident={actions.handleCloseIncident}
+            onInvalidateIncident={actions.handleInvalidateIncident}
+            onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
+            onApplyEditRequest={actions.handleApplyEditRequest}
+            onRejectEditRequest={actions.handleRejectEditRequest}
+            onApproveDeleteRequest={actions.handleApproveDeleteRequest}
+            onRejectDeleteRequest={actions.handleRejectDeleteRequest}
+            onEditSuccess={(updated) => {
+              upsertIncident(updated);
               setSelectedIncident(updated);
+              void refreshMetrics();
+            }}
+            onDeleteCommentConfirm={handleDeleteCommentConfirm}
+            patchIncident={async (id, payload) => {
+              const updated = await updateWorkshopIncident(id, payload);
               setIncidents((prev) =>
                 sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
               );
+              setSelectedIncident(updated);
               void refreshMetrics();
+              return updated;
             }}
-            requestOnly={canRequestEdit}
           />
-        )}
-
-        {showDeleteRequest && selectedIncident && (
-          <DeleteRequestModal
-            incident={selectedIncident}
-            onClose={() => setShowDeleteRequest(false)}
-            onConfirm={handleRequestDelete}
-          />
-        )}
-
-        {showTakeChargeConfirm && selectedIncident && (
-          <TakeChargeConfirmModal
-            incident={selectedIncident}
-            onClose={() => setShowTakeChargeConfirm(false)}
-            onConfirm={handleConfirmTakeCharge}
-          />
-        )}
-
-        {showPendingConfirm && selectedIncident && (
-          <PendingConfirmModal
-            incident={selectedIncident}
-            onClose={() => setShowPendingConfirm(false)}
-            onConfirm={handleSetPending}
-          />
-        )}
-
-        {showResumeConfirm && selectedIncident && (
-          <ResumeIncidentConfirmModal
-            incident={selectedIncident}
-            onClose={() => setShowResumeConfirm(false)}
-            onConfirm={handleResumeIncident}
-          />
-        )}
-
-        {showCloseConfirm && selectedIncident && (
-          <CloseIncidentModal
-            incident={selectedIncident}
-            onClose={() => setShowCloseConfirm(false)}
-            onConfirm={handleCloseIncident}
-          />
-        )}
-
-        {showInvalidateConfirm && selectedIncident && (
-          <InvalidateIncidentModal
-            incident={selectedIncident}
-            onClose={() => setShowInvalidateConfirm(false)}
-            onConfirm={handleInvalidateIncident}
-          />
-        )}
-
-        {reviewIncident && reviewType && (
-          <ReviewIncidentRequestModal
-            incident={reviewIncident}
-            lines={lines}
-            type={reviewType}
-            loading={reviewLoading}
-            error={reviewError}
-            onClose={closeReview}
-            onApplyEdit={handleApplyEditRequest}
-            onRejectEdit={handleRejectEditRequest}
-            onApproveDelete={handleApproveDeleteRequest}
-            onRejectDelete={handleRejectDeleteRequest}
-            allowDeleteApproval={canPerform(user?.role, 'approveCancel', reviewIncident)}
-            allowDeleteReject={canPerform(user?.role, 'rejectCancel', reviewIncident)}
-            deleteApprovalDisabled={!canPerform(user?.role, 'approveCancel', reviewIncident)}
-            deleteWarning={
-              canPerform(user?.role, 'approveCancel', reviewIncident)
-                ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
-                : undefined
-            }
-            allowEditApply={canPerform(user?.role, 'approveEdit', reviewIncident)}
-            allowEditReject={canPerform(user?.role, 'rejectEdit', reviewIncident)}
-            editDisabled={!canPerform(user?.role, 'approveEdit', reviewIncident)}
-            editWarning={
-              !canPerform(user?.role, 'approveEdit', reviewIncident)
-                ? 'Seul le responsable peut arbitrer une demande de correction active.'
-                : undefined
-            }
-          />
-        )}
-
-        {showMaintenanceDeleteConfirm && (selectedIncident || reviewIncident) && (
-          <MaintenanceDeleteConfirmModal
-            incident={maintenanceDeleteMode === 'approve' ? reviewIncident! : selectedIncident}
-            title={maintenanceDeleteMode === 'approve' ? "Valider l'annulation" : "Annuler l'incident"}
-            message={maintenanceDeleteMode === 'approve'
-              ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
-              : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."}
-            onClose={() => {
-              setShowMaintenanceDeleteConfirm(false);
-              setMaintenanceDeleteMode(null);
-              setReviewLoading(false);
-            }}
-            onConfirm={handleMaintenanceDeleteConfirm}
-          />
-        )}
-        {unfollowConfirmIncident && (
-          <UnfollowIncidentConfirmModal
-            incident={unfollowConfirmIncident}
-            onClose={() => setUnfollowConfirmIncident(null)}
-            onConfirm={() => handleToggleFollow(unfollowConfirmIncident)}
-          />
-        )}
-        {deleteResponsibleCommentIncident && (
-          <DeleteResponsibleCommentConfirmModal
-            incident={deleteResponsibleCommentIncident}
-            onClose={() => setDeleteResponsibleCommentIncident(null)}
-            onConfirm={() => deleteResponsibleComment(deleteResponsibleCommentIncident)}
-          />
-        )}
         </main>
       </>
     );
@@ -794,180 +234,215 @@ export default function WorkshopDashboardPage() {
     <>
       <WorkshopNavBar />
       <main id="main-content" className="page-container workshop-page">
-      <div className="page-header">
-        <h1>Tableau de bord atelier</h1>
-        <div className="action-bar" style={{ marginTop: 0 }}>
-          {user && (
-            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-              + Créer un incident
-            </button>
-          )}
-          {!user && (
-            <button className="btn btn-secondary" onClick={() => navigate('/login')}>
-              Se connecter
-            </button>
-          )}
-        </div>
-      </div>
-
-      {!user && (
-        <div className="notice" style={{ marginBottom: 20 }}>
-          Lecture seule : connectez-vous pour créer ou agir sur un incident.
-        </div>
-      )}
-
-      {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
-
-      <IncidentMetricsBar
-        metricsLoading={metricsLoading}
-        metrics={metrics}
-        filters={filters}
-        role={user?.role}
-        createdByMeCount={createdByMeCount}
-        onSetFilters={setFilters}
-      />
-
-      <div className="workshop-search-bar">
-        <div className="filter-group workshop-search-filter">
-          <span className="filter-label">Recherche</span>
-          <input
-            className="form-input"
-            value={filters.query}
-            onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
-            placeholder="Ligne, machine, robot, produit..."
-          />
-        </div>
-        <div className="sort-toggle-group">
-          <button
-            type="button"
-            className={`sort-toggle-btn${sortOrder === 'default' ? ' active' : ''}`}
-            onClick={() => setSortOrder('default')}
-          >
-            Par défaut
-          </button>
-          <button
-            type="button"
-            className={`sort-toggle-btn${sortOrder === 'date_desc' ? ' active' : ''}`}
-            onClick={() => setSortOrder('date_desc')}
-          >
-            Plus récent
-          </button>
-          <button
-            type="button"
-            className={`sort-toggle-btn${sortOrder === 'date_asc' ? ' active' : ''}`}
-            onClick={() => setSortOrder('date_asc')}
-          >
-            Plus ancien
-          </button>
-        </div>
-        <button className="btn btn-secondary workshop-filter-button" type="button" onClick={() => setShowFilters(true)}>
-          Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-        </button>
-      </div>
-
-      <FilterSummary
-        count={filteredIncidents.length}
-        countLabel="incident(s) affiché(s)"
-        chips={filterChips}
-        onClear={clearAllFilters}
-      />
-      {isResponsable && sortedIncidents.length > 1 && sortOrder === 'default' && (
-        <div className="reorder-help">
-          Pour changer l'ordre de traitement, sélectionnez un incident puis glissez-le à la position voulue.
-        </div>
-      )}
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <span className="spinner" aria-hidden="true" style={{ width: 24, height: 24, borderWidth: 3 }} />
-        </div>
-      ) : sortedIncidents.length === 0 ? (
-        <div className="card">
-          <div className="empty-state">
-            {activeFilterCount > 0 ? 'Aucun incident ne correspond aux filtres.' : 'Aucun incident à traiter.'}
+        <div className="page-header">
+          <h1>Tableau de bord atelier</h1>
+          <div className="action-bar" style={{ marginTop: 0 }}>
+            {user && (
+              <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
+                + Créer un incident
+              </button>
+            )}
+            {!user && (
+              <button className="btn btn-secondary" onClick={() => void navigate('/login')}>
+                Se connecter
+              </button>
+            )}
           </div>
         </div>
-      ) : (
-        <div className="incident-list">
-          {sortedIncidents.map((incident) => (
-            <IncidentCard
-              key={incident.id}
-              incident={incident}
-              isDragging={draggedIncidentId === incident.id}
-              isDropTarget={dragOverIncidentId === incident.id && draggedIncidentId !== incident.id}
-              canReorder={sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)}
-              isResponsable={isResponsable}
-              isMaintenance={isMaintenance}
-              onToggleFollow={handleToggleFollow}
-              onDragStart={(event, id) => {
-                setDraggedIncidentId(id);
-              }}
-              onDragOver={(_event, id, clientY) => {
-                if (draggedIncidentId && draggedIncidentId !== id) {
-                  scheduleAutoScroll(clientY);
-                  setDropTarget(id);
-                }
-              }}
-              onDragLeave={(id) => {
-                clearDropTarget(id);
-              }}
-              onDrop={(_event, id) => {
-                void reorderDraggedIncident(id);
-              }}
-              onDragEnd={resetDragState}
-              onClick={(inc) => {
-                setSelectedIncident(inc);
-                setIncidentUrlParam(inc.id);
-                if (isResponsable && inc.cancel_request) {
-                  openReview(inc, 'delete');
-                  return;
-                }
-                if (isResponsable && inc.edit_request) {
-                  openReview(inc, 'edit');
-                }
-              }}
-              onReviewEdit={(_event, inc) => openReview(inc, 'edit')}
-              onReviewDelete={(_event, inc) => openReview(inc, 'delete')}
-            />
-          ))}
-        </div>
-      )}
 
-      {showCreate && (
-        <CreateIncidentModal
-          lines={lines}
-          onClose={() => setShowCreate(false)}
-          onSuccess={(incident) => {
-            setShowCreate(false);
-            setIncidents((prev) => sortIncidents([incident, ...prev]));
-            void refreshMetrics();
-          }}
-        />
-      )}
-      {showFilters && (
-        <DashboardFilters
-          lines={lines}
+        {!user && (
+          <div className="notice" style={{ marginBottom: 20 }}>
+            Lecture seule : connectez-vous pour créer ou agir sur un incident.
+          </div>
+        )}
+
+        {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
+
+        <IncidentMetricsBar
+          metricsLoading={metricsLoading}
+          metrics={metrics}
           filters={filters}
+          role={user?.role}
+          createdByMeCount={createdByMeCount}
           onSetFilters={setFilters}
-          onClose={() => setShowFilters(false)}
-          filteredCount={filteredIncidents.length}
-          filterChips={filterChips}
         />
-      )}
-      {unfollowConfirmIncident && (
-        <UnfollowIncidentConfirmModal
-          incident={unfollowConfirmIncident}
-          onClose={() => setUnfollowConfirmIncident(null)}
-          onConfirm={() => handleToggleFollow(unfollowConfirmIncident)}
+
+        <div className="workshop-search-bar">
+          <div className="filter-group workshop-search-filter">
+            <span className="filter-label">Recherche</span>
+            <input
+              className="form-input"
+              value={filters.query}
+              onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
+              placeholder="Ligne, machine, robot, produit..."
+            />
+          </div>
+          <div className="sort-toggle-group">
+            <button
+              type="button"
+              className={`sort-toggle-btn${sortOrder === 'default' ? ' active' : ''}`}
+              onClick={() => setSortOrder('default')}
+            >
+              Par défaut
+            </button>
+            <button
+              type="button"
+              className={`sort-toggle-btn${sortOrder === 'date_desc' ? ' active' : ''}`}
+              onClick={() => setSortOrder('date_desc')}
+            >
+              Plus récent
+            </button>
+            <button
+              type="button"
+              className={`sort-toggle-btn${sortOrder === 'date_asc' ? ' active' : ''}`}
+              onClick={() => setSortOrder('date_asc')}
+            >
+              Plus ancien
+            </button>
+          </div>
+          <button
+            className="btn btn-secondary workshop-filter-button"
+            type="button"
+            onClick={() => modal.openModal('filters')}
+          >
+            Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
+        </div>
+
+        <FilterSummary
+          count={filteredIncidents.length}
+          countLabel="incident(s) affiché(s)"
+          chips={filterChips}
+          onClear={clearAllFilters}
         />
-      )}
-      {deleteResponsibleCommentIncident && (
-        <DeleteResponsibleCommentConfirmModal
-          incident={deleteResponsibleCommentIncident}
-          onClose={() => setDeleteResponsibleCommentIncident(null)}
-          onConfirm={() => deleteResponsibleComment(deleteResponsibleCommentIncident)}
-        />
-      )}
+
+        {isResponsable && sortedIncidents.length > 1 && sortOrder === 'default' && (
+          <div className="reorder-help">
+            Pour changer l'ordre de traitement, sélectionnez un incident puis glissez-le à la position voulue.
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+            <span className="spinner" aria-hidden="true" style={{ width: 24, height: 24, borderWidth: 3 }} />
+          </div>
+        ) : sortedIncidents.length === 0 ? (
+          <div className="card">
+            <div className="empty-state">
+              {activeFilterCount > 0 ? 'Aucun incident ne correspond aux filtres.' : 'Aucun incident à traiter.'}
+            </div>
+          </div>
+        ) : (
+          <div className="incident-list">
+            {sortedIncidents.map((incident) => (
+              <IncidentCard
+                key={incident.id}
+                incident={incident}
+                isDragging={draggedIncidentId === incident.id}
+                isDropTarget={dragOverIncidentId === incident.id && draggedIncidentId !== incident.id}
+                canReorder={sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)}
+                isResponsable={isResponsable}
+                isMaintenance={isMaintenance}
+                onToggleFollow={actions.handleToggleFollow}
+                onDragStart={(_e, id) => setDraggedIncidentId(id)}
+                onDragOver={(_e, id, clientY) => {
+                  if (draggedIncidentId && draggedIncidentId !== id) {
+                    scheduleAutoScroll(clientY);
+                    setDropTarget(id);
+                  }
+                }}
+                onDragLeave={(id) => clearDropTarget(id)}
+                onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
+                onDragEnd={resetDragState}
+                onClick={(inc) => {
+                  setSelectedIncident(inc);
+                  setIncidentUrlParam(inc.id);
+                  if (isResponsable && inc.cancel_request) {
+                    modal.openReview(inc, 'delete');
+                    return;
+                  }
+                  if (isResponsable && inc.edit_request) {
+                    modal.openReview(inc, 'edit');
+                  }
+                }}
+                onReviewEdit={(_e, inc) => modal.openReview(inc, 'edit')}
+                onReviewDelete={(_e, inc) => modal.openReview(inc, 'delete')}
+              />
+            ))}
+          </div>
+        )}
+
+        {modal.state.activeModal === 'create' && (
+          <CreateIncidentModal
+            lines={lines}
+            onClose={() => modal.closeModal()}
+            onSuccess={(incident) => {
+              modal.closeModal();
+              setIncidents((prev) => sortIncidents([incident, ...prev]));
+              void refreshMetrics();
+            }}
+          />
+        )}
+
+        {modal.state.activeModal === 'filters' && (
+          <DashboardFilters
+            lines={lines}
+            filters={filters}
+            onSetFilters={setFilters}
+            onClose={() => modal.closeModal()}
+            filteredCount={filteredIncidents.length}
+            filterChips={filterChips}
+          />
+        )}
+
+        {modal.state.reviewIncident && modal.state.reviewType && (
+          <ReviewIncidentRequestModal
+            incident={modal.state.reviewIncident}
+            lines={lines}
+            type={modal.state.reviewType}
+            loading={modal.state.reviewLoading}
+            error={modal.state.reviewError}
+            onClose={modal.closeReview}
+            onApplyEdit={actions.handleApplyEditRequest}
+            onRejectEdit={actions.handleRejectEditRequest}
+            onApproveDelete={actions.handleApproveDeleteRequest}
+            onRejectDelete={actions.handleRejectDeleteRequest}
+            allowDeleteApproval={canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)}
+            allowDeleteReject={canPerform(user?.role, 'rejectCancel', modal.state.reviewIncident)}
+            deleteApprovalDisabled={!canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)}
+            deleteWarning={
+              canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)
+                ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
+                : undefined
+            }
+            allowEditApply={canPerform(user?.role, 'approveEdit', modal.state.reviewIncident)}
+            allowEditReject={canPerform(user?.role, 'rejectEdit', modal.state.reviewIncident)}
+            editDisabled={!canPerform(user?.role, 'approveEdit', modal.state.reviewIncident)}
+            editWarning={
+              !canPerform(user?.role, 'approveEdit', modal.state.reviewIncident)
+                ? 'Seul le responsable peut arbitrer une demande de correction active.'
+                : undefined
+            }
+          />
+        )}
+
+        {modal.state.unfollowConfirmIncident && (
+          <UnfollowIncidentConfirmModal
+            incident={modal.state.unfollowConfirmIncident}
+            onClose={() => modal.setUnfollowConfirm(null)}
+            onConfirm={() => actions.handleToggleFollow(modal.state.unfollowConfirmIncident!)}
+          />
+        )}
+
+        {modal.state.deleteResponsibleCommentIncident && (
+          <DeleteResponsibleCommentConfirmModal
+            incident={modal.state.deleteResponsibleCommentIncident}
+            onClose={() => modal.setDeleteCommentConfirm(null)}
+            onConfirm={() =>
+              handleDeleteCommentConfirm(modal.state.deleteResponsibleCommentIncident!)
+            }
+          />
+        )}
       </main>
     </>
   );
