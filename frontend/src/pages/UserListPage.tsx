@@ -180,7 +180,7 @@ export default function UserListPage() {
   return (
     <>
       <NavBar />
-      <div className="page-container">
+      <main id="main-content" className="page-container">
         <div className="page-header">
           <h1>Gestion des comptes</h1>
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
@@ -334,7 +334,7 @@ export default function UserListPage() {
             </>
           )}
         </div>
-      </div>
+      </main>
 
       {showCreate && (
         <CreateUserModal

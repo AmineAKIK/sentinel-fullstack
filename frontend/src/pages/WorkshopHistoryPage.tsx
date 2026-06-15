@@ -354,6 +354,7 @@ export default function WorkshopHistoryPage() {
                       return (
                         <th
                           key={col}
+                          scope="col"
                           aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                         >
                           <button

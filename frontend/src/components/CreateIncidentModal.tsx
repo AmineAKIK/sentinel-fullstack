@@ -157,35 +157,35 @@ export default function CreateIncidentModal({
             <table className="change-table">
               <tbody>
                 <tr>
-                  <td><strong>Équipe</strong></td>
+                  <th scope="row">Équipe</th>
                   <td>{SHIFTS.find((item) => item.value === shift)?.label}</td>
                 </tr>
                 <tr>
-                  <td><strong>Ligne</strong></td>
+                  <th scope="row">Ligne</th>
                   <td>{selectedLine?.line_number}</td>
                 </tr>
                 <tr>
-                  <td><strong>Machine</strong></td>
+                  <th scope="row">Machine</th>
                   <td>{selectedMachine?.machineId} - {selectedMachine?.brand}</td>
                 </tr>
                 <tr>
-                  <td><strong>Robot</strong></td>
+                  <th scope="row">Robot</th>
                   <td>{robotLabel}</td>
                 </tr>
                 <tr>
-                  <td><strong>Tête</strong></td>
+                  <th scope="row">Tête</th>
                   <td>{headNumber}</td>
                 </tr>
                 <tr>
-                  <td><strong>État</strong></td>
+                  <th scope="row">État</th>
                   <td>{STATES.find((item) => item.value === state)?.label}</td>
                 </tr>
                 <tr>
-                  <td><strong>Produit en cours</strong></td>
+                  <th scope="row">Produit en cours</th>
                   <td>{currentProduct.trim() || '-'}</td>
                 </tr>
                 <tr>
-                  <td><strong>Commentaire</strong></td>
+                  <th scope="row">Commentaire</th>
                   <td>{comment.trim() || '-'}</td>
                 </tr>
               </tbody>

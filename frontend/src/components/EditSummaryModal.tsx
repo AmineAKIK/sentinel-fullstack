@@ -118,9 +118,9 @@ export default function EditSummaryModal({
           <table className="change-table">
             <thead>
               <tr>
-                <th>Champ</th>
-                <th>Ancienne valeur</th>
-                <th>Nouvelle valeur</th>
+                <th scope="col">Champ</th>
+                <th scope="col">Ancienne valeur</th>
+                <th scope="col">Nouvelle valeur</th>
               </tr>
             </thead>
             <tbody>

@@ -76,7 +76,7 @@ export default function UserDetailPage() {
   return (
     <>
       <NavBar />
-      <div className="page-container">
+      <main id="main-content" className="page-container">
         <button className="back-link" onClick={() => navigate('/admin/users')}>
           Retour à la liste
         </button>
@@ -122,7 +122,7 @@ export default function UserDetailPage() {
             Supprimer
           </button>
         </div>
-      </div>
+      </main>
 
       {modal === 'edit' && (
         <EditUserModal
