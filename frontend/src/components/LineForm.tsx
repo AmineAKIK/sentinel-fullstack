@@ -45,7 +45,7 @@ export default function LineForm({
       return;
     }
 
-    updateMachine(index, { ...current, [field]: value } as LineMachine);
+    updateMachine(index, { ...current, [field]: value });
   }
 
   function addMachine() {

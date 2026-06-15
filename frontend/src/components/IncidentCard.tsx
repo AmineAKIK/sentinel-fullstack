@@ -41,7 +41,8 @@ export default function IncidentCard({
     (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED');
 
   return (
-    <article
+    <div
+      role="button"
       className={`incident-card${incident.is_priority ? ' incident-card--urgent' : ''}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
       key={incident.id}
       draggable={canReorder}
@@ -62,7 +63,6 @@ export default function IncidentCard({
       }}
       onDragEnd={onDragEnd}
       onClick={() => onClick(incident)}
-      role="button"
       tabIndex={0}
       aria-label={`Ouvrir incident ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
       onKeyDown={(event) => {
@@ -179,6 +179,6 @@ export default function IncidentCard({
       {incident.responsible_comment && (
         <p className="incident-comment">{incident.responsible_comment}</p>
       )}
-    </article>
+    </div>
   );
 }

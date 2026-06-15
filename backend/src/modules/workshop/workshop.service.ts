@@ -31,7 +31,7 @@ export {
 
 import {
   EDIT_FIELD_KEYS,
-  EDIT_FIELD_SET,
+  EDIT_FIELD_SET as _EDIT_FIELD_SET,
   definedUpdateKeys,
   hasOnlyKeys,
   unexpectedFieldsError,
@@ -166,7 +166,7 @@ export async function updateIncidentService(
     if (!hasOnlyKeys(keys, ['requestOnly', ...EDIT_FIELD_KEYS])) return unexpectedFieldsError();
     if (!hasEditFields(keys)) return badRequest('Aucune modification demandée.');
     const editPayload = pickEditPayload(updates);
-    return requestEditIncidentService(id, editPayload as Record<string, unknown>, actorUserId, actorRole);
+    return requestEditIncidentService(id, editPayload, actorUserId, actorRole);
   }
   if (updates.requestOnly !== undefined) return unexpectedFieldsError();
 

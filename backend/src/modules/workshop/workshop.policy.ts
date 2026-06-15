@@ -2,7 +2,6 @@ import {
   IncidentAction,
   IncidentStatus,
   isWorkshopRole,
-  WorkshopRole,
 } from '../../domain/constants';
 
 export interface CurrentIncident {
@@ -35,7 +34,7 @@ export function canPerform(
   actorId?: number
 ): boolean {
   if (!isWorkshopRole(role)) return false;
-  const workshopRole = role as WorkshopRole;
+  const workshopRole = role;
 
   switch (action) {
     case 'REQUEST_EDIT':

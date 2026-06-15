@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000';
 
 export class ApiResponseError extends Error {
   code: string;
@@ -27,7 +27,7 @@ async function request<T>(
     let code = 'SERVER_ERROR';
     let message = 'Une erreur est survenue.';
     try {
-      const data = await res.json();
+      const data = (await res.json()) as { error?: { code?: string; message?: string } };
       if (data?.error?.code) code = data.error.code;
       if (data?.error?.message) message = data.error.message;
     } catch {

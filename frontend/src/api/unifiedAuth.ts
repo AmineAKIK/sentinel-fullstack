@@ -1,5 +1,5 @@
 import { api } from './client';
-import { AdminInfo, WorkshopUser, WorkshopPasswordRequired, WorkshopPasswordSetupRequired } from '../types';
+import { AdminInfo, WorkshopUser, WorkshopPasswordSetupRequired } from '../types';
 
 export interface AdminLoginSuccess extends AdminInfo {
   accountType: 'admin';

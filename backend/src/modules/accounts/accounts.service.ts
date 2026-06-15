@@ -1,4 +1,4 @@
-import { badRequest, ServiceResult } from '../../utils/serviceResult';
+import { ServiceResult } from '../../utils/serviceResult';
 import { withTransaction } from '../../db/transaction';
 import {
   generateWorkshopPasswordSetupCode,

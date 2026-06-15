@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import { UserFormData } from './UserForm';
-import { SentinelUser, Role } from '../types';
+import { SentinelUser } from '../types';
 import { activateAccount, deactivateAccount, updateAccount } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
 import { ROLE_LABELS } from '../utils/labels';
@@ -69,7 +69,7 @@ export default function EditSummaryModal({
     if (form.firstName.trim() !== user.first_name) payload.firstName = form.firstName.trim();
     if (form.lastName.trim() !== user.last_name) payload.lastName = form.lastName.trim();
     if (form.badgeNumber.trim() !== user.badge_number) payload.badgeNumber = form.badgeNumber.trim();
-    if (form.role !== user.role) payload.role = form.role as Role;
+    if (form.role !== user.role) payload.role = form.role;
 
     try {
       let updated = user;

@@ -47,7 +47,7 @@ export function pickEditPayload(updates: UpdateIncidentInput): Pick<UpdateIncide
       payload[key] = value as never;
     }
   }
-  return payload as Pick<UpdateIncidentInput, (typeof EDIT_FIELD_KEYS)[number]>;
+  return payload;
 }
 
 export function hasEditFields(keys: string[]): boolean {

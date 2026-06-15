@@ -234,7 +234,7 @@ export default function WorkshopHistoryPage() {
     ...stateFilterChip(stateFilter, () => { setStateFilter('all'); updateSearchFilter('state', 'all'); }),
   ];
 
-  const eventFilterChips: FilterChip[] = [
+  const _eventFilterChips: FilterChip[] = [
     ...(eventTypeFilter !== 'all' ? [{
       key: 'event',
       label: `Action: ${EVENT_LABELS[eventTypeFilter] || eventTypeFilter}`,
@@ -287,7 +287,7 @@ export default function WorkshopHistoryPage() {
     setSearchParams(nextParams);
   }
 
-  function clearEventFilters(): void {
+  function _clearEventFilters(): void {
     setEventTypeFilter('all');
     updateSearchFilter('event', 'all');
   }
@@ -641,12 +641,11 @@ export default function WorkshopHistoryPage() {
                       const labels: Record<SortCol, string> = { date: 'Date', action: 'Action', incident: 'Incident', actor: 'Acteur' };
                       const active = sortCol === col;
                       return (
-                        <th key={col}>
+                        <th key={col} aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
                           <button
                             type="button"
                             className={`sort-th-btn${active ? ' sort-th-active' : ''}`}
                             onClick={() => handleSort(col)}
-                            aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                           >
                             {labels[col]}
                           </button>

@@ -169,7 +169,7 @@ export async function findMachineConflicts(machineIds: string[], excludeLineId?:
     params
   );
 
-  return rows.map((row) => row.machine_id as string);
+  return rows.map((row) => row.machine_id);
 }
 
 export async function getActiveIncidentCountForLine(lineId: number): Promise<number> {

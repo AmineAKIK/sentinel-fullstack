@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState, useCallback } from 'react';
 
 interface ModalProps {
   title: string;
@@ -30,7 +30,7 @@ export default function Modal({
   const [confirmClose, setConfirmClose] = useState(false);
   const modalRef = useRef<HTMLDivElement | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
-  const titleId = useMemo(() => `modal-title-${Math.random().toString(36).slice(2)}`, []);
+  const titleIdStr = `modal-title-${useId()}`;
   const canClose = Boolean(onClose) && !isLoading;
   const escapeEnabled = closeOnEscape ?? closeOnOverlay;
   const modalClassName = useMemo(() => {
@@ -130,6 +130,7 @@ export default function Modal({
   return (
     <div
       className="modal-overlay"
+      role="presentation"
       onClick={(e) => {
         if (!closeOnOverlay) return;
         if (e.target === e.currentTarget) requestClose();
@@ -139,12 +140,12 @@ export default function Modal({
         className={modalClassName}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={titleIdStr}
         ref={modalRef}
         tabIndex={-1}
       >
         <div className="modal-header">
-          <span className="modal-title" id={titleId}>{title}</span>
+          <span className="modal-title" id={titleIdStr}>{title}</span>
           {canClose && (
             <button className="btn btn-ghost btn-sm" onClick={requestClose} aria-label="Fermer">
               <span aria-hidden="true">✕</span>

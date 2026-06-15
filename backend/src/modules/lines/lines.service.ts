@@ -112,7 +112,7 @@ export async function updateLineService(
   const line = await withTransaction(async (client) => {
     const updated = await updateLineData(id, updates, client);
     if (!updated) return null;
-    await createLineAuditEvent(id, adminId, eventType, updates as Record<string, unknown>, client);
+    await createLineAuditEvent(id, adminId, eventType, updates, client);
     return updated;
   });
 

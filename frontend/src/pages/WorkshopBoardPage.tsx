@@ -16,7 +16,6 @@ import {
   normalizeScreenId,
   paginate,
   statusLabel,
-  BOARD_SESSION_SCREEN_KEY,
 } from '../utils/boardUtils';
 import { usePageTitle } from '../hooks/usePageTitle';
 
@@ -132,8 +131,8 @@ export default function WorkshopBoardPage() {
   }
 
   useEffect(() => {
-    refreshBoard();
-    const refreshId = window.setInterval(refreshBoard, 30000);
+    void refreshBoard();
+    const refreshId = window.setInterval(() => void refreshBoard(), 30000);
     const clockId = window.setInterval(() => setNow(new Date()), 15000);
     return () => {
       window.clearInterval(refreshId);

@@ -86,7 +86,7 @@ export async function askSupport(
   });
 
   if (!response.ok) {
-    const text = await response.text();
+    await response.text();
     logger.error({ status: response.status }, 'DeepSeek API error');
     throw new Error('DeepSeek API error');
   }

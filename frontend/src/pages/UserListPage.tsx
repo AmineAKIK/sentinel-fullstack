@@ -62,7 +62,7 @@ export default function UserListPage() {
   }, [filterRole]);
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, [fetchUsers]);
 
   function handleSortChange(value: string) {
@@ -167,7 +167,7 @@ export default function UserListPage() {
     return order === 'asc' ? 'Tri ascendant' : 'Tri descendant';
   }
 
-  function headerSortIndicator(field: UserSortField): string {
+  function _headerSortIndicator(field: UserSortField): string {
     if (sort !== field) return '↕';
     return order === 'asc' ? '↑' : '↓';
   }

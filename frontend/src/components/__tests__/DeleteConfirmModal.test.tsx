@@ -65,7 +65,7 @@ beforeEach(() => {
 // ─── rendering ────────────────────────────────────────────────────────────────
 
 describe('DeleteConfirmModal – rendu', () => {
-  it('affiche le nom et prénom de l\'utilisateur', async () => {
+  it('affiche le nom et prénom de l\'utilisateur', () => {
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
     renderModal();
     expect(screen.getByText(/Jean Dupont/)).toBeDefined();
@@ -116,7 +116,7 @@ describe('DeleteConfirmModal – suppression réussie', () => {
     const { verifyAdminPassword } = await import('../../api/adminSecurity');
     vi.mocked(verifyAdminPassword).mockResolvedValue({} as never);
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
-    vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined as never);
+    vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined);
     const onSuccess = vi.fn();
     renderModal(mockUser(), vi.fn(), onSuccess);
     await waitFor(() => {
@@ -159,7 +159,7 @@ describe('DeleteConfirmModal – vérification admin password', () => {
     const { verifyAdminPassword } = await import('../../api/adminSecurity');
     vi.mocked(verifyAdminPassword).mockResolvedValue({} as never);
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
-    vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined as never);
+    vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined);
     renderModal(mockUser({ id: 5 }));
     await waitFor(() => {
       expect(accountsApi.getAccountImpact).toHaveBeenCalledWith(5);

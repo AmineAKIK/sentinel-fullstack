@@ -88,7 +88,7 @@ async function start(): Promise<void> {
       logger.info({ port: PORT }, 'Sentinel backend listening');
     });
 
-    async function shutdown(signal: string): Promise<void> {
+    function shutdown(signal: string): void {
       logger.info({ signal }, 'Shutting down gracefully');
       server.close(async () => {
         try {
@@ -110,4 +110,4 @@ async function start(): Promise<void> {
   }
 }
 
-start();
+void start();

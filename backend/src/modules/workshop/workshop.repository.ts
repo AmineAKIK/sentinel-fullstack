@@ -17,8 +17,8 @@ type QueryParams = Record<string, unknown>;
 const activeIncidentStatusSql = statusInSql('status', ACTIVE_INCIDENT_STATUSES);
 const openStatusSql = statusEqualsSql('status', 'OPEN');
 const pendingStatusSql = statusEqualsSql('status', 'PENDING');
-const closedStatusSql = statusEqualsSql('status', 'CLOSED');
-const nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql('wi.status', INCIDENT_STATUSES.filter(
+const _closedStatusSql = statusEqualsSql('status', 'CLOSED');
+const _nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql('wi.status', INCIDENT_STATUSES.filter(
   (status) => status !== 'CANCELED' && status !== 'INVALIDATED'
 ));
 
@@ -44,7 +44,7 @@ const INCIDENT_USER_JOINS = `JOIN sentinel_users su ON su.id = wi.user_id
 // ─── SQL time interval constants ──────────────────────────────────────────────
 
 const INCIDENT_CRITICAL_AGE = `'7 days'`;
-const INCIDENT_RECENT_AGE = `'24 hours'`;
+const _INCIDENT_RECENT_AGE = `'24 hours'`;
 
 export type StoredMachine =
   | {

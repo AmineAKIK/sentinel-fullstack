@@ -20,7 +20,7 @@ function singleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot:
     robotNumber: 'R01',
     robotHeads: 2,
     ...overrides,
-  } as LineMachine;
+  };
 }
 
 function doubleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot: true }>> = {}): LineMachine {
@@ -33,7 +33,7 @@ function doubleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot:
     rightRobotNumber: 'R1',
     rightRobotHeads: 3,
     ...overrides,
-  } as LineMachine;
+  };
 }
 
 // ─── emptyMachine ─────────────────────────────────────────────────────────────

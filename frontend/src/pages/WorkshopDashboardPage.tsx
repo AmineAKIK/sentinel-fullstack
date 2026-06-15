@@ -254,7 +254,7 @@ export default function WorkshopDashboardPage() {
       const updated = await updateWorkshopIncident(reviewIncident.id, { applyEditRequest: true });
       upsertIncident(updated);
       closeReview();
-    } catch (err) {
+    } catch (_err) {
       setReviewError('Impossible d\'appliquer la modification.');
     } finally {
       setReviewLoading(false);
@@ -273,7 +273,7 @@ export default function WorkshopDashboardPage() {
       const updated = await updateWorkshopIncident(reviewIncident.id, { rejectEditRequest: true });
       upsertIncident(updated);
       closeReview();
-    } catch (err) {
+    } catch (_err) {
       setReviewError('Impossible de refuser la modification.');
     } finally {
       setReviewLoading(false);
@@ -292,7 +292,7 @@ export default function WorkshopDashboardPage() {
       if (selectedIncident?.id === reviewIncident.id) clearSelectedIncident();
       void refreshMetrics();
       closeReview();
-    } catch (err) {
+    } catch (_err) {
       setReviewError("Impossible d'annuler l'incident.");
     } finally {
       setReviewLoading(false);
@@ -307,7 +307,7 @@ export default function WorkshopDashboardPage() {
       const updated = await updateWorkshopIncident(reviewIncident.id, { rejectDeleteRequest: true });
       upsertIncident(updated);
       closeReview();
-    } catch (err) {
+    } catch (_err) {
       setReviewError("Impossible de refuser l'annulation.");
     } finally {
       setReviewLoading(false);
@@ -758,7 +758,7 @@ export default function WorkshopDashboardPage() {
 
         {showMaintenanceDeleteConfirm && (selectedIncident || reviewIncident) && (
           <MaintenanceDeleteConfirmModal
-            incident={maintenanceDeleteMode === 'approve' ? reviewIncident! : selectedIncident!}
+            incident={maintenanceDeleteMode === 'approve' ? reviewIncident! : selectedIncident}
             title={maintenanceDeleteMode === 'approve' ? "Valider l'annulation" : "Annuler l'incident"}
             message={maintenanceDeleteMode === 'approve'
               ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."

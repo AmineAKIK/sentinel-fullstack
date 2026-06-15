@@ -39,7 +39,7 @@ export default function EditMachineModal({
       return;
     }
 
-    setForm({ ...form, [field]: value } as LineMachine);
+    setForm({ ...form, [field]: value });
   }
 
   function validate(): string[] {

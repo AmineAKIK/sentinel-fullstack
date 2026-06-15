@@ -294,7 +294,7 @@ export default function WorkshopKnowledgePage() {
 
   function copyLink(): void {
     const url = `${window.location.origin}${window.location.pathname}?incident=${selectedId}`;
-    navigator.clipboard.writeText(url).then(() => {
+    void navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

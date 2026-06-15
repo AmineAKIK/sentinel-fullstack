@@ -122,7 +122,7 @@ export async function me(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function logout(req: Request, res: Response): Promise<void> {
+export function logout(req: Request, res: Response): void {
   clearAuthCookie(res, ADMIN_AUTH_COOKIE);
   clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
   res.json({ message: 'Déconnecté.' });

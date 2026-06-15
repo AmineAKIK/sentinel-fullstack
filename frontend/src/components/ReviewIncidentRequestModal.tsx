@@ -47,7 +47,7 @@ export default function ReviewIncidentRequestModal({
 }: ReviewIncidentRequestModalProps) {
   const requested = useMemo(() => {
     if (!incident.edit_request || typeof incident.edit_request !== 'object') return null;
-    return incident.edit_request as Record<string, unknown>;
+    return incident.edit_request;
   }, [incident.edit_request]);
 
   const changeRows = useMemo(
