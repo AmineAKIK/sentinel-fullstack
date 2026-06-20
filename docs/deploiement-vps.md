@@ -1,5 +1,5 @@
 # Documentation de Déploiement — Sentinel Fullstack
-## Production sur VPS OVH · `sentinel.akiksystems.fr`
+## Production sur VPS · `sentinel.akiksystems.fr`
 
 ---
 
@@ -7,10 +7,13 @@
 
 ### Infrastructure existante avant déploiement
 
-- **VPS OVH** : Ubuntu, IP `<IP_DU_VPS>`
-- **Nginx** déjà en place comme reverse proxy pour `akiksystems.fr`
-- **Site principal** : tourne sous l'utilisateur `deploy`, géré par **PM2**, sur le port `3000`
-- **Docker 29.1.3** et **Docker Compose 2.37.1** déjà installés
+Contexte type de ce déploiement (un VPS qui héberge déjà un autre service) :
+
+- **VPS** sous Linux, avec une IP publique et un domaine dédié à Sentinel.
+- **Nginx** déjà en place sur l'hôte comme reverse proxy pour un autre site.
+- **Un service applicatif voisin** tourne déjà sur l'hôte (géré par un gestionnaire
+  de process type PM2). Sentinel doit cohabiter sans perturber l'existant.
+- **Docker** et **Docker Compose v2** déjà installés.
 
 ### Stack Sentinel
 
@@ -59,7 +62,7 @@ pm2 list              # services PM2 actifs
 docker ps             # conteneurs Docker actifs
 ```
 
-> **Règle d'or :** Ne jamais toucher au site existant `akiksystems.fr` qui tourne en parallèle.
+> **Règle d'or :** Ne jamais toucher au service existant qui tourne en parallèle sur l'hôte.
 
 ### 2.2 Clonage du projet
 

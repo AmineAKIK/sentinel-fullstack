@@ -17,7 +17,7 @@
 | Opératrice | Sonia Operatrice — badge `JE-OP-01`, rôle `OPERATOR` |
 | Technicien | Marc Technicien — badge `JE-MA-01`, rôle `MAINTENANCE` |
 | Responsable | Leïla Responsable — badge `JE-RE-01`, rôle `RESPONSABLE` |
-| Mot de passe commun de test | `Essai#2026` |
+| Mot de passe commun de test | `<mot_de_passe_test>` |
 
 Création des données : insertion SQL directe (voir « Reproduire ce jeu d'essai » en fin de document).
 
@@ -29,7 +29,7 @@ Création des données : insertion SQL directe (voir « Reproduire ce jeu d'essa
 
 | | |
 |---|---|
-| **Entrée** | `POST /api/auth/login` — `{"identifier":"JE-OP-01","password":"Essai#2026"}` |
+| **Entrée** | `POST /api/auth/login` — `{"identifier":"JE-OP-01","password":"<mot_de_passe_test>"}` |
 | **Attendu** | 200, cookie de session HTTP-only posé, profil OPERATOR retourné |
 | **Obtenu** | `{"accountType":"workshop","id":1,"first_name":"Sonia","last_name":"Operatrice","badge_number":"JE-OP-01","role":"OPERATOR"}` ✅ |
 

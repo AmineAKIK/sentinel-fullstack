@@ -38,6 +38,7 @@ Thumbs.db
 # Internal / private documents (not for publication)
 PLAN-EXAMEN.md
 docs/Sentinel_cadrage_conceptuel.docx
+docs/phase-0-stabilisation.md
 
 # Local databases, backups and private certificates
 *.sqlite
