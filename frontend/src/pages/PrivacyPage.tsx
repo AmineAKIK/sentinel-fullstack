@@ -6,7 +6,7 @@ export default function PrivacyPage() {
   return (
     <main className="login-hub-page" id="main-content">
       <section className="login-hub-shell privacy-shell">
-        <header className="login-hub-header">
+        <header className="privacy-header">
           <h1>Confidentialité des données</h1>
           <p>Comment Sentinel traite les données personnelles.</p>
         </header>
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
         </div>
 
         <footer className="privacy-footer">
-          <Link to="/login" className="privacy-back-link">← Retour à l'accueil</Link>
+          <Link to="/login" className="privacy-back-link">Retour à l'accueil</Link>
         </footer>
       </section>
     </main>

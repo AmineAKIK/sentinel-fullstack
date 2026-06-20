@@ -205,7 +205,29 @@
 }
 
 .privacy-shell {
-  max-width: 720px;
+  width: min(720px, 100%);
+  gap: 20px;
+}
+
+.privacy-header {
+  min-width: 0;
+  text-align: left;
+}
+
+.privacy-header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  line-height: 1.15;
+  font-weight: 800;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.privacy-header p {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .privacy-content {
