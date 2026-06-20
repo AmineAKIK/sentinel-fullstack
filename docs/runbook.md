@@ -13,7 +13,7 @@ Il complète la checklist `release-checklist.md` qui couvre la validation avant 
 
 ### Prérequis sur le serveur
 - Docker Engine >= 24 et Docker Compose v2
-- Ports 80 et 443 ouverts en entrée **et libres** (sinon voir [deploiement-vps.md](deploiement-vps.md) section 6)
+- Ports 80 et 443 ouverts en entrée **et libres** (si un reverse proxy occupe déjà ces ports, voir [deploiement-vps.md](deploiement-vps.md) sections 4 et 7)
 - Un nom de domaine DNS pointant sur l'IP du serveur
 
 ### Étapes
