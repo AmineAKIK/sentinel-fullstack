@@ -150,6 +150,7 @@ Frontend : voir [frontend/.env.example](frontend/.env.example).
 - [Documentation technique](docs/documentation-technique.md)
 - [Jeu d'essai](docs/jeu-essai.md)
 - [Tests manuels](docs/manual-tests.md)
+- [Déploiement sur VPS](docs/deploiement-vps.md)
 - [Runbook d'exploitation](docs/runbook.md)
 - [Checklist de publication](docs/release-checklist.md)
 

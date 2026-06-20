@@ -6,6 +6,10 @@ coverage/
 .cache/
 *.tsbuildinfo
 
+# Local Docker Compose overrides (host-specific, e.g. reverse proxy / ports)
+docker-compose.override.yml
+docker-compose.override.yaml
+
 # Local environment files (keep documented templates)
 .env
 .env.*

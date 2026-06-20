@@ -3,13 +3,17 @@
 Ce document décrit les procédures d'exploitation à connaître avant de mettre Sentinel en production.
 Il complète la checklist `release-checklist.md` qui couvre la validation avant déploiement.
 
+> Pour un déploiement détaillé sur VPS — notamment le cas d'un **reverse proxy
+> déjà présent** sur les ports 80/443 — voir [deploiement-vps.md](deploiement-vps.md).
+> La section ci-dessous couvre le cas par défaut (VPS dédié, Caddy intégré).
+
 ---
 
 ## 1. Premier déploiement
 
 ### Prérequis sur le serveur
 - Docker Engine >= 24 et Docker Compose v2
-- Ports 80 et 443 ouverts en entrée
+- Ports 80 et 443 ouverts en entrée **et libres** (sinon voir [deploiement-vps.md](deploiement-vps.md) section 6)
 - Un nom de domaine DNS pointant sur l'IP du serveur
 
 ### Étapes
