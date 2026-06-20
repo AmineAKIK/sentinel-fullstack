@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatDuration, formatIncidentDuration } from '../durationFormat';
 
-function iso(offsetMs: number): string {
-  return new Date(Date.now() + offsetMs).toISOString();
-}
-
 describe('formatDuration', () => {
   it('diff nulle ou négative → "—"', () => {
     const now = new Date().toISOString();

@@ -1,31 +1,30 @@
 # Phase 0 - Stabilisation
 
-Cette phase sert de base de contrôle avant les refactors de séparation des responsabilités et les refactors DRY.
+Ce document conserve la trace de la phase de stabilisation réalisée avant les
+refactors de séparation des responsabilités et les refactors DRY. La phase est
+terminée ; la validation courante à utiliser avant publication se trouve dans
+[`release-checklist.md`](release-checklist.md).
 
 ## État Technique De Référence
 
-- Branche de travail : `refactor/phase-0-stabilisation`
-- Frontend : `npm run build` OK
-- Backend : `npm run build` OK
-- DRY baseline : backend `npm run build` OK
-- DRY baseline : frontend `npm run build` OK
-- DRY baseline : `npm run verify:reliability` échoue encore sur 7 points connus, à traiter hors phase DRY mécanique.
+- Branche historique de travail : `refactor/phase-0-stabilisation` (fusionnée dans `main`)
+- Frontend : lint, build et tests automatisés intégrés à la CI
+- Backend : lint, build, tests unitaires et tests d'intégration intégrés à la CI
+- `npm run verify:reliability` : 20 contrôles de fiabilité couverts
 - Les dossiers `node_modules/`, `dist/` et les fichiers `.env` doivent rester ignorés par git.
 - Les exemples d'environnement doivent être versionnés :
   - `backend/.env.example`
   - `frontend/.env.example`
 
-## Dette Active Avant Refactor DRY
+## Points Résolus Pendant La Stabilisation
 
-Ces points sont connus au moment du lancement du chantier DRY. Ils ne doivent pas être confondus avec des régressions introduites par les extractions mécaniques.
-
-- `verify:reliability` : Admin cannot remove active operational references.
-- `verify:reliability` : Workshop permissions are mirrored backend/frontend.
-- `verify:reliability` : Canceled incidents are preserved but excluded from operational metrics.
-- `verify:reliability` : Board respects responsible manual ordering after priority.
-- `verify:reliability` : Workshop history, pilotage, and knowledge are separated pages.
-- `verify:reliability` : Workshop pilotage exposes period trend indicators.
-- `verify:reliability` : Workshop event log has payloads for important operational decisions.
+- Blocage de suppression des références encore utilisées par des incidents actifs.
+- Miroir des permissions atelier entre backend et frontend.
+- Conservation des incidents annulés ou invalidés hors des métriques opérationnelles.
+- Tri du board par priorité, ordre manuel, prise en charge puis date.
+- Séparation des pages historique, pilotage et base de connaissance.
+- Indicateurs de tendance du pilotage.
+- Payloads d'audit pour les décisions opérationnelles importantes.
 
 ## Périmètre Source À Surveiller
 

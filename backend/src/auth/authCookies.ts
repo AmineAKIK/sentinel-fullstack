@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import type { CookieOptions, Response } from 'express';
 import { SESSION_DURATION_MS } from './session';
 
 export const ADMIN_AUTH_COOKIE = 'sentinel_admin_token';
@@ -6,9 +6,9 @@ export const WORKSHOP_AUTH_COOKIE = 'sentinel_workshop_token';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-export const authCookieOptions = {
+export const authCookieOptions: CookieOptions = {
   httpOnly: true,
-  sameSite: (isProduction ? 'strict' : 'lax'),
+  sameSite: isProduction ? 'strict' : 'lax',
   secure: isProduction,
 };
 

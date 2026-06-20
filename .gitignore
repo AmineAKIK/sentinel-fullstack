@@ -1,7 +1,45 @@
+# Dependencies and generated outputs
 node_modules/
 dist/
 coverage/
 .vite/
 .cache/
+*.tsbuildinfo
+
+# Local environment files (keep documented templates)
 .env
+.env.*
+!.env.example
+!**/.env.example
+!.env.release.example
+
+# Logs and local process files
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local databases, backups and private certificates
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.backup
+*.sql.gz
+backups/
+*.pem
+*.key
+*.p12
+*.pfx

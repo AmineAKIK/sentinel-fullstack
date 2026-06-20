@@ -83,15 +83,23 @@ backend/src/
 │   ├── serviceResult.ts       # Type ServiceResult<T> + helpers
 │   └── controller.ts          # Helpers partagés entre controllers
 └── modules/
-    ├── adminAuth/             # Login/logout admin
+    ├── auth/                  # Connexion unifiée, session et déconnexion
     ├── admin/                 # Dashboard admin
+    ├── adminCredentials/      # Lecture et rotation des identifiants admin
+    ├── adminSecurity/         # Vérification/changement du mot de passe admin
     ├── accounts/              # CRUD utilisateurs workshop
+    ├── board/                 # Session et données du board en lecture seule
     ├── lines/                 # CRUD lignes de production
+    ├── support/               # Assistant support admin/atelier
+    ├── workshopCredentials/   # Premier mot de passe et connexion atelier
     └── workshop/              # Gestion des incidents (module principal)
         ├── workshop.routes.ts
         ├── workshop.controller.ts
-        ├── workshop.service.ts     # Fonctions dédiées par action
+        ├── workshop.service.ts     # Façade et lectures
+        ├── workshop.service.edit.ts
+        ├── workshop.service.mutations.ts
         ├── workshop.repository.ts
+        ├── workshop.repository.analytics.ts
         ├── workshop.policy.ts      # Matrice de permissions
         ├── workshop.events.ts      # Logging des événements d'audit
         └── workshop.validation.ts  # Schémas Zod
@@ -105,13 +113,13 @@ Sentinel a une entree unifiee cote interface et trois espaces d'acces separes co
 
 ### Auth Administration
 - Login par username + mot de passe
-- Cookie HTTP-only nommé `sentinel_admin_session`
+- Cookie HTTP-only nommé `sentinel_admin_token`
 - JWT vérifié à chaque requête par `adminAuth` middleware
 - Donne accès à : gestion des utilisateurs, lignes, audit
 
 ### Auth Workshop
 - Login par numéro de badge + mot de passe (optionnel au premier login)
-- Cookie HTTP-only nommé `sentinel_workshop_session`
+- Cookie HTTP-only nommé `sentinel_workshop_token`
 - JWT vérifié à chaque requête par `workshopAuth` middleware
 - À chaque requête : vérifie en base que l'utilisateur est toujours actif
 - Donne accès à : tableau de bord incidents, historique, analytics
@@ -136,12 +144,14 @@ Les actions possibles sur un incident sont contrôlées par un système de permi
 1. **Backend** (`workshop.policy.ts`) : source de vérité. Chaque action est vérifiée avant d'exécuter la logique métier.
 2. **Frontend** (`workshopPermissions.ts`) : miroir du backend pour désactiver les boutons côté UI. Ne remplace pas la vérification backend.
 
-### Les 17 actions possibles
+### Les 19 actions possibles
 | Action | Qui peut faire | Condition |
 |---|---|---|
-| `REQUEST_EDIT` | OPERATOR | Incident actif |
-| `REQUEST_CANCEL` | OPERATOR | Actif + non pris |
+| `REQUEST_EDIT` | OPERATOR | Son incident actif |
+| `WITHDRAW_EDIT` | OPERATOR | Sa demande d'édition en attente |
+| `REQUEST_CANCEL` | OPERATOR | Son incident actif + non pris |
 | `DIRECT_EDIT` | RESPONSABLE, MAINTENANCE | Actif + non pris |
+| `RESPONSABLE_EDIT` | RESPONSABLE | Incident actif, même après prise en charge |
 | `EDIT_AFTER_TAKE` | MAINTENANCE | Actif + pris par lui-même |
 | `CANCEL` | RESPONSABLE, MAINTENANCE | Actif + non pris |
 | `APPROVE_EDIT` | RESPONSABLE | Demande d'édition en attente |
@@ -274,12 +284,15 @@ frontend/src/
 postgres   # PostgreSQL 15 avec health check
 backend    # Node.js compilé, attend que postgres soit healthy
 frontend   # Build Vite statique servi par nginx, attend que backend soit healthy
+caddy      # Reverse proxy, routage /api et TLS automatique
 ```
 
 ### CI/CD (GitHub Actions)
 - Déclenché sur chaque push et pull request vers `main`
-- **Backend** : build TypeScript → tests Jest → verify:reliability
-- **Frontend** : build Vite → tests Vitest
+- **Backend** : lint → build TypeScript → tests Jest → audit npm → verify:reliability
+- **Frontend** : lint → build Vite → tests Vitest → audit npm
+- **Intégration** : migrations et tests backend sur PostgreSQL 15
+- **Docker** : build des images backend et frontend
 
 ---
 

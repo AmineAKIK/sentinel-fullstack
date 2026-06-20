@@ -1,5 +1,6 @@
 import { ZodError } from 'zod';
 import { z } from 'zod';
+import type { Response } from 'express';
 import { formatZodError, parseIdParam, sendServiceError } from '../../utils/controller';
 import { ServiceResult } from '../../utils/serviceResult';
 
@@ -67,18 +68,23 @@ describe('parseIdParam', () => {
 // ─── sendServiceError ─────────────────────────────────────────────────────────
 
 describe('sendServiceError', () => {
-  function mockRes() {
+  type MockResponse = Response & {
+    status: jest.Mock;
+    json: jest.Mock;
+  };
+
+  function mockRes(): MockResponse {
     const res: Record<string, jest.Mock> = {};
     res.status = jest.fn().mockReturnValue(res);
     res.json = jest.fn().mockReturnValue(res);
-    return res as unknown as import('express').Response;
+    return res as unknown as MockResponse;
   }
 
   it('returns false and does NOT call res when result is ok', () => {
     const res = mockRes();
     const result: ServiceResult<string> = { ok: true, data: 'hello' };
     expect(sendServiceError(res, result)).toBe(false);
-    expect((res as any).status).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it('returns true and sends the error when result is not ok', () => {
@@ -90,8 +96,8 @@ describe('sendServiceError', () => {
       message: 'Introuvable.',
     };
     expect(sendServiceError(res, result)).toBe(true);
-    expect((res as any).status).toHaveBeenCalledWith(404);
-    expect((res as any).json).toHaveBeenCalledWith({
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
       error: { code: 'NOT_FOUND', message: 'Introuvable.' },
     });
   });
@@ -105,6 +111,6 @@ describe('sendServiceError', () => {
       message: 'Accès refusé.',
     };
     sendServiceError(res, result);
-    expect((res as any).status).toHaveBeenCalledWith(403);
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });

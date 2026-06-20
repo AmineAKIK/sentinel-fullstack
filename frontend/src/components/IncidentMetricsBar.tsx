@@ -1,14 +1,6 @@
 import { WorkshopIncidentMetrics } from '../types';
-
-interface Filters {
-  lineId: string;
-  status: string;
-  aging: string;
-  priority: string;
-  taken: string;
-  scope?: string;
-  query: string;
-}
+import type { Dispatch, SetStateAction } from 'react';
+import type { DashboardFilters as Filters } from '../hooks/useDashboardFilters';
 
 interface IncidentMetricsBarProps {
   metricsLoading: boolean;
@@ -16,7 +8,7 @@ interface IncidentMetricsBarProps {
   filters: Filters;
   role?: string;
   createdByMeCount?: number;
-  onSetFilters: (value: any) => void;
+  onSetFilters: Dispatch<SetStateAction<Filters>>;
 }
 
 const RESET = { status: 'all', aging: 'all', priority: 'all', taken: 'all', scope: 'all' };

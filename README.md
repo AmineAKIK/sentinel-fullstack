@@ -142,6 +142,17 @@ Backend : voir [backend/.env.example](backend/.env.example).
 
 Frontend : voir [frontend/.env.example](frontend/.env.example).
 
+## Documentation
+
+- [Architecture](ARCHITECTURE.md)
+- [Cycle de vie des incidents](INCIDENT_LIFECYCLE.md)
+- [Cadrage fonctionnel](docs/cadrage-fonctionnel.md)
+- [Documentation technique](docs/documentation-technique.md)
+- [Jeu d'essai](docs/jeu-essai.md)
+- [Tests manuels](docs/manual-tests.md)
+- [Runbook d'exploitation](docs/runbook.md)
+- [Checklist de publication](docs/release-checklist.md)
+
 ## Notes De Dépôt
 
 Les dossiers `node_modules/`, `dist/` et les fichiers `.env` sont ignorés. Les dépendances se restaurent avec `npm install`, et les builds se régénèrent avec `npm run build`.

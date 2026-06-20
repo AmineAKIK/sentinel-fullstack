@@ -24,6 +24,7 @@ const defaultFilters = {
   aging: 'all',
   priority: 'all',
   taken: 'all',
+  scope: 'all',
   query: '',
 };
 

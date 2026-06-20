@@ -1,21 +1,13 @@
 import Modal from './Modal';
 import FilterSummary, { FilterChip } from './FilterSummary';
 import { ProductionLine } from '../types';
-
-interface Filters {
-  lineId: string;
-  status: string;
-  priority: string;
-  taken: string;
-  scope?: string;
-  query: string;
-  aging: string;
-}
+import type { Dispatch, SetStateAction } from 'react';
+import type { DashboardFilters as Filters } from '../hooks/useDashboardFilters';
 
 interface DashboardFiltersProps {
   lines: ProductionLine[];
   filters: Filters;
-  onSetFilters: (value: any) => void;
+  onSetFilters: Dispatch<SetStateAction<Filters>>;
   onClose: () => void;
   filteredCount: number;
   filterChips: FilterChip[];

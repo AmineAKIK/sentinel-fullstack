@@ -7,6 +7,10 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
+function readMany(relativePaths) {
+  return relativePaths.map(read).join('\n');
+}
+
 const checks = [];
 
 function check(name, test) {
@@ -104,14 +108,20 @@ check('Board frontend consumes only the secured board endpoint', () => {
 
 check('Board respects responsible manual ordering after priority', () => {
   const repository = read('backend/src/modules/workshop/workshop.repository.ts');
-  const board = read('frontend/src/pages/WorkshopBoardPage.tsx');
+  const board = readMany([
+    'frontend/src/pages/WorkshopBoardPage.tsx',
+    'frontend/src/utils/incidentSort.ts',
+  ]);
   return repository.includes('ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC')
     && includesInOrder(board, 'if (a.is_priority !== b.is_priority)', 'if (a.display_order !== b.display_order)')
     && includesInOrder(board, 'if (a.display_order !== b.display_order)', 'if (a.is_taken !== b.is_taken)');
 });
 
 check('Board settings are scoped per display screen', () => {
-  const board = read('frontend/src/pages/WorkshopBoardPage.tsx');
+  const board = readMany([
+    'frontend/src/pages/WorkshopBoardPage.tsx',
+    'frontend/src/utils/boardUtils.ts',
+  ]);
   return board.includes('BOARD_SESSION_SCREEN_KEY')
     && board.includes('getOrCreateSessionScreenId')
     && board.includes("nextParams.set('screen', screenId)")
@@ -186,8 +196,14 @@ check('Legacy auth surfaces are removed', () => {
 });
 
 check('Workshop history, pilotage, and knowledge are separated pages', () => {
-  const pilotage = read('frontend/src/pages/WorkshopPilotagePage.tsx');
-  const history = read('frontend/src/pages/WorkshopHistoryPage.tsx');
+  const pilotage = readMany([
+    'frontend/src/pages/WorkshopPilotagePage.tsx',
+    'frontend/src/hooks/usePilotageData.ts',
+  ]);
+  const history = readMany([
+    'frontend/src/pages/WorkshopHistoryPage.tsx',
+    'frontend/src/hooks/useHistoryData.ts',
+  ]);
   const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
   const api = read('frontend/src/api/workshop.ts');
   const repository = read('backend/src/modules/workshop/workshop.repository.ts');
@@ -210,49 +226,58 @@ check('Workshop history, pilotage, and knowledge are separated pages', () => {
 
 check('Workshop knowledge page presents validated intervention cards', () => {
   const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
-  const styles = read('frontend/src/styles.css');
-  return knowledge.includes('knowledge-card-list')
-    && knowledge.includes('knowledge-detail')
+  const styles = read('frontend/src/styles/pages/knowledge.css');
+  return knowledge.includes('kb-card')
+    && knowledge.includes('kb-detail')
     && knowledge.includes('Solution / intervention validée')
-    && knowledge.includes('selectedIncident.intervention_note')
-    && styles.includes('.knowledge-layout')
-    && styles.includes('.knowledge-section-primary');
+    && knowledge.includes('incident.intervention_note')
+    && styles.includes('.kb-layout')
+    && styles.includes('.kb-section-solution');
 });
 
 check('Workshop pilotage exposes period trend indicators', () => {
-  const repository = read('backend/src/modules/workshop/workshop.repository.ts');
-  const types = read('frontend/src/types/index.ts');
-  const pilotage = read('frontend/src/pages/WorkshopPilotagePage.tsx');
-  const styles = read('frontend/src/styles.css');
+  const repository = read('backend/src/modules/workshop/workshop.repository.analytics.ts');
+  const types = read('frontend/src/types/workshop.ts');
+  const pilotage = readMany([
+    'frontend/src/pages/WorkshopPilotagePage.tsx',
+    'frontend/src/hooks/usePilotageData.ts',
+    'frontend/src/components/pilotage/PilotageCharts.tsx',
+  ]);
+  const styles = read('frontend/src/styles/pages/pilotage.css');
   return repository.includes('trendRows')
     && repository.includes('created_count')
     && repository.includes('closed_count')
     && repository.includes('oldest_active_seconds')
     && types.includes('trend: {')
     && pilotage.includes('Temps réel')
-    && pilotage.includes('Recensement')
-    && pilotage.includes('Analyse & bilan')
-    && pilotage.includes('Faits constatés sur la période')
-    && pilotage.includes('Lecture exploitable en réunion')
-    && pilotage.includes('Tendance quotidienne')
+    && pilotage.includes('Bilan analytique')
+    && pilotage.includes('Indicateurs sur la période')
+    && pilotage.includes('Historique journalier')
+    && pilotage.includes('Créations et clôtures')
     && pilotage.includes('trendSummary')
-    && pilotage.includes('Lecture rapide')
-    && pilotage.includes('renderComparisonBars')
+    && pilotage.includes('<TrendChart')
+    && pilotage.includes('<Ranking')
     && pilotage.includes('Taux de clôture')
     && !pilotage.includes('donut')
-    && styles.includes('.pilotage-insight-grid')
+    && styles.includes('.pilotage-analytics-kpis')
     && styles.includes('.pilotage-section')
-    && styles.includes('.pilotage-summary-card')
-    && styles.includes('.comparison-list')
-    && styles.includes('.trend-bar-created');
+    && styles.includes('.pilotage-hotspot-grid')
+    && styles.includes('.pilotage-trend-bar-created');
 });
 
 check('Workshop knowledge and history are cross-linked by incident trace', () => {
   const routes = read('backend/src/modules/workshop/workshop.routes.ts');
   const api = read('frontend/src/api/workshop.ts');
-  const history = read('frontend/src/pages/WorkshopHistoryPage.tsx');
+  const history = readMany([
+    'frontend/src/pages/WorkshopHistoryPage.tsx',
+    'frontend/src/hooks/useHistoryData.ts',
+    'frontend/src/components/IncidentDossier.tsx',
+  ]);
   const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
-  const styles = read('frontend/src/styles.css');
+  const styles = readMany([
+    'frontend/src/styles/pages/history.css',
+    'frontend/src/styles/pages/knowledge.css',
+  ]);
   return routes.includes("router.get('/history/incidents/:id', getHistoryIncident)")
     && routes.includes("router.get('/knowledge/incidents/:id', getKnowledgeIncident)")
     && api.includes('getWorkshopHistoryIncident')
@@ -260,19 +285,22 @@ check('Workshop knowledge and history are cross-linked by incident trace', () =>
     && history.includes('useSearchParams')
     && history.includes("searchParams.get('incident')")
     && history.includes('/workshop/knowledge?incident=')
-    && history.includes('inline-link-button')
+    && history.includes('history-knowledge-btn')
     && knowledge.includes('useSearchParams')
     && knowledge.includes('getWorkshopKnowledgeIncident')
     && knowledge.includes('/workshop/history?incident=')
-    && styles.includes('.inline-link-button')
-    && styles.includes('.knowledge-actions')
+    && styles.includes('.history-knowledge-btn')
+    && styles.includes('.kb-actions')
     && styles.includes('.history-header-actions');
 });
 
 check('Workshop history and knowledge filters are URL-restorable', () => {
-  const history = read('frontend/src/pages/WorkshopHistoryPage.tsx');
+  const history = readMany([
+    'frontend/src/pages/WorkshopHistoryPage.tsx',
+    'frontend/src/hooks/useHistoryData.ts',
+  ]);
   const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
-  const styles = read('frontend/src/styles.css');
+  const styles = read('frontend/src/styles/base.css');
   return history.includes("searchParams.get('q')")
     && history.includes("searchParams.get('status')")
     && history.includes("searchParams.get('line')")
@@ -297,7 +325,7 @@ check('Workshop history and knowledge filters are URL-restorable', () => {
 
 check('Modal base protects sensitive and dirty flows consistently', () => {
   const modal = read('frontend/src/components/Modal.tsx');
-  const styles = read('frontend/src/styles.css');
+  const styles = read('frontend/src/styles/responsive.css');
   const createIncident = read('frontend/src/components/CreateIncidentModal.tsx');
   const createLine = read('frontend/src/components/CreateLineModal.tsx');
   const editMachine = read('frontend/src/components/EditMachineModal.tsx');
@@ -312,7 +340,8 @@ check('Modal base protects sensitive and dirty flows consistently', () => {
     && styles.includes('.modal-lg')
     && createIncident.includes('isDirty={isDirty}')
     && createIncident.includes('closeOnOverlay={false}')
-    && createLine.includes('size="lg"')
+    && createLine.includes('isDirty={isDirty}')
+    && createLine.includes('isLoading={loading}')
     && editMachine.includes('isLoading={loading}')
     && deleteUser.includes('hasActiveTakenIncidents')
     && invalidate.includes('variant="danger"');
@@ -330,7 +359,10 @@ check('Database constraints and indexes harden core workshop integrity', () => {
 });
 
 check('Workshop event log has payloads for important operational decisions', () => {
-  const service = read('backend/src/modules/workshop/workshop.service.ts');
+  const service = readMany([
+    'backend/src/modules/workshop/workshop.service.edit.ts',
+    'backend/src/modules/workshop/workshop.service.mutations.ts',
+  ]);
   return service.includes('INCIDENT_CREATED')
     && service.includes('EDIT_REQUESTED')
     && service.includes('EDIT_APPLIED')

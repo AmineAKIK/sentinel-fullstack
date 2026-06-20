@@ -89,8 +89,8 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 | 6.6 | MAINTENANCE | Reprendre (RESUME) | Statut repasse à OPEN |
 | 6.7 | MAINTENANCE | Clore (CLOSE) avec note d'intervention | Statut CLOSED, `intervention_note` enregistrée |
 | 6.8 | Tous | Vérifier l'incident dans l'historique | Incident visible dans `/workshop/history` |
-| 6.9 | RESPONSABLE | Invalider un incident clôturé | Statut repasse à OPEN, événement INVALIDATE_CLOSED loggué |
-| 6.10 | OPERATOR | Demander annulation (REQUEST_CANCEL) + motif | `cancel_request = true`, motif enregistré |
+| 6.9 | RESPONSABLE | Invalider un incident clôturé | Statut passe à INVALIDATED, événement INCIDENT_INVALIDATED journalisé |
+| 6.10 | OPERATOR | Créer un second incident non pris puis demander son annulation (REQUEST_CANCEL) + motif | `cancel_request = true`, motif enregistré |
 | 6.11 | RESPONSABLE | Approuver l'annulation | Incident CANCELED |
 | 6.12 | Tous | Vérifier que l'incident annulé n'est plus sur le board actif | Absent du board |
 
@@ -107,8 +107,8 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 | 7.5 | Cliquer sur un incident historique | Détail complet (diagnostic, note, acteurs) |
 | 7.6 | Aller sur `/workshop/knowledge` | Seuls les incidents CLOSED avec `intervention_note` non vide apparaissent |
 | 7.7 | Vérifier qu'un incident annulé n'est pas dans la base de connaissance | Absent |
-| 7.8 | Charger plus (pagination/limit) | Les incidents suivants s'affichent |
-| 7.9 | Vérifier l'onglet événements d'un incident | Événements dans l'ordre chronologique (créé → pris → mis en attente → clôturé…) |
+| 7.8 | Copier ou ouvrir une URL `/workshop/knowledge?incident=<id>` valide | La fiche ciblée est sélectionnée |
+| 7.9 | Vérifier la trace d'événements d'un incident | Événements dans l'ordre chronologique (créé → pris → mis en attente → clôturé…) |
 
 ---
 
