@@ -31,6 +31,10 @@ Thumbs.db
 *.swo
 *~
 
+# Internal / private documents (not for publication)
+PLAN-EXAMEN.md
+docs/Sentinel_cadrage_conceptuel.docx
+
 # Local databases, backups and private certificates
 *.sqlite
 *.sqlite3
