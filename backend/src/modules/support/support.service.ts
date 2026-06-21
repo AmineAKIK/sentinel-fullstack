@@ -11,20 +11,24 @@ let cachedDoc: string | null = null;
 function loadFunctionalDoc(): string {
   if (cachedDoc !== null) return cachedDoc;
 
-  const docPath = path.resolve(
-    __dirname,
-    '../../../..',
-    'docs',
-    'support-knowledge.md'
-  );
+  // __dirname is dist/modules/support at runtime; backend root is three levels up.
+  // Candidates cover both the compiled layout (prod/Docker) and ts-node (dev).
+  const candidates = [
+    path.resolve(__dirname, '../../..', 'docs', 'support-knowledge.md'),
+    path.resolve(__dirname, '../../../..', 'docs', 'support-knowledge.md'),
+  ];
 
-  try {
-    cachedDoc = fs.readFileSync(docPath, 'utf-8');
-  } catch {
-    cachedDoc = '(Documentation non disponible.)';
-    logger.warn({ docPath }, 'Support knowledge file not found');
+  for (const docPath of candidates) {
+    try {
+      cachedDoc = fs.readFileSync(docPath, 'utf-8');
+      return cachedDoc;
+    } catch {
+      // try next candidate
+    }
   }
 
+  cachedDoc = '(Documentation non disponible.)';
+  logger.warn({ candidates }, 'Support knowledge file not found');
   return cachedDoc;
 }
 

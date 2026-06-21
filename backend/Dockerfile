@@ -20,6 +20,7 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY migrations ./migrations
+COPY docs ./docs
 
 EXPOSE 3000
 

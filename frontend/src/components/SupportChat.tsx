@@ -49,7 +49,8 @@ export default function SupportChat({ onSend }: Props) {
       setError('Une erreur est survenue. Vérifiez votre connexion et réessayez.');
     } finally {
       setLoading(false);
-      textareaRef.current?.focus();
+      // Re-focus after the re-render re-enables the textarea (disabled while loading).
+      requestAnimationFrame(() => textareaRef.current?.focus());
     }
   }
 
