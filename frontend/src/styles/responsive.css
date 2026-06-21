@@ -304,6 +304,7 @@
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
   min-width: 0;
 }

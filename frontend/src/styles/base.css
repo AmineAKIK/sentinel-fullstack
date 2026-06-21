@@ -234,12 +234,33 @@ a { color: var(--color-primary); text-decoration: none; }
   padding: 0;
   margin: 0;
   min-width: 0;
+  width: 100%;
 }
 
 .radio-fieldset > legend.form-label {
-  float: left;
+  display: block;
   width: 100%;
   margin-bottom: 4px;
+}
+
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.radio-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.radio-row input[type='radio'] {
+  flex-shrink: 0;
+  margin: 0;
 }
 
 .form-input,
