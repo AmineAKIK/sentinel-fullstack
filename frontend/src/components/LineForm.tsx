@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { LineMachine } from '../types';
 import { emptyMachine, switchMachineRobotMode } from '../utils/lineMachines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
@@ -29,6 +30,17 @@ export default function LineForm({
   showStatus,
   lineError,
 }: LineFormProps) {
+  // Clés stables par position : évite key={index}, qui réattribue mal les
+  // inputs lors d'une suppression de machine au milieu de la liste.
+  const nextKeyRef = useRef(0);
+  const machineKeysRef = useRef<number[]>([]);
+  // Complète si des machines ont été ajoutées hors de ce composant (init/édition).
+  while (machineKeysRef.current.length < data.machines.length) {
+    machineKeysRef.current.push(nextKeyRef.current++);
+  }
+  machineKeysRef.current.length = data.machines.length;
+  const machineKey = (index: number): number => machineKeysRef.current[index];
+
   function updateMachine(index: number, machine: LineMachine) {
     onChange({
       ...data,
@@ -51,11 +63,13 @@ export default function LineForm({
 
   function addMachine() {
     if (data.machines.length >= 10) return;
+    machineKeysRef.current.push(nextKeyRef.current++);
     onChange({ ...data, machines: [...data.machines, emptyMachine()] });
   }
 
   function removeMachine(index: number) {
     if (data.machines.length <= 1) return;
+    machineKeysRef.current.splice(index, 1);
     onChange({ ...data, machines: data.machines.filter((_, currentIndex) => currentIndex !== index) });
   }
 
@@ -123,7 +137,7 @@ export default function LineForm({
 
       <div className="line-machines-list">
         {data.machines.map((machine, index) => (
-          <div className="line-machine-card" key={index}>
+          <div className="line-machine-card" key={machineKey(index)}>
             <div className="line-machine-title">
               <strong>Machine {index + 1}</strong>
               <button

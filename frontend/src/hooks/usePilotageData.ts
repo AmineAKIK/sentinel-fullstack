@@ -6,6 +6,7 @@ import {
   listWorkshopLines,
 } from '../api/workshop';
 import { ProductionLine, WorkshopAnalytics, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
+import { isOlderThanDays } from '../utils/date';
 import { buildAnalyticsParams } from '../utils/workshopAnalytics';
 import { HistoryPeriod } from '../utils/workshopHistory';
 
@@ -20,10 +21,6 @@ export type LineStatus = {
   oldCases: number;
   tone: StatusTone;
 };
-
-function isOver7d(iso: string): boolean {
-  return Date.now() - new Date(iso).getTime() > 7 * 24 * 60 * 60 * 1000;
-}
 
 export function usePilotageData() {
   const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
@@ -97,7 +94,7 @@ export function usePilotageData() {
   const notTaken = useMemo(() => activeIncidents.filter((i) => !i.is_taken), [activeIncidents]);
 
   const oldCases = useMemo(
-    () => activeIncidents.filter((i) => isOver7d(i.created_at)),
+    () => activeIncidents.filter((i) => isOlderThanDays(i.created_at, 7)),
     [activeIncidents]
   );
 
@@ -120,7 +117,7 @@ export function usePilotageData() {
         const li = activeIncidents.filter((i) => i.line_id === line.id);
         const unt = li.filter((i) => i.is_priority && !i.is_taken).length;
         const nt = li.filter((i) => !i.is_taken).length;
-        const old = li.filter((i) => isOver7d(i.created_at)).length;
+        const old = li.filter((i) => isOlderThanDays(i.created_at, 7)).length;
         const tone: StatusTone = unt > 0 || old > 0 ? 'tension' : nt > 0 ? 'watch' : 'stable';
         return { line, incidents: li, urgentNotTaken: unt, notTaken: nt, oldCases: old, tone };
       })

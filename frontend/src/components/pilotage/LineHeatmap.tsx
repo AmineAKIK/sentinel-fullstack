@@ -1,12 +1,5 @@
 import { LineStatus } from '../../hooks/usePilotageData';
-
-function isOver7d(iso: string): boolean {
-  return Date.now() - new Date(iso).getTime() > 7 * 24 * 60 * 60 * 1000;
-}
-
-function isOver24h(iso: string): boolean {
-  return Date.now() - new Date(iso).getTime() > 24 * 60 * 60 * 1000;
-}
+import { isOlderThanDays } from '../../utils/date';
 
 function formatAge(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -81,9 +74,9 @@ export default function LineHeatmap({ lineStatuses, onOpenLine }: LineHeatmapPro
               <span
                 data-label="Âge"
                 className={`pilotage-heatmap-cell${
-                  oldest && isOver7d(oldest.created_at)
+                  oldest && isOlderThanDays(oldest.created_at, 7)
                     ? ' pilotage-heatmap-cell-critical'
-                    : oldest && isOver24h(oldest.created_at)
+                    : oldest && isOlderThanDays(oldest.created_at, 1)
                       ? ' pilotage-heatmap-cell-warn'
                       : ''
                 }`}

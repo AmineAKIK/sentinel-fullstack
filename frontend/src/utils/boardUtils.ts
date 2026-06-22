@@ -1,4 +1,5 @@
 import { WorkshopBoardIncident } from '../types';
+import { isOlderThanDays } from './date';
 
 export const BOARD_SESSION_SCREEN_KEY = 'sentinel.board.sessionScreenId.v1';
 
@@ -33,7 +34,7 @@ export function ageLabel(iso: string): string {
 }
 
 export function isOpenOverSevenDays(incident: WorkshopBoardIncident): boolean {
-  return incident.status === 'OPEN' && Date.now() - new Date(incident.created_at).getTime() > 7 * 24 * 60 * 60 * 1000;
+  return incident.status === 'OPEN' && isOlderThanDays(incident.created_at, 7);
 }
 
 export function paginate<T>(items: T[], size: number): T[][] {

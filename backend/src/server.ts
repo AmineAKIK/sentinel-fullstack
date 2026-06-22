@@ -61,14 +61,15 @@ app.use('/api', globalApiRateLimit);
 app.use('/api/auth/login', loginRateLimit);
 app.use('/api/board/session', loginRateLimit);
 app.use('/api/auth', authRoutes);
+// Routes admin spécifiques montées avant le routeur générique /api/admin.
 app.use('/api/admin/security', adminSecurityRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/admin/accounts', accountsRoutes);
 app.use('/api/admin/lines', linesRoutes);
-app.use('/api/board', boardRouter);
-app.use('/api/workshop', workshopRoutes);
 app.use('/api/admin/support', adminSupportRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/board', boardRouter);
 app.use('/api/workshop/support', workshopSupportRoutes);
+app.use('/api/workshop', workshopRoutes);
 
 app.get('/api/health', async (_req, res) => {
   try {

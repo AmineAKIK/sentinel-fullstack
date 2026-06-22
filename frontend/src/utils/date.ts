@@ -1,3 +1,10 @@
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Vrai si la date ISO est plus ancienne que `days` jours par rapport à maintenant. */
+export function isOlderThanDays(iso: string, days: number): boolean {
+  return Date.now() - new Date(iso).getTime() > days * DAY_MS;
+}
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', {
     day: '2-digit',
