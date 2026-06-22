@@ -112,6 +112,7 @@ const validInput = () => ({
   robotLabel: 'R01',
   headNumber: 1,
   state: 'DEGRADEE' as const,
+  currentProduct: 'REF-INT',
 });
 
 function assertOk<T>(result: ServiceResult<T>): T {

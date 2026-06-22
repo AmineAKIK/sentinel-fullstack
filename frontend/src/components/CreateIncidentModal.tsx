@@ -68,7 +68,7 @@ export default function CreateIncidentModal({
       setError("Aucune ligne active n'est disponible dans le référentiel.");
       return false;
     }
-    if (!shift || !lineId || !machineId || !robotLabel || !headNumber || !state) {
+    if (!shift || !lineId || !machineId || !robotLabel || !headNumber || !state || !currentProduct.trim()) {
       setError('Veuillez renseigner tous les champs obligatoires.');
       return false;
     }
@@ -322,7 +322,7 @@ export default function CreateIncidentModal({
       </div>
 
       <div className="form-group">
-        <label className="form-label" htmlFor="incidentProduct">Produit en cours</label>
+        <label className="form-label" htmlFor="incidentProduct">Produit en cours *</label>
         <input
           id="incidentProduct"
           className="form-input"

@@ -13,7 +13,7 @@ export const createIncidentSchema = z.object({
   headNumber: z.coerce.number().int().min(1, 'La tête doit correspondre au référentiel de la machine.'),
   state: IncidentStateEnum,
   comment: z.string().trim().max(1000).optional(),
-  currentProduct: z.string().trim().max(120).optional(),
+  currentProduct: z.string().trim().min(1, 'Le produit en cours est obligatoire.').max(120),
 });
 
 export const updateIncidentSchema = createIncidentSchema.partial().extend({

@@ -129,6 +129,9 @@ describe('CreateIncidentModal – soumission réussie', () => {
     chooseOption('Robot', 'R01');
     chooseOption('Tête', '1');
     chooseOption('État', 'Dégradée');
+    fireEvent.change(screen.getByLabelText(/Produit en cours/i), {
+      target: { value: 'REF-001' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /Aperçu/i }));
     fireEvent.click(screen.getByRole('button', { name: /Valider la création/i }));
@@ -142,7 +145,7 @@ describe('CreateIncidentModal – soumission réussie', () => {
         headNumber: 1,
         state: 'DEGRADEE',
         comment: '',
-        currentProduct: '',
+        currentProduct: 'REF-001',
         requestOnly: undefined,
       });
       expect(onSuccess).toHaveBeenCalledWith({ id: 1 });

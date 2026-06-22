@@ -131,6 +131,7 @@ const validCreateInput = {
   robotLabel: 'R01',
   headNumber: 1,
   state: 'DEGRADEE' as const,
+  currentProduct: 'REF-TEST',
 };
 
 beforeEach(() => {

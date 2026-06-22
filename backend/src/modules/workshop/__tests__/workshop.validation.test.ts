@@ -10,6 +10,7 @@ function validCreatePayload() {
     robotLabel: 'Robot 1',
     headNumber: 2,
     state: 'DEGRADEE',
+    currentProduct: 'REF-001',
   };
 }
 
@@ -21,13 +22,23 @@ describe('createIncidentSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts optional fields comment and currentProduct', () => {
+  it('accepts the optional comment field', () => {
     const result = createIncidentSchema.safeParse({
       ...validCreatePayload(),
       comment: 'Commentaire',
-      currentProduct: 'Produit X',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('rejects a payload without currentProduct', () => {
+    const { currentProduct: _omit, ...withoutProduct } = validCreatePayload();
+    const result = createIncidentSchema.safeParse(withoutProduct);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty currentProduct', () => {
+    const result = createIncidentSchema.safeParse({ ...validCreatePayload(), currentProduct: '   ' });
+    expect(result.success).toBe(false);
   });
 
   it('rejects an invalid shift', () => {
