@@ -571,6 +571,8 @@
   display: grid;
   align-content: start;
   gap: var(--space-1);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .board-incident-product strong {
@@ -588,13 +590,26 @@
   font-weight: 700;
 }
 
-.board-incident-equipment strong {
+.board-incident-equipment-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.board-incident-equipment-value strong {
+  flex: 0 1 auto;
   overflow: hidden;
   color: var(--color-text);
   font-size: 22px;
   line-height: 1.05;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.board-incident-equipment-value small {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .board-incident-instruction {
@@ -628,7 +643,7 @@
   font-weight: 500;
 }
 
-.board-incident-equipment small,
+.board-incident-equipment-value small,
 .board-incident-footer > span {
   overflow: hidden;
   color: var(--color-text-secondary);
@@ -769,7 +784,7 @@
     font-size: var(--text-xl);
   }
 
-  .board-incident-equipment strong {
+  .board-incident-equipment-value strong {
     font-size: var(--text-lg);
   }
 }
@@ -864,7 +879,11 @@
     font-size: var(--text-base);
   }
 
-  .board-incident-equipment strong {
+  .board-incident-equipment-value {
+    gap: 6px;
+  }
+
+  .board-incident-equipment-value strong {
     font-size: 18px;
   }
 
@@ -877,7 +896,7 @@
     font-size: var(--text-xs);
   }
 
-  .board-incident-equipment small,
+  .board-incident-equipment-value small,
   .board-incident-footer > span {
     font-size: var(--text-xs);
   }

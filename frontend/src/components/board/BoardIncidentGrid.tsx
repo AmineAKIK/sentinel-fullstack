@@ -80,10 +80,12 @@ export default function BoardIncidentGrid({
             </div>
             <div className="board-incident-equipment">
               <span>Équipement</span>
-              <strong>{incident.machine_id}</strong>
-              <small>
-                {incident.robot_label} · Tête {incident.head_number}
-              </small>
+              <div className="board-incident-equipment-value">
+                <strong>{incident.machine_id}</strong>
+                <small>
+                  {incident.robot_label} · Tête {incident.head_number}
+                </small>
+              </div>
             </div>
             <div
               className={`board-incident-instruction${responsibleInstruction ? '' : ' is-empty'}`}

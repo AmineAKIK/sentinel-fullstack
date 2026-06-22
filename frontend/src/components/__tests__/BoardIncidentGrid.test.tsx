@@ -65,6 +65,15 @@ describe('BoardIncidentGrid', () => {
     expect(screen.getByLabelText('Aucune consigne responsable')).toBeDefined();
   });
 
+  it('regroupe les détails équipement sur une ligne de valeur dédiée', () => {
+    const { container } = renderGrid([mockIncident()]);
+    const equipmentValue = container.querySelector('.board-incident-equipment-value');
+
+    expect(equipmentValue).not.toBeNull();
+    expect(equipmentValue?.textContent).toContain('JE-M1');
+    expect(equipmentValue?.textContent).toContain('R01 · Tête 4');
+  });
+
   it('conserve la consigne longue dans le DOM tout en laissant le CSS gérer sa troncature', () => {
     const instruction = 'Consigne responsable détaillée. '.repeat(16).slice(0, 500);
     const { container } = renderGrid([mockIncident({ responsible_comment: instruction })]);
