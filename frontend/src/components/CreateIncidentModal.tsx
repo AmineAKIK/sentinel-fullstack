@@ -18,6 +18,8 @@ interface CreateIncidentModalProps {
   onSuccess: (incident: WorkshopIncident) => void;
 }
 
+const COMMENT_MAX_LENGTH = 500;
+
 const STATES: { value: IncidentState; label: string }[] = [
   { value: 'SKIPEE_PAR_MACHINE', label: 'Skipée par machine' },
   { value: 'SKIPEE_PAR_CONDUCTEUR', label: 'Skipée par conducteur' },
@@ -281,13 +283,19 @@ export default function CreateIncidentModal({
           id="incidentComment"
           className="form-input"
           value={comment}
-          onChange={(e) => setComment(e.target.value)}
+          onChange={(e) => setComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
           disabled={loading}
           rows={3}
+          maxLength={COMMENT_MAX_LENGTH}
           placeholder="Ajouter un commentaire"
           aria-invalid={Boolean(error) || undefined}
           aria-describedby={error ? 'create-incident-error' : undefined}
         />
+        <div
+          className={`char-counter${comment.length >= COMMENT_MAX_LENGTH * 0.9 ? ' char-counter--warning' : ''}`}
+        >
+          {comment.length} / {COMMENT_MAX_LENGTH}
+        </div>
       </div>
 
       <div className="form-group">

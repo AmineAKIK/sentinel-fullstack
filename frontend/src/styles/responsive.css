@@ -1093,11 +1093,20 @@ tbody tr:hover .row-action {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
 
 .change-table th {
   font-size: 12px;
   padding: 0;
+}
+
+.change-table th[scope='row'] {
+  width: 35%;
+  padding: 8px 10px;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .sort-th-btn {
@@ -1130,6 +1139,8 @@ tbody tr:hover .row-action {
 .change-table td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .change-table tr:last-child td {

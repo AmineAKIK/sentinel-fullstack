@@ -422,7 +422,7 @@ La page `/board` est accessible apres saisie du code board local. Elle consomme 
 | `robot_label` | Robot concerné (ex : "Gauche 01", "Droite 02") |
 | `head_number` | Numéro de tête concernée (1 → max robots têtes) |
 | `state` | Type d'anomalie (voir §16) |
-| `comment` | Commentaire libre opérateur (≤ 1000 car.) |
+| `comment` | Commentaire libre opérateur (≤ 500 car.) |
 | `current_product` | Référence produit en cours (≤ 120 car.) |
 | `status` | Statut du workflow (voir §16) |
 | `is_taken` | Pris en charge par maintenance |

@@ -792,7 +792,7 @@ C'est le module central du Workshop. Il couvre les incidents, les métriques, l'
   robotLabel: string
   headNumber: number (min 1)
   state: 'SKIPEE_PAR_MACHINE' | 'SKIPEE_PAR_CONDUCTEUR' | 'DEGRADEE' | 'INDISPONIBLE'
-  comment?: string (max 1000)
+  comment?: string (max 500)
   currentProduct: string (obligatoire, max 120)
 }
 ```

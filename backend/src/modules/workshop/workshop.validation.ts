@@ -10,7 +10,7 @@ export const createIncidentSchema = z.object({
   robotLabel: z.string().trim().min(1),
   headNumber: z.coerce.number().int().min(1, 'La tête doit correspondre au référentiel de la machine.'),
   state: IncidentStateEnum,
-  comment: z.string().trim().max(1000).optional(),
+  comment: z.string().trim().max(500).optional(),
   currentProduct: z.string().trim().min(1, 'Le produit en cours est obligatoire.').max(120),
 });
 

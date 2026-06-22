@@ -71,12 +71,20 @@ describe('createIncidentSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects a comment longer than 1000 characters', () => {
+  it('rejects a comment longer than 500 characters', () => {
     const result = createIncidentSchema.safeParse({
       ...validCreatePayload(),
-      comment: 'a'.repeat(1001),
+      comment: 'a'.repeat(501),
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts a comment of exactly 500 characters', () => {
+    const result = createIncidentSchema.safeParse({
+      ...validCreatePayload(),
+      comment: 'a'.repeat(500),
+    });
+    expect(result.success).toBe(true);
   });
 
   it('trims whitespace from robotLabel', () => {
