@@ -25,7 +25,6 @@ function incident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
   return {
     id: 1,
     user_id: 1,
-    shift: 'MATIN',
     line_id: 1,
     line_number: 'L01',
     machine_id: 'M1',
@@ -62,14 +61,6 @@ describe('computeIncidentDiff', () => {
     expect(computeIncidentDiff(incident(), {}, lines)).toEqual([]);
   });
 
-  it('détecte un changement de shift', () => {
-    const rows = computeIncidentDiff(incident(), { shift: 'NUIT' }, lines);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].label).toBe('Équipe');
-    expect(rows[0].current).toBe('Matin');
-    expect(rows[0].requested).toBe('Nuit');
-  });
-
   it('détecte un changement de ligne', () => {
     const rows = computeIncidentDiff(incident(), { lineId: 2 }, lines);
     expect(rows).toHaveLength(1);
@@ -100,12 +91,12 @@ describe('computeIncidentDiff', () => {
   });
 
   it('plusieurs changements simultanés → plusieurs lignes', () => {
-    const rows = computeIncidentDiff(incident(), { shift: 'NUIT', lineId: 2 }, lines);
+    const rows = computeIncidentDiff(incident(), { currentProduct: 'ProdX', lineId: 2 }, lines);
     expect(rows).toHaveLength(2);
   });
 
-  it('ignore le shift si identique', () => {
-    const rows = computeIncidentDiff(incident({ shift: 'MATIN' }), { shift: 'MATIN' }, lines);
+  it('ignore un champ si identique', () => {
+    const rows = computeIncidentDiff(incident({ line_id: 1 }), { lineId: 1 }, lines);
     expect(rows).toHaveLength(0);
   });
 });

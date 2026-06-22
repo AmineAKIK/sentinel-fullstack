@@ -106,7 +106,6 @@ afterAll(async () => {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const validInput = () => ({
-  shift: 'MATIN' as const,
   lineId,
   machineId: 'M-INT-01',
   robotLabel: 'R01',
@@ -281,9 +280,9 @@ describeIntegration('DB constraints (real DB)', () => {
     await expect(
       pool.query(
         `INSERT INTO workshop_incidents
-           (user_id, shift, line_id, line_number, machine_id, machine_brand,
+           (user_id, line_id, line_number, machine_id, machine_brand,
             robot_label, head_number, state, status, display_order)
-         VALUES ($1, 'MATIN', $2, 'L-INT-01', 'M-INT-01', 'Fanuc', 'R01', 1, 'DEGRADEE', 'INVALID_STATUS', 0)`,
+         VALUES ($1, $2, 'L-INT-01', 'M-INT-01', 'Fanuc', 'R01', 1, 'DEGRADEE', 'INVALID_STATUS', 0)`,
         [operatorId, lineId]
       )
     ).rejects.toThrow();

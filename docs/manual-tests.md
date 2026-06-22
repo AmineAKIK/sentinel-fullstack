@@ -81,7 +81,7 @@ Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
 
 | # | Rôle | Action | Résultat attendu |
 |---|------|--------|-----------------|
-| 6.1 | OPERATOR | Créer un incident (shift, ligne, machine, robot, tête, état) | Incident OPEN créé, visible sur le board |
+| 6.1 | OPERATOR | Créer un incident (ligne, machine, robot, tête, état, produit en cours) | Incident OPEN créé, visible sur le board |
 | 6.2 | RESPONSABLE | Vérifier la visibilité de l'incident | Incident présent avec les bons champs |
 | 6.3 | MAINTENANCE | Prendre en charge | `is_taken = true`, statut reste OPEN |
 | 6.4 | OPERATOR | Tenter de REQUEST_CANCEL sur un incident pris | **Interdit** (bouton absent ou erreur 403) |

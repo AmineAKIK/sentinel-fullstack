@@ -24,7 +24,7 @@ const _nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql('wi.status', I
 
 // ─── SQL column constants ─────────────────────────────────────────────────────
 
-const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.shift, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
+const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
             wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
             wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
             wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
@@ -85,7 +85,6 @@ export interface IncidentCancelSnapshot {
 export interface WorkshopIncidentRow extends CurrentIncident {
   id: number;
   user_id: number;
-  shift: string;
   line_id: number;
   line_number: string;
   machine_id: string;
@@ -265,7 +264,7 @@ export async function getBoardData() {
        ORDER BY line_number ASC`
     ),
     pool.query(
-      `SELECT id, shift, line_id, line_number, machine_id, robot_label,
+      `SELECT id, line_id, line_number, machine_id, robot_label,
               head_number, state, current_product, is_taken, is_priority,
               status, display_order, created_at, updated_at
        FROM workshop_incidents
@@ -402,14 +401,13 @@ export async function createIncidentData(input: {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `INSERT INTO workshop_incidents (
-      user_id, shift, line_id, line_number, machine_id, machine_brand,
+      user_id, line_id, line_number, machine_id, machine_brand,
       robot_label, head_number, state, comment, current_product, display_order
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id`,
     [
       input.actorUserId,
-      input.data.shift,
       input.line.id,
       input.line.line_number,
       input.machine.machineId,
@@ -537,13 +535,12 @@ export async function applyEditRequestIncident(input: {
   const requested = input.requested;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
-     SET shift = $1, line_id = $2, line_number = $3, machine_id = $4, machine_brand = $5,
-         robot_label = $6, head_number = $7, state = $8, comment = $9, current_product = $10,
+     SET line_id = $1, line_number = $2, machine_id = $3, machine_brand = $4,
+         robot_label = $5, head_number = $6, state = $7, comment = $8, current_product = $9,
          edit_request = NULL, updated_at = NOW()
-     WHERE id = $11
+     WHERE id = $10
      RETURNING id`,
     [
-      (requested.shift as string | undefined) ?? input.current.shift,
       (requested.lineId as number | undefined) ?? input.current.line_id,
       input.selection.lineNumber,
       (requested.machineId as string | undefined) ?? input.current.machine_id,
@@ -599,15 +596,14 @@ export async function updateIncidentData(input: {
 
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
-     SET shift = $1, line_id = $2, line_number = $3, machine_id = $4, machine_brand = $5,
-         robot_label = $6, head_number = $7, state = $8, comment = $9, current_product = $10,
-         is_taken = $11, is_priority = $12, status = $13, diagnostic = $14,
-         intervention_note = $15, responsible_comment = $16,
-         taken_by_user_id = $17, taken_at = $18, display_order = $19, updated_at = NOW()
-     WHERE id = $20
+     SET line_id = $1, line_number = $2, machine_id = $3, machine_brand = $4,
+         robot_label = $5, head_number = $6, state = $7, comment = $8, current_product = $9,
+         is_taken = $10, is_priority = $11, status = $12, diagnostic = $13,
+         intervention_note = $14, responsible_comment = $15,
+         taken_by_user_id = $16, taken_at = $17, display_order = $18, updated_at = NOW()
+     WHERE id = $19
      RETURNING id`,
     [
-      updates.shift ?? current.shift,
       input.lineId,
       input.selection.lineNumber,
       input.machineId,

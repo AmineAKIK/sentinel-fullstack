@@ -12,7 +12,6 @@ import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
-import { SHIFT_LABELS } from '../utils/labels';
 import { formatDuration } from '../utils/durationFormat';
 import {
   buildIncidentWorkspaceParams,
@@ -117,10 +116,6 @@ function KnowledgeDetail({ incident, onViewHistory, onCopyLink, copied }: Knowle
         <div className="kb-meta-item">
           <span className="detail-field-label">Produit</span>
           <strong>{incident.current_product || '—'}</strong>
-        </div>
-        <div className="kb-meta-item">
-          <span className="detail-field-label">Shift</span>
-          <strong>{SHIFT_LABELS[incident.shift] || incident.shift || '—'}</strong>
         </div>
         <div className="kb-meta-item">
           <span className="detail-field-label">Résolu le</span>

@@ -417,7 +417,6 @@ La page `/board` est accessible apres saisie du code board local. Elle consomme 
 
 | Champ | Description |
 |---|---|
-| `shift` | Poste de travail : MATIN / APRES_MIDI / NUIT / WEEKEND |
 | `line_id` / `line_number` | Ligne de production concernée |
 | `machine_id` / `machine_brand` | Machine concernée |
 | `robot_label` | Robot concerné (ex : "Gauche 01", "Droite 02") |
@@ -612,7 +611,7 @@ Tri par défaut : urgents en premier (`is_priority DESC`), puis par ordre d'affi
 ### 11.4 Carte incident
 
 Chaque incident est affiché dans une carte présentant :
-- Identifiant, statut, ancienneté, poste
+- Identifiant, statut, ancienneté
 - Ligne / machine / robot / tête / état
 - Indicateurs urgence et prise en charge
 - Actions contextuelles selon rôle et état
@@ -799,7 +798,7 @@ Regroupe uniquement les incidents **clôturés** avec une **note d'intervention 
 ### 15.4 Fiche connaissance
 
 Sélection d'un incident → affichage du détail complet :
-- Contexte : ligne, machine, robot, tête, produit en cours, poste, type d'anomalie
+- Contexte : ligne, machine, robot, tête, produit en cours, type d'anomalie
 - Diagnostic du technicien
 - Note d'intervention
 - Opérateur déclarant et technicien ayant clôturé
@@ -841,15 +840,6 @@ Statuts actifs (inclus dans les métriques) : `OPEN` et `PENDING`.
 | `SKIPEE_PAR_CONDUCTEUR` | Skipée par conducteur |
 | `DEGRADEE` | Dégradée |
 | `INDISPONIBLE` | Indisponible |
-
-### 16.3 Postes de travail (shifts)
-
-| Code | Libellé |
-|---|---|
-| `MATIN` | Matin |
-| `APRES_MIDI` | Après-midi |
-| `NUIT` | Nuit |
-| `WEEKEND` | Week-end |
 
 ---
 
@@ -909,7 +899,7 @@ production_lines
 workshop_incidents
 ├── id
 ├── user_id → sentinel_users (déclarant)
-├── shift, line_id, line_number
+├── line_id, line_number
 ├── machine_id, machine_brand, robot_label, head_number
 ├── state, status
 ├── comment, current_product

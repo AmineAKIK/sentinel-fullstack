@@ -6,7 +6,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const shifts = ['MATIN', 'APRES_MIDI', 'NUIT', 'WEEKEND'];
 const states = ['SKIPEE_PAR_MACHINE', 'SKIPEE_PAR_CONDUCTEUR', 'DEGRADEE', 'INDISPONIBLE'];
 const products = [
   'Ref A12', 'Ref B07', 'Ref C03', 'Ref D20', 'Ref E02',
@@ -208,7 +207,6 @@ async function main() {
       const cancelRequest = status === 'OPEN' && index === 27;
       const editRequest = status === 'OPEN' && index === 28
         ? {
-            shift: pick(shifts, index + 1),
             currentProduct: `${pick(products, index)} (correction demandée)`,
             comment: 'Correction demandée par l’opérateur après relecture du signalement.',
           }
@@ -231,23 +229,22 @@ async function main() {
 
       const { rows } = await client.query(
         `INSERT INTO workshop_incidents (
-          user_id, shift, line_id, line_number, machine_id, machine_brand,
+          user_id, line_id, line_number, machine_id, machine_brand,
           robot_label, head_number, state, comment, current_product,
           is_taken, is_priority, updated_at, status, diagnostic, intervention_note,
           responsible_comment, edit_request, cancel_request, cancel_request_reason,
           taken_by_user_id, taken_at, display_order, created_at
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11,
-          $12, $13, $14, $15, $16, $17,
-          $18, $19, $20, $21,
-          $22, $23, $24, $25
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16,
+          $17, $18, $19, $20,
+          $21, $22, $23, $24
         )
         RETURNING id`,
         [
           operator.id,
-          pick(shifts, index),
           line.id,
           line.line_number,
           machine.machineId,

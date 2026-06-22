@@ -24,7 +24,6 @@ function incident(overrides: Partial<WorkshopBoardIncident> = {}): WorkshopBoard
     status: 'OPEN',
     is_taken: false,
     is_priority: false,
-    shift: 'MATIN',
     display_order: 0,
     current_product: null,
     created_at: new Date(Date.now() - 1000 * 3600).toISOString(),

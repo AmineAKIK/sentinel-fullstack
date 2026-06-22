@@ -1,6 +1,6 @@
 import { WorkshopIncident } from '../types';
 import { formatDateTime } from '../utils/date';
-import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS } from '../utils/labels';
+import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
 
 interface IncidentCardProps {
   incident: WorkshopIncident;
@@ -151,7 +151,7 @@ export default function IncidentCard({
         <div className="incident-summary-primary">
           <span className="detail-field-label">Équipement</span>
           <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
-          <p>{SHIFT_LABELS[incident.shift] || incident.shift} · {formatDateTime(incident.created_at)}</p>
+          <p>{formatDateTime(incident.created_at)}</p>
         </div>
         <div className="incident-summary-primary">
           <span className="detail-field-label">Produit</span>

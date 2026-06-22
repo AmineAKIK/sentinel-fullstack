@@ -121,7 +121,7 @@ frontend/
 │   ├── components/                  ~40 composants (modales, cartes, formulaires, UI)
 │   └── utils/
 │       ├── workshopPermissions.ts   Miroir frontend de workshop.policy.ts
-│       ├── labels.ts                Labels d'affichage des enums (shift, state, status, rôle)
+│       ├── labels.ts                Labels d'affichage des enums (state, status, rôle)
 │       ├── date.ts                  Formatage des dates et ancienneté
 │       ├── lineMachines.ts          Helpers sélection machine/robot/tête
 │       ├── workshopFilters.ts       Logique de filtrage côté client
@@ -316,6 +316,7 @@ Le script peut aussi être exécuté de façon autonome : `npm run migrate`.
 | 019 | `refine_incident_cancellation_and_watchers` | Colonnes `cancel_request`/`cancel_request_reason`, ajout statut `INVALIDATED`, FK RESTRICT sur followers |
 | 020 | `add_workshop_password_setup_codes` | Colonnes `password_setup_token_hash`, `password_setup_expires_at` + contrainte `chk_password_setup_pair` |
 | 021 | `harden_workshop_setup_invariants` | Renforcement des contraintes `chk_password_setup_pair` et `chk_edit_request_shape` |
+| 024 | `remove_incident_shift` | Suppression de la colonne `shift` (poste) et de sa contrainte CHECK ; `chk_edit_request_shape` recréée sans `shift` |
 
 ### 6.3 Schéma complet
 
@@ -391,7 +392,6 @@ Structure d'un élément de `machine_sequence` :
 ```sql
 id                    SERIAL PRIMARY KEY
 user_id               INTEGER REFERENCES sentinel_users(id)
-shift                 VARCHAR NOT NULL  -- CHECK IN ('MATIN','APRES_MIDI','NUIT','WEEKEND')
 line_id               INTEGER NOT NULL
 line_number           VARCHAR NOT NULL
 machine_id            VARCHAR NOT NULL
@@ -787,14 +787,13 @@ C'est le module central du Workshop. Il couvre les incidents, les métriques, l'
 **`createIncidentSchema` :**
 ```typescript
 {
-  shift: 'MATIN' | 'APRES_MIDI' | 'NUIT' | 'WEEKEND'
   lineId: number (positif)
   machineId: string
   robotLabel: string
   headNumber: number (min 1)
   state: 'SKIPEE_PAR_MACHINE' | 'SKIPEE_PAR_CONDUCTEUR' | 'DEGRADEE' | 'INDISPONIBLE'
   comment?: string (max 1000)
-  currentProduct?: string (max 120)
+  currentProduct: string (obligatoire, max 120)
 }
 ```
 
@@ -802,7 +801,7 @@ C'est le module central du Workshop. Il couvre les incidents, les métriques, l'
 ```typescript
 {
   // Champs descriptifs (partial)
-  shift?, lineId?, machineId?, robotLabel?, headNumber?, state?, comment?, currentProduct?
+  lineId?, machineId?, robotLabel?, headNumber?, state?, comment?, currentProduct?
   // Champs workflow
   isTaken?, isPriority?, displayOrder?, status?, diagnostic?, interventionNote?
   responsibleComment?, requestOnly?, cancelRequest?, cancelRequestReason?
@@ -920,7 +919,6 @@ Wrapper `fetch` centralisé :
 
 ```typescript
 type Role = 'OPERATOR' | 'MAINTENANCE' | 'RESPONSABLE'
-type IncidentShift = 'MATIN' | 'APRES_MIDI' | 'NUIT' | 'WEEKEND'
 type IncidentState = 'SKIPEE_PAR_MACHINE' | 'SKIPEE_PAR_CONDUCTEUR' | 'DEGRADEE' | 'INDISPONIBLE'
 type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED'
 ```

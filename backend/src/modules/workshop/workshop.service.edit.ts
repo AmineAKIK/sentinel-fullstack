@@ -14,7 +14,6 @@ export function requestedChangeKeys(changes: Record<string, unknown> | null | un
 }
 
 export const EDIT_FIELD_KEYS = [
-  'shift',
   'lineId',
   'machineId',
   'robotLabel',
@@ -106,7 +105,6 @@ export async function createIncidentService(
   const incidentId = await withTransaction(async (client) => {
     const id = await workshopRepository.createIncidentData({ actorUserId, data, line, machine, robotLabel: robot.label }, client);
     await logIncidentEvent(id, actorUserId, 'INCIDENT_CREATED', {
-      shift: data.shift,
       lineNumber: line.line_number,
       machineId: machine.machineId,
       robotLabel: robot.label,
@@ -126,7 +124,7 @@ export async function createIncidentService(
 
 export async function editIncidentService(
   incidentId: number,
-  updates: Pick<UpdateIncidentInput, 'shift' | 'lineId' | 'machineId' | 'robotLabel' | 'headNumber' | 'state' | 'comment' | 'currentProduct'>,
+  updates: Pick<UpdateIncidentInput, 'lineId' | 'machineId' | 'robotLabel' | 'headNumber' | 'state' | 'comment' | 'currentProduct'>,
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
@@ -151,7 +149,6 @@ export async function editIncidentService(
     if (!selection) return { kind: 'bad_request' as const, msg: 'Sélection ligne/machine/robot/tête invalide.' };
 
     const directChanges: Record<string, { old: unknown; new: unknown }> = {};
-    if (updates.shift !== undefined && updates.shift !== current.shift) directChanges.shift = { old: current.shift, new: updates.shift };
     if (updates.lineId !== undefined && updates.lineId !== current.line_id) { directChanges.lineId = { old: current.line_id, new: lineId }; directChanges.lineNumber = { old: current.line_number, new: selection.lineNumber }; }
     if (updates.machineId !== undefined && updates.machineId !== current.machine_id) { directChanges.machineId = { old: current.machine_id, new: machineId }; directChanges.machineBrand = { old: current.machine_brand, new: selection.machineBrand }; }
     if (updates.robotLabel !== undefined && updates.robotLabel !== current.robot_label) directChanges.robotLabel = { old: current.robot_label, new: robotLabel };

@@ -1,7 +1,6 @@
 import { api } from './client';
 import { buildQuery } from '../utils/query';
 import {
-  IncidentShift,
   IncidentState,
   ProductionLine,
   WorkshopHistoryEvent,
@@ -12,14 +11,13 @@ import {
 } from '../types';
 
 export interface CreateIncidentPayload {
-  shift: IncidentShift;
   lineId: number;
   machineId: string;
   robotLabel: string;
   headNumber: number;
   state: IncidentState;
   comment?: string;
-  currentProduct?: string;
+  currentProduct: string;
 }
 
 export async function listWorkshopLines(): Promise<ProductionLine[]> {

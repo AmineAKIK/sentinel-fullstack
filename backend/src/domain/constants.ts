@@ -1,9 +1,6 @@
 export const WORKSHOP_ROLES = ['OPERATOR', 'MAINTENANCE', 'RESPONSABLE'] as const;
 export type WorkshopRole = (typeof WORKSHOP_ROLES)[number];
 
-export const INCIDENT_SHIFTS = ['MATIN', 'APRES_MIDI', 'NUIT', 'WEEKEND'] as const;
-export type IncidentShift = (typeof INCIDENT_SHIFTS)[number];
-
 export const INCIDENT_STATES = [
   'SKIPEE_PAR_MACHINE',
   'SKIPEE_PAR_CONDUCTEUR',

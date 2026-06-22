@@ -1,12 +1,10 @@
 import { z } from 'zod';
-import { INCIDENT_SHIFTS, INCIDENT_STATES, INCIDENT_STATUSES } from '../../domain/constants';
+import { INCIDENT_STATES, INCIDENT_STATUSES } from '../../domain/constants';
 
-export const ShiftEnum = z.enum(INCIDENT_SHIFTS);
 export const IncidentStateEnum = z.enum(INCIDENT_STATES);
 export const IncidentStatusEnum = z.enum(INCIDENT_STATUSES);
 
 export const createIncidentSchema = z.object({
-  shift: ShiftEnum,
   lineId: z.coerce.number().int().positive(),
   machineId: z.string().trim().min(1),
   robotLabel: z.string().trim().min(1),

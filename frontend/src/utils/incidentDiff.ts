@@ -1,5 +1,5 @@
-import { IncidentShift, IncidentState, ProductionLine, WorkshopIncident } from '../types';
-import { SHIFT_LABELS, STATE_LABELS } from './labels';
+import { IncidentState, ProductionLine, WorkshopIncident } from '../types';
+import { STATE_LABELS } from './labels';
 
 export interface ChangeRow {
   label: string;
@@ -37,7 +37,6 @@ export function computeIncidentDiff(
 ): ChangeRow[] {
   const rows: ChangeRow[] = [];
 
-  const requestedShift = requested.shift as IncidentShift | undefined;
   const requestedLineId = requested.lineId as number | undefined;
   const requestedMachineId = requested.machineId as string | undefined;
   const requestedRobotLabel = requested.robotLabel as string | undefined;
@@ -46,9 +45,6 @@ export function computeIncidentDiff(
   const requestedComment = requested.comment as string | undefined;
   const requestedProduct = requested.currentProduct as string | undefined;
 
-  if (requestedShift && requestedShift !== incident.shift) {
-    rows.push({ label: 'Équipe', current: SHIFT_LABELS[incident.shift], requested: SHIFT_LABELS[requestedShift] || requestedShift });
-  }
   if (requestedLineId && requestedLineId !== incident.line_id) {
     rows.push({ label: 'Ligne', current: formatLineLabel(lines, incident.line_id), requested: formatLineLabel(lines, requestedLineId) });
   }

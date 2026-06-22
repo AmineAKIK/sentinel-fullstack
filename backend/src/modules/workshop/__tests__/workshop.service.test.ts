@@ -102,7 +102,6 @@ function mockIncident(overrides: Record<string, unknown> = {}) {
     delete_request: false,
     delete_request_reason: null,
     edit_request: null,
-    shift: 'MATIN',
     line_id: 1,
     line_number: 'L01',
     machine_id: 'M01',
@@ -125,7 +124,6 @@ function mockIncident(overrides: Record<string, unknown> = {}) {
 }
 
 const validCreateInput = {
-  shift: 'MATIN' as const,
   lineId: 1,
   machineId: 'M01',
   robotLabel: 'R01',

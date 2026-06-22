@@ -350,7 +350,6 @@ check('Modal base protects sensitive and dirty flows consistently', () => {
 check('Database constraints and indexes harden core workshop integrity', () => {
   const migration = read('backend/migrations/015_harden_workshop_integrity.sql');
   return migration.includes('chk_sentinel_users_role')
-    && migration.includes('chk_workshop_incidents_shift')
     && migration.includes('chk_workshop_incidents_state')
     && migration.includes('chk_workshop_incidents_status')
     && migration.includes('idx_workshop_incidents_board_order')

@@ -4,7 +4,6 @@ import SelectField from './ui/SelectField';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
 import { ApiResponseError } from '../api/client';
 import {
-  IncidentShift,
   IncidentState,
   ProductionLine,
   WorkshopIncident,
@@ -18,13 +17,6 @@ interface CreateIncidentModalProps {
   onClose: () => void;
   onSuccess: (incident: WorkshopIncident) => void;
 }
-
-const SHIFTS: { value: IncidentShift; label: string }[] = [
-  { value: 'MATIN', label: 'Matin' },
-  { value: 'APRES_MIDI', label: 'Après midi' },
-  { value: 'NUIT', label: 'Nuit' },
-  { value: 'WEEKEND', label: 'Weekend' },
-];
 
 const STATES: { value: IncidentState; label: string }[] = [
   { value: 'SKIPEE_PAR_MACHINE', label: 'Skipée par machine' },
@@ -41,7 +33,6 @@ export default function CreateIncidentModal({
   onSuccess,
 }: CreateIncidentModalProps) {
   const hasLineReferences = lines.length > 0;
-  const [shift, setShift] = useState<IncidentShift | ''>(incident?.shift || '');
   const [lineId, setLineId] = useState(incident ? String(incident.line_id) : '');
   const [machineId, setMachineId] = useState(incident?.machine_id || '');
   const [robotLabel, setRobotLabel] = useState(incident?.robot_label || '');
@@ -68,7 +59,7 @@ export default function CreateIncidentModal({
       setError("Aucune ligne active n'est disponible dans le référentiel.");
       return false;
     }
-    if (!shift || !lineId || !machineId || !robotLabel || !headNumber || !state || !currentProduct.trim()) {
+    if (!lineId || !machineId || !robotLabel || !headNumber || !state || !currentProduct.trim()) {
       setError('Veuillez renseigner tous les champs obligatoires.');
       return false;
     }
@@ -82,13 +73,11 @@ export default function CreateIncidentModal({
   async function handleSubmit() {
     if (!validate()) return;
 
-    const selectedShift = shift as IncidentShift;
     const selectedState = state as IncidentState;
 
     setLoading(true);
     try {
       const payload = {
-        shift: selectedShift,
         lineId: Number(lineId),
         machineId,
         robotLabel,
@@ -111,7 +100,6 @@ export default function CreateIncidentModal({
 
   const isEditing = Boolean(incident);
   const isDirty = !showPreview && (
-    shift !== (incident?.shift || '') ||
     lineId !== (incident ? String(incident.line_id) : '') ||
     machineId !== (incident?.machine_id || '') ||
     robotLabel !== (incident?.robot_label || '') ||
@@ -157,10 +145,6 @@ export default function CreateIncidentModal({
             <table className="change-table">
               <tbody>
                 <tr>
-                  <th scope="row">Équipe</th>
-                  <td>{SHIFTS.find((item) => item.value === shift)?.label}</td>
-                </tr>
-                <tr>
                   <th scope="row">Ligne</th>
                   <td>{selectedLine?.line_number}</td>
                 </tr>
@@ -199,21 +183,6 @@ export default function CreateIncidentModal({
         {hasLineReferences
           ? 'Ligne, machine, robot et tête proviennent du référentiel actif créé dans l’administration.'
           : "Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration avant de déclarer un incident."}
-      </div>
-
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentShift">Équipe *</label>
-        <SelectField
-          id="incidentShift"
-          value={shift}
-          onChange={(value) => setShift(value as IncidentShift)}
-          disabled={loading}
-          ariaLabel="Équipe"
-          options={[
-            { value: '', label: '-- Sélectionner --' },
-            ...SHIFTS.map((item) => ({ value: item.value, label: item.label })),
-          ]}
-        />
       </div>
 
       <div className="form-group">

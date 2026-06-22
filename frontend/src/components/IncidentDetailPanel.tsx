@@ -14,7 +14,7 @@ import DetailField from './ui/DetailField';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { Role } from '../types/common';
 import { formatDateTime } from '../utils/date';
-import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
+import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
 import { ModalStateApi } from '../hooks/useModalState';
 import { sortIncidents } from '../utils/incidentSort';
@@ -149,7 +149,6 @@ export default function IncidentDetailPanel({
           <div className="detail-grid">
             <DetailField label="Utilisateur">{incident.first_name} {incident.last_name}</DetailField>
             <DetailField label="Rôle créateur">{ROLE_LABELS[incident.role] ?? incident.role}</DetailField>
-            <DetailField label="Équipe">{SHIFT_LABELS[incident.shift]}</DetailField>
             <DetailField label="État">{STATE_LABELS[incident.state]}</DetailField>
             <DetailField label="Ligne">{incident.line_number}</DetailField>
             <DetailField label="Machine">{incident.machine_id} · {incident.machine_brand}</DetailField>

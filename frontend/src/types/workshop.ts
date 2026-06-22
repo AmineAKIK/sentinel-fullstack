@@ -1,6 +1,5 @@
 import type { Role } from './common';
 
-export type IncidentShift = 'MATIN' | 'APRES_MIDI' | 'NUIT' | 'WEEKEND';
 export type IncidentState =
   | 'SKIPEE_PAR_MACHINE'
   | 'SKIPEE_PAR_CONDUCTEUR'
@@ -11,7 +10,6 @@ export type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVAL
 export interface WorkshopIncident {
   id: number;
   user_id: number;
-  shift: IncidentShift;
   line_id: number;
   line_number: string;
   machine_id: string;
@@ -91,7 +89,6 @@ export interface WorkshopBoardLine {
 
 export interface WorkshopBoardIncident {
   id: number;
-  shift: IncidentShift;
   line_id: number;
   line_number: string;
   machine_id: string;

@@ -55,8 +55,8 @@ describe('formatEventDetail', () => {
   });
 
   it('INCIDENT_UPDATED avec fields → liste des champs', () => {
-    const result = formatEventDetail(event({ event_type: 'INCIDENT_UPDATED', payload: { fields: ['shift', 'state'] } }));
-    expect(result).toBe('champs: shift, state');
+    const result = formatEventDetail(event({ event_type: 'INCIDENT_UPDATED', payload: { fields: ['comment', 'state'] } }));
+    expect(result).toBe('champs: comment, state');
   });
 
   it('RESPONSIBLE_COMMENT_UPDATED → texte fixe', () => {

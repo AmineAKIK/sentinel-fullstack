@@ -37,7 +37,7 @@ Création des données : insertion SQL directe (voir « Reproduire ce jeu d'essa
 
 | | |
 |---|---|
-| **Entrée** | `POST /api/workshop/incidents` — `{"shift":"MATIN","lineId":13,"machineId":"JE-M1","robotLabel":"R01","headNumber":2,"state":"DEGRADEE","comment":"Cadence réduite de 30 % sur tête 2, à vérifier.","currentProduct":"REF-4821"}` |
+| **Entrée** | `POST /api/workshop/incidents` — `{"lineId":13,"machineId":"JE-M1","robotLabel":"R01","headNumber":2,"state":"DEGRADEE","comment":"Cadence réduite de 30 % sur tête 2, à vérifier.","currentProduct":"REF-4821"}` |
 | **Attendu** | 200, incident créé en statut `OPEN`, non pris en charge, rattaché à l'opératrice |
 | **Obtenu** | `{"id":1,"user_id":1,"status":"OPEN","is_taken":false,"taken_by_user_id":null,"state":"DEGRADEE","head_number":2,...}` ✅ |
 
@@ -130,7 +130,7 @@ validation hiérarchique — c'est la règle métier centrale du module.
 
 | Cas | Entrée | Attendu | Obtenu |
 |---|---|---|---|
-| 4.a Énumérations invalides | `POST /incidents` avec `"shift":"APREM"`, `"state":"ARRET"` | 400 + message explicite | `400 VALIDATION_ERROR : "Invalid enum value. Expected 'MATIN' \| 'APRES_MIDI' \| 'NUIT' \| 'WEEKEND', received 'APREM' …"` ✅ |
+| 4.a Énumérations invalides | `POST /incidents` avec `"state":"ARRET"` | 400 + message explicite | `400 VALIDATION_ERROR : "Invalid enum value. Expected 'SKIPEE_PAR_MACHINE' \| 'SKIPEE_PAR_CONDUCTEUR' \| 'DEGRADEE' \| 'INDISPONIBLE', received 'ARRET' …"` ✅ |
 | 4.b Numéro de tête hors référentiel | `"headNumber":0` | 400 | `400 VALIDATION_ERROR` (« La tête doit correspondre au référentiel de la machine. ») ✅ |
 | 4.c Ligne inexistante | `"lineId":99999` | 404 | `404 {"error":{"code":"NOT_FOUND","message":"Ligne introuvable ou inactive."}}` ✅ |
 | 4.d Commentaire de 1 200 caractères | `comment` = 1 200 × `X` | 400 (max 1 000) | `400 VALIDATION_ERROR : "String must contain at most 1000 character(s)"` ✅ |

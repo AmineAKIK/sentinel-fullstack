@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Modal from './Modal';
 import { ProductionLine, WorkshopIncident } from '../types';
-import { SHIFT_LABELS, STATE_LABELS } from '../utils/labels';
+import { STATE_LABELS } from '../utils/labels';
 import { computeIncidentDiff } from '../utils/incidentDiff';
 
 interface ReviewIncidentRequestModalProps {
@@ -109,10 +109,6 @@ export default function ReviewIncidentRequestModal({
           <span className="detail-field-value">
             {incident.first_name} {incident.last_name}
           </span>
-        </div>
-        <div className="detail-field">
-          <span className="detail-field-label">Équipe</span>
-          <span className="detail-field-value">{SHIFT_LABELS[incident.shift]}</span>
         </div>
         <div className="detail-field">
           <span className="detail-field-label">État</span>

@@ -8,7 +8,6 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
   return {
     id: 1,
     user_id: 1,
-    shift: 'MATIN',
     line_id: 1,
     line_number: 'L01',
     machine_id: 'M01',

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from './ui/EmptyState';
 import { WorkshopIncident, WorkshopIncidentEvent } from '../types';
-import { ROLE_LABELS, SHIFT_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
+import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import { EVENT_LABELS, formatDateTime, formatEventActor, formatEventDetail } from '../utils/workshopHistory';
 import { formatIncidentDuration } from '../utils/durationFormat';
 
@@ -87,9 +87,8 @@ export default function IncidentDossier({
           <p>{STATE_LABELS[incident.state] ?? incident.state}</p>
         </div>
         <div>
-          <span className="detail-field-label">Poste · Produit</span>
-          <strong>{SHIFT_LABELS[incident.shift] ?? incident.shift}</strong>
-          <p>{incident.current_product ?? 'Produit non renseigné'}</p>
+          <span className="detail-field-label">Produit</span>
+          <strong>{incident.current_product ?? 'Produit non renseigné'}</strong>
         </div>
         <div>
           <span className="detail-field-label">Déclarant</span>

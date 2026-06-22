@@ -65,9 +65,9 @@ beforeEach(() => {
 // ─── rendu ────────────────────────────────────────────────────────────────────
 
 describe('CreateIncidentModal – rendu', () => {
-  it('affiche le sélecteur d\'équipe (shift)', () => {
+  it('affiche le champ produit en cours', () => {
     renderModal();
-    expect(screen.getByText(/Équipe/i)).toBeDefined();
+    expect(screen.getByLabelText(/Produit en cours/i)).toBeDefined();
   });
 
   it('affiche le titre de création', () => {
@@ -93,9 +93,9 @@ describe('CreateIncidentModal – isDirty', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('isDirty est vrai quand un shift est sélectionné', async () => {
+  it('isDirty est vrai quand un état est sélectionné', async () => {
     renderModal();
-    chooseOption('Équipe', 'Matin');
+    chooseOption('État', 'Dégradée');
     fireEvent.click(screen.getByRole('button', { name: /Fermer/i }));
     await waitFor(() => {
       expect(screen.getByText('Quitter sans enregistrer ?')).toBeDefined();
@@ -123,7 +123,6 @@ describe('CreateIncidentModal – soumission réussie', () => {
     vi.mocked(workshopApi.createWorkshopIncident).mockResolvedValue({ id: 1 } as never);
     renderModal([mockLine()], onClose, onSuccess);
 
-    chooseOption('Équipe', 'Matin');
     chooseOption('Ligne', 'L01');
     chooseOption('Machine', 'M01 · Fanuc');
     chooseOption('Robot', 'R01');
@@ -138,7 +137,6 @@ describe('CreateIncidentModal – soumission réussie', () => {
 
     await waitFor(() => {
       expect(workshopApi.createWorkshopIncident).toHaveBeenCalledWith({
-        shift: 'MATIN',
         lineId: 1,
         machineId: 'M01',
         robotLabel: 'R01',
@@ -168,7 +166,7 @@ describe('CreateIncidentModal – soumission réussie', () => {
 describe('CreateIncidentModal – mode requestOnly', () => {
   it("affiche Modifier l'incident si un incident est fourni (mode édition)", () => {
     const incident = {
-      id: 1, shift: 'MATIN' as const, line_id: 1, line_number: 'L01',
+      id: 1, line_id: 1, line_number: 'L01',
       machine_id: 'M01', machine_brand: 'Fanuc', robot_label: 'R01', head_number: 1,
       state: 'DEGRADEE' as const, status: 'OPEN' as const, is_taken: false,
       is_priority: false, comment: null, current_product: null, display_order: 0,

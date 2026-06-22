@@ -4,7 +4,6 @@ import { createIncidentSchema, updateIncidentSchema } from '../workshop.validati
 
 function validCreatePayload() {
   return {
-    shift: 'MATIN',
     lineId: 1,
     machineId: 'M01',
     robotLabel: 'Robot 1',
@@ -38,11 +37,6 @@ describe('createIncidentSchema', () => {
 
   it('rejects an empty currentProduct', () => {
     const result = createIncidentSchema.safeParse({ ...validCreatePayload(), currentProduct: '   ' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an invalid shift', () => {
-    const result = createIncidentSchema.safeParse({ ...validCreatePayload(), shift: 'SOIR' });
     expect(result.success).toBe(false);
   });
 
