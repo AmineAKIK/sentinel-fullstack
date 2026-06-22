@@ -11,9 +11,11 @@ import ReviewIncidentRequestModal from './ReviewIncidentRequestModal';
 import UnfollowIncidentConfirmModal from './UnfollowIncidentConfirmModal';
 import DeleteResponsibleCommentConfirmModal from './DeleteResponsibleCommentConfirmModal';
 import DetailField from './ui/DetailField';
+import CharCounter from './ui/CharCounter';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { Role } from '../types/common';
 import { formatDateTime } from '../utils/date';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
 import { ModalStateApi } from '../hooks/useModalState';
@@ -223,9 +225,11 @@ export default function IncidentDetailPanel({
                     className="form-input"
                     rows={3}
                     value={responsibleDraft}
-                    onChange={(e) => setResponsibleDraft(e.target.value)}
+                    onChange={(e) => setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))}
+                    maxLength={FIELD_LIMITS.COMMENT}
                     placeholder="Consigne courte pour orienter le traitement"
                   />
+                  <CharCounter current={responsibleDraft.length} max={FIELD_LIMITS.COMMENT} />
                 </div>
                 <div className="action-bar">
                   <button

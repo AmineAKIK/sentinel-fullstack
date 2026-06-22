@@ -7,6 +7,7 @@ import { getJwtSecret, isJwtSessionError, verifyAuthToken } from '../../auth/jwt
 import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
 import { getBoardData } from '../workshop/workshop.controller';
+import { FIELD_LIMITS } from '../../domain/constants';
 import logger from '../../logger';
 
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
@@ -156,7 +157,7 @@ boardRouter.post('/session', (req, res) => {
   }
 
   const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  if (!code.trim()) {
+  if (!code.trim() || code.length > FIELD_LIMITS.CODE) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Code board requis.');
     return;
   }

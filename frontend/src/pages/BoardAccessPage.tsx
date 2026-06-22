@@ -4,6 +4,7 @@ import { createBoardSession, getBoardAccess } from '../api/board';
 import { ApiResponseError } from '../api/client';
 import WorkshopBoardPage from './WorkshopBoardPage';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 type AccessState = 'checking' | 'locked' | 'ready';
 
@@ -79,6 +80,7 @@ export default function BoardAccessPage() {
               autoComplete="off"
               autoFocus
               disabled={loading}
+              maxLength={FIELD_LIMITS.CODE}
               placeholder="Code du tableau"
               aria-invalid={Boolean(error) || undefined}
               aria-describedby={error ? 'board-access-error' : undefined}

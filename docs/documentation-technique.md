@@ -639,6 +639,10 @@ const result = await withTransaction(async (client) => {
 - Admin : 12 caractères (`MIN_PASSWORD_LENGTH_ADMIN`)
 - Atelier : 6 caractères (`MIN_PASSWORD_LENGTH_WORKSHOP`)
 
+**Longueur maximale :** 128 caractères (`MAX_PASSWORD_LENGTH`). bcrypt ne lit que les
+72 premiers octets, mais la borne haute rejette tôt les saisies abusives pour éviter
+de hacher des charges inutilement lourdes.
+
 ### 8.5 Setup codes
 
 Générés pour les nouveaux comptes et lors des réinitialisations. Implémentation dans `auth/setupCode.ts` :
@@ -679,6 +683,35 @@ Appliqués sur toutes les réponses backend :
 `POST /api/admin/security/verify-password` permet de confirmer le mot de passe admin avant une opération destructive (suppression d'utilisateur, suppression de ligne) sans rouvrir de session.
 
 **Protection anti-bruteforce intégrée :** au bout de 3 échecs consécutifs (dans une fenêtre de 30 min), la session admin est invalidée et le cookie effacé.
+
+### 8.9 Limites de longueur des champs texte
+
+Tous les champs texte sont bornés en longueur, à la fois pour prévenir les abus
+(saisies massives, charges inutiles) et pour garantir des données propres.
+
+- **Première ligne de défense :** `express.json({ limit: '50kb' })` plafonne la taille
+  de tout corps de requête.
+- **Source de vérité backend :** `FIELD_LIMITS` dans `domain/constants.ts`, réutilisé
+  par les schémas Zod. Les mots de passe sont bornés par `MAX_PASSWORD_LENGTH`
+  (`auth/bcrypt.ts`).
+- **Miroir frontend :** `utils/fieldLimits.ts` aligne les attributs `maxLength` et les
+  compteurs de caractères sur les mêmes valeurs.
+
+| Champ | Limite |
+|---|---|
+| Prénom / nom | 80 |
+| Numéro de badge | 40 |
+| Identifiant de connexion | 80 |
+| Identifiant machine | 50 |
+| Marque machine | 100 |
+| Numéro / label de robot | 50 |
+| Numéro de ligne | 40 |
+| Produit en cours | 120 |
+| Code (board / configuration) | 100 |
+| Mot de passe | 128 |
+| Commentaire, consigne, motif | 500 |
+| Diagnostic, note d'intervention | 1000 |
+| Recherche / filtre | 120 |
 
 ---
 

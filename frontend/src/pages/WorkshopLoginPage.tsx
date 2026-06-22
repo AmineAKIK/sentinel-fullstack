@@ -4,6 +4,7 @@ import { unifiedLogin } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 type Mode = 'identifier' | 'password' | 'setup';
 
@@ -149,6 +150,7 @@ export default function WorkshopLoginPage() {
               disabled={loading}
               autoComplete="username"
               autoFocus={mode === 'identifier'}
+              maxLength={FIELD_LIMITS.IDENTIFIER}
               placeholder="0001"
               aria-invalid={Boolean(error) || undefined}
               aria-describedby={error ? 'workshop-login-error' : undefined}
@@ -165,6 +167,7 @@ export default function WorkshopLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
+                maxLength={FIELD_LIMITS.PASSWORD}
                 autoComplete="current-password"
                 autoFocus
                 placeholder="••••••••"
@@ -203,6 +206,7 @@ export default function WorkshopLoginPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   disabled={loading}
                   autoComplete="new-password"
+                  maxLength={FIELD_LIMITS.PASSWORD}
                   placeholder="••••••••"
                   aria-invalid={Boolean(error) || undefined}
                   aria-describedby={error ? 'workshop-login-error' : undefined}
@@ -218,6 +222,7 @@ export default function WorkshopLoginPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
                   autoComplete="new-password"
+                  maxLength={FIELD_LIMITS.PASSWORD}
                   placeholder="••••••••"
                   aria-invalid={Boolean(error) || undefined}
                   aria-describedby={error ? 'workshop-login-error' : undefined}

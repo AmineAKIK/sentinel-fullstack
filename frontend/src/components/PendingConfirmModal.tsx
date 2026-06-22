@@ -1,5 +1,6 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 interface PendingConfirmModalProps {
   incident: WorkshopIncident;
@@ -19,6 +20,7 @@ export default function PendingConfirmModal({ incident, onClose, onConfirm }: Pe
       requiredMessage="Merci de renseigner la justification."
       failureMessage="Impossible de suspendre l'incident."
       textareaId="pendingReason"
+      maxLength={FIELD_LIMITS.NOTE}
       onClose={onClose}
       onConfirm={onConfirm}
     />

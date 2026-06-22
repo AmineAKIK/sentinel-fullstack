@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
+import CharCounter from './ui/CharCounter';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 type TextConfirmModalProps = {
   title: string;
@@ -15,6 +17,7 @@ type TextConfirmModalProps = {
   onConfirm: (value: string) => Promise<void>;
   variant?: 'default' | 'danger';
   textareaId?: string;
+  maxLength?: number;
 };
 
 export default function TextConfirmModal({
@@ -30,6 +33,7 @@ export default function TextConfirmModal({
   onConfirm,
   variant = 'default',
   textareaId = 'confirmText',
+  maxLength = FIELD_LIMITS.COMMENT,
 }: TextConfirmModalProps) {
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,10 +85,12 @@ export default function TextConfirmModal({
           className="form-input"
           rows={4}
           value={value}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => setValue(event.target.value.slice(0, maxLength))}
+          maxLength={maxLength}
           disabled={loading}
           placeholder={placeholder}
         />
+        <CharCounter current={value.length} max={maxLength} />
       </div>
       {error && <ErrorBanner>{error}</ErrorBanner>}
     </Modal>

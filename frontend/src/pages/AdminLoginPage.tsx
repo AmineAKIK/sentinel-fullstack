@@ -4,6 +4,7 @@ import { unifiedLogin } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 export default function AdminLoginPage() {
   usePageTitle('Connexion administration');
@@ -92,6 +93,7 @@ export default function AdminLoginPage() {
               disabled={loading}
               autoComplete="username"
               autoFocus
+              maxLength={FIELD_LIMITS.IDENTIFIER}
               placeholder="admin"
               aria-invalid={Boolean(error) || undefined}
               aria-describedby={error ? 'admin-login-error' : undefined}
@@ -109,6 +111,7 @@ export default function AdminLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 autoComplete="current-password"
+                maxLength={FIELD_LIMITS.PASSWORD}
                 autoFocus
                 placeholder="••••••••"
                 aria-invalid={Boolean(error) || undefined}

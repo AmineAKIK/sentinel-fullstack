@@ -1,6 +1,27 @@
 export const WORKSHOP_ROLES = ['OPERATOR', 'MAINTENANCE', 'RESPONSABLE'] as const;
 export type WorkshopRole = (typeof WORKSHOP_ROLES)[number];
 
+/**
+ * Longueurs maximales des champs texte, source de vérité partagée entre les
+ * schémas de validation. Empêche les saisies abusives et garde des données
+ * propres et cohérentes.
+ */
+export const FIELD_LIMITS = {
+  NAME: 80, // prénom, nom
+  BADGE: 40, // numéro de badge
+  IDENTIFIER: 80, // identifiant de connexion (badge ou username admin)
+  MACHINE_ID: 50, // identifiant machine
+  BRAND: 100, // marque machine
+  ROBOT: 50, // numéro / label de robot
+  LINE_NUMBER: 40, // numéro de ligne
+  PRODUCT: 120, // produit en cours
+  CODE: 100, // code d'accès board / code de configuration
+  // Pour les mots de passe, voir MAX_PASSWORD_LENGTH dans auth/bcrypt.ts (source d'autorité).
+  COMMENT: 500, // commentaire incident, consigne responsable, motifs
+  NOTE: 1000, // diagnostic, note d'intervention
+  SEARCH: 120, // requêtes de recherche / filtres
+} as const;
+
 export const INCIDENT_STATES = [
   'SKIPEE_PAR_MACHINE',
   'SKIPEE_PAR_CONDUCTEUR',

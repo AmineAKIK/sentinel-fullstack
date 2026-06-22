@@ -1,5 +1,6 @@
 import { LineMachine } from '../types';
 import { emptyMachine, switchMachineRobotMode } from '../utils/lineMachines';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 import RobotFieldsGroup from './RobotFieldsGroup';
 
 export interface LineFormData {
@@ -73,7 +74,7 @@ export default function LineForm({
           onChange={(e) => onChange({ ...data, lineNumber: e.target.value.replace(/\D/g, '') })}
           disabled={disabled}
           placeholder=""
-          maxLength={40}
+          maxLength={FIELD_LIMITS.LINE_NUMBER}
         />
         {lineError && <div className="field-error">{lineError}</div>}
       </div>
@@ -146,6 +147,7 @@ export default function LineForm({
                   onChange={(e) => updateMachineField(index, 'machineId', e.target.value)}
                   disabled={disabled}
                   placeholder="MCH-001"
+                  maxLength={FIELD_LIMITS.MACHINE_ID}
                 />
               </div>
 
@@ -159,6 +161,7 @@ export default function LineForm({
                   onChange={(e) => updateMachineField(index, 'brand', e.target.value)}
                   disabled={disabled}
                   placeholder="Marque"
+                  maxLength={FIELD_LIMITS.BRAND}
                 />
               </div>
             </div>

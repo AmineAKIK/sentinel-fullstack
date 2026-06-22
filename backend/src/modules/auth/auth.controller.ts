@@ -5,20 +5,21 @@ import { sendError } from '../../utils/errors';
 import { sendInvalidServerConfig } from '../../auth/authResponses';
 import { handleControllerError } from '../../utils/controller';
 import { unifiedLoginService, verifyAdminSession, verifyWorkshopSession } from './auth.service';
+import { loginSchema } from './auth.validation';
 import { AdminPayload } from '../../middlewares/adminAuth';
 import { WorkshopPayload } from '../../middlewares/workshopAuth';
 
 export async function login(req: Request, res: Response): Promise<void> {
-  const { identifier, password, newPassword, setupCode } = req.body;
-
-  if (!identifier || typeof identifier !== 'string' || !identifier.trim()) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Identifiant requis.');
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendError(res, 400, 'VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Requête invalide.');
     return;
   }
+  const { identifier, password, newPassword, setupCode } = parsed.data;
 
   try {
     const result = await unifiedLoginService(
-      identifier.trim(),
+      identifier,
       password,
       newPassword,
       setupCode

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import {
   hashAdminPassword,
   MIN_PASSWORD_LENGTH_ADMIN,
+  MAX_PASSWORD_LENGTH,
   verifyPassword as verifyPwd,
 } from '../../auth/bcrypt';
 import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
@@ -21,12 +22,17 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 
   const { currentPassword, newPassword } = req.body || {};
 
-  if (!currentPassword || typeof currentPassword !== 'string') {
+  if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length > MAX_PASSWORD_LENGTH) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
     return;
   }
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH_ADMIN) {
-    sendError(res, 400, 'VALIDATION_ERROR', `Le nouveau mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH_ADMIN} caractères.`);
+  if (
+    !newPassword ||
+    typeof newPassword !== 'string' ||
+    newPassword.length < MIN_PASSWORD_LENGTH_ADMIN ||
+    newPassword.length > MAX_PASSWORD_LENGTH
+  ) {
+    sendError(res, 400, 'VALIDATION_ERROR', `Le nouveau mot de passe doit contenir entre ${MIN_PASSWORD_LENGTH_ADMIN} et ${MAX_PASSWORD_LENGTH} caractères.`);
     return;
   }
 
@@ -61,7 +67,7 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
   }
 
   const { password } = req.body || {};
-  if (!password) {
+  if (!password || typeof password !== 'string' || password.length > MAX_PASSWORD_LENGTH) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe requis.');
     return;
   }

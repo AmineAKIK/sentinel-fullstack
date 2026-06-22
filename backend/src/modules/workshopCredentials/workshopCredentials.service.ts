@@ -1,6 +1,7 @@
 import {
   hashWorkshopPassword,
   MIN_PASSWORD_LENGTH_WORKSHOP,
+  MAX_PASSWORD_LENGTH,
   verifyPassword,
 } from '../../auth/bcrypt';
 import { verifyWorkshopPasswordSetupCode } from '../../auth/setupCode';
@@ -28,7 +29,12 @@ export async function loginWorkshopUserService(
   if (!user) return { kind: 'invalid_badge' };
 
   if (!user.password_hash) {
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH_WORKSHOP) {
+    if (
+      !newPassword ||
+      typeof newPassword !== 'string' ||
+      newPassword.length < MIN_PASSWORD_LENGTH_WORKSHOP ||
+      newPassword.length > MAX_PASSWORD_LENGTH
+    ) {
       return { kind: 'requires_password_setup', badgeNumber: user.badge_number };
     }
     if (!setupCode || typeof setupCode !== 'string') {

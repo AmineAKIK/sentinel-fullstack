@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import Modal from './Modal';
 import SelectField from './ui/SelectField';
+import CharCounter from './ui/CharCounter';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
 import { ApiResponseError } from '../api/client';
 import {
@@ -9,6 +10,7 @@ import {
   WorkshopIncident,
 } from '../types';
 import { getRobotOptions } from '../utils/lineMachines';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 interface CreateIncidentModalProps {
   lines: ProductionLine[];
@@ -17,8 +19,6 @@ interface CreateIncidentModalProps {
   onClose: () => void;
   onSuccess: (incident: WorkshopIncident) => void;
 }
-
-const COMMENT_MAX_LENGTH = 500;
 
 const STATES: { value: IncidentState; label: string }[] = [
   { value: 'SKIPEE_PAR_MACHINE', label: 'Skipée par machine' },
@@ -283,19 +283,15 @@ export default function CreateIncidentModal({
           id="incidentComment"
           className="form-input"
           value={comment}
-          onChange={(e) => setComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+          onChange={(e) => setComment(e.target.value.slice(0, FIELD_LIMITS.COMMENT))}
           disabled={loading}
           rows={3}
-          maxLength={COMMENT_MAX_LENGTH}
+          maxLength={FIELD_LIMITS.COMMENT}
           placeholder="Ajouter un commentaire"
           aria-invalid={Boolean(error) || undefined}
           aria-describedby={error ? 'create-incident-error' : undefined}
         />
-        <div
-          className={`char-counter${comment.length >= COMMENT_MAX_LENGTH * 0.9 ? ' char-counter--warning' : ''}`}
-        >
-          {comment.length} / {COMMENT_MAX_LENGTH}
-        </div>
+        <CharCounter current={comment.length} max={FIELD_LIMITS.COMMENT} />
       </div>
 
       <div className="form-group">
@@ -306,6 +302,7 @@ export default function CreateIncidentModal({
           value={currentProduct}
           onChange={(e) => setCurrentProduct(e.target.value)}
           disabled={loading}
+          maxLength={FIELD_LIMITS.PRODUCT}
           placeholder="Référence produit"
           aria-invalid={Boolean(error) || undefined}
           aria-describedby={error ? 'create-incident-error' : undefined}

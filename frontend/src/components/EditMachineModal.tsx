@@ -3,6 +3,7 @@ import Modal from './Modal';
 import { LineMachine, ProductionLine } from '../types';
 import { ApiResponseError } from '../api/client';
 import { checkLineConflicts, updateLine } from '../api/lines';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 import DetailField from './ui/DetailField';
 import ErrorBanner from './ui/ErrorBanner';
 import Spinner from './ui/Spinner';
@@ -177,6 +178,7 @@ export default function EditMachineModal({
               value={form.machineId}
               onChange={(e) => updateField('machineId', e.target.value)}
               disabled={loading}
+              maxLength={FIELD_LIMITS.MACHINE_ID}
             />
           </div>
           <div className="form-group">
@@ -188,6 +190,7 @@ export default function EditMachineModal({
               value={form.brand}
               onChange={(e) => updateField('brand', e.target.value)}
               disabled={loading}
+              maxLength={FIELD_LIMITS.BRAND}
             />
           </div>
           <label className="checkbox-row">

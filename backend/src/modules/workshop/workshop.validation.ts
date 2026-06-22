@@ -1,17 +1,17 @@
 import { z } from 'zod';
-import { INCIDENT_STATES, INCIDENT_STATUSES } from '../../domain/constants';
+import { INCIDENT_STATES, INCIDENT_STATUSES, FIELD_LIMITS } from '../../domain/constants';
 
 export const IncidentStateEnum = z.enum(INCIDENT_STATES);
 export const IncidentStatusEnum = z.enum(INCIDENT_STATUSES);
 
 export const createIncidentSchema = z.object({
   lineId: z.coerce.number().int().positive(),
-  machineId: z.string().trim().min(1),
-  robotLabel: z.string().trim().min(1),
+  machineId: z.string().trim().min(1).max(FIELD_LIMITS.MACHINE_ID),
+  robotLabel: z.string().trim().min(1).max(FIELD_LIMITS.ROBOT),
   headNumber: z.coerce.number().int().min(1, 'La tête doit correspondre au référentiel de la machine.'),
   state: IncidentStateEnum,
-  comment: z.string().trim().max(500).optional(),
-  currentProduct: z.string().trim().min(1, 'Le produit en cours est obligatoire.').max(120),
+  comment: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
+  currentProduct: z.string().trim().min(1, 'Le produit en cours est obligatoire.').max(FIELD_LIMITS.PRODUCT),
 });
 
 export const updateIncidentSchema = createIncidentSchema.partial().extend({
@@ -19,15 +19,15 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   isPriority: z.boolean().optional(),
   displayOrder: z.coerce.number().int().optional(),
   status: IncidentStatusEnum.optional(),
-  diagnostic: z.string().trim().max(1000).optional(),
-  interventionNote: z.string().trim().max(1000).optional(),
-  responsibleComment: z.string().trim().max(500).optional(),
+  diagnostic: z.string().trim().max(FIELD_LIMITS.NOTE).optional(),
+  interventionNote: z.string().trim().max(FIELD_LIMITS.NOTE).optional(),
+  responsibleComment: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
   requestOnly: z.boolean().optional(),
   cancelRequest: z.boolean().optional(),
-  cancelRequestReason: z.string().trim().max(500).optional(),
+  cancelRequestReason: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
   deleteRequest: z.boolean().optional(),
-  deleteRequestReason: z.string().trim().max(500).optional(),
-  invalidationReason: z.string().trim().max(500).optional(),
+  deleteRequestReason: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
+  invalidationReason: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
   applyEditRequest: z.boolean().optional(),
   rejectEditRequest: z.boolean().optional(),
   rejectDeleteRequest: z.boolean().optional(),
@@ -35,11 +35,11 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
 });
 
 export const incidentWorkspaceQuerySchema = z.object({
-  q: z.string().trim().max(120).optional(),
+  q: z.string().trim().max(FIELD_LIMITS.SEARCH).optional(),
   status: IncidentStatusEnum.optional(),
   state: IncidentStateEnum.optional(),
   lineId: z.coerce.number().int().positive().optional(),
-  machineId: z.string().trim().max(120).optional(),
+  machineId: z.string().trim().max(FIELD_LIMITS.SEARCH).optional(),
   eventType: z.string().trim().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });

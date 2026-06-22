@@ -1,5 +1,6 @@
 import { Role } from '../types';
 import { ROLE_LABELS } from '../utils/labels';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 import SelectField from './ui/SelectField';
 
 export interface UserFormData {
@@ -46,6 +47,7 @@ export default function UserForm({
           disabled={disabled}
           placeholder="Dupont"
           autoComplete="family-name"
+          maxLength={FIELD_LIMITS.NAME}
         />
       </div>
       <div className="form-group">
@@ -59,6 +61,7 @@ export default function UserForm({
           disabled={disabled}
           placeholder="Jean"
           autoComplete="given-name"
+          maxLength={FIELD_LIMITS.NAME}
         />
       </div>
       <div className="form-group">
@@ -73,7 +76,7 @@ export default function UserForm({
           onChange={(e) => handleChange('badgeNumber', e.target.value.replace(/\D/g, ''))}
           disabled={disabled}
           placeholder="0001"
-          maxLength={40}
+          maxLength={FIELD_LIMITS.BADGE}
         />
         {badgeError && <div className="field-error">{badgeError}</div>}
       </div>

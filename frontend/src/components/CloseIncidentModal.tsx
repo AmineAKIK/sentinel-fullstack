@@ -1,5 +1,6 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 
 interface CloseIncidentModalProps {
   incident: WorkshopIncident;
@@ -19,6 +20,7 @@ export default function CloseIncidentModal({ incident, onClose, onConfirm }: Clo
       requiredMessage="Merci de renseigner le compte rendu."
       failureMessage="Impossible de clôturer l'incident."
       textareaId="closeNote"
+      maxLength={FIELD_LIMITS.NOTE}
       onClose={onClose}
       onConfirm={onConfirm}
     />
