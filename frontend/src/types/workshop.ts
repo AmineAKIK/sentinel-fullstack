@@ -98,6 +98,7 @@ export interface WorkshopBoardIncident {
   current_product: string | null;
   is_taken: boolean;
   is_priority: boolean;
+  responsible_comment: string | null;
   status: 'OPEN' | 'PENDING';
   display_order: number;
   created_at: string;

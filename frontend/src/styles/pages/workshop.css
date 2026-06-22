@@ -234,8 +234,11 @@ button.workshop-metric:hover,
 }
 
 .incident-card--urgent {
-  border-color: var(--color-danger);
-  box-shadow: 0 0 0 1px rgba(180, 35, 24, 0.24), var(--shadow);
+  border-left: 4px solid var(--color-danger);
+}
+
+.incident-card--urgent:hover {
+  border-left-color: var(--color-danger);
 }
 
 .incident-card--resolved-followed {
@@ -305,6 +308,13 @@ button.workshop-metric:hover,
   color: var(--color-primary);
 }
 
+.badge-status.priority {
+  border: 1px solid var(--color-danger-border);
+  background-color: var(--color-surface);
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
 .incident-card-summary {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
@@ -329,10 +339,53 @@ button.workshop-metric:hover,
   overflow-wrap: anywhere;
 }
 
+.incident-summary-product strong {
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.incident-summary-product.is-missing strong {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
 .incident-summary-primary p {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
+.incident-responsible-instruction {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius);
+  background-color: var(--color-surface-alt);
+}
+
+.incident-responsible-instruction > strong {
+  color: var(--color-primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.incident-responsible-instruction p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
@@ -398,6 +451,10 @@ button.workshop-metric:hover,
   .incident-card-summary {
     grid-template-columns: 1fr;
   }
+  .incident-responsible-instruction {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
   .workshop-metrics {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -432,4 +489,3 @@ button.workshop-metric:hover,
   gap: var(--space-3);
   margin-top: var(--space-1);
 }
-

@@ -51,6 +51,8 @@ export default function BoardIncidentGrid({
     <div className="board-incident-grid">
       {items.map((incident) => {
         const isOldCase = isOpenOverSevenDays(incident);
+        const currentProduct = incident.current_product?.trim();
+        const responsibleInstruction = incident.responsible_comment?.trim();
         return (
           <article
             key={incident.id}
@@ -61,14 +63,20 @@ export default function BoardIncidentGrid({
                   ? 'board-incident-watch'
                   : 'board-incident-steady'
             }`}
+            aria-label={`${incident.is_priority ? 'Incident urgent' : 'Incident'} ligne ${incident.line_number}, machine ${incident.machine_id}`}
           >
             <div className="board-incident-top">
-              <span>Ligne {incident.line_number}</span>
-              <span>{STATE_LABELS[incident.state] ?? incident.state}</span>
+              <strong>Ligne {incident.line_number}</strong>
+              <div className="board-incident-top-status">
+                <span className="board-incident-state">{STATE_LABELS[incident.state] ?? incident.state}</span>
+                {incident.is_priority && (
+                  <span className="board-chip board-chip-priority">Urgent</span>
+                )}
+              </div>
             </div>
-            <div className="board-incident-product">
+            <div className={`board-incident-product${currentProduct ? '' : ' is-missing'}`}>
               <span>Produit en cours</span>
-              <strong>{incident.current_product ?? 'Non renseigné'}</strong>
+              <strong>{currentProduct || 'Non renseigné'}</strong>
             </div>
             <div className="board-incident-equipment">
               <span>Équipement</span>
@@ -77,14 +85,20 @@ export default function BoardIncidentGrid({
                 {incident.robot_label} · Tête {incident.head_number}
               </small>
             </div>
+            <div
+              className={`board-incident-instruction${responsibleInstruction ? '' : ' is-empty'}`}
+              title={responsibleInstruction}
+            >
+              <span>Consigne</span>
+              <p aria-label={responsibleInstruction ? undefined : 'Aucune consigne responsable'}>
+                {responsibleInstruction || '—'}
+              </p>
+            </div>
             <div className="board-incident-footer">
               <span>
                 Depuis {ageLabel(incident.created_at)} · {formatTime(incident.created_at)}
               </span>
               <div className="board-incident-status">
-                {incident.is_priority && (
-                  <span className="board-chip board-chip-critical">Urgent</span>
-                )}
                 {isOldCase && <span className="board-chip board-chip-warning">&gt; 7 j</span>}
                 <span
                   className={`board-chip ${

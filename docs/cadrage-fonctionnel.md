@@ -684,7 +684,9 @@ Les paramètres sont **persistés par écran** (`localStorage`) avec un identifi
 
 ### 12.6 Informations affichées par incident
 
-Ligne, machine, robot, tête, type d'anomalie, produit en cours, ancienneté, statut (pris/non pris/en attente), indicateur d'urgence.
+Ligne, machine, robot, tête, type d'anomalie, produit en cours, ancienneté, statut (pris/non pris/en attente), indicateur d'urgence et consigne responsable lorsqu'elle existe.
+
+Le produit reste une donnée décisionnelle de premier niveau. Une référence renseignée est fortement mise en avant ; l'état vide « Non renseigné » reste visible sans recevoir la même emphase. Les cartes conservent une anatomie et une hauteur stables afin de faciliter leur comparaison. La priorité est indiquée par un rail et un libellé compact, tandis que la consigne occupe une zone informationnelle dédiée sans transformer toute la carte en alarme visuelle.
 
 ---
 

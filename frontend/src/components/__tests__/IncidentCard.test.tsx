@@ -77,11 +77,45 @@ describe('IncidentCard – rendu', () => {
   it('affiche le badge "Urgent" si is_priority est vrai', () => {
     render(<IncidentCard incident={mockIncident({ is_priority: true })} {...defaultProps} />);
     expect(screen.getByText('Urgent')).toBeDefined();
+    expect(screen.queryByText(/action prioritaire/i)).toBeNull();
   });
 
   it('n\'affiche pas le badge urgent si is_priority est faux', () => {
     render(<IncidentCard incident={mockIncident({ is_priority: false })} {...defaultProps} />);
     expect(screen.queryByText('Urgent')).toBeNull();
+  });
+
+  it('ne présente pas un incident résolu suivi comme une urgence active', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ is_priority: true, is_followed: true, status: 'CLOSED' })}
+        {...defaultProps}
+      />
+    );
+    expect(screen.queryByText('Urgent')).toBeNull();
+    expect(screen.getByText('Incident clôturé')).toBeDefined();
+  });
+
+  it('identifie clairement la consigne responsable', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ responsible_comment: 'Sécuriser la zone avant intervention.' })}
+        {...defaultProps}
+      />
+    );
+    expect(screen.getByText('Consigne responsable')).toBeDefined();
+    expect(screen.getByText('Sécuriser la zone avant intervention.')).toBeDefined();
+  });
+
+  it('conserve le produit en cours dans le premier niveau de synthèse', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ current_product: 'PRODUIT X45' })}
+        {...defaultProps}
+      />
+    );
+    expect(screen.getByText('Produit en cours')).toBeDefined();
+    expect(screen.getByText('PRODUIT X45')).toBeDefined();
   });
 
   it('affiche le bouton "Correction demandée" si responsable et edit_request présent', () => {

@@ -39,11 +39,13 @@ export default function IncidentCard({
 }: IncidentCardProps) {
   const isResolvedFollowed = incident.is_followed &&
     (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED');
+  const isActiveUrgent = incident.is_priority && !isResolvedFollowed;
+  const currentProduct = incident.current_product?.trim();
 
   return (
     <div
       role="button"
-      className={`incident-card${incident.is_priority ? ' incident-card--urgent' : ''}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+      className={`incident-card${isActiveUrgent ? ' incident-card--urgent' : ''}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
       key={incident.id}
       draggable={canReorder}
       onDragStart={(event) => {
@@ -64,7 +66,7 @@ export default function IncidentCard({
       onDragEnd={onDragEnd}
       onClick={() => onClick(incident)}
       tabIndex={0}
-      aria-label={`Ouvrir incident ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
+      aria-label={`Ouvrir incident${isActiveUrgent ? ' urgent' : ''} ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
@@ -96,7 +98,7 @@ export default function IncidentCard({
         </div>
         <div className="incident-card-status">
           <span className="badge-role">{STATE_LABELS[incident.state] || incident.state}</span>
-          {incident.is_priority && <span className="badge-status inactive">Urgent</span>}
+          {isActiveUrgent && <span className="badge-status priority">Urgent</span>}
           {incident.status === 'CLOSED' && <span className="badge-status neutral">Clôturé</span>}
           {incident.status === 'CANCELED' && <span className="badge-status neutral">Annulé</span>}
           {incident.status === 'INVALIDATED' && <span className="badge-status neutral">Invalidé</span>}
@@ -148,15 +150,15 @@ export default function IncidentCard({
       </div>
 
       <div className="incident-card-summary">
+        <div className={`incident-summary-primary incident-summary-product${currentProduct ? '' : ' is-missing'}`}>
+          <span className="detail-field-label">Produit en cours</span>
+          <strong>{currentProduct || 'Non renseigné'}</strong>
+          <p>Créé par {ROLE_LABELS[incident.role] || incident.role}</p>
+        </div>
         <div className="incident-summary-primary">
           <span className="detail-field-label">Équipement</span>
           <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
           <p>{formatDateTime(incident.created_at)}</p>
-        </div>
-        <div className="incident-summary-primary">
-          <span className="detail-field-label">Produit</span>
-          <strong>{incident.current_product || '-'}</strong>
-          <p>Créé par {ROLE_LABELS[incident.role] || incident.role}</p>
         </div>
         {(isMaintenance || isResponsable) && (
           <div className="incident-summary-primary">
@@ -171,13 +173,16 @@ export default function IncidentCard({
         )}
       </div>
 
+      {incident.responsible_comment && (
+        <div className="incident-responsible-instruction">
+          <strong>Consigne responsable</strong>
+          <p>{incident.responsible_comment}</p>
+        </div>
+      )}
       {incident.status === 'PENDING' && incident.diagnostic && (
         <div className="notice" style={{ marginTop: 12 }}>
           Suspension justifiée : {incident.diagnostic}
         </div>
-      )}
-      {incident.responsible_comment && (
-        <p className="incident-comment">{incident.responsible_comment}</p>
       )}
     </div>
   );

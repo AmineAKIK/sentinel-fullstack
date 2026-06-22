@@ -266,7 +266,7 @@ export async function getBoardData() {
     pool.query(
       `SELECT id, line_id, line_number, machine_id, robot_label,
               head_number, state, current_product, is_taken, is_priority,
-              status, display_order, created_at, updated_at
+              responsible_comment, status, display_order, created_at, updated_at
        FROM workshop_incidents
        WHERE ${activeIncidentStatusSql}
        ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC`

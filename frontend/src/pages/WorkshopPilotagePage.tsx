@@ -178,7 +178,7 @@ export default function WorkshopPilotagePage() {
               </div>
             </div>
             {!realtimeLoading && activeIncidents.length > 0 && (
-              <button type="button" className="btn" onClick={() => goToDashboard()}>
+              <button type="button" className="btn btn-secondary" onClick={() => goToDashboard()}>
                 Ouvrir le dashboard
               </button>
             )}

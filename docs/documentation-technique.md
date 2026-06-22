@@ -958,7 +958,7 @@ type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED'
 
 **`WorkshopIncident` :** objet incident complet retourné par `GET /workshop/incidents`. Contient les champs de l'incident, les informations du déclarant (`first_name`, `last_name`, `badge_number`, `role`), les informations du technicien (`taken_by_first_name`, `taken_by_last_name`, `taken_by_role`), et les champs de suivi (`is_followed`, `followed_at`).
 
-**`WorkshopBoardData` :** objet retourné par `GET /api/board/data` (route lecture seule protegee). Contient uniquement `lines`, `incidents` (format allégé `WorkshopBoardIncident`) et `metrics`.
+**`WorkshopBoardData` :** objet retourné par `GET /api/board/data` (route lecture seule protegee). Contient uniquement `lines`, `incidents` (format allégé `WorkshopBoardIncident`) et `metrics`. Le format incident inclut notamment `current_product`, `is_priority` et `responsible_comment` pour porter le contexte de décision et la consigne sur l'écran mural.
 
 **`WorkshopAnalytics` :** objet complet retourné par `GET /workshop/analytics`. Contient les KPI numériques, les délais médians/moyens, les classements (`by_state`, `by_line`, `by_machine`) et les données de tendance (`trend[]`).
 
