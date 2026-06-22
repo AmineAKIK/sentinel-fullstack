@@ -68,7 +68,7 @@ export default function SupportChat({ onSend }: Props) {
           <div className="support-agent-mark" aria-hidden="true">SENTINEL</div>
           <div>
             <p className="support-agent-title">Assistant Sentinel</p>
-            <p className="support-agent-subtitle">Réponses contextualisées sur l'application</p>
+            <p className="support-agent-subtitle">Aide sur l'utilisation de l'application</p>
           </div>
         </div>
         <span className="support-status">Disponible</span>

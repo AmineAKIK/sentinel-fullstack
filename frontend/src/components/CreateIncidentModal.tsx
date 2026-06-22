@@ -58,7 +58,7 @@ export default function CreateIncidentModal({
   function validate(): boolean {
     setError('');
     if (!hasLineReferences) {
-      setError("Aucune ligne active n'est disponible dans le référentiel.");
+      setError("Aucune ligne active n'est disponible.");
       return false;
     }
     if (!lineId || !machineId || !robotLabel || !headNumber || !state || !currentProduct.trim()) {
@@ -181,11 +181,11 @@ export default function CreateIncidentModal({
         </>
       ) : (
         <>
-      <div className={hasLineReferences ? 'notice' : 'error-message'} style={{ marginBottom: 12 }}>
-        {hasLineReferences
-          ? 'Ligne, machine, robot et tête proviennent du référentiel actif créé dans l’administration.'
-          : "Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration avant de déclarer un incident."}
-      </div>
+      {!hasLineReferences && (
+        <div className="error-message" style={{ marginBottom: 12 }}>
+          Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration avant de déclarer un incident.
+        </div>
+      )}
 
       <div className="form-group">
         <label className="form-label" htmlFor="incidentLine">Ligne *</label>
@@ -201,7 +201,7 @@ export default function CreateIncidentModal({
           disabled={loading || !hasLineReferences}
           ariaLabel="Ligne"
           options={[
-            { value: '', label: hasLineReferences ? '-- Ligne du référentiel --' : '-- Aucune ligne active --' },
+            { value: '', label: hasLineReferences ? 'Sélectionner une ligne' : 'Aucune ligne active' },
             ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
           ]}
         />
@@ -220,7 +220,7 @@ export default function CreateIncidentModal({
           disabled={loading || !selectedLine}
           ariaLabel="Machine"
           options={[
-            { value: '', label: selectedLine ? '-- Machine du référentiel --' : '-- Sélectionnez une ligne d’abord --' },
+            { value: '', label: selectedLine ? 'Sélectionner une machine' : 'Choisir une ligne d’abord' },
             ...(selectedLine?.machines.map((machine) => ({
               value: machine.machineId,
               label: `${machine.machineId} · ${machine.brand}`,
@@ -241,7 +241,7 @@ export default function CreateIncidentModal({
           disabled={loading || !selectedMachine}
           ariaLabel="Robot"
           options={[
-            { value: '', label: selectedMachine ? '-- Robot du référentiel --' : '-- Sélectionnez une machine d’abord --' },
+            { value: '', label: selectedMachine ? 'Sélectionner un robot' : 'Choisir une machine d’abord' },
             ...robots.map((robot) => ({ value: robot.label, label: robot.label })),
           ]}
         />
@@ -256,7 +256,7 @@ export default function CreateIncidentModal({
           disabled={loading || !selectedRobot}
           ariaLabel="Tête"
           options={[
-            { value: '', label: selectedRobot ? '-- Tête disponible --' : '-- Sélectionnez un robot d’abord --' },
+            { value: '', label: selectedRobot ? 'Sélectionner une tête' : 'Choisir un robot d’abord' },
             ...heads.map((head) => ({ value: String(head), label: String(head) })),
           ]}
         />
@@ -271,7 +271,7 @@ export default function CreateIncidentModal({
           disabled={loading}
           ariaLabel="État"
           options={[
-            { value: '', label: '-- Sélectionner --' },
+            { value: '', label: 'Sélectionner un état' },
             ...STATES.map((item) => ({ value: item.value, label: item.label })),
           ]}
         />

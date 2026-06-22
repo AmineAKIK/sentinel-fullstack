@@ -186,12 +186,6 @@ export default function WorkshopBoardPage() {
         ? `${activeIncidents.length} cas ouvert${activeIncidents.length > 1 ? 's' : ''} dans le périmètre`
         : 'Aucun incident ouvert';
 
-  const boardModeDetail =
-    boardMode === 'critical'
-      ? 'Les urgences et les incidents non pris restent affichés en priorité.'
-      : boardMode === 'watch'
-        ? "L'écran suit les incidents ouverts et fait tourner les vues utiles automatiquement."
-        : 'Le périmètre affiché ne contient aucun incident actif.';
 
   const noLineScope = settings.lineIds.includes(NO_LINES_SELECTED);
   const alertIncidents = activeIncidents.filter(
@@ -324,11 +318,9 @@ export default function WorkshopBoardPage() {
         <div className="board-status-copy">
           <span>{boardModeLabel}</span>
           <strong>{boardModeTitle}</strong>
-          <p>
-            {noLineScope
-              ? "Aucune ligne n'est incluse dans les paramètres de cet écran."
-              : boardModeDetail}
-          </p>
+          {noLineScope && (
+            <p>Aucune ligne n'est incluse dans les paramètres de cet écran.</p>
+          )}
         </div>
         <div className="board-status-meta">
           <span>Écran {screenLabel}</span>
@@ -421,7 +413,7 @@ export default function WorkshopBoardPage() {
           }
         >
           <div className="board-settings-panel">
-            <div className="notice">Ces paramètres concernent uniquement cet écran : {screenId}.</div>
+            <div className="notice">Portée : écran {screenId} uniquement.</div>
 
             <section className="board-settings-section">
               <div>

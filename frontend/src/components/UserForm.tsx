@@ -89,7 +89,7 @@ export default function UserForm({
           disabled={disabled}
           ariaLabel="Rôle"
           options={[
-            { value: '', label: '-- Sélectionner un rôle --' },
+            { value: '', label: 'Sélectionner un rôle' },
             ...ROLES.map((role) => ({ value: role.value, label: role.label })),
           ]}
         />

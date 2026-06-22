@@ -42,9 +42,7 @@ export default function DashboardFilters({
       }
     >
       <div className="board-settings-panel dashboard-filter-panel">
-        <div className="notice">
-          Ces filtres concernent uniquement la liste opérationnelle du dashboard.
-        </div>
+        <div className="notice">Portée : liste du tableau de bord uniquement.</div>
 
         <section className="board-settings-section dashboard-line-filter-section">
           <div>
