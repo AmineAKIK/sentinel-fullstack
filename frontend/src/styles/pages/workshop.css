@@ -17,7 +17,7 @@
   display: grid;
   grid-template-columns: minmax(260px, 1fr) auto auto;
   align-items: end;
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 10px;
   padding: 14px;
   border: 1px solid var(--color-border);
@@ -31,7 +31,7 @@
 .sort-toggle-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -82,9 +82,9 @@
 .active-filter-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .active-filter-chip {
@@ -126,7 +126,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   min-width: 0;
 }
 
@@ -152,7 +152,7 @@ button.workshop-metric {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .workshop-metric span {
@@ -189,7 +189,7 @@ button.workshop-metric:hover,
 .incident-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .incident-card {
@@ -275,7 +275,7 @@ button.workshop-metric:hover,
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--space-4);
   margin-bottom: 10px;
 }
 
@@ -289,7 +289,7 @@ button.workshop-metric:hover,
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -315,7 +315,7 @@ button.workshop-metric:hover,
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .incident-summary-primary .detail-field-label {
@@ -337,16 +337,16 @@ button.workshop-metric:hover,
 
 .incident-comment {
   margin-top: 14px;
-  padding-top: 12px;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
   color: var(--color-text-secondary);
 }
 
 .incident-tags {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .incident-order-controls {
@@ -402,7 +402,7 @@ button.workshop-metric:hover,
   }
   .workshop-search-bar {
     grid-template-columns: 1fr;
-    padding: 12px;
+    padding: var(--space-3);
   }
   .workshop-search-filter {
     min-width: unset;
@@ -428,7 +428,7 @@ button.workshop-metric:hover,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 4px;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
 }
 

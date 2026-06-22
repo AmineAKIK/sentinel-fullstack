@@ -3,16 +3,16 @@
 }
 
 .pilotage-filter-card {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 /* ── Hero zone ────────────────────────────────────────────────── */
 
 .pilotage-hero {
   display: grid;
-  gap: 20px;
+  gap: var(--space-5);
   margin-bottom: 28px;
-  padding: 24px;
+  padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background-color: var(--color-surface);
@@ -23,7 +23,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -36,7 +36,7 @@
 .pilotage-hero-state {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .pilotage-hero-state-label {
@@ -53,13 +53,13 @@
 .pilotage-hero-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .pilotage-hero-stat {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 18px 16px 14px;
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-border);
@@ -127,7 +127,7 @@
 .pilotage-sparkline {
   display: block;
   flex-shrink: 0;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   opacity: 0.85;
 }
 
@@ -141,9 +141,9 @@
 /* Bandeau actions urgentes */
 .pilotage-hero-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  padding-top: 16px;
+  padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
 }
 
@@ -153,7 +153,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px;
+  padding: var(--space-5);
   color: var(--color-text-secondary);
   font-size: var(--text-base);
 }
@@ -178,7 +178,7 @@
   display: grid;
   grid-template-columns: 48px minmax(150px, 1.4fr) repeat(4, minmax(120px, 1fr));
   min-width: 0;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 12px 18px;
   background-color: var(--color-surface-alt);
   border-bottom: 1px solid var(--color-border);
@@ -193,7 +193,7 @@
   display: grid;
   grid-template-columns: 48px minmax(150px, 1.4fr) repeat(4, minmax(120px, 1fr));
   min-width: 0;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 13px 18px;
   border: none;
@@ -234,7 +234,7 @@
 .pilotage-heatmap-linename {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: var(--text-base);
   font-weight: 700;
   color: var(--color-text);
@@ -295,7 +295,7 @@
   background-color: var(--color-surface);
   box-shadow: var(--shadow);
   overflow: hidden;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 
 .pilotage-analytics-kpi {
@@ -357,7 +357,7 @@
 
 .pilotage-section {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
   margin-bottom: 22px;
   min-width: 0;
 }
@@ -366,7 +366,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -422,7 +422,7 @@
 .pilotage-decision-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin-bottom: 2px;
 }
 
@@ -456,7 +456,7 @@
   grid-row: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-2);
   align-self: start;
   min-width: 0;
 }
@@ -516,7 +516,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: 14px;
   padding-top: 14px;
@@ -553,7 +553,7 @@
 
 .pilotage-hotspot-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
 }
@@ -648,7 +648,7 @@
 
 .pilotage-trend-totals {
   display: flex;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: center;
   flex-shrink: 0;
   flex-wrap: wrap;
@@ -667,8 +667,8 @@
 
 .pilotage-trend-legend {
   display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .pilotage-trend-legend-item {
@@ -696,13 +696,13 @@
   gap: 6px;
   align-items: flex-end;
   min-width: max-content;
-  padding-bottom: 4px;
+  padding-bottom: var(--space-1);
 }
 
 .pilotage-trend-col {
   display: grid;
   align-items: end;
-  gap: 4px;
+  gap: var(--space-1);
   flex: 1 0 32px;
   min-width: 32px;
   max-width: 64px;
@@ -770,7 +770,7 @@
 .pilotage-split-grid,
 .pilotage-report-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
 }
@@ -846,7 +846,7 @@
 
 .trend-bars {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .trend-bar {
@@ -873,7 +873,7 @@
 .trend-counts span {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .trend-counts span span {
@@ -884,7 +884,7 @@
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }

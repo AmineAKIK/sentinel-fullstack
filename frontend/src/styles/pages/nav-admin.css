@@ -5,7 +5,7 @@
   display: grid;
   grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
   min-height: 56px;
   position: sticky;
   top: 0;
@@ -18,7 +18,7 @@
 .nav-left {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -50,8 +50,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 4px;
+  gap: var(--space-1);
+  padding: var(--space-1);
   border: 1px solid var(--color-nav-border);
   border-radius: var(--radius-md);
   background-color: var(--color-nav-panel);
@@ -127,7 +127,7 @@
 }
 
 .admin-home {
-  padding-top: 32px;
+  padding-top: var(--space-8);
 }
 
 .admin-home .kpi-grid {
@@ -141,7 +141,7 @@
 .admin-overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(320px, 0.9fr);
-  gap: 16px;
+  gap: var(--space-4);
   align-items: start;
 }
 
@@ -155,9 +155,9 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   margin-bottom: 14px;
-  padding-bottom: 12px;
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -223,7 +223,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 24px;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 72px;
   padding: 14px 16px;
   text-align: left;
@@ -272,7 +272,7 @@
   cursor: pointer;
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
   min-height: 46px;
   padding: 9px 12px;
@@ -330,7 +330,7 @@
 }
 
 .admin-activity-list {
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 @media (max-width: 980px) {
@@ -347,7 +347,7 @@
     display: none;
   }
   .admin-home {
-    padding-top: 24px;
+    padding-top: var(--space-6);
   }
   .admin-overview-grid {
     grid-template-columns: 1fr;
@@ -408,7 +408,7 @@
 @media (max-width: 1100px) {
   .nav-bar {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
+    gap: var(--space-3);
     min-height: 56px;
     padding: 8px 12px;
     width: 100%;
@@ -431,7 +431,7 @@
   .nav-links {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 4px;
+    gap: var(--space-1);
     justify-content: stretch;
     padding: 6px;
   }
@@ -459,7 +459,7 @@
     flex-direction: column-reverse;
     align-items: stretch;
     width: 100%;
-    gap: 8px;
+    gap: var(--space-2);
   }
   .workshop-nav-user {
     width: 100%;

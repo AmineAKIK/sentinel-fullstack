@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   background-color: var(--color-bg);
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .login-card {
@@ -24,7 +24,7 @@
 .login-title h1 {
   font-size: 1.3rem;
   color: var(--color-text);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .login-title p {
@@ -35,11 +35,11 @@
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .login-board-entry {
-  margin-top: 20px;
+  margin-top: var(--space-5);
   padding-top: 18px;
   border-top: 1px solid var(--color-border);
   display: grid;
@@ -134,7 +134,7 @@
   min-width: 0;
 }
 
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   .login-card,
   .board-access-card {
     padding: 24px 20px;
@@ -148,6 +148,6 @@
 .workshop-session {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 

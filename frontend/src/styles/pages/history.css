@@ -1,14 +1,14 @@
 .history-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--space-4);
   align-items: start;
 }
 
 .history-incident-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   max-height: 640px;
   overflow-y: auto;
 }
@@ -17,7 +17,7 @@
   display: grid;
   gap: 6px;
   width: 100%;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background-color: var(--color-surface);
@@ -51,7 +51,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -81,7 +81,7 @@
 .history-timeline-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 18px;
 }
 
@@ -89,7 +89,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .history-timeline-header h2 {
@@ -112,7 +112,7 @@
 
 .timeline-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .timeline-item {
@@ -125,7 +125,7 @@
 
 .timeline-item.is-highlighted {
   margin: 0 -12px;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--color-primary-border);
   border-radius: var(--radius);
   background-color: var(--color-primary-soft);
@@ -138,14 +138,14 @@
 
 .timeline-content {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .history-dossier-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   padding: 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -155,7 +155,7 @@
 .history-dossier-summary > div {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .history-dossier-summary strong {
@@ -175,7 +175,7 @@
 .history-texts {
   display: grid;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .history-text-section {
@@ -198,7 +198,7 @@
 }
 
 .history-text-expand {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   padding: 0;
   border: none;
   background: none;
@@ -214,8 +214,8 @@
 }
 
 .history-trace-header {
-  margin-bottom: 8px;
-  padding-bottom: 8px;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -252,7 +252,7 @@
 .history-journal-card {
   display: grid;
   gap: 6px;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background-color: var(--color-surface);
@@ -290,7 +290,7 @@
 .history-event-filter {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   margin-bottom: 14px;
   padding-bottom: 14px;
