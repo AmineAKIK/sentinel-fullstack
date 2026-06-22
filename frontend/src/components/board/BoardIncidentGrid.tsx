@@ -89,7 +89,6 @@ export default function BoardIncidentGrid({
             </div>
             <div
               className={`board-incident-instruction${responsibleInstruction ? '' : ' is-empty'}`}
-              title={responsibleInstruction}
             >
               <span>Consigne</span>
               <p aria-label={responsibleInstruction ? undefined : 'Aucune consigne responsable'}>

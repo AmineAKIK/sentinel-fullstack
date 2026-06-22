@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import BoardIncidentGrid from '../board/BoardIncidentGrid';
 import type { WorkshopBoardIncident } from '../../types';
+import boardStyles from '../../styles/pages/board.css?raw';
 
 function mockIncident(overrides: Partial<WorkshopBoardIncident> = {}): WorkshopBoardIncident {
   return {
@@ -74,12 +75,16 @@ describe('BoardIncidentGrid', () => {
     expect(equipmentValue?.textContent).toContain('R01 · Tête 4');
   });
 
-  it('conserve la consigne longue dans le DOM tout en laissant le CSS gérer sa troncature', () => {
+  it('conserve la consigne longue intégralement sans mécanisme de troncature', () => {
     const instruction = 'Consigne responsable détaillée. '.repeat(16).slice(0, 500);
     const { container } = renderGrid([mockIncident({ responsible_comment: instruction })]);
     const instructionBlock = container.querySelector('.board-incident-instruction');
 
-    expect(instructionBlock?.getAttribute('title')).toBe(instruction);
+    expect(instructionBlock?.hasAttribute('title')).toBe(false);
     expect(screen.getByText(instruction)).toBeDefined();
+  });
+
+  it('interdit les ellipses dans les informations du board', () => {
+    expect(boardStyles).not.toContain('text-overflow: ellipsis');
   });
 });

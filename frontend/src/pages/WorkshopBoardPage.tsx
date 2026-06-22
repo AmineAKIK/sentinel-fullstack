@@ -20,7 +20,7 @@ import {
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const VIEW_DURATION_MS = 12000;
-const ROWS_PER_PAGE = 9;
+const ROWS_PER_PAGE = 6;
 type BoardView = 'alerts' | 'all' | 'lines';
 const VIEWS: BoardView[] = ['alerts', 'all', 'lines'];
 type BoardMode = 'normal' | 'watch' | 'critical';
