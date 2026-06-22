@@ -632,6 +632,35 @@ tbody tr:hover .row-action {
 }
 
 @media (max-width: 600px) {
+  /* Tables label/valeur : empiler label au-dessus de la valeur pour éviter le débordement. */
+  .change-table--rows,
+  .change-table--rows tbody,
+  .change-table--rows tr,
+  .change-table--rows th[scope='row'],
+  .change-table--rows td {
+    display: block;
+    width: auto;
+  }
+  .change-table--rows tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .change-table--rows tr:last-child {
+    border-bottom: none;
+  }
+  .change-table--rows th[scope='row'] {
+    padding: 0 0 2px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .change-table--rows td {
+    padding: 0;
+    border-bottom: none;
+    font-size: 14px;
+  }
+
   .page-container {
     width: 100%;
     max-width: 100%;

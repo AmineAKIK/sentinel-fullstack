@@ -144,7 +144,7 @@ export default function CreateIncidentModal({
       {showPreview ? (
         <>
           <div className="table-wrapper">
-            <table className="change-table">
+            <table className="change-table change-table--rows">
               <tbody>
                 <tr>
                   <th scope="row">Ligne</th>
