@@ -118,7 +118,7 @@
     min-width: 0;
     gap: 10px;
     padding: 10px 14px;
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
 
   /* Analytics KPIs */
@@ -157,7 +157,7 @@
     grid-template-columns: 36px minmax(90px, 1.2fr) repeat(4, minmax(68px, 1fr));
     min-width: 0;
     gap: 8px;
-    font-size: 12px;
+    font-size: var(--text-xs);
     padding: 8px 10px;
   }
 
@@ -199,7 +199,7 @@
   }
 
   .pilotage-hero-stat-value {
-    font-size: 24px;
+    font-size: var(--text-xl);
   }
 
   /* Analytics KPIs 1 colonne */
@@ -293,7 +293,7 @@
 }
 
 .modal-title {
-  font-size: 16px;
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--color-text);
 }
@@ -404,7 +404,7 @@ thead {
 th {
   padding: 10px 14px;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -436,7 +436,7 @@ th {
 
 .table-sort-indicator {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1;
 }
 
@@ -450,7 +450,7 @@ td {
   padding: 12px 14px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 tr:last-child td {
@@ -528,13 +528,13 @@ tbody tr:hover .row-action {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 
 .user-card-badge,
 .user-card-footer {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .user-card-meta {
@@ -567,7 +567,7 @@ tbody tr:hover .row-action {
 }
 
 .filter-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--color-text-muted);
 }
@@ -650,7 +650,7 @@ tbody tr:hover .row-action {
   }
   .change-table--rows th[scope='row'] {
     padding: 0 0 2px;
-    font-size: 11px;
+    font-size: var(--text-2xs);
     color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -658,7 +658,7 @@ tbody tr:hover .row-action {
   .change-table--rows td {
     padding: 0;
     border-bottom: none;
-    font-size: 14px;
+    font-size: var(--text-base);
   }
 
   .page-container {
@@ -845,7 +845,7 @@ tbody tr:hover .row-action {
     min-width: 0;
   }
   .pilotage-section-header h2 {
-    font-size: 20px;
+    font-size: var(--text-lg);
   }
   .comparison-list,
   .bar-list,
@@ -901,7 +901,7 @@ tbody tr:hover .row-action {
   .pilotage-heatmap-linename {
     grid-row: 1;
     grid-column: 2 / -1;
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: 700;
     align-self: center;
     gap: 0;
@@ -918,7 +918,7 @@ tbody tr:hover .row-action {
     min-width: 0;
     gap: 2px;
     color: var(--color-text);
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: 700;
     line-height: 1.1;
     text-align: center;
@@ -934,7 +934,7 @@ tbody tr:hover .row-action {
   .pilotage-heatmap-cell::before {
     content: attr(data-label);
     color: var(--color-text-muted);
-    font-size: 11px;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -978,23 +978,23 @@ tbody tr:hover .row-action {
 
   .pilotage-trend-mobile-head strong {
     color: var(--color-text);
-    font-size: 13px;
+    font-size: var(--text-sm);
   }
 
   .pilotage-trend-mobile-head span {
-    font-size: 12px;
+    font-size: var(--text-xs);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
 
   .pilotage-trend-mobile-series span {
     color: var(--color-text-muted);
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
 
   .pilotage-trend-mobile-series strong {
     color: var(--color-text);
-    font-size: 12px;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1041,7 +1041,7 @@ tbody tr:hover .row-action {
 
   .pilotage-trend-col-date,
   .pilotage-trend-col-delta {
-    font-size: 11px;
+    font-size: var(--text-2xs);
   }
   .modal-overlay,
   .modal-confirm-overlay {
@@ -1071,7 +1071,7 @@ tbody tr:hover .row-action {
 }
 
 .detail-field-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--color-text-muted);
   text-transform: uppercase;
@@ -1079,7 +1079,7 @@ tbody tr:hover .row-action {
 }
 
 .detail-field-value {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--color-text);
   font-weight: 500;
 }
@@ -1089,7 +1089,7 @@ tbody tr:hover .row-action {
   align-items: center;
   gap: 6px;
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -1115,18 +1115,18 @@ tbody tr:hover .row-action {
   border-radius: var(--radius);
   padding: 10px 14px;
   color: var(--color-primary-hover);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .change-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--text-sm);
   table-layout: fixed;
 }
 
 .change-table th {
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 0;
 }
 
@@ -1148,7 +1148,7 @@ tbody tr:hover .row-action {
   background: none;
   color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;

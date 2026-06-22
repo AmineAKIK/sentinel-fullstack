@@ -30,7 +30,7 @@
 .login-hub-header p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.45;
   text-align: right;
 }
@@ -86,7 +86,7 @@
 .login-space-card span {
   color: inherit;
   opacity: 0.6;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -111,7 +111,7 @@
   margin: 0;
   color: inherit;
   opacity: 0.65;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
@@ -161,7 +161,7 @@
   }
 
   .login-hub-header p {
-    font-size: 14px;
+    font-size: var(--text-base);
   }
 
   .login-space-card {
@@ -171,7 +171,7 @@
   }
 
   .login-space-card span {
-    font-size: 11px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.1em;
   }
 
@@ -180,7 +180,7 @@
   }
 
   .login-space-card p {
-    font-size: 13px;
+    font-size: var(--text-sm);
     line-height: 1.42;
   }
 }
