@@ -471,7 +471,7 @@ tr:last-child td {
 
 tbody tr {
   cursor: pointer;
-  transition: background-color 0.1s;
+  transition: background-color var(--transition-fast);
 }
 
 tbody tr:hover {
@@ -489,7 +489,7 @@ tbody tr[role="button"]:focus-visible {
   color: var(--color-text-muted);
   opacity: 0;
   transform: translateX(-2px);
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity var(--transition-base), transform var(--transition-base);
   white-space: nowrap;
 }
 

@@ -57,7 +57,7 @@
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.1s;
+  transition: background-color var(--transition-fast);
 }
 
 .kb-card:last-child {

@@ -54,7 +54,7 @@
   border-radius: calc(var(--radius) - 2px);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .sort-toggle-btn:hover {
@@ -201,7 +201,7 @@ button.workshop-metric:hover,
   min-height: 0;
   cursor: pointer;
   transform: translateY(0);
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base), opacity var(--transition-base), background-color var(--transition-base);
 }
 
 .incident-card[draggable="true"] {
@@ -216,6 +216,7 @@ button.workshop-metric:hover,
 .incident-card:hover {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
 }
 
 .incident-card.is-dragging {

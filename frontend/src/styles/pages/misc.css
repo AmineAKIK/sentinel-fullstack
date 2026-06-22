@@ -66,13 +66,13 @@
   text-align: left;
   box-shadow: var(--shadow);
   text-decoration: none;
-  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
 }
 
 .login-space-card:hover,
 .login-space-card:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 8px 32px rgba(11, 18, 32, 0.13);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-4px);
 }
 

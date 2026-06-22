@@ -87,7 +87,7 @@
   font-size: var(--text-md);
   font-weight: 700;
   padding: 9px 14px;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .board-exit:hover {
@@ -223,7 +223,7 @@
 .board-lines-toggle::after {
   content: '▾';
   font-size: var(--text-xs);
-  transition: transform 0.15s ease;
+  transition: transform var(--transition-base);
 }
 
 .board-settings-lines[open] .board-lines-toggle::after {
@@ -1110,7 +1110,7 @@
   justify-content: center;
   opacity: 0;
   transform: translateX(-4px);
-  transition: opacity 0.15s, transform 0.15s, background-color 0.15s, color 0.15s;
+  transition: opacity var(--transition-base), transform var(--transition-base), background-color var(--transition-base), color var(--transition-base);
   cursor: inherit;
   pointer-events: none;
 }

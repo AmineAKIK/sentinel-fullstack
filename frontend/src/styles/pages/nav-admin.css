@@ -111,7 +111,7 @@
   height: 2px;
   border-radius: var(--radius-pill);
   background-color: currentColor;
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition: transform var(--transition-base), opacity var(--transition-base);
 }
 
 .nav-bar.is-open .nav-toggle span:nth-child(1) {
@@ -227,7 +227,7 @@
   min-height: 72px;
   padding: 14px 16px;
   text-align: left;
-  transition: border-color 0.15s, background-color 0.15s, transform 0.15s;
+  transition: border-color var(--transition-base), background-color var(--transition-base), transform var(--transition-base);
 }
 
 .admin-action-row:hover {
@@ -277,7 +277,7 @@
   min-height: 46px;
   padding: 9px 12px;
   text-align: left;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .quality-item:hover {

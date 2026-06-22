@@ -67,7 +67,7 @@
   background: none;
   text-align: left;
   cursor: default;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
   min-width: 0;
 }
 
@@ -202,7 +202,7 @@
   text-align: left;
   align-items: center;
   cursor: pointer;
-  transition: background-color 0.1s;
+  transition: background-color var(--transition-fast);
 }
 
 .pilotage-heatmap-row:last-child {
@@ -270,7 +270,7 @@
   cursor: pointer;
   font-size: var(--text-sm);
   font-weight: 600;
-  transition: background-color 0.1s;
+  transition: background-color var(--transition-fast);
 }
 
 .pilotage-heatmap-action:hover {
@@ -475,7 +475,7 @@
 
 .pilotage-decision-stat-clickable {
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
 }
 
 .pilotage-decision-stat-clickable:hover {
