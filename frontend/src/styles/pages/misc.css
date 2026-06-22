@@ -58,7 +58,7 @@
   flex-direction: column;
   gap: 11px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background-color: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
@@ -166,7 +166,7 @@
 
   .login-space-card {
     min-height: 122px;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     padding: 18px;
   }
 
@@ -233,7 +233,7 @@
 .privacy-content {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 24px 28px;
   text-align: left;
 }

@@ -264,7 +264,7 @@
 .pilotage-heatmap-action {
   padding: 2px 8px;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: none;
   color: var(--color-primary);
   cursor: pointer;
@@ -430,7 +430,7 @@
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 
@@ -579,7 +579,7 @@
   width: 24px;
   height: 24px;
   border: 1px solid var(--color-border);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 700;
@@ -611,7 +611,7 @@
 
 .pilotage-ranking-bar {
   height: 8px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-surface-alt);
   overflow: hidden;
 }
@@ -619,7 +619,7 @@
 .pilotage-ranking-bar i {
   display: block;
   height: 100%;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .pilotage-ranking-blue i  { background-color: var(--color-primary); }
@@ -684,7 +684,7 @@
   display: inline-block;
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 
@@ -724,7 +724,7 @@
 
 .pilotage-trend-bar {
   width: 100%;
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   min-height: 3px;
   transition: height 0.25s ease;
 }
@@ -798,7 +798,7 @@
 
 .comparison-track {
   height: 10px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-surface-alt);
   overflow: hidden;
 }
@@ -806,7 +806,7 @@
 .comparison-fill {
   display: block;
   height: 100%;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .comparison-fill-blue {
@@ -852,7 +852,7 @@
 .trend-bar {
   display: block;
   height: 8px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .trend-bar-created {
@@ -900,7 +900,7 @@
   display: inline-block;
   width: 9px;
   height: 9px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .trend-dot-created {

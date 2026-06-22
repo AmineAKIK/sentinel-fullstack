@@ -1003,7 +1003,7 @@ tbody tr:hover .row-action {
     height: 7px;
     min-width: 0;
     overflow: hidden;
-    border-radius: 9999px;
+    border-radius: var(--radius-pill);
     background-color: var(--color-surface-alt);
   }
 
@@ -1011,7 +1011,7 @@ tbody tr:hover .row-action {
     display: block;
     height: 100%;
     min-width: 0;
-    border-radius: 9999px;
+    border-radius: var(--radius-pill);
   }
 
   .pilotage-trend-mobile-created {

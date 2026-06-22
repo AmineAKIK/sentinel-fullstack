@@ -61,7 +61,32 @@
   --board-card: #f7f9fc;
   --board-accent-info: #38bdf8;
   --board-accent-warning-text: #f4d58a;
-  --radius: 6px;
+  /* ── Échelle de rayons ─────────────────────────────────────────────────── */
+  --radius-xs: 3px; /* micro-éléments : puces, barres de graphique */
+  --radius-sm: 6px; /* inputs, boutons, petites cartes */
+  --radius-md: 10px; /* cartes, panneaux */
+  --radius-lg: 14px; /* modals, grands conteneurs */
+  --radius-pill: 9999px; /* badges, chips */
+  --radius: var(--radius-sm); /* alias rétrocompatible */
+
+  /* ── Échelle d'espacement (base 4px) ───────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ── Échelle typographique ─────────────────────────────────────────────── */
+  --text-xs: 12px; /* méta, labels secondaires */
+  --text-sm: 13px; /* texte dense, tableaux */
+  --text-base: 14px; /* corps de texte par défaut */
+  --text-md: 16px; /* sous-titres */
+  --text-lg: 20px; /* titres de section */
+  --text-xl: 24px; /* titres de page */
+  --text-2xl: 32px; /* grands titres */
+
   --shadow: 0 1px 2px rgba(11, 18, 32, 0.06), 0 8px 24px rgba(11, 18, 32, 0.04);
   --shadow-lg: 0 14px 36px rgba(11, 18, 32, 0.12), 0 4px 12px rgba(11, 18, 32, 0.06);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -435,7 +460,7 @@ a { color: var(--color-primary); text-decoration: none; }
   align-items: center;
   gap: 5px;
   padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 500;
   min-height: 24px;
@@ -525,7 +550,7 @@ a { color: var(--color-primary); text-decoration: none; }
   gap: 7px;
   max-width: 260px;
   border: 1px solid var(--color-primary-border);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-primary-soft);
   color: var(--color-primary);
   padding: 5px 10px;
@@ -759,7 +784,7 @@ a { color: var(--color-primary); text-decoration: none; }
 .legend-dot {
   width: 10px;
   height: 10px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .legend-count {
@@ -787,7 +812,7 @@ a { color: var(--color-primary); text-decoration: none; }
 
 .bar-track {
   height: 8px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-surface-alt);
   overflow: hidden;
 }
@@ -795,7 +820,7 @@ a { color: var(--color-primary); text-decoration: none; }
 .bar-fill {
   height: 100%;
   background-color: var(--color-primary);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .bar-count {

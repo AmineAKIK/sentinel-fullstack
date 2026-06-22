@@ -115,7 +115,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
@@ -293,7 +293,7 @@
 
 .request-badge {
   border: none;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   padding: 2px 10px;
   font-size: 12px;
   font-weight: 600;

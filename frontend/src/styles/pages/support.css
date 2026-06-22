@@ -79,7 +79,7 @@
   color: var(--color-active-text);
   background-color: var(--color-active-bg);
   border: 1px solid var(--color-active-text);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 700;
@@ -90,7 +90,7 @@
   content: "";
   width: 7px;
   height: 7px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background-color: currentColor;
 }
 
@@ -264,7 +264,7 @@
   font-size: 12px;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   color: var(--color-text);
 }
@@ -363,7 +363,7 @@
 .support-input::-webkit-scrollbar-thumb {
   background-color: var(--color-border-strong);
   border: 2px solid var(--color-surface);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .support-input::-webkit-scrollbar-button {
@@ -419,7 +419,7 @@
 
   .support-layout {
     min-height: 0;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   .support-chat-header {
