@@ -206,8 +206,8 @@ testable et déployable indépendamment.
 | 1 | F2 Composant attention | P1, P4 | ✅ Fait |
 | 1 | F3 Temps matière | P7 | ✅ Fait |
 | 1 | F4 Chargement unifié | P2 | ✅ Fait |
-| 2 | U1 Urgence Dashboard | P1 | À faire |
-| 2 | U2 Cartes Board | P1, P7 | À faire |
+| 2 | U1 Urgence Dashboard | P1 | ✅ Fait |
+| 2 | U2 Cartes Board | P1, P7 | ✅ Fait |
 | 3 | K1 Fiche connaissance | P5 | À faire |
 | 3 | K2 Rôles connaissance | P3 | À faire |
 | 4 | S1 Pilotage | P1, P3, P7 | À faire |

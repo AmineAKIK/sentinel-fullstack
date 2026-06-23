@@ -233,12 +233,22 @@ button.workshop-metric:hover,
   background-color: var(--color-surface-subtle);
 }
 
-.incident-card--urgent {
-  border-left: 4px solid var(--color-danger);
+/* Liseré gauche = niveau d'attention (doctrine §5.1, P1). L'urgent émerge par
+   contraste avec les niveaux inférieurs, pas par agression absolue. */
+.incident-card--attention-calm {
+  border-left: 4px solid transparent;
 }
 
-.incident-card--urgent:hover {
-  border-left-color: var(--color-danger);
+.incident-card--attention-watch {
+  border-left: 4px solid var(--attention-watch-border);
+}
+
+.incident-card--attention-act {
+  border-left: 4px solid var(--attention-act-text);
+}
+
+.incident-card--attention-critical {
+  border-left: 4px solid var(--attention-critical-text);
 }
 
 .incident-card--resolved-followed {

@@ -500,17 +500,23 @@
   min-width: 0;
 }
 
+/* Liseré gauche = niveau d'attention (doctrine §5.1, P1), aligné sur la grammaire.
+   Le critique émerge par contraste avec les niveaux inférieurs. */
 .board-incident-critical {
-  border-left-color: var(--color-danger);
+  border-left-color: var(--attention-critical-text);
+}
+
+.board-incident-act {
+  border-left-color: var(--attention-act-text);
 }
 
 .board-incident-watch {
-  border-left-color: var(--color-watch);
+  border-left-color: var(--attention-watch-border);
   background-color: var(--color-warning-bg);
 }
 
-.board-incident-steady {
-  border-left-color: var(--color-success);
+.board-incident-calm {
+  border-left-color: var(--attention-calm-border);
 }
 
 .board-incident-top,

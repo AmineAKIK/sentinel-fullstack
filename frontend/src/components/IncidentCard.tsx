@@ -1,5 +1,6 @@
 import { WorkshopIncident } from '../types';
-import { formatDateTime } from '../utils/date';
+import { formatDateTime, formatDuration } from '../utils/date';
+import { incidentAttentionLevel } from '../utils/attention';
 import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
 
 interface IncidentCardProps {
@@ -41,11 +42,14 @@ export default function IncidentCard({
     (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED');
   const isActiveUrgent = incident.is_priority && !isResolvedFollowed;
   const currentProduct = incident.current_product?.trim();
+  // Niveau d'attention unifié (F1/F2) : le liseré gauche encode ce niveau, de
+  // sorte que l'urgent émerge par contraste avec les autres, sans agression (P1).
+  const attentionLevel = isResolvedFollowed ? 'calm' : incidentAttentionLevel(incident);
 
   return (
     <div
       role="button"
-      className={`incident-card${isActiveUrgent ? ' incident-card--urgent' : ''}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
       key={incident.id}
       draggable={canReorder}
       onDragStart={(event) => {
@@ -158,7 +162,7 @@ export default function IncidentCard({
         <div className="incident-summary-primary">
           <span className="detail-field-label">Équipement</span>
           <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
-          <p>{formatDateTime(incident.created_at)}</p>
+          <p title={formatDateTime(incident.created_at)}>Depuis {formatDuration(incident.created_at)}</p>
         </div>
         {(isMaintenance || isResponsable) && (
           <div className="incident-summary-primary">

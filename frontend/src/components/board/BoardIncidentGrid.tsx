@@ -1,6 +1,7 @@
 import { WorkshopBoardIncident } from '../../types';
 import { STATE_LABELS } from '../../utils/labels';
 import { ageLabel, formatTime, isOpenOverSevenDays, statusLabel } from '../../utils/boardUtils';
+import { incidentAttentionLevel } from '../../utils/attention';
 
 interface EmptyStateProps {
   boardModeLabel: string;
@@ -49,16 +50,11 @@ export default function BoardIncidentGrid({
         const isOldCase = isOpenOverSevenDays(incident);
         const currentProduct = incident.current_product?.trim();
         const responsibleInstruction = incident.responsible_comment?.trim();
+        const attentionLevel = incidentAttentionLevel(incident);
         return (
           <article
             key={incident.id}
-            className={`board-incident-card ${
-              incident.is_priority
-                ? 'board-incident-critical'
-                : incident.status === 'PENDING' || !incident.is_taken
-                  ? 'board-incident-watch'
-                  : 'board-incident-steady'
-            }`}
+            className={`board-incident-card board-incident-${attentionLevel}`}
             aria-label={`${incident.is_priority ? 'Incident urgent' : 'Incident'} ligne ${incident.line_number}, machine ${incident.machine_id}`}
           >
             <div className="board-incident-top">
