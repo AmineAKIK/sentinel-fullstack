@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
+import Skeleton from '../components/ui/Skeleton';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
@@ -216,7 +217,11 @@ export default function WorkshopHistoryPage() {
               </div>
               <div className="history-incident-list">
                 {loading ? (
-                  <EmptyState>Chargement…</EmptyState>
+                  <div aria-busy="true" aria-label="Chargement des incidents" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} height={40} block />
+                    ))}
+                  </div>
                 ) : incidents.length === 0 ? (
                   <EmptyState>Aucun incident.</EmptyState>
                 ) : (

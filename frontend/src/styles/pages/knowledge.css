@@ -7,6 +7,21 @@
   font-size: var(--text-sm);
 }
 
+/* Skeleton de liste (F4, §5.4) : préserve la structure pendant le chargement */
+.kb-list-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.kb-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  cursor: default;
+  pointer-events: none;
+}
+
 .kb-layout {
   display: grid;
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
@@ -371,31 +386,25 @@
   cursor: pointer;
   background-color: var(--color-primary-soft-strong);
   color: var(--color-primary);
-  box-shadow: 0 0 0 0 var(--pulse-color, rgba(11, 18, 32, 0.2));
+  border: 1px solid transparent;
 }
 
+/* Une demande en attente attire l'œil par sa couleur d'attention (P1/P4),
+   pas par une pulsation en boucle (interdite par §5.2). */
 .request-badge-edit {
-  background-color: var(--color-warning-bg);
-  color: var(--color-warning);
-  --pulse-color: var(--color-watch-ring);
-  animation: requestPulse 1.6s ease-in-out infinite;
+  background-color: var(--attention-watch-bg);
+  border-color: var(--attention-watch-border);
+  color: var(--attention-watch-text);
 }
 
 .request-badge-delete {
-  background-color: var(--color-danger-bg);
-  color: var(--color-danger);
-  --pulse-color: rgba(180, 35, 24, 0.44);
-  animation: requestPulse 1.6s ease-in-out infinite;
+  background-color: var(--attention-critical-bg);
+  border-color: var(--attention-critical-border);
+  color: var(--attention-critical-text);
 }
 
 .request-badge-followed {
   background-color: var(--color-primary-soft);
   color: var(--color-primary);
-}
-
-@keyframes requestPulse {
-  0% { box-shadow: 0 0 0 0 var(--pulse-color); transform: scale(1); }
-  60% { box-shadow: 0 0 0 8px rgba(11, 18, 32, 0); transform: scale(1.02); }
-  100% { box-shadow: 0 0 0 0 rgba(11, 18, 32, 0); transform: scale(1); }
 }
 

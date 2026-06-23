@@ -8,6 +8,7 @@ import {
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import Skeleton from '../components/ui/Skeleton';
 import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopIncident } from '../types';
@@ -437,7 +438,15 @@ export default function WorkshopKnowledgePage() {
 
             <div className="kb-list">
               {loading ? (
-                <EmptyState>Chargement...</EmptyState>
+                <div className="kb-list-skeleton" aria-busy="true" aria-label="Chargement des fiches">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="kb-card kb-card-skeleton">
+                      <Skeleton width="40%" height={12} />
+                      <Skeleton width="75%" />
+                      <Skeleton width="60%" height={12} />
+                    </div>
+                  ))}
+                </div>
               ) : incidents.length === 0 ? (
                 <div className="kb-empty">
                   <p>Aucune fiche trouvée.</p>

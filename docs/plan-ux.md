@@ -191,11 +191,18 @@ testable et déployable indépendamment.
 
 ### Phase 5 — Finitions transversales
 
-12. **X1 — États vides systématiques** (T5) : `EmptyState` partout, conçus comme
-    information.
-13. **X2 — Densité par contexte** (T6) : règles explicites Board vs Pilotage.
-14. **X3 — Passe finale de conformité** : repasser chaque écran avec les tests
-    P1–P7.
+12. **X1 — États de chargement.** *Fait :* skeletons (F4) sur les listes
+    master-detail Connaissance et Historique, préservant la structure pendant le
+    chargement. Les indicateurs inline (compteurs) et le `FullPageLoader`
+    accessible restent légitimes.
+13. **X2 — Densité par contexte.** *Vérifié conforme :* Board en densité minimale
+    et gros repères (lecture de loin) ; Pilotage dense et analytique (lecture de
+    près). Conforme à §5.3 sans changement à forcer.
+14. **X3 — Passe finale de conformité.** *Fait + correction :* l'audit P1–P7 a
+    relevé une vraie violation — les badges « demande en attente » pulsaient en
+    boucle (`requestPulse`, interdit par P1/§5.2). Remplacés par un traitement
+    statique aligné sur la grammaire d'attention. Seules subsistent les animations
+    légitimes (spinner, skeleton, indicateur « écrit… » du chat).
 
 ---
 
@@ -224,6 +231,6 @@ testable et déployable indépendamment.
 | 4 | S1 Pilotage | P1, P3, P7 | ✅ Fait (grammaire alignée) |
 | 4 | S2 Historique & Audit | P6 | ✅ Vérifié conforme |
 | 4 | S3 Admin | P2, P3 | ✅ Vérifié conforme |
-| 5 | X1 États vides | P2 | À faire |
-| 5 | X2 Densité | P2 | À faire |
-| 5 | X3 Passe conformité | P1–P7 | À faire |
+| 5 | X1 États de chargement (skeletons) | P2 | ✅ Fait |
+| 5 | X2 Densité par contexte | P2 | ✅ Vérifié conforme |
+| 5 | X3 Passe conformité (corrige pulsation) | P1–P7 | ✅ Fait |
