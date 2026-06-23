@@ -79,18 +79,19 @@
   background-color: var(--color-surface-alt);
 }
 
+/* Niveaux d'attention alignés sur la grammaire (doctrine §5.1) */
 .pilotage-hero-stat-watch {
-  border-left-color: var(--color-watch);
-  background-color: var(--color-warning-bg);
+  border-left-color: var(--attention-watch-border);
+  background-color: var(--attention-watch-bg);
 }
 
 .pilotage-hero-stat-watch:hover {
-  background-color: color-mix(in srgb, var(--color-warning-bg) 60%, var(--color-surface-alt)) !important;
+  background-color: color-mix(in srgb, var(--attention-watch-bg) 60%, var(--color-surface-alt)) !important;
 }
 
 .pilotage-hero-stat-tension {
-  border-left-color: var(--color-danger);
-  background-color: var(--color-danger-bg);
+  border-left-color: var(--attention-critical-text);
+  background-color: var(--attention-critical-bg);
 }
 
 .pilotage-hero-stat-tension:hover {
@@ -121,7 +122,7 @@
 }
 
 .pilotage-hero-stat-value-critical {
-  color: var(--color-danger);
+  color: var(--attention-critical-text);
 }
 
 .pilotage-sparkline {

@@ -178,12 +178,16 @@ testable et déployable indépendamment.
 
 ### Phase 4 — Cohérence des écrans secondaires
 
-9. **S1 — Pilotage** : appliquer F1/F3, ajouter la dimension projection (P7),
-   différencier par rôle (T4).
-10. **S2 — Historique & Audit** : audit P6 (responsabiliser sans surveiller),
-    états vides/chargement (F4).
-11. **S3 — Admin (Users/Lines/Accueil)** : états (F4), densité tables mobile,
-    orientation action de l'accueil.
+9. **S1 — Pilotage.** *Fait :* niveaux d'attention du hero (watch/tension)
+   alignés sur la grammaire F1. L'écran sert déjà la projection (métriques
+   agrégées, durées de résolution) ; pas de gold-plating ajouté.
+10. **S2 — Historique & Audit.** *Vérifié conforme :* le journal et l'audit sont
+    déjà factuels et neutres (« Acteur », « Cible »), sans mise au pilori —
+    conformes à P6. Rien à forcer ; les états de chargement sont traités
+    globalement en Phase 5 (X1).
+11. **S3 — Admin (Accueil/Users/Lines).** *Vérifié conforme :* l'accueil oriente
+    déjà vers l'action (points qualité = boutons cliquables vers la correction,
+    P3). Pas de changement forcé ; états de chargement → Phase 5.
 
 ### Phase 5 — Finitions transversales
 
@@ -217,9 +221,9 @@ testable et déployable indépendamment.
 | 2 | U2 Cartes Board | P1, P7 | ✅ Fait |
 | 3 | K1 Fiche connaissance (cas similaires) | P5 | ✅ Fait |
 | 3 | K2 Mémoire collective rendue visible | P5 | ✅ Fait |
-| 4 | S1 Pilotage | P1, P3, P7 | À faire |
-| 4 | S2 Historique & Audit | P6 | À faire |
-| 4 | S3 Admin | P2, P3 | À faire |
+| 4 | S1 Pilotage | P1, P3, P7 | ✅ Fait (grammaire alignée) |
+| 4 | S2 Historique & Audit | P6 | ✅ Vérifié conforme |
+| 4 | S3 Admin | P2, P3 | ✅ Vérifié conforme |
 | 5 | X1 États vides | P2 | À faire |
 | 5 | X2 Densité | P2 | À faire |
 | 5 | X3 Passe conformité | P1–P7 | À faire |
