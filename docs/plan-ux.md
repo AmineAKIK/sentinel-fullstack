@@ -202,7 +202,7 @@ testable et déployable indépendamment.
 
 | Phase | Lot | Principe | État |
 |-------|-----|----------|------|
-| 1 | F1 Grammaire couleur | P1, P4 | À faire |
+| 1 | F1 Grammaire couleur | P1, P4 | ✅ Fait |
 | 1 | F2 Composant attention | P1, P4 | À faire |
 | 1 | F3 Temps matière | P7 | À faire |
 | 1 | F4 Chargement unifié | P2 | À faire |

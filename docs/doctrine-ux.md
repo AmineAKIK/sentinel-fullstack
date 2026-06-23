@@ -284,15 +284,19 @@ d'interface.
 On raisonne en niveaux d'attention, traités de façon constante dans toute
 l'application.
 
-| Niveau | Sens | Traitement |
-|--------|------|-----------|
-| Calme | Rien à décider | Neutre, faible contraste, l'élément s'efface. |
-| À surveiller | Attention sans action immédiate | Accent doux, contraste mesuré. |
-| À traiter | Action attendue | Accent affirmé mais sobre, position prioritaire dans la lecture. |
-| Critique | Enjeu réel et urgent | Contraste fort par la place et la position, sans saturation extrême ni clignotement. |
+| Niveau | Sens | Traitement | Tokens (`base.css`) |
+|--------|------|-----------|---------------------|
+| Calme | Rien à décider | Neutre, faible contraste, l'élément s'efface. | `--attention-calm-{bg,border,text}` |
+| À surveiller | Attention sans action immédiate | Accent doux, contraste mesuré. | `--attention-watch-{bg,border,text}` |
+| À traiter | Action attendue | Accent affirmé mais sobre, position prioritaire dans la lecture. | `--attention-act-{bg,border,text}` |
+| Critique | Enjeu réel et urgent | Contraste fort par la place et la position, sans saturation extrême ni clignotement. | `--attention-critical-{bg,border,text}` |
 
 L'urgent se distingue par contraste relatif au calme environnant. Un écran où tout
 ressort est un écran où rien ne ressort.
+
+Ces tokens sont la **source unique** de la sémantique de couleur d'attention :
+cartes, board, statistiques de pilotage et badges doivent tous les consommer, au
+lieu de redéfinir localement des couleurs d'état.
 
 ### 5.2 Mouvement (P1, P2)
 

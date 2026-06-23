@@ -50,6 +50,27 @@
   --color-neutral-bg: #e2e8f0;
   --color-neutral-text: #334155;
   --color-overlay: rgba(11, 18, 32, 0.5);
+
+  /* ── Grammaire des niveaux d'attention (doctrine §5.1) ──────────────────── */
+  /* Quatre niveaux constants dans toute l'app. La couleur encode un niveau
+     d'attention requis, jamais une décoration. Le critique se distingue par le
+     contraste et la position, pas par la saturation maximale.
+     Chaque niveau : -bg (fond doux), -border (liseré), -text (accent lisible). */
+  --attention-calm-bg: var(--color-surface-alt);
+  --attention-calm-border: var(--color-border);
+  --attention-calm-text: var(--color-text-secondary);
+
+  --attention-watch-bg: var(--color-warning-bg);
+  --attention-watch-border: var(--color-warning-border);
+  --attention-watch-text: var(--color-warning);
+
+  --attention-act-bg: var(--color-primary-soft);
+  --attention-act-border: var(--color-primary-border);
+  --attention-act-text: var(--color-primary);
+
+  --attention-critical-bg: var(--color-danger-bg);
+  --attention-critical-border: var(--color-danger-border);
+  --attention-critical-text: var(--color-danger);
   --board-bg: #08111f;
   --board-bg-alt: #0d1828;
   --board-panel: rgba(20, 32, 51, 0.78);
