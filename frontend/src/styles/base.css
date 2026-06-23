@@ -516,6 +516,43 @@ a { color: var(--color-primary); text-decoration: none; }
   color: var(--color-primary);
 }
 
+/* Badge de niveau d'attention (doctrine §5.1) — consomme la grammaire F1. */
+.attention-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  min-height: 24px;
+}
+
+.attention-badge--calm {
+  background-color: var(--attention-calm-bg);
+  border-color: var(--attention-calm-border);
+  color: var(--attention-calm-text);
+}
+
+.attention-badge--watch {
+  background-color: var(--attention-watch-bg);
+  border-color: var(--attention-watch-border);
+  color: var(--attention-watch-text);
+}
+
+.attention-badge--act {
+  background-color: var(--attention-act-bg);
+  border-color: var(--attention-act-border);
+  color: var(--attention-act-text);
+}
+
+.attention-badge--critical {
+  background-color: var(--attention-critical-bg);
+  border-color: var(--attention-critical-border);
+  color: var(--attention-critical-text);
+}
+
 .history-grid {
   display: grid;
   gap: var(--space-4);
