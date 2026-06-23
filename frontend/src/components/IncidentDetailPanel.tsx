@@ -109,7 +109,7 @@ export default function IncidentDetailPanel({
             </button>
           )}
           {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
-            <button className="btn btn-secondary" onClick={() => modal.openModal('edit')}>
+            <button className="btn btn-outline" onClick={() => modal.openModal('edit')}>
               {canRequestEdit ? 'Demander une correction' : 'Modifier'}
             </button>
           )}
@@ -191,12 +191,12 @@ export default function IncidentDetailPanel({
             </div>
             <div className="action-bar">
               {canResume && (
-                <button className="btn btn-secondary" onClick={() => modal.openModal('resume')}>
+                <button className="btn btn-outline" onClick={() => modal.openModal('resume')}>
                   Reprendre
                 </button>
               )}
               {canSetPending && (
-                <button className="btn btn-secondary" onClick={() => modal.openModal('pending')}>
+                <button className="btn btn-outline" onClick={() => modal.openModal('pending')}>
                   Suspendre
                 </button>
               )}

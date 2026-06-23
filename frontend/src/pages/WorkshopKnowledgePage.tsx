@@ -189,10 +189,10 @@ function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, on
 
       {/* Actions */}
       <div className="kb-actions">
-        <button type="button" className="btn btn-secondary" onClick={onViewHistory}>
+        <button type="button" className="btn btn-outline" onClick={onViewHistory}>
           Trace historique
         </button>
-        <button type="button" className="btn btn-secondary" onClick={onCopyLink}>
+        <button type="button" className="btn btn-outline" onClick={onCopyLink}>
           {copied ? 'Lien copié !' : 'Copier le lien'}
         </button>
       </div>

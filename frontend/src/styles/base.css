@@ -243,6 +243,20 @@ a { color: var(--color-primary); text-decoration: none; }
   background-color: var(--color-surface-alt);
 }
 
+/* Action secondaire mais identifiable : bordure et texte en couleur d'accent.
+   Pour les boutons d'action isolés (Modifier, Reprendre…), qui doivent se lire
+   comme actionnables sans crier (P1, P4) — au lieu d'un blanc « éteint ». */
+.btn-outline {
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  border-color: var(--color-primary-border);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
 .btn-danger {
   background-color: var(--color-danger);
   color: var(--color-primary-text);

@@ -70,7 +70,7 @@ export default function IncidentDossier({
         {hasKnowledge && (
           <button
             type="button"
-            className="btn btn-secondary history-knowledge-btn"
+            className="btn btn-outline history-knowledge-btn"
             onClick={() => void navigate(`/workshop/knowledge?incident=${incident.id}`)}
           >
             Voir la fiche connaissance

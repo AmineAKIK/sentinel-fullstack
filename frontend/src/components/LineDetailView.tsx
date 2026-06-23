@@ -49,8 +49,8 @@ export default function LineDetailView({
         <div className="page-header">
           <h1>Ligne {line.line_number}</h1>
           <div className="action-bar" style={{ marginTop: 0 }}>
-            <button className="btn btn-secondary" onClick={() => setShowPlan(true)}>Plan de la ligne</button>
-            <button className="btn btn-secondary" onClick={() => setShowEdit(true)}>Modifier</button>
+            <button className="btn btn-outline" onClick={() => setShowPlan(true)}>Plan de la ligne</button>
+            <button className="btn btn-outline" onClick={() => setShowEdit(true)}>Modifier</button>
             <button className="btn btn-danger" onClick={() => setShowDelete(true)}>Supprimer</button>
           </div>
         </div>

@@ -99,7 +99,7 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
       >
         <UserForm data={form} onChange={setForm} showStatus />
         <div className="modal-inline-actions">
-          <button className="btn btn-secondary" onClick={() => setShowResetPassword(true)}>
+          <button className="btn btn-outline" onClick={() => setShowResetPassword(true)}>
             Réinitialiser mot de passe
           </button>
         </div>

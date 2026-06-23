@@ -115,7 +115,7 @@ export default function UserDetailPage() {
         </div>
 
         <div className="action-bar">
-          <button className="btn btn-secondary" onClick={() => setModal('edit')}>
+          <button className="btn btn-outline" onClick={() => setModal('edit')}>
             Modifier
           </button>
           <button className="btn btn-danger" onClick={() => setModal('delete')}>
