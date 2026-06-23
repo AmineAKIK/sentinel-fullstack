@@ -145,6 +145,7 @@ Frontend : voir [frontend/.env.example](frontend/.env.example).
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md)
+- [Doctrine d'expérience (UX)](docs/doctrine-ux.md)
 - [Cycle de vie des incidents](INCIDENT_LIFECYCLE.md)
 - [Cadrage fonctionnel](docs/cadrage-fonctionnel.md)
 - [Documentation technique](docs/documentation-technique.md)
