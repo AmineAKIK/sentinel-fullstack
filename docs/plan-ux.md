@@ -164,10 +164,17 @@ testable et déployable indépendamment.
 
 ### Phase 3 — Le cœur de valeur : la Connaissance (P5)
 
-7. **K1 — Repenser la fiche de connaissance** comme dispositif d'apprentissage :
-   mettre en avant le *pourquoi* de la solution, faciliter la réutilisation, relier
-   aux cas voisins. C'est le plus fort levier stratégique (la spirale).
-8. **K2 — Différenciation par rôle** (T4) sur la Connaissance.
+7. **K1 — Repenser la fiche de connaissance** comme dispositif d'apprentissage.
+   *Fait :* section « Déjà résolu ailleurs » reliant aux cas voisins (même
+   machine ou même anomalie), calculés côté front sans nouvel endpoint. C'est la
+   spirale : voir comment ce problème a été résolu ailleurs nourrit le modèle
+   mental (P5).
+8. **K2 — Mémoire collective rendue visible.** *Décision :* plutôt que de
+   fragmenter l'écran par rôle (gold-plating — opérateur et maintenance y
+   cherchent la même chose), on rend la richesse de la base visible à tous via un
+   sous-titre valorisant (« N interventions sur M machines — la mémoire de
+   l'atelier »). C'est l'application juste de P5 : donner le sentiment que la
+   mémoire vit et grandit.
 
 ### Phase 4 — Cohérence des écrans secondaires
 
@@ -208,8 +215,8 @@ testable et déployable indépendamment.
 | 1 | F4 Chargement unifié | P2 | ✅ Fait |
 | 2 | U1 Urgence Dashboard | P1 | ✅ Fait |
 | 2 | U2 Cartes Board | P1, P7 | ✅ Fait |
-| 3 | K1 Fiche connaissance | P5 | À faire |
-| 3 | K2 Rôles connaissance | P3 | À faire |
+| 3 | K1 Fiche connaissance (cas similaires) | P5 | ✅ Fait |
+| 3 | K2 Mémoire collective rendue visible | P5 | ✅ Fait |
 | 4 | S1 Pilotage | P1, P3, P7 | À faire |
 | 4 | S2 Historique & Audit | P6 | À faire |
 | 4 | S3 Admin | P2, P3 | À faire |

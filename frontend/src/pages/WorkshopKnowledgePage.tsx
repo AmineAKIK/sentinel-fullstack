@@ -80,12 +80,14 @@ function KnowledgeCard({ incident, active, onClick }: KnowledgeCardProps) {
 // ── Composant détail ───────────────────────────────────────────────
 type KnowledgeDetailProps = {
   incident: WorkshopIncident;
+  related: WorkshopIncident[];
+  onSelectRelated: (id: number) => void;
   onViewHistory: () => void;
   onCopyLink: () => void;
   copied: boolean;
 };
 
-function KnowledgeDetail({ incident, onViewHistory, onCopyLink, copied }: KnowledgeDetailProps) {
+function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, onCopyLink, copied }: KnowledgeDetailProps) {
   const resTime = formatDuration(incident.created_at, incident.updated_at);
   const technician = incident.taken_by_first_name
     ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
@@ -159,6 +161,30 @@ function KnowledgeDetail({ incident, onViewHistory, onCopyLink, copied }: Knowle
           </div>
         )}
       </div>
+
+      {/* Cas similaires — tisse la mémoire collective et nourrit le modèle mental (P5) */}
+      {related.length > 0 && (
+        <div className="kb-related">
+          <span className="detail-field-label">Déjà résolu ailleurs</span>
+          <p className="kb-related-intro">
+            Mêmes équipement ou anomalie — comment l'atelier s'en est sorti.
+          </p>
+          <ul className="kb-related-list">
+            {related.map((r) => (
+              <li key={r.id}>
+                <button type="button" className="kb-related-item" onClick={() => onSelectRelated(r.id)}>
+                  <span className={`kb-state-badge ${stateToneClass(r.state)}`}>
+                    {STATE_LABELS[r.state] || r.state}
+                  </span>
+                  <span className="kb-related-where">Ligne {r.line_number} · {r.machine_id}</span>
+                  {r.intervention_note && <span className="kb-related-preview">{r.intervention_note}</span>}
+                  <span className="kb-related-date">{shortDate(r.updated_at)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="kb-actions">
@@ -241,6 +267,20 @@ export default function WorkshopKnowledgePage() {
   const lastItem = incidents[0];
   const selectedIncident = incidents.find((i) => String(i.id) === selectedId);
 
+  // Cas similaires : mêmes équipement ou anomalie que la fiche ouverte (P5).
+  // Priorité aux fiches même machine, puis même type d'anomalie ; limité à 4.
+  const relatedIncidents = selectedIncident
+    ? incidents
+        .filter((i) => i.id !== selectedIncident.id &&
+          (i.machine_id === selectedIncident.machine_id || i.state === selectedIncident.state))
+        .sort((a, b) => {
+          const aSame = a.machine_id === selectedIncident.machine_id ? 0 : 1;
+          const bSame = b.machine_id === selectedIncident.machine_id ? 0 : 1;
+          return aSame - bSame;
+        })
+        .slice(0, 4)
+    : [];
+
   // Chips de filtres actifs
   const filterChips: FilterChip[] = [
     ...searchFilterChip(query, () => { setQuery(''); updateSearchFilter('q', '', ''); }),
@@ -304,7 +344,15 @@ export default function WorkshopKnowledgePage() {
         </button>
 
         <div className="page-header">
-          <h1>Base de connaissance</h1>
+          <div>
+            <h1>Base de connaissance</h1>
+            {!loading && incidents.length > 0 && (
+              <p className="kb-memory-line">
+                {incidents.length} intervention{incidents.length !== 1 ? 's' : ''} documentée{incidents.length !== 1 ? 's' : ''}
+                {' '}sur {machineCount} machine{machineCount !== 1 ? 's' : ''} — la mémoire de l'atelier.
+              </p>
+            )}
+          </div>
         </div>
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
@@ -415,6 +463,8 @@ export default function WorkshopKnowledgePage() {
                 <div className="card-body">
                   <KnowledgeDetail
                     incident={selectedIncident}
+                    related={relatedIncidents}
+                    onSelectRelated={selectIncident}
                     onViewHistory={() => navigate(`/workshop/history?incident=${selectedIncident.id}`)}
                     onCopyLink={copyLink}
                     copied={copied}
