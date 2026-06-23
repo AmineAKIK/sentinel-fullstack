@@ -2,8 +2,6 @@ import { WorkshopBoardIncident } from '../../types';
 import { STATE_LABELS } from '../../utils/labels';
 import { ageLabel, formatTime, isOpenOverSevenDays, statusLabel } from '../../utils/boardUtils';
 
-type BoardMode = 'normal' | 'watch' | 'critical';
-
 interface EmptyStateProps {
   boardModeLabel: string;
   title: string;
@@ -24,14 +22,12 @@ interface BoardIncidentGridProps {
   items: WorkshopBoardIncident[];
   activeView: 'alerts' | 'all' | 'lines';
   boardModeLabel: string;
-  boardMode: BoardMode;
 }
 
 export default function BoardIncidentGrid({
   items,
   activeView,
   boardModeLabel,
-  boardMode: _boardMode,
 }: BoardIncidentGridProps) {
   if (items.length === 0) {
     return (

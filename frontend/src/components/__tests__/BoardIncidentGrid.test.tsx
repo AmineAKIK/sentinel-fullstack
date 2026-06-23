@@ -31,7 +31,6 @@ function renderGrid(items: WorkshopBoardIncident[]) {
       items={items}
       activeView="alerts"
       boardModeLabel="Alerte atelier"
-      boardMode="critical"
     />
   );
 }

@@ -382,7 +382,6 @@ export default function WorkshopBoardPage() {
                 items={incidentPages[safePageIndex] ?? []}
                 activeView={activeView}
                 boardModeLabel={boardModeLabel}
-                boardMode={boardMode}
               />
             )}
           </div>
