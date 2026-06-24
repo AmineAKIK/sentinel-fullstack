@@ -33,9 +33,9 @@
   --color-success: #166534;
   --color-success-bg: #ecfdf5;
   --color-success-border: #bbf7d0;
-  --color-warning: #6f4a12;
-  --color-warning-bg: #fff8ec;
-  --color-warning-border: #b98026;
+  --color-warning: #b45309;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fcd34d;
   --color-info-bg: var(--color-primary-soft);
   --color-info-border: var(--color-primary-border);
   --color-info-text: var(--color-primary);

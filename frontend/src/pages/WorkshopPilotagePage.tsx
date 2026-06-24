@@ -192,7 +192,7 @@ export default function WorkshopPilotagePage() {
           <div className="pilotage-hero-stats">
             <button
               type="button"
-              className={`pilotage-hero-stat${activeIncidents.length > 0 ? ' pilotage-hero-stat-watch' : ''}`}
+              className="pilotage-hero-stat"
               onClick={activeIncidents.length > 0 ? () => goToDashboard() : undefined}
               disabled={activeIncidents.length === 0}
             >
