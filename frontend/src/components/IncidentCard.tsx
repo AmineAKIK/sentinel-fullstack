@@ -157,7 +157,7 @@ export default function IncidentCard({
         <div className={`incident-summary-primary incident-summary-product${currentProduct ? '' : ' is-missing'}`}>
           <span className="detail-field-label">Produit en cours</span>
           <strong>{currentProduct || 'Non renseigné'}</strong>
-          <p>Créé par {ROLE_LABELS[incident.role] || incident.role}</p>
+          <p>Créé par {`${incident.first_name} ${incident.last_name}`.trim()} · {ROLE_LABELS[incident.role] || incident.role}</p>
         </div>
         <div className="incident-summary-primary">
           <span className="detail-field-label">Équipement</span>
