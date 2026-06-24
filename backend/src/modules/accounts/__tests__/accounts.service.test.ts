@@ -253,14 +253,20 @@ describe('deleteAccountService', () => {
   });
 
   it('supprime logiquement le compte avec succès', async () => {
+    const account = mockAccount({ first_name: 'Karim', last_name: 'Bensaïd', badge_number: 'B777' });
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
+    jest.mocked(repo.getAccountData).mockResolvedValue(account);
     jest.mocked(repo.softDeleteAccount).mockResolvedValue(true);
     jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
 
     const result = await deleteAccountService(1, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.message).toBe('Utilisateur supprimé.');
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_SOFT_DELETED', null, null);
+    // L'identité d'origine est figée dans l'event (pas le pseudonyme ANON).
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(
+      1, 1, 'USER_SOFT_DELETED', null, null,
+      { firstName: 'Karim', lastName: 'Bensaïd', badgeNumber: 'B777' }
+    );
   });
 });
 

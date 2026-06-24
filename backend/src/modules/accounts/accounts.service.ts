@@ -155,10 +155,23 @@ export async function deleteAccountService(id: number, adminId: number): Promise
   const guard = await guardNoActiveTakenIncidents(id, 'supprimer cet utilisateur');
   if (guard) return guard;
 
+  // On capture l'identité AVANT l'anonymisation : l'event de suppression doit
+  // figer qui était ce compte, pas son pseudonyme « ANON-<id> ».
+  const before = await getAccountData(id);
+
   const deleted = await withTransaction(async (client) => {
     const ok = await softDeleteAccount(id, client);
     if (!ok) return false;
-    await createAccountAuditEvent(id, adminId, 'USER_SOFT_DELETED', null, client);
+    await createAccountAuditEvent(
+      id,
+      adminId,
+      'USER_SOFT_DELETED',
+      null,
+      client,
+      before
+        ? { firstName: before.first_name, lastName: before.last_name, badgeNumber: before.badge_number }
+        : undefined
+    );
     return true;
   });
 

@@ -6,6 +6,7 @@ import { sendInvalidServerConfig } from '../../auth/authResponses';
 import { handleControllerError } from '../../utils/controller';
 import { unifiedLoginService, verifyAdminSession, verifyWorkshopSession } from './auth.service';
 import { loginSchema } from './auth.validation';
+import { loginLimiter } from '../../middlewares/loginRateLimit';
 import { AdminPayload } from '../../middlewares/adminAuth';
 import { WorkshopPayload } from '../../middlewares/workshopAuth';
 
@@ -27,6 +28,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     switch (result.kind) {
       case 'invalid_credentials':
+        loginLimiter.recordFailure(req);
         sendError(res, 401, 'UNAUTHORIZED', 'Identifiants incorrects.');
         return;
 
@@ -43,16 +45,19 @@ export async function login(req: Request, res: Response): Promise<void> {
         return;
 
       case 'workshop_invalid_setup_code':
+        loginLimiter.recordFailure(req);
         sendError(res, 401, 'UNAUTHORIZED', 'Code temporaire incorrect.');
         return;
 
       case 'workshop_expired_setup_code':
+        loginLimiter.recordFailure(req);
         sendError(res, 401, 'UNAUTHORIZED', "Code temporaire expiré ou absent. Demandez une réinitialisation à l'administrateur.");
         return;
 
       case 'admin_success': {
         const token = signAuthToken({ adminId: result.admin.id, username: result.admin.username, sessionVersion: result.admin.sessionVersion });
         if (!token) { sendInvalidServerConfig(res); return; }
+        loginLimiter.clear(req);
         setAuthCookie(res, ADMIN_AUTH_COOKIE, token);
         res.json({ accountType: 'admin', id: result.admin.id, username: result.admin.username });
         return;
@@ -65,6 +70,7 @@ export async function login(req: Request, res: Response): Promise<void> {
           role: result.user.role,
         });
         if (!token) { sendInvalidServerConfig(res); return; }
+        loginLimiter.clear(req);
         setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token);
         res.json({
           accountType: 'workshop',

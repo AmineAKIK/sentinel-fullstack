@@ -92,9 +92,16 @@ const taskGroups: Record<string, string[]> = {
   access: ['USER_PASSWORD_RESET'],
 };
 
+// On affiche l'identité FIGÉE dans l'event (target_*) : un journal d'audit
+// montre qui était la cible au moment de l'action, pas son état actuel (qui
+// peut être anonymisé après suppression). La jointure live ne sert que de repli
+// pour d'éventuels anciens events sans snapshot.
 const accountAuditSql = `
   SELECT ae.id, 'account' AS scope, ae.event_type, ae.changes, ae.created_at,
-         su.first_name, su.last_name, su.badge_number, NULL::varchar AS line_number
+         COALESCE(ae.target_first_name, su.first_name) AS first_name,
+         COALESCE(ae.target_last_name, su.last_name) AS last_name,
+         COALESCE(ae.target_badge_number, su.badge_number) AS badge_number,
+         NULL::varchar AS line_number
   FROM account_audit_events ae
   LEFT JOIN sentinel_users su ON su.id = ae.target_user_id`;
 

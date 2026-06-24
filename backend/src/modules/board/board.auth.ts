@@ -8,6 +8,7 @@ import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
 import { getBoardData } from '../workshop/workshop.controller';
 import { FIELD_LIMITS } from '../../domain/constants';
+import { loginLimiter } from '../../middlewares/loginRateLimit';
 import logger from '../../logger';
 
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
@@ -163,9 +164,14 @@ boardRouter.post('/session', (req, res) => {
   }
 
   if (!timingSafeHashEquals(hashAccessCode(code), BOARD_ACCESS_CODE_HASH)) {
+    // Code board partagé (pas d'identité) → le limiteur clé par IP. On compte
+    // l'échec ici, comme pour le login utilisateur.
+    loginLimiter.recordFailure(req);
     sendError(res, 401, 'UNAUTHORIZED', 'Code board incorrect.');
     return;
   }
+
+  loginLimiter.clear(req);
 
   const secret = getJwtSecret();
   if (!secret) {

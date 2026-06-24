@@ -120,4 +120,23 @@ describeIntegration('RGPD — anonymisation à la suppression de compte', () => 
     expect(second.ok).toBe(false);
     if (!second.ok) expect(second.status).toBe(404);
   });
+
+  it("fige l'identité d'origine dans l'event d'audit (pas le pseudonyme ANON)", async () => {
+    await deleteAccountService(userId, adminId);
+
+    const { rows } = await pool.query(
+      `SELECT target_first_name, target_last_name, target_badge_number
+       FROM account_audit_events
+       WHERE target_user_id = $1 AND event_type = 'USER_SOFT_DELETED'`,
+      [userId]
+    );
+
+    expect(rows).toHaveLength(1);
+    // Le journal doit montrer qui était ce compte au moment de la suppression,
+    // pas son état anonymisé courant.
+    expect(rows[0].target_first_name).toBe('Karim');
+    expect(rows[0].target_last_name).toBe('Bensaïd');
+    expect(rows[0].target_badge_number).toBe(BADGE);
+    expect(rows[0].target_badge_number).not.toBe(`ANON-${userId}`);
+  });
 });
