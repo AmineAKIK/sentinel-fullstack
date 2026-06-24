@@ -54,13 +54,40 @@ Backend :
 - `npm run build` : compilation TypeScript vers `dist/`
 - `npm run start` : démarre `dist/server.js`
 - `npm run migrate` : exécute les migrations SQL
+- `npm run lint` : analyse statique ESLint
+- `npm test` : tests unitaires et d'intégration (Jest)
 - `npm run verify:reliability` : vérifications de fiabilité atelier
+- `npm run seed:demo` : jeu de données de démonstration atelier
+- `npm run seed:e2e` : jeu de données dédié aux tests end-to-end
 
 Frontend :
 
 - `npm run dev` : serveur Vite
 - `npm run build` : typecheck puis build Vite
 - `npm run preview` : prévisualisation du build
+- `npm run lint` : analyse statique ESLint
+- `npm test` : tests unitaires et composants (Vitest)
+- `npm run test:e2e` : tests end-to-end (Playwright) — re-seed puis exécution
+
+## Tests End-to-End
+
+Les parcours critiques sont couverts par Playwright (dossier `frontend/e2e/`).
+La suite démarre les serveurs au besoin (réutilise ceux déjà lancés) et
+s'appuie sur un jeu de données dédié recréé à chaque exécution.
+
+```bash
+cd frontend
+npm run test:e2e        # re-seed (backend) puis exécution Playwright
+```
+
+Pré-requis : une base PostgreSQL accessible (cf. `backend/.env`) et les
+bibliothèques système du navigateur. Sous Debian/Ubuntu :
+
+```bash
+sudo npx playwright install-deps chromium
+# ou, si la commande sudo n'a pas npx dans son PATH :
+sudo apt-get install -y libnss3 libnspr4 libasound2
+```
 
 ## Publication
 
@@ -75,6 +102,7 @@ npm run verify:reliability
 cd ../frontend
 npm run build
 npm test
+npm run test:e2e
 ```
 
 Puis exécuter la recette manuelle et les contrôles de configuration décrits dans [docs/release-checklist.md](docs/release-checklist.md).
@@ -161,3 +189,7 @@ Frontend : voir [frontend/.env.example](frontend/.env.example).
 ## Notes De Dépôt
 
 Les dossiers `node_modules/`, `dist/` et les fichiers `.env` sont ignorés. Les dépendances se restaurent avec `npm install`, et les builds se régénèrent avec `npm run build`.
+
+## Licence
+
+Distribué sous licence MIT. Voir [LICENSE](LICENSE).
