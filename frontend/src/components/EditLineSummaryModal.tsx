@@ -4,7 +4,7 @@ import { updateLine } from '../api/lines';
 import { ApiResponseError } from '../api/client';
 import { ProductionLine } from '../types';
 import { LineFormData } from './LineForm';
-import { normalizeLineMachine } from '../utils/lineMachines';
+import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
 
 interface EditLineSummaryModalProps {
   line: ProductionLine;
@@ -15,7 +15,7 @@ interface EditLineSummaryModalProps {
 }
 
 function machinesChanged(line: ProductionLine, form: LineFormData): boolean {
-  return JSON.stringify(line.machines) !== JSON.stringify(form.machines.map(normalizeLineMachine));
+  return !lineMachinesEqual(line.machines, form.machines);
 }
 
 function formatMachineOrder(machines: ProductionLine['machines']): string {

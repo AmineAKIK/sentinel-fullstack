@@ -7,6 +7,8 @@ import {
   validateLineForm,
   validateMachineAgainstLine,
   machineRobotSummary,
+  lineMachineEquals,
+  lineMachinesEqual,
 } from '../../utils/lineMachines';
 import type { LineMachine } from '../../types';
 
@@ -182,6 +184,60 @@ describe('validateMachineAgainstLine', () => {
     const machines = [singleMachine({ machineId: 'M01' }), singleMachine({ machineId: 'm01' })];
     const errors = validateMachineAgainstLine(machines[1], machines, 1);
     expect(errors.some((e) => e.includes('existe déjà'))).toBe(true);
+  });
+});
+
+// ─── lineMachineEquals ────────────────────────────────────────────────────────
+
+describe('lineMachineEquals', () => {
+  it('considers identical machines equal', () => {
+    expect(lineMachineEquals(singleMachine(), singleMachine())).toBe(true);
+    expect(lineMachineEquals(doubleMachine(), doubleMachine())).toBe(true);
+  });
+
+  it('ignores non-significant whitespace (normalises before comparing)', () => {
+    expect(lineMachineEquals(singleMachine({ machineId: ' M01 ' }), singleMachine({ machineId: 'M01' }))).toBe(true);
+  });
+
+  it('detects a brand change', () => {
+    expect(lineMachineEquals(singleMachine({ brand: 'Fanuc' }), singleMachine({ brand: 'KUKA' }))).toBe(false);
+  });
+
+  it('detects a robot mode switch', () => {
+    expect(lineMachineEquals(singleMachine(), doubleMachine())).toBe(false);
+  });
+
+  it('detects a heads-count change on a single robot', () => {
+    expect(lineMachineEquals(singleMachine({ robotHeads: 2 }), singleMachine({ robotHeads: 4 }))).toBe(false);
+  });
+
+  it('detects a change on the right robot of a double machine', () => {
+    expect(lineMachineEquals(doubleMachine({ rightRobotHeads: 3 }), doubleMachine({ rightRobotHeads: 8 }))).toBe(false);
+  });
+
+  it('ignores residual fields of the inactive mode (no false negative)', () => {
+    // Une machine simple ayant gardé des champs « double » résiduels reste
+    // égale à une machine simple propre : seul le mode actif compte.
+    const withResidual = { ...singleMachine(), leftRobotNumber: 'X9', leftRobotHeads: 99 } as LineMachine;
+    expect(lineMachineEquals(withResidual, singleMachine())).toBe(true);
+  });
+});
+
+// ─── lineMachinesEqual ────────────────────────────────────────────────────────
+
+describe('lineMachinesEqual', () => {
+  it('considers identical lists equal', () => {
+    expect(lineMachinesEqual([singleMachine(), doubleMachine()], [singleMachine(), doubleMachine()])).toBe(true);
+  });
+
+  it('detects a different length', () => {
+    expect(lineMachinesEqual([singleMachine()], [singleMachine(), singleMachine()])).toBe(false);
+  });
+
+  it('is order-sensitive (reordering counts as a change)', () => {
+    const a = [singleMachine({ machineId: 'M01' }), singleMachine({ machineId: 'M02' })];
+    const b = [singleMachine({ machineId: 'M02' }), singleMachine({ machineId: 'M01' })];
+    expect(lineMachinesEqual(a, b)).toBe(false);
   });
 });
 

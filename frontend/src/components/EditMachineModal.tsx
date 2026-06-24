@@ -4,11 +4,11 @@ import { LineMachine, ProductionLine } from '../types';
 import { ApiResponseError } from '../api/client';
 import { checkLineConflicts, updateLine } from '../api/lines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
-import DetailField from './ui/DetailField';
 import ErrorBanner from './ui/ErrorBanner';
 import Spinner from './ui/Spinner';
 import {
   emptyToString,
+  lineMachineEquals,
   machineRobotSummary,
   normalizeLineMachine,
   switchMachineRobotMode,
@@ -88,8 +88,16 @@ export default function EditMachineModal({
 
   async function handleSave() {
     setError('');
-    setLoading(true);
 
+    // Filet de sécurité : rien n'a changé → on ne sollicite pas le serveur et
+    // on ne ment pas avec un message de succès. Le bouton est déjà désactivé
+    // dans ce cas ; cette garde couvre aussi l'appel clavier.
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+
+    setLoading(true);
     try {
       const updatedMachines = line.machines.map((machine, index) =>
         index === machineIndex ? normalizeLineMachine(form) : machine
@@ -114,20 +122,27 @@ export default function EditMachineModal({
     onClose();
   }
 
-  const original = normalizeLineMachine(line.machines[machineIndex]);
-  const normalized = normalizeLineMachine(form);
-  const isDirty = normalized.machineId !== original.machineId
-    || normalized.brand !== original.brand
-    || normalized.hasDoubleRobot !== original.hasDoubleRobot
-    || (normalized.hasDoubleRobot && original.hasDoubleRobot
-        ? normalized.leftRobotNumber !== original.leftRobotNumber
-          || normalized.leftRobotHeads !== original.leftRobotHeads
-          || normalized.rightRobotNumber !== original.rightRobotNumber
-          || normalized.rightRobotHeads !== original.rightRobotHeads
-        : !normalized.hasDoubleRobot && !original.hasDoubleRobot
-          ? normalized.robotNumber !== original.robotNumber
-            || normalized.robotHeads !== original.robotHeads
-          : true);
+  const original = line.machines[machineIndex];
+  const isDirty = !lineMachineEquals(form, original);
+
+  // Récapitulatif « avant / après » : on montre ce qui change, pas seulement
+  // l'état final — cohérent avec les autres écrans de modification.
+  const changes: { label: string; before: string; after: string }[] = [];
+  const originalNorm = normalizeLineMachine(original);
+  const formNorm = normalizeLineMachine(form);
+  if (originalNorm.machineId !== formNorm.machineId) {
+    changes.push({ label: 'ID machine', before: originalNorm.machineId, after: formNorm.machineId });
+  }
+  if (originalNorm.brand !== formNorm.brand) {
+    changes.push({ label: 'Marque', before: originalNorm.brand, after: formNorm.brand });
+  }
+  if (machineRobotSummary(originalNorm) !== machineRobotSummary(formNorm)) {
+    changes.push({
+      label: 'Configuration robot',
+      before: machineRobotSummary(originalNorm),
+      after: machineRobotSummary(formNorm),
+    });
+  }
 
   return (
     <Modal
@@ -143,7 +158,7 @@ export default function EditMachineModal({
             <button className="btn btn-secondary" onClick={handleBack} disabled={loading}>
               Retour
             </button>
-            <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
+            <button className="btn btn-primary" onClick={handleSave} disabled={loading || !isDirty}>
               {loading ? <><Spinner /> Enregistrement…</> : 'Confirmer'}
             </button>
           </>
@@ -152,7 +167,7 @@ export default function EditMachineModal({
             <button className="btn btn-secondary" onClick={handleClose} disabled={loading}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={handlePreview} disabled={loading}>
+            <button className="btn btn-primary" onClick={handlePreview} disabled={loading || !isDirty}>
               Aperçu
             </button>
           </>
@@ -160,13 +175,29 @@ export default function EditMachineModal({
       }
     >
       {step === 'preview' ? (
-        <div className="detail-grid">
-          <DetailField label="ID machine">{form.machineId}</DetailField>
-          <DetailField label="Marque">{form.brand}</DetailField>
-          <DetailField label="Configuration robot" style={{ gridColumn: '1 / -1' }}>
-            {machineRobotSummary(form)}
-          </DetailField>
-        </div>
+        changes.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>
+            Aucune modification détectée.
+          </p>
+        ) : (
+          <div className="recap-list">
+            {changes.map((change) => (
+              <div key={change.label} className="recap-item">
+                <div className="recap-title">{change.label}</div>
+                <div className="recap-columns">
+                  <div className="recap-block">
+                    <div className="recap-label">Avant</div>
+                    <div>{change.before}</div>
+                  </div>
+                  <div className="recap-block">
+                    <div className="recap-label">Après</div>
+                    <div>{change.after}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : (
         <>
           <div className="form-group">

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Modal from './Modal';
 import LineForm, { LineFormData } from './LineForm';
 import { ProductionLine } from '../types';
-import { normalizeLineMachine, validateLineForm } from '../utils/lineMachines';
+import { lineMachinesEqual, validateLineForm } from '../utils/lineMachines';
 import EditLineSummaryModal from './EditLineSummaryModal';
 
 interface EditLineModalProps {
@@ -23,19 +23,15 @@ export default function EditLineModal({ line, onClose, onSuccess }: EditLineModa
   const [form, setForm] = useState<LineFormData>(lineToForm(line));
   const [error, setError] = useState('');
   const [showSummary, setShowSummary] = useState(false);
-  const normalizedMachines = form.machines.map(normalizeLineMachine);
   const isDirty =
     form.lineNumber.trim() !== line.line_number ||
     form.isActive !== line.is_active ||
-    JSON.stringify(line.machines) !== JSON.stringify(normalizedMachines);
+    !lineMachinesEqual(line.machines, form.machines);
 
   function handleSubmit() {
     setError('');
-    const noChanges =
-      form.lineNumber.trim() === line.line_number &&
-      form.isActive === line.is_active &&
-      JSON.stringify(line.machines) === JSON.stringify(normalizedMachines);
-    if (noChanges) {
+    // Rien n'a changé → on ferme sans afficher de confirmation mensongère.
+    if (!isDirty) {
       onClose();
       return;
     }

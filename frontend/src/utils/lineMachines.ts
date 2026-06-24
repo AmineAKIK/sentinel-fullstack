@@ -115,6 +115,43 @@ export function validateMachineAgainstLine(
   return issues.map((issue) => issue.replace(/^Machine : /, ''));
 }
 
+/**
+ * Égalité métier entre deux machines, après normalisation (trim des chaînes).
+ * Compare uniquement les champs significatifs du mode actif (simple ou double
+ * robot), pas les champs résiduels de l'autre mode — contrairement à un
+ * `JSON.stringify` naïf. Source unique de la détection « a-t-on changé quelque
+ * chose ? » pour les écrans d'édition machine.
+ */
+export function lineMachineEquals(a: LineMachine, b: LineMachine): boolean {
+  const na = normalizeLineMachine(a);
+  const nb = normalizeLineMachine(b);
+
+  if (na.machineId !== nb.machineId) return false;
+  if (na.brand !== nb.brand) return false;
+  if (na.hasDoubleRobot !== nb.hasDoubleRobot) return false;
+
+  if (na.hasDoubleRobot && nb.hasDoubleRobot) {
+    return (
+      na.leftRobotNumber === nb.leftRobotNumber &&
+      na.leftRobotHeads === nb.leftRobotHeads &&
+      na.rightRobotNumber === nb.rightRobotNumber &&
+      na.rightRobotHeads === nb.rightRobotHeads
+    );
+  }
+
+  if (!na.hasDoubleRobot && !nb.hasDoubleRobot) {
+    return na.robotNumber === nb.robotNumber && na.robotHeads === nb.robotHeads;
+  }
+
+  return false;
+}
+
+/** Égalité métier entre deux listes de machines (ordre significatif). */
+export function lineMachinesEqual(a: LineMachine[], b: LineMachine[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((machine, index) => lineMachineEquals(machine, b[index]));
+}
+
 export function machineRobotSummary(machine: LineMachine): string {
   return machine.hasDoubleRobot
     ? `Double robot · Gauche ${machine.leftRobotNumber} (${machine.leftRobotHeads} têtes) · Droite ${machine.rightRobotNumber} (${machine.rightRobotHeads} têtes)`

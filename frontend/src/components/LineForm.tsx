@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import { LineMachine } from '../types';
 import { emptyMachine, switchMachineRobotMode } from '../utils/lineMachines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
@@ -30,16 +30,29 @@ export default function LineForm({
   showStatus,
   lineError,
 }: LineFormProps) {
-  // Clés stables par position : évite key={index}, qui réattribue mal les
-  // inputs lors d'une suppression de machine au milieu de la liste.
-  const nextKeyRef = useRef(0);
-  const machineKeysRef = useRef<number[]>([]);
-  // Complète si des machines ont été ajoutées hors de ce composant (init/édition).
-  while (machineKeysRef.current.length < data.machines.length) {
-    machineKeysRef.current.push(nextKeyRef.current++);
+  // Clés stables par position : évite key={index}, qui réattribuerait mal les
+  // inputs lors d'une suppression de machine au milieu de la liste. La liste de
+  // clés vit dans un état React et se synchronise sur la longueur via le pattern
+  // officiel « adjuster l'état pendant le rendu » (setState conditionnel) —
+  // déterministe et compatible StrictMode, contrairement à une mutation de ref.
+  const [keyState, setKeyState] = useState<{ keys: number[]; next: number }>(() => ({
+    keys: data.machines.map((_, index) => index),
+    next: data.machines.length,
+  }));
+
+  if (keyState.keys.length !== data.machines.length) {
+    setKeyState((prev) => {
+      if (prev.keys.length === data.machines.length) return prev;
+      if (prev.keys.length < data.machines.length) {
+        const added = data.machines.length - prev.keys.length;
+        const extra = Array.from({ length: added }, (_, offset) => prev.next + offset);
+        return { keys: [...prev.keys, ...extra], next: prev.next + added };
+      }
+      return { ...prev, keys: prev.keys.slice(0, data.machines.length) };
+    });
   }
-  machineKeysRef.current.length = data.machines.length;
-  const machineKey = (index: number): number => machineKeysRef.current[index];
+
+  const machineKey = (index: number): number => keyState.keys[index] ?? index;
 
   function updateMachine(index: number, machine: LineMachine) {
     onChange({
@@ -63,13 +76,18 @@ export default function LineForm({
 
   function addMachine() {
     if (data.machines.length >= 10) return;
-    machineKeysRef.current.push(nextKeyRef.current++);
+    // La clé de la nouvelle machine est attribuée par la synchro de longueur.
     onChange({ ...data, machines: [...data.machines, emptyMachine()] });
   }
 
   function removeMachine(index: number) {
     if (data.machines.length <= 1) return;
-    machineKeysRef.current.splice(index, 1);
+    // Retirer la clé À cet index (pas la dernière) pour que les machines
+    // restantes conservent leur identité — sinon les inputs se mélangent.
+    setKeyState((prev) => ({
+      ...prev,
+      keys: prev.keys.filter((_, currentIndex) => currentIndex !== index),
+    }));
     onChange({ ...data, machines: data.machines.filter((_, currentIndex) => currentIndex !== index) });
   }
 

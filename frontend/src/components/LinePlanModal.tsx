@@ -3,7 +3,7 @@ import Modal from './Modal';
 import { ProductionLine } from '../types';
 import { updateLine } from '../api/lines';
 import { ApiResponseError } from '../api/client';
-import { normalizeLineMachine } from '../utils/lineMachines';
+import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
 
 interface LinePlanModalProps {
   line: ProductionLine;
@@ -19,7 +19,7 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
   const [step, setStep] = useState<'plan' | 'preview'>('plan');
 
   const hasChanges = useMemo(() => {
-    return JSON.stringify(machines) !== JSON.stringify(line.machines.map(normalizeLineMachine));
+    return !lineMachinesEqual(machines, line.machines);
   }, [machines, line.machines]);
 
   function formatOrder(list: typeof machines): string {
