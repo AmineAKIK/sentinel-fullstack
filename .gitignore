@@ -6,6 +6,11 @@ coverage/
 .cache/
 *.tsbuildinfo
 
+# Playwright (artefacts générés ; les tests sources e2e/ restent versionnés)
+playwright-report/
+test-results/
+.playwright/
+
 # Local Docker Compose overrides (host-specific, e.g. reverse proxy / ports)
 docker-compose.override.yml
 docker-compose.override.yaml

@@ -10,6 +10,7 @@
     "migrate": "ts-node src/db/migrate.ts",
     "verify:reliability": "node scripts/verifyReliability.js",
     "seed:demo": "node scripts/seedWorkshopProductionDemo.js",
+    "seed:e2e": "ts-node scripts/seedE2E.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint src",
