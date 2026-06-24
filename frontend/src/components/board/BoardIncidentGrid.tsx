@@ -1,7 +1,6 @@
 import { WorkshopBoardIncident } from '../../types';
 import { STATE_LABELS } from '../../utils/labels';
 import { ageLabel, isOpenOverSevenDays, statusLabel } from '../../utils/boardUtils';
-import { formatDateTime } from '../../utils/date';
 import { incidentAttentionLevel } from '../../utils/attention';
 
 interface EmptyStateProps {
@@ -89,9 +88,7 @@ export default function BoardIncidentGrid({
               </p>
             </div>
             <div className="board-incident-footer">
-              <span title={formatDateTime(incident.created_at)}>
-                Depuis {ageLabel(incident.created_at)}
-              </span>
+              <span>Depuis {ageLabel(incident.created_at)}</span>
               <div className="board-incident-status">
                 {isOldCase && <span className="board-chip board-chip-warning">&gt; 7 j</span>}
                 <span
