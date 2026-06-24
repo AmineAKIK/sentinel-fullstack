@@ -116,6 +116,17 @@ TRUST_PROXY=true
 BOARD_ACCESS_LABEL=Board atelier
 BOARD_SESSION_TTL_HOURS=12
 
+# Journalisation (optionnel : trace|debug|info|warn|error|fatal, défaut info)
+LOG_LEVEL=info
+
+# Rate-limit global de l'API (optionnel — surcharge les défauts du code).
+# Compte TOUTES les requêtes par IP ; pensé pour laisser de la marge à plusieurs
+# postes derrière une même IP publique. Laisser vide pour garder les défauts
+# (3000 requêtes / 15 min). Le rate-limit de connexion, lui, n'est pas
+# configurable (10 échecs / 5 min, codé en dur).
+GLOBAL_API_RATE_LIMIT_MAX=3000
+GLOBAL_API_RATE_LIMIT_WINDOW_MS=900000
+
 # IA (optionnel)
 DEEPSEEK_API_KEY=<ta_clé>
 ```

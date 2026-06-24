@@ -1,12 +1,12 @@
 # Résultats d'audit de mise en production — Sentinel
 
-Exécution du plan [audit-prod.md](audit-prod.md). Daté du 2026-06-24.
+Exécution du plan [audit-prod.md](audit-prod.md). Daté du 2026-06-25.
 
-**Environnement d'audit :** poste de développement. Limites assumées : Docker
-indisponible et PostgreSQL local en *peer authentication* (inaccessible sans
-credentials). Les contrôles nécessitant l'application lancée ou une base dédiée
-sont donc soit couverts par la CI, soit reportés à un environnement adéquat —
-c'est signalé explicitement, jamais masqué.
+**Environnement d'audit :** poste de développement. PostgreSQL local désormais
+accessible (les tests d'intégration et la suite E2E sont rejoués localement).
+Seul Docker reste indisponible sur ce poste (WSL sans Docker Desktop) ; les
+contrôles purement conteneur sont donc couverts par la CI. C'est signalé
+explicitement, jamais masqué.
 
 Légende : ✅ vérifié OK · 🟡 partiel / couvert ailleurs · ⏭️ reporté · ❌ bloquant.
 
@@ -18,7 +18,7 @@ Légende : ✅ vérifié OK · 🟡 partiel / couvert ailleurs · ⏭️ report�
 |---------|---------|
 | 1. Fondations qualité | ✅ |
 | 2. Couverture de test | ✅ (backend) / 🟡 (frontend, normal) |
-| 3. Parcours E2E | ⏭️ reporté (recette manuelle en place) |
+| 3. Parcours E2E | ✅ socle Playwright en place / 🟡 couverture à étendre |
 | 4. Performance & volume | ✅ (audit statique) / 🟡 (charge réelle à faire) |
 | 5. Sécurité | ✅ aucun point bloquant |
 | 6. Accessibilité | ✅ (statique + contraste) / 🟡 (audit DOM à faire) |
@@ -39,10 +39,10 @@ dans un environnement avec l'app lancée, pas des défauts du produit.
 | Lint frontend | ✅ 0 erreur |
 | Build backend (tsc) | ✅ |
 | Build frontend (vite) | ✅ |
-| Tests unitaires backend | ✅ **208 tests passent** (12 suites) |
-| Tests frontend | ✅ **263 tests passent** (22 fichiers) |
-| Reliability checks | ✅ couverts CI (`verifyReliability.js`) |
-| Tests d'intégration backend | 🟡 couverts par la CI (job `integration` avec service Postgres) — non rejouables localement (peer-auth) |
+| Tests unitaires backend | ✅ **212 tests passent** (13 suites) |
+| Tests frontend | ✅ **276 tests passent** (23 fichiers) |
+| Reliability checks | ✅ **20/20** (`verifyReliability.js`, rejoué localement) |
+| Tests d'intégration backend | ✅ **29 tests passent** (3 suites) sur base réelle — suites isolées, exécution parallèle déterministe |
 
 ## 2. Couverture de test — ✅ / 🟡
 
@@ -53,12 +53,15 @@ dans un environnement avec l'app lancée, pas des défauts du produit.
   validation relève de l'E2E (§3), pas du test unitaire. La logique métier front
   (utils, permissions, formatage) est testée.
 
-## 3. Parcours E2E — ⏭️ reporté
+## 3. Parcours E2E — ✅ socle / 🟡 couverture
 
-Aucun test E2E automatisé à ce jour. **À faire dans un environnement où l'app
-tourne** (Playwright), pour une validation réelle plutôt qu'un code écrit à
-l'aveugle. En attendant, les parcours critiques sont couverts par la recette
-manuelle documentée ([manual-tests.md](manual-tests.md)).
+Socle Playwright opérationnel (`frontend/e2e/`, `npm run test:e2e`), avec un
+jeu de données dédié recréé à chaque exécution (`seed:e2e`). Le parcours
+d'édition machine (déclencheur de régression « confirmer une non-action ») est
+couvert bout en bout et **vu vert** dans un vrai navigateur.
+🟡 La couverture reste à étendre aux autres parcours (login atelier, création
+de ligne…) ; en complément, la recette manuelle reste documentée
+([manual-tests.md](manual-tests.md)).
 
 ## 4. Performance & volume — ✅ (statique)
 
@@ -82,7 +85,7 @@ manuelle documentée ([manual-tests.md](manual-tests.md)).
 | `npm audit` backend & frontend | ✅ **0 vulnérabilité** |
 | Cookies | ✅ `httpOnly`, `secure` en prod, `sameSite: strict` en prod |
 | CORS | ✅ `origin: CLIENT_ORIGIN` (pas de wildcard), `credentials: true` |
-| Rate-limiting | ✅ login borné (20 / 15 min) + global |
+| Rate-limiting | ✅ login borné (10 échecs / 5 min) + global configurable |
 | Limite payload | ✅ `express.json({ limit: '50kb' })` |
 | Bornes de champs | ✅ `FIELD_LIMITS` + Zod (audité) |
 | Autorisation par route | ✅ middleware appliqué avant chaque route |
@@ -136,7 +139,7 @@ accessibilité conforme au contraste AA. **Aucun défaut bloquant.**
 Les conditions restantes ne sont pas des défauts mais des **vérifications à mener
 sur un environnement avec l'application lancée** :
 
-1. ⏭️ Automatiser au moins les parcours E2E 3.1–3.3 (ou recette manuelle signée).
+1. 🟡 Étendre la couverture E2E aux parcours 3.1–3.3 (socle Playwright déjà en place).
 2. 🟡 Éprouver une **restauration de backup** réelle (§9.1).
 3. 🟡 Lancer un **test de charge** et un **volume amplifié** sur staging (§4).
 4. 🟡 Audit **Lighthouse a11y** par page avec l'app lancée (§6.1).

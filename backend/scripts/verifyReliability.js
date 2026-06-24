@@ -285,11 +285,11 @@ check('Workshop knowledge and history are cross-linked by incident trace', () =>
     && history.includes('useSearchParams')
     && history.includes("searchParams.get('incident')")
     && history.includes('/workshop/knowledge?incident=')
-    && history.includes('history-knowledge-btn')
+    && history.includes('history-knowledge-actions')
     && knowledge.includes('useSearchParams')
     && knowledge.includes('getWorkshopKnowledgeIncident')
     && knowledge.includes('/workshop/history?incident=')
-    && styles.includes('.history-knowledge-btn')
+    && styles.includes('.history-knowledge-actions')
     && styles.includes('.kb-actions')
     && styles.includes('.history-header-actions');
 });

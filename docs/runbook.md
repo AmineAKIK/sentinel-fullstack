@@ -65,8 +65,17 @@ Ce processus peut prendre 30 à 60 secondes.
 | `TRUST_PROXY` | oui | `true` derrière Caddy |
 | `DEEPSEEK_API_KEY` | non | Désactive le support IA si absent |
 | `LOG_LEVEL` | non | `info` par défaut |
+| `GLOBAL_API_RATE_LIMIT_MAX` | non | Plafond global de requêtes/IP (défaut 3000) |
+| `GLOBAL_API_RATE_LIMIT_WINDOW_MS` | non | Fenêtre du plafond global en ms (défaut 900000 = 15 min) |
 
 Le backend refuse de démarrer en production si une valeur critique manque ou est faible.
+
+> **Rate-limit.** Le plafond *global* d'API (par IP) est ajustable via les deux
+> variables ci-dessus — utile si plusieurs postes partagent une IP publique et
+> déclenchent des 429 en usage normal. Le rate-limit *de connexion* (10 échecs
+> par identité / 5 min, remis à zéro après un login réussi) n'est pas
+> configurable. Un `429` ponctuel sur `/api/auth/login` est attendu après
+> plusieurs échecs ; il se résorbe seul à la fin de la fenêtre.
 
 ---
 

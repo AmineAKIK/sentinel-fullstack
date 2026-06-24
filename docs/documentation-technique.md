@@ -66,7 +66,7 @@ backend/
 │   ├── middlewares/
 │   │   ├── adminAuth.ts             Middleware JWT admin — injecte req.admin
 │   │   ├── workshopAuth.ts          Middleware JWT atelier — injecte req.workshopUser
-│   │   ├── loginRateLimit.ts        Rate limiting login (20 req / 15 min par IP+identité)
+│   │   ├── loginRateLimit.ts        Rate limiting login + quota API global
 │   │   └── securityHeaders.ts       Headers HTTP sécurité (CSP, X-Frame-Options…)
 │   ├── domain/
 │   │   └── constants.ts             Enums TypeScript (rôles, statuts, états, actions)
@@ -241,13 +241,19 @@ npm run test:coverage  vitest run --coverage
 
 ### 5.1 `docker-compose.yml`
 
-Trois services :
+Quatre services. **Seul Caddy publie des ports sur l'hôte** ; les autres
+restent sur le réseau interne et ne sont joignables qu'au travers du proxy.
 
 | Service | Image / Build | Port exposé | Dépendance |
 |---|---|---|---|
 | `postgres` | `postgres:15-alpine` | *(interne)* | — |
-| `backend` | `./backend/Dockerfile` | `3000:3000` | `postgres` (healthcheck) |
-| `frontend` | `./frontend/Dockerfile` | `5173:80` | `backend` (healthcheck) |
+| `backend` | `./backend/Dockerfile` | *(interne)* | `postgres` (healthcheck) |
+| `frontend` | `./frontend/Dockerfile` | *(interne)* | `backend` (healthcheck) |
+| `caddy` | `caddy:2-alpine` | `80`, `443`, `443/udp` | `frontend`, `backend` |
+
+Caddy route `/api/*` vers `backend:3000` et le reste vers `frontend:80`
+(cf. `Caddyfile`). L'application est donc servie sur `http://localhost` (valeur
+par défaut de `CADDY_DOMAIN`), pas sur des ports applicatifs directs.
 
 Le volume `sentinel_data` persiste les données PostgreSQL.
 
@@ -656,14 +662,23 @@ Générés pour les nouveaux comptes et lors des réinitialisations. Implémenta
 
 Le code est retourné en clair **une seule fois** dans la réponse de création/réinitialisation, à communiquer à l'utilisateur.
 
-### 8.6 Rate limiting login (`loginRateLimit.ts`)
+### 8.6 Rate limiting (`loginRateLimit.ts`)
 
-- **Fenêtre :** 15 minutes
-- **Seuil :** 20 tentatives par fenêtre
+**Connexion :**
+
+- **Fenêtre :** 5 minutes
+- **Seuil :** 10 échecs par fenêtre
 - **Clé d'identification :** `METHOD:path:IP:identité` (username ou badgeNumber normalisé)
 - **Stockage :** Map en mémoire (pas de Redis — remise à zéro au redémarrage)
-- **Nettoyage :** automatique à chaque requête si la dernière purge date de > 15 min
+- **Nettoyage :** automatique à chaque requête si la dernière purge date de > fenêtre
 - **Réponse en cas de dépassement :** HTTP 429 + header `Retry-After`
+
+**Quota API global :**
+
+- **Fenêtre par défaut :** 15 minutes (`GLOBAL_API_RATE_LIMIT_WINDOW_MS=900000`)
+- **Seuil par défaut :** 3000 requêtes par IP (`GLOBAL_API_RATE_LIMIT_MAX=3000`)
+- **Exception :** `/api/health` ne consomme pas le quota applicatif
+- **Clé d'identification :** IP seule, donc `TRUST_PROXY=true` est nécessaire derrière Nginx/Caddy
 
 ### 8.7 Headers de sécurité (`securityHeaders.ts`)
 
@@ -879,6 +894,10 @@ Tableau de dispatch des actions :
 
 `autoFollowForResponsable(incidentId, actorUserId, actorRole, client)` est appelé lors des actions `APPROVE_EDIT`, `REJECT_EDIT`, `APPROVE_CANCEL`, `REJECT_CANCEL`, et lors de la création. Si l'acteur est un RESPONSABLE, il est automatiquement abonné à l'incident via `followIncidentData`.
 
+#### Annulation directe
+
+L'endpoint canonique est `POST /api/workshop/incidents/:id/cancel`. L'annulation est une transition métier auditée (`status = CANCELED`, événement `INCIDENT_CANCELED`), pas une suppression physique. `DELETE /api/workshop/incidents/:id` reste uniquement toléré en compatibilité legacy et ne doit pas être utilisé par le frontend.
+
 ---
 
 ## 10. Frontend — Architecture
@@ -1058,10 +1077,14 @@ docker compose up --build
 Le backend applique les migrations automatiquement au démarrage.
 Le compte admin est créé s'il n'existe pas (ADMIN_USERNAME / ADMIN_PASSWORD).
 
-Accès :
-- Frontend : http://localhost:5173
-- Backend API : http://localhost:3000
-- Portail : http://localhost:5173/login
+Accès (tout passe par le proxy Caddy, `CADDY_DOMAIN` par défaut `localhost`) :
+- Application : http://localhost
+- Portail : http://localhost/login
+- API : http://localhost/api
+
+> Les ports `5173` (Vite) et `3000` (API) ne concernent que le mode local
+> sans Docker décrit ci-dessous ; sous Docker, seuls les ports de Caddy
+> (80/443) sont publiés.
 
 ### 14.3 En local sans Docker
 

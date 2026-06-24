@@ -11,17 +11,26 @@ Application full-stack de pilotage Sentinel organisee autour de trois espaces : 
 
 ## Démarrage Docker
 
-Le `docker-compose.yml` démarre un environnement local par défaut.
+Le `docker-compose.yml` démarre un environnement complet derrière un reverse
+proxy Caddy. **Seul Caddy est exposé** (ports 80/443) ; le frontend et le
+backend restent sur le réseau interne et ne sont pas joignables directement.
 
 ```bash
 docker compose up --build
 ```
 
-- Frontend : http://localhost:5173
-- Backend API : http://localhost:3000
-- Portail : http://localhost:5173/login
-- Board : http://localhost:5173/board
-- Admin local par defaut : `admin` / `admin123`
+Tout passe par Caddy (`CADDY_DOMAIN`, par défaut `localhost`) :
+
+- Application : http://localhost
+- Portail : http://localhost/login
+- Board : http://localhost/board
+- API : http://localhost/api
+
+Au premier démarrage, le backend amorce un compte administrateur unique à
+partir de `ADMIN_USERNAME` / `ADMIN_PASSWORD` (valeurs de bootstrap local
+`admin` / `admin123` par défaut). **À changer impérativement avant toute mise
+en production** : ces identifiants ne servent qu'à démarrer un environnement de
+développement local et ne peuvent pas être modifiés à chaud ensuite.
 
 Pour une publication, copier `.env.release.example` vers `.env` sur l'hôte de déploiement et remplacer toutes les valeurs sensibles avant de lancer Docker Compose. En `NODE_ENV=production`, le backend refuse de démarrer si les secrets ou l'origine client restent sur des valeurs de démonstration.
 
