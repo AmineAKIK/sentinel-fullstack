@@ -156,6 +156,7 @@ Frontend : voir [frontend/.env.example](frontend/.env.example).
 - [Runbook d'exploitation](docs/runbook.md)
 - [Checklist de publication](docs/release-checklist.md)
 - [Audit & stress-test de mise en production](docs/audit-prod.md)
+- [Résultats d'audit de mise en production](docs/audit-prod-resultats.md)
 
 ## Notes De Dépôt
 
