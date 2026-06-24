@@ -1,30 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration, formatIncidentDuration } from '../durationFormat';
-
-describe('formatDuration', () => {
-  it('diff nulle ou négative → "—"', () => {
-    const now = new Date().toISOString();
-    expect(formatDuration(now, now)).toBe('—');
-  });
-
-  it('30 minutes → "30 min"', () => {
-    const start = new Date('2024-01-01T08:00:00Z').toISOString();
-    const end = new Date('2024-01-01T08:30:00Z').toISOString();
-    expect(formatDuration(start, end)).toBe('30 min');
-  });
-
-  it('2 heures → "2 h"', () => {
-    const start = new Date('2024-01-01T08:00:00Z').toISOString();
-    const end = new Date('2024-01-01T10:00:00Z').toISOString();
-    expect(formatDuration(start, end)).toBe('2 h');
-  });
-
-  it('3 jours → "3 j"', () => {
-    const start = new Date('2024-01-01T00:00:00Z').toISOString();
-    const end = new Date('2024-01-04T00:00:00Z').toISOString();
-    expect(formatDuration(start, end)).toBe('3 j');
-  });
-});
+import { formatIncidentDuration } from '../durationFormat';
 
 describe('formatIncidentDuration', () => {
   it('sans startIso → "—"', () => {

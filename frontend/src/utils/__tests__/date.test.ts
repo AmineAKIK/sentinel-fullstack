@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatShortDate, formatDateTime, formatSeconds } from '../../utils/date';
+import { formatDate, formatShortDate, formatDateTime, formatSeconds, formatElapsed } from '../../utils/date';
 
 // Use a fixed ISO string that is unambiguous in fr-FR locale
 // 2024-06-15T14:30:00.000Z → 15/06/2024 in fr-FR
@@ -55,5 +55,38 @@ describe('formatSeconds', () => {
     expect(formatSeconds(3600)).toBe('1 h');
     // 7200 seconds = 120 min → 2 h
     expect(formatSeconds(7200)).toBe('2 h');
+  });
+});
+
+describe('formatElapsed', () => {
+  it('moins d\'une heure → minutes', () => {
+    const from = new Date(Date.now() - 1000 * 60 * 30).toISOString();
+    expect(formatElapsed(from)).toBe('30 min');
+  });
+
+  it('quelques heures → "3 h"', () => {
+    const from = new Date(Date.now() - 1000 * 3600 * 3).toISOString();
+    expect(formatElapsed(from)).toBe('3 h');
+  });
+
+  it('jours pile → "2 j"', () => {
+    const from = new Date(Date.now() - 1000 * 3600 * 24 * 2).toISOString();
+    expect(formatElapsed(from)).toBe('2 j');
+  });
+
+  it('jours et heures → "2 j 17 h"', () => {
+    const from = new Date(Date.now() - 1000 * 3600 * (24 * 2 + 17)).toISOString();
+    expect(formatElapsed(from)).toBe('2 j 17 h');
+  });
+
+  it('entre deux dates explicites', () => {
+    const start = '2024-01-01T08:00:00Z';
+    const end = '2024-01-01T08:45:00Z';
+    expect(formatElapsed(start, end)).toBe('45 min');
+  });
+
+  it('durée nulle ou négative → "—"', () => {
+    const now = new Date().toISOString();
+    expect(formatElapsed(now, now)).toBe('—');
   });
 });

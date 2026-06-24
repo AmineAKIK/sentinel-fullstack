@@ -39,7 +39,7 @@ function signedNumber(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
-function formatDuration(seconds: number | null): string {
+function formatSecondsDuration(seconds: number | null): string {
   if (!seconds || seconds <= 0) return '—';
   const totalMinutes = Math.floor(seconds / 60);
   const hours = Math.floor(totalMinutes / 60);
@@ -437,12 +437,12 @@ export default function WorkshopPilotagePage() {
                   },
                   {
                     label: 'Médiane prise en charge',
-                    value: formatDuration(analytics?.median_take_seconds ?? null),
+                    value: formatSecondsDuration(analytics?.median_take_seconds ?? null),
                     sub: 'Avant 1ère action',
                   },
                   {
                     label: 'Médiane clôture',
-                    value: formatDuration(analytics?.median_close_seconds ?? null),
+                    value: formatSecondsDuration(analytics?.median_close_seconds ?? null),
                     sub: 'Durée typique',
                   },
                   {

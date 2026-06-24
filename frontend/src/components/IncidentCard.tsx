@@ -1,5 +1,5 @@
 import { WorkshopIncident } from '../types';
-import { formatDateTime, formatDuration } from '../utils/date';
+import { formatDateTime, formatElapsed } from '../utils/date';
 import { incidentAttentionLevel } from '../utils/attention';
 import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
 
@@ -162,7 +162,7 @@ export default function IncidentCard({
         <div className="incident-summary-primary">
           <span className="detail-field-label">Équipement</span>
           <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
-          <p title={formatDateTime(incident.created_at)}>Depuis {formatDuration(incident.created_at)}</p>
+          <p title={formatDateTime(incident.created_at)}>Depuis {formatElapsed(incident.created_at)}</p>
         </div>
         {(isMaintenance || isResponsable) && (
           <div className="incident-summary-primary">

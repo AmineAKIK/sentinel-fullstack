@@ -3,7 +3,6 @@ import {
   formatTime,
   formatClock,
   statusLabel,
-  ageLabel,
   isOpenOverSevenDays,
   paginate,
   normalizeScreenId,
@@ -59,28 +58,6 @@ describe('statusLabel', () => {
 
   it('OPEN + pris → "Pris en charge"', () => {
     expect(statusLabel(incident({ status: 'OPEN', is_taken: true }))).toBe('Pris en charge');
-  });
-});
-
-describe('ageLabel', () => {
-  it('moins d\'une heure → minutes', () => {
-    const recent = new Date(Date.now() - 1000 * 60 * 30).toISOString();
-    expect(ageLabel(recent)).toBe('30 min');
-  });
-
-  it('quelques heures → "3 h"', () => {
-    const threeHoursAgo = new Date(Date.now() - 1000 * 3600 * 3).toISOString();
-    expect(ageLabel(threeHoursAgo)).toBe('3 h');
-  });
-
-  it('deux jours pile → "2 j"', () => {
-    const twoDaysAgo = new Date(Date.now() - 1000 * 3600 * 24 * 2).toISOString();
-    expect(ageLabel(twoDaysAgo)).toBe('2 j');
-  });
-
-  it('deux jours et des heures → "2 j 17 h"', () => {
-    const old = new Date(Date.now() - 1000 * 3600 * (24 * 2 + 17)).toISOString();
-    expect(ageLabel(old)).toBe('2 j 17 h');
   });
 });
 

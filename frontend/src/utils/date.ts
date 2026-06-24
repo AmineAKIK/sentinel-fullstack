@@ -1,7 +1,6 @@
 import type { AttentionLevel } from './attention';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
 
 /** Vrai si la date ISO est plus ancienne que `days` jours par rapport à maintenant. */
 export function isOlderThanDays(iso: string, days: number): boolean {
@@ -9,15 +8,24 @@ export function isOlderThanDays(iso: string, days: number): boolean {
 }
 
 /**
- * Durée vécue depuis une date ISO, en langage court (« < 1 h », « 5 h », « 3 j »).
- * Le temps s'exprime en durée ressentie, pas en horodatage à déchiffrer (P7, §5.6).
+ * Durée vécue, en langage court et précis : « 30 min », « 5 h », « 2 j 17 h ».
+ * Source unique de la « durée ressentie » dans toute l'app (P7, §5.6) — pour
+ * « depuis X » comme pour une durée entre deux instants.
+ *
+ * @param fromIso  début de la période (ISO)
+ * @param toIso    fin de la période (ISO) ; par défaut « maintenant »
  */
-export function formatDuration(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const hours = Math.max(0, Math.floor(diffMs / HOUR_MS));
-  if (hours < 1) return '< 1 h';
-  if (hours < 24) return `${hours} h`;
-  return `${Math.floor(hours / 24)} j`;
+export function formatElapsed(fromIso: string, toIso?: string): string {
+  const end = toIso ? new Date(toIso).getTime() : Date.now();
+  const diffMs = end - new Date(fromIso).getTime();
+  if (diffMs <= 0) return '—';
+  const totalMinutes = Math.floor(diffMs / 60000);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) return `${totalHours} h`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  return hours > 0 ? `${days} j ${hours} h` : `${days} j`;
 }
 
 /**

@@ -25,23 +25,6 @@ export function statusLabel(incident: WorkshopBoardIncident): string {
   return incident.is_taken ? 'Pris en charge' : 'Non pris';
 }
 
-/**
- * Durée vécue depuis une date (P7, §5.6). Reste précise quand ça compte :
- * minutes en deçà d'une heure, heures en deçà d'un jour, puis « j h » au-delà
- * (« 2 j 17 h ») — un incident qui traîne se lit au quart de journée près, pas
- * arrondi au jour entier.
- */
-export function ageLabel(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const totalMinutes = Math.max(0, Math.floor(diffMs / 60000));
-  if (totalMinutes < 60) return `${totalMinutes} min`;
-  const totalHours = Math.floor(totalMinutes / 60);
-  if (totalHours < 24) return `${totalHours} h`;
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  return hours > 0 ? `${days} j ${hours} h` : `${days} j`;
-}
-
 export function isOpenOverSevenDays(incident: WorkshopBoardIncident): boolean {
   return incident.status === 'OPEN' && isOlderThanDays(incident.created_at, 7);
 }

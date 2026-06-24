@@ -13,7 +13,7 @@ import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
-import { formatDuration } from '../utils/durationFormat';
+import { formatElapsed } from '../utils/date';
 import {
   buildIncidentWorkspaceParams,
   getWorkshopMachineOptions,
@@ -89,7 +89,7 @@ type KnowledgeDetailProps = {
 };
 
 function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, onCopyLink, copied }: KnowledgeDetailProps) {
-  const resTime = formatDuration(incident.created_at, incident.updated_at);
+  const resTime = formatElapsed(incident.created_at, incident.updated_at);
   const technician = incident.taken_by_first_name
     ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
     : null;
