@@ -16,8 +16,10 @@ export function isOlderThanDays(iso: string, days: number): boolean {
  * @param toIso    fin de la période (ISO) ; par défaut « maintenant »
  */
 export function formatElapsed(fromIso: string, toIso?: string): string {
+  const start = new Date(fromIso).getTime();
   const end = toIso ? new Date(toIso).getTime() : Date.now();
-  const diffMs = end - new Date(fromIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return '—';
+  const diffMs = end - start;
   if (diffMs <= 0) return '—';
   const totalMinutes = Math.floor(diffMs / 60000);
   if (totalMinutes < 60) return `${totalMinutes} min`;

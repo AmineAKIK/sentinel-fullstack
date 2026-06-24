@@ -4,6 +4,16 @@ import {
   isWorkshopRole,
 } from '../../domain/constants';
 
+/*
+ * Permissions atelier — SOURCE DE VÉRITÉ en matière de sécurité (`canPerform`).
+ * Appliquée par chaque mutation du service avant toute action ; le frontend en
+ * tient un MIROIR pour l'UX dans frontend/src/utils/workshopPermissions.ts.
+ * Toute règle modifiée ici DOIT l'être aussi côté front (et inversement), sinon
+ * l'interface et le serveur divergent. Les noms d'action diffèrent par
+ * convention (MAJUSCULES ici, camelCase côté front) mais les règles sont
+ * identiques.
+ */
+
 export interface CurrentIncident {
   status: IncidentStatus;
   is_taken: boolean;

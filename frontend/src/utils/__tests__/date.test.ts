@@ -89,4 +89,9 @@ describe('formatElapsed', () => {
     const now = new Date().toISOString();
     expect(formatElapsed(now, now)).toBe('—');
   });
+
+  it('date invalide → "—" (jamais "NaN j")', () => {
+    expect(formatElapsed('pas-une-date')).toBe('—');
+    expect(formatElapsed('2024-01-01T00:00:00Z', 'invalide')).toBe('—');
+  });
 });

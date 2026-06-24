@@ -1,5 +1,17 @@
 import { Role, WorkshopIncident } from '../types';
 
+/*
+ * Permissions atelier côté UI (affichage/masquage des actions).
+ *
+ * ⚠️ MIROIR de backend/src/modules/workshop/workshop.policy.ts (`canPerform`).
+ * Le backend reste la SEULE source de vérité en matière de sécurité : ce fichier
+ * ne sert qu'à l'expérience (ne pas montrer un bouton dont l'action serait
+ * refusée). Toute règle modifiée ici DOIT l'être aussi dans la policy backend,
+ * et inversement — sinon un bouton s'affiche mais l'action renvoie 403.
+ * Les noms d'action diffèrent par convention (camelCase ici, MAJUSCULES côté
+ * back) mais les règles doivent rester identiques.
+ */
+
 export type WorkshopAction =
   | 'requestEdit'
   | 'directEdit'
