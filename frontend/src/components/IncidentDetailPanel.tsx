@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CreateIncidentModal from './CreateIncidentModal';
 import DeleteRequestModal from './DeleteRequestModal';
 import TakeChargeConfirmModal from './TakeChargeConfirmModal';
@@ -74,7 +75,12 @@ export default function IncidentDetailPanel({
   onDeleteCommentConfirm,
   patchIncident,
 }: IncidentDetailPanelProps) {
+  const navigate = useNavigate();
   const [responsibleDraft, setResponsibleDraft] = useState(incident.responsible_comment ?? '');
+
+  // Contexte machine : amène directement à l'historique / la connaissance de
+  // cette ligne+machine, filtre pré-rempli (P3 — répondre, pas faire chercher).
+  const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
 
   const canRequestEdit = canPerform(userRole, 'requestEdit', incident, userId);
   const canDirectEdit = canPerform(userRole, 'directEdit', incident);
@@ -166,6 +172,25 @@ export default function IncidentDetailPanel({
             <DetailField label="Statut">{STATUS_LABELS[incident.status] ?? incident.status}</DetailField>
             <DetailField label="Produit en cours">{incident.current_product ?? '-'}</DetailField>
             <DetailField label="Création">{formatDateTime(incident.created_at)}</DetailField>
+          </div>
+          <div className="machine-context-actions">
+            <span className="detail-field-label">Contexte de cette machine</span>
+            <div className="action-bar" style={{ marginTop: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => navigate(`/workshop/knowledge?${machineContextQuery}`)}
+              >
+                Solutions déjà appliquées
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => navigate(`/workshop/history?${machineContextQuery}`)}
+              >
+                Historique de la machine
+              </button>
+            </div>
           </div>
           {incident.comment && <p className="incident-comment">{incident.comment}</p>}
           {incident.diagnostic && (
