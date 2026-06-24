@@ -30,6 +30,13 @@ const describeIntegration = RUN ? describe : describe.skip;
 
 let pool: Pool;
 
+// Préfixes réservés à CE fichier : le nettoyage est chirurgical (on ne touche
+// qu'à nos propres lignes), pour que la suite reste sûre même si d'autres
+// fichiers d'intégration s'exécutent en parallèle sur la même base. Pas de
+// TRUNCATE — qui détruirait les données des autres suites.
+const ADMIN_PREFIX = 'int-auth-';
+const BADGE_PREFIX = 'IA-';
+
 beforeAll(async () => {
   if (!RUN) return;
   pool = new Pool({ connectionString: DB_URL });
@@ -39,23 +46,23 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!RUN) return;
+  await cleanAuthFixtures();
   await pool.end();
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function cleanAdminAccounts() {
-  await pool.query('TRUNCATE admin_accounts RESTART IDENTITY CASCADE');
-}
-
-async function cleanWorkshopUsers() {
-  await pool.query('TRUNCATE sentinel_users RESTART IDENTITY CASCADE');
+async function cleanAuthFixtures() {
+  await pool.query('DELETE FROM admin_accounts WHERE username LIKE $1', [`${ADMIN_PREFIX}%`]);
+  await pool.query('DELETE FROM sentinel_users WHERE badge_number LIKE $1', [`${BADGE_PREFIX}%`]);
 }
 
 async function insertAdmin(username: string, password: string): Promise<number> {
   const hash = await hashAdminPassword(password);
   const { rows } = await pool.query<{ id: number }>(
-    'INSERT INTO admin_accounts (username, password_hash) VALUES ($1, $2) RETURNING id',
+    `INSERT INTO admin_accounts (username, password_hash) VALUES ($1, $2)
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
+     RETURNING id`,
     [username, hash]
   );
   return rows[0].id;
@@ -86,32 +93,33 @@ async function insertWorkshopUser(opts: {
 // ── Admin login ────────────────────────────────────────────────────────────────
 
 describeIntegration('Admin login (real DB)', () => {
-  beforeEach(cleanAdminAccounts);
+  const ADMIN = `${ADMIN_PREFIX}admin`;
+  beforeEach(cleanAuthFixtures);
 
   it('returns admin_success with correct credentials', async () => {
-    await insertAdmin('admin_int', 'correct_password_123');
-    const result = await unifiedLoginService('admin_int', 'correct_password_123', undefined, undefined);
+    await insertAdmin(ADMIN, 'correct_password_123');
+    const result = await unifiedLoginService(ADMIN, 'correct_password_123', undefined, undefined);
     expect(result.kind).toBe('admin_success');
     if (result.kind === 'admin_success') {
-      expect(result.admin.username).toBe('admin_int');
+      expect(result.admin.username).toBe(ADMIN);
       expect(typeof result.admin.id).toBe('number');
     }
   });
 
   it('returns invalid_credentials with wrong password', async () => {
-    await insertAdmin('admin_int', 'correct_password_123');
-    const result = await unifiedLoginService('admin_int', 'wrong_password', undefined, undefined);
+    await insertAdmin(ADMIN, 'correct_password_123');
+    const result = await unifiedLoginService(ADMIN, 'wrong_password', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
   });
 
   it('returns invalid_credentials for unknown username', async () => {
-    const result = await unifiedLoginService('nobody', 'any_password', undefined, undefined);
+    const result = await unifiedLoginService(`${ADMIN_PREFIX}nobody`, 'any_password', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
   });
 
   it('returns admin_requires_password when no password is supplied', async () => {
-    await insertAdmin('admin_int', 'correct_password_123');
-    const result = await unifiedLoginService('admin_int', undefined, undefined, undefined);
+    await insertAdmin(ADMIN, 'correct_password_123');
+    const result = await unifiedLoginService(ADMIN, undefined, undefined, undefined);
     expect(result.kind).toBe('admin_requires_password');
   });
 });
@@ -119,51 +127,51 @@ describeIntegration('Admin login (real DB)', () => {
 // ── Workshop login ─────────────────────────────────────────────────────────────
 
 describeIntegration('Workshop login (real DB)', () => {
-  beforeEach(() => Promise.all([cleanAdminAccounts(), cleanWorkshopUsers()]));
+  beforeEach(cleanAuthFixtures);
 
   it('returns requires_password_setup for a user without a password set', async () => {
-    await insertWorkshopUser({ badge: 'W001' });
-    const result = await unifiedLoginService('W001', undefined, undefined, undefined);
+    await insertWorkshopUser({ badge: `${BADGE_PREFIX}001` });
+    const result = await unifiedLoginService(`${BADGE_PREFIX}001`, undefined, undefined, undefined);
     expect(result.kind).toBe('workshop_requires_password_setup');
     if (result.kind === 'workshop_requires_password_setup') {
-      expect(result.badgeNumber).toBe('W001');
+      expect(result.badgeNumber).toBe(`${BADGE_PREFIX}001`);
     }
   });
 
   it('returns requires_password for a user who has a password set', async () => {
-    await insertWorkshopUser({ badge: 'W002', withPassword: 'mypassword99' });
-    const result = await unifiedLoginService('W002', undefined, undefined, undefined);
+    await insertWorkshopUser({ badge: `${BADGE_PREFIX}002`, withPassword: 'mypassword99' });
+    const result = await unifiedLoginService(`${BADGE_PREFIX}002`, undefined, undefined, undefined);
     expect(result.kind).toBe('workshop_requires_password');
     if (result.kind === 'workshop_requires_password') {
-      expect(result.badgeNumber).toBe('W002');
+      expect(result.badgeNumber).toBe(`${BADGE_PREFIX}002`);
     }
   });
 
   it('returns workshop_success with correct credentials', async () => {
-    await insertWorkshopUser({ badge: 'W003', withPassword: 'correct_pass_99' });
-    const result = await unifiedLoginService('W003', 'correct_pass_99', undefined, undefined);
+    await insertWorkshopUser({ badge: `${BADGE_PREFIX}003`, withPassword: 'correct_pass_99' });
+    const result = await unifiedLoginService(`${BADGE_PREFIX}003`, 'correct_pass_99', undefined, undefined);
     expect(result.kind).toBe('workshop_success');
     if (result.kind === 'workshop_success') {
-      expect(result.user.badge_number).toBe('W003');
+      expect(result.user.badge_number).toBe(`${BADGE_PREFIX}003`);
       expect(typeof result.user.id).toBe('number');
     }
   });
 
   it('returns invalid_credentials with wrong password', async () => {
-    await insertWorkshopUser({ badge: 'W004', withPassword: 'correct_pass_99' });
-    const result = await unifiedLoginService('W004', 'wrong_pass', undefined, undefined);
+    await insertWorkshopUser({ badge: `${BADGE_PREFIX}004`, withPassword: 'correct_pass_99' });
+    const result = await unifiedLoginService(`${BADGE_PREFIX}004`, 'wrong_pass', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
   });
 
   it('returns invalid_credentials for inactive user', async () => {
-    await insertWorkshopUser({ badge: 'W005', withPassword: 'correct_pass_99', active: false });
-    const result = await unifiedLoginService('W005', 'correct_pass_99', undefined, undefined);
+    await insertWorkshopUser({ badge: `${BADGE_PREFIX}005`, withPassword: 'correct_pass_99', active: false });
+    const result = await unifiedLoginService(`${BADGE_PREFIX}005`, 'correct_pass_99', undefined, undefined);
     // Inactive users are treated as unknown badges (not_found in the credential service)
     expect(result.kind).toBe('invalid_credentials');
   });
 
   it('returns invalid_credentials for unknown badge number', async () => {
-    const result = await unifiedLoginService('UNKNOWN_BADGE', 'any', undefined, undefined);
+    const result = await unifiedLoginService(`${BADGE_PREFIX}UNKNOWN`, 'any', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
   });
 });

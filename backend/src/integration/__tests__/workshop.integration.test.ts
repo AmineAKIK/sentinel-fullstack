@@ -98,7 +98,11 @@ afterEach(async () => {
 
 afterAll(async () => {
   if (!RUN) return;
-  await pool.query(`DELETE FROM sentinel_users WHERE badge_number LIKE '%-INT-%'`);
+  // Nettoyage chirurgical : uniquement les badges de CE fichier (préfixe de
+  // deux lettres + « -INT- », ex. OP-INT-01). On évite « %-INT-% » qui
+  // attraperait aussi les fixtures d'autres suites (ex. RGPD-INT-01) lorsque
+  // les fichiers d'intégration s'exécutent en parallèle.
+  await pool.query(`DELETE FROM sentinel_users WHERE badge_number LIKE '__-INT-%'`);
   await pool.query(`DELETE FROM production_lines WHERE line_number = 'L-INT-01'`);
   await pool.end();
 });
