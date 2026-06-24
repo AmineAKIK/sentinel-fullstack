@@ -53,6 +53,11 @@ export default function IncidentDossier({
   const navigate = useNavigate();
   const hasKnowledge = incident.status === 'CLOSED' && Boolean(incident.intervention_note);
 
+  // Contexte machine : mène à la connaissance de cette ligne+machine, filtre
+  // pré-rempli (P3 — répondre, pas faire chercher). Même geste que sur le
+  // détail du tableau de bord. L'historique n'y figure pas : on y est déjà.
+  const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
+
   return (
     <>
       <div className="history-timeline-header">
@@ -67,15 +72,24 @@ export default function IncidentDossier({
             {STATUS_LABELS[incident.status] ?? incident.status}
           </span>
         </div>
-        {hasKnowledge && (
+        <div className="action-bar history-knowledge-actions">
+          {hasKnowledge && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => void navigate(`/workshop/knowledge?incident=${incident.id}`)}
+            >
+              Cette fiche connaissance
+            </button>
+          )}
           <button
             type="button"
-            className="btn btn-outline history-knowledge-btn"
-            onClick={() => void navigate(`/workshop/knowledge?incident=${incident.id}`)}
+            className="btn btn-outline btn-sm"
+            onClick={() => void navigate(`/workshop/knowledge?${machineContextQuery}`)}
           >
-            Voir la fiche connaissance
+            Solutions déjà appliquées
           </button>
-        )}
+        </div>
       </div>
 
       <div className="history-dossier-summary">

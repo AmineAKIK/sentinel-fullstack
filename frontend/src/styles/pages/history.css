@@ -98,8 +98,9 @@
   overflow-wrap: anywhere;
 }
 
-.history-knowledge-btn {
+.history-knowledge-actions {
   align-self: flex-start;
+  margin-top: 0;
 }
 
 .history-header-actions {
