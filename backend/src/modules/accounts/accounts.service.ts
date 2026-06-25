@@ -30,7 +30,7 @@ async function guardNoActiveTakenIncidents(userId: number, action: string): Prom
       ok: false,
       status: 409,
       code: 'RESOURCE_IN_USE',
-      message: `Impossible de ${action} : ${count} incident(s) actif(s) sont encore pris en charge par cet utilisateur.`,
+      message: `Impossible de ${action} : ce technicien a ${count} incident${count > 1 ? 's' : ''} actif${count > 1 ? 's' : ''} en cours. Réassignez-les ou clôturez-les avant de continuer.`,
     };
   }
   return null;
