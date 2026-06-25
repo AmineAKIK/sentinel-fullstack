@@ -345,7 +345,13 @@ export default function WorkshopHistoryPage() {
 
             {/* Tableau desktop */}
             <div className="table-wrapper history-journal-table">
-              <table className="change-table">
+              <table className="change-table" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '25%' }} />
+                  <col style={{ width: '30%' }} />
+                  <col />
+                </colgroup>
                 <thead>
                   <tr>
                     {(['date', 'action', 'incident', 'actor'] as SortCol[]).map((col) => {

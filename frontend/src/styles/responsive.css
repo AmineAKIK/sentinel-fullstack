@@ -465,11 +465,6 @@ td {
   font-size: var(--text-base);
 }
 
-.td-shrink {
-  white-space: nowrap;
-  width: 1%;
-}
-
 tr:last-child td {
   border-bottom: none;
 }

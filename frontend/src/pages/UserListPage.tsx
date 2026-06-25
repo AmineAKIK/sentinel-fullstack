@@ -231,7 +231,15 @@ export default function UserListPage() {
           ) : (
             <>
             <div className="table-wrapper user-table-wrapper">
-              <table>
+              <table style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '40px' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th scope="col" aria-sort={headerAriaSort('name')}>
@@ -276,16 +284,16 @@ export default function UserListPage() {
                       <td>
                         <strong>{user.last_name}</strong> {user.first_name}
                       </td>
-                      <td className="td-shrink">{user.badge_number}</td>
-                      <td className="td-shrink">
+                      <td>{user.badge_number}</td>
+                      <td>
                         <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
                       </td>
-                      <td className="td-shrink">
+                      <td>
                         <span className={`badge-status ${user.is_active ? 'active' : 'inactive'}`}>
                           {user.is_active ? 'Actif' : 'Inactif'}
                         </span>
                       </td>
-                      <td className="td-shrink">{formatDate(user.created_at)}</td>
+                      <td>{formatDate(user.created_at)}</td>
                       <td className="row-action" aria-hidden="true">
                         <svg
                           className="row-action-icon"

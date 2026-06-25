@@ -212,7 +212,16 @@ export default function LinesPage() {
           ) : (
             <>
               <div className="table-wrapper line-table-wrapper">
-                <table>
+                <table style={{ tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '40px' }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th scope="col" aria-sort={headerAriaSort('line_number')}>

@@ -274,7 +274,14 @@ export default function AdminAuditPage() {
           ) : (
             <>
               <div className="table-wrapper audit-table-wrapper">
-                <table>
+                <table style={{ tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th scope="col" aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}>
