@@ -97,8 +97,8 @@ describe('MAINTENANCE permissions', () => {
     expect(canPerform('MAINTENANCE', 'take', incident({ status: 'OPEN', is_taken: false }))).toBe(true);
   });
 
-  it('cannot take an already-taken incident', () => {
-    expect(canPerform('MAINTENANCE', 'take', incident({ is_taken: true }))).toBe(false);
+  it('can retake an already-taken open incident', () => {
+    expect(canPerform('MAINTENANCE', 'take', incident({ status: 'OPEN', is_taken: true }))).toBe(true);
   });
 
   it('can setPending when OPEN and taken', () => {

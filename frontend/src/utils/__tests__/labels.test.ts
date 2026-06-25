@@ -8,9 +8,9 @@ describe('formatAuditEventTarget', () => {
     expect(formatAuditEventTarget(target)).toBe('L03');
   });
 
-  it('scope=line sans numéro → "Ligne supprimée"', () => {
+  it('scope=line sans numéro → "Ligne archivée"', () => {
     const target: AuditEventTarget = { scope: 'line', line_number: null };
-    expect(formatAuditEventTarget(target)).toBe('Ligne supprimée');
+    expect(formatAuditEventTarget(target)).toBe('Ligne archivée');
   });
 
   it('scope=user avec prénom + nom', () => {
