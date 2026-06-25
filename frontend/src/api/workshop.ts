@@ -28,6 +28,7 @@ export async function listWorkshopIncidents(): Promise<WorkshopIncident[]> {
   return api.get<WorkshopIncident[]>('/api/workshop/incidents');
 }
 
+
 export type IncidentWorkspaceParams = {
   q?: string;
   status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
