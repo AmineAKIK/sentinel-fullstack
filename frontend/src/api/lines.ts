@@ -45,8 +45,11 @@ export async function updateLine(
   return api.patch<ProductionLine>(`/api/admin/lines/${id}`, payload);
 }
 
-export async function deleteLine(id: number): Promise<void> {
-  return api.delete<void>(`/api/admin/lines/${id}`);
+export async function archiveLine(
+  id: number,
+  force = false
+): Promise<{ message: string; canceledIncidents?: number }> {
+  return api.post(`/api/admin/lines/${id}/archive`, { force });
 }
 
 export async function getLineImpact(id: number): Promise<{

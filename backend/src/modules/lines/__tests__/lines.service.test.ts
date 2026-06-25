@@ -1,8 +1,8 @@
 import {
+  archiveLineService,
   checkLineAvailabilityService,
   checkLineConflictsService,
   createLineService,
-  deleteLineService,
   getLineImpactService,
   getLineService,
   updateLineService,
@@ -11,6 +11,7 @@ import {
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock('../lines.repository', () => ({
+  cancelActiveIncidentsByLine: jest.fn(),
   createLineData: jest.fn(),
   findMachineConflicts: jest.fn(),
   getActiveIncidentCountForLine: jest.fn(),
@@ -25,6 +26,10 @@ jest.mock('../lines.repository', () => ({
 
 jest.mock('../lines.events', () => ({
   createLineAuditEvent: jest.fn(),
+}));
+
+jest.mock('../../workshop/workshop.events', () => ({
+  logIncidentEvent: jest.fn(),
 }));
 
 jest.mock('../lines.policy', () => ({
@@ -223,16 +228,16 @@ describe('updateLineService', () => {
   });
 });
 
-// ─── deleteLineService ────────────────────────────────────────────────────────
+// ─── archiveLineService ───────────────────────────────────────────────────────
 
-describe('deleteLineService', () => {
-  it('retourne RESOURCE_IN_USE si la ligne a des incidents actifs', async () => {
-    jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(1);
+describe('archiveLineService', () => {
+  it('retourne LINE_HAS_ACTIVE_INCIDENTS si la ligne a des incidents actifs sans force', async () => {
+    jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(2);
 
-    const result = await deleteLineService(1, 1);
+    const result = await archiveLineService(1, 1, false);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe('RESOURCE_IN_USE');
+      expect(result.code).toBe('LINE_HAS_ACTIVE_INCIDENTS');
       expect(result.status).toBe(409);
     }
   });
@@ -241,7 +246,7 @@ describe('deleteLineService', () => {
     jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(0);
     jest.mocked(repo.softDeleteLine).mockResolvedValue(false);
 
-    const result = await deleteLineService(999, 1);
+    const result = await archiveLineService(999, 1);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe('NOT_FOUND');
@@ -249,15 +254,31 @@ describe('deleteLineService', () => {
     }
   });
 
-  it('supprime logiquement la ligne avec succès', async () => {
+  it('archive la ligne avec succès quand pas d\'incidents actifs', async () => {
     jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(0);
     jest.mocked(repo.softDeleteLine).mockResolvedValue(true);
     jest.mocked(events.createLineAuditEvent).mockResolvedValue(undefined);
 
-    const result = await deleteLineService(1, 1);
+    const result = await archiveLineService(1, 1);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data.message).toBe('Ligne supprimée.');
-    expect(events.createLineAuditEvent).toHaveBeenCalledWith(1, 1, 'LINE_SOFT_DELETED', null, null);
+    if (result.ok) expect(result.data.message).toBe('Ligne archivée.');
+    expect(events.createLineAuditEvent).toHaveBeenCalledWith(
+      1, 1, 'LINE_SOFT_DELETED', { forcedCanceledIncidents: 0 }, null
+    );
+  });
+
+  it('annule les incidents actifs et archive la ligne avec force=true', async () => {
+    jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(3);
+    jest.mocked(repo.cancelActiveIncidentsByLine).mockResolvedValue([10, 11, 12]);
+    jest.mocked(repo.softDeleteLine).mockResolvedValue(true);
+    jest.mocked(events.createLineAuditEvent).mockResolvedValue(undefined);
+
+    const result = await archiveLineService(1, 1, true);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.message).toContain('3 incident(s) actif(s) annulé(s)');
+      expect(result.data.canceledIncidents).toBe(3);
+    }
   });
 });
 

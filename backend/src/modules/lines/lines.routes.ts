@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { adminAuthMiddleware } from '../../middlewares/adminAuth';
 import {
+	archiveLine,
 	createLine,
-	deleteLine,
 	getLine,
 	listLines,
 	updateLine,
@@ -24,6 +24,6 @@ router.post('/', createLine);
 router.get('/:id', getLine);
 router.get('/:id/impact', getLineImpact);
 router.patch('/:id', updateLine);
-router.delete('/:id', deleteLine);
+router.post('/:id/archive', archiveLine);
 
 export default router;

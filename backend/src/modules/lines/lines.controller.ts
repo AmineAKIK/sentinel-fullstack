@@ -8,10 +8,10 @@ import {
 import { sendError } from '../../utils/errors';
 import { badRequest } from '../../utils/serviceResult';
 import {
+  archiveLineService,
   checkLineAvailabilityService,
   checkLineConflictsService,
   createLineService,
-  deleteLineService,
   getLineImpactService,
   getLineService,
   listLinesService,
@@ -115,17 +115,18 @@ export async function updateLine(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function deleteLine(req: Request, res: Response): Promise<void> {
+export async function archiveLine(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
 
-    const result = await deleteLineService(id.data, req.admin!.adminId);
+    const force = req.body?.force === true;
+    const result = await archiveLineService(id.data, req.admin!.adminId, force);
     if (sendServiceError(res, result)) return;
 
     res.json(result.data);
   } catch (err) {
-    handleControllerError(res, 'deleteLine', err);
+    handleControllerError(res, 'archiveLine', err);
   }
 }
 

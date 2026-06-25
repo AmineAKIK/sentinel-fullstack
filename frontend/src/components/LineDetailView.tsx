@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import NavBar from './NavBar';
 import EditLineModal from './EditLineModal';
-import DeleteLineConfirmModal from './DeleteLineConfirmModal';
+import ArchiveLineConfirmModal from './ArchiveLineConfirmModal';
 import EditMachineModal from './EditMachineModal';
 import LinePlanModal from './LinePlanModal';
 import DetailField from './ui/DetailField';
@@ -115,7 +115,7 @@ export default function LineDetailView({
         />
       )}
       {showDelete && (
-        <DeleteLineConfirmModal
+        <ArchiveLineConfirmModal
           line={line}
           onClose={() => setShowDelete(false)}
           onSuccess={() => {

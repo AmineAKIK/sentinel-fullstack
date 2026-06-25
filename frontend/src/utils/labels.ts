@@ -43,7 +43,7 @@ export interface AuditEventTarget {
 }
 
 export function formatAuditEventTarget(event: AuditEventTarget, includeBadge = false): string {
-  if (event.scope === 'line') return event.line_number || 'Ligne supprimée';
+  if (event.scope === 'line') return event.line_number || 'Ligne archivée';
   const name = `${event.first_name || ''} ${event.last_name || ''}`.trim();
   if (includeBadge && event.badge_number) return `${name || 'Utilisateur'} (${event.badge_number})`;
   return name || 'Utilisateur';

@@ -3,6 +3,7 @@ import { withTransaction } from '../../db/transaction';
 import { createLineAuditEvent } from './lines.events';
 import { getLineEventType } from './lines.policy';
 import {
+  cancelActiveIncidentsByLine,
   createLineData,
   findMachineConflicts,
   getActiveIncidentCountForLine,
@@ -16,6 +17,7 @@ import {
   softDeleteLine,
   updateLineData,
 } from './lines.repository';
+import { logIncidentEvent } from '../workshop/workshop.events';
 import { CreateLineInput, UpdateLineInput } from './lines.validation';
 
 export async function listLinesService(): Promise<LineDto[]> {
@@ -123,29 +125,50 @@ export async function updateLineService(
   return { ok: true, data: line };
 }
 
-export async function deleteLineService(id: number, adminId: number): Promise<ServiceResult<{ message: string }>> {
-  const activeIncidents = await getActiveIncidentCountForLine(id);
-  if (activeIncidents > 0) {
+export async function archiveLineService(
+  id: number,
+  adminId: number,
+  force = false
+): Promise<ServiceResult<{ message: string; canceledIncidents?: number }>> {
+  const activeCount = await getActiveIncidentCountForLine(id);
+
+  if (activeCount > 0 && !force) {
     return {
       ok: false,
       status: 409,
-      code: 'RESOURCE_IN_USE',
-      message: `Impossible de supprimer cette ligne : ${activeIncidents} incident(s) actif(s) y sont encore liés.`,
+      code: 'LINE_HAS_ACTIVE_INCIDENTS',
+      message: `Cette ligne a ${activeCount} incident(s) actif(s). Annulez-les d'abord ou forcez l'archivage.`,
     };
   }
 
-  const deleted = await withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
+    let canceledCount = 0;
+    if (force && activeCount > 0) {
+      const canceledIds = await cancelActiveIncidentsByLine(id, client);
+      canceledCount = canceledIds.length;
+      for (const incidentId of canceledIds) {
+        await logIncidentEvent(incidentId, adminId, 'INCIDENT_CANCELED', { reason: 'line_archived' }, client);
+      }
+    }
     const ok = await softDeleteLine(id, client);
-    if (!ok) return false;
-    await createLineAuditEvent(id, adminId, 'LINE_SOFT_DELETED', null, client);
-    return true;
+    if (!ok) return null;
+    await createLineAuditEvent(id, adminId, 'LINE_SOFT_DELETED', { forcedCanceledIncidents: canceledCount }, client);
+    return canceledCount;
   });
 
-  if (!deleted) {
+  if (result === null) {
     return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Ligne introuvable.' };
   }
 
-  return { ok: true, data: { message: 'Ligne supprimée.' } };
+  return {
+    ok: true,
+    data: {
+      message: result > 0
+        ? `Ligne archivée. ${result} incident(s) actif(s) annulé(s).`
+        : 'Ligne archivée.',
+      canceledIncidents: result,
+    },
+  };
 }
 
 export async function getLineImpactService(id: number): Promise<LineImpactDto> {

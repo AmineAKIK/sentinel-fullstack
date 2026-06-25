@@ -182,3 +182,22 @@ export async function getActiveIncidentCountForLine(lineId: number): Promise<num
 
   return rows[0]?.count ?? 0;
 }
+
+export async function cancelActiveIncidentsByLine(lineId: number, client?: PoolClient): Promise<number[]> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
+    `UPDATE workshop_incidents
+     SET status = 'CANCELED',
+         cancel_request = FALSE,
+         cancel_request_reason = NULL,
+         delete_request = FALSE,
+         delete_request_reason = NULL,
+         edit_request = NULL,
+         updated_at = NOW()
+     WHERE line_id = $1 AND ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)}
+     RETURNING id`,
+    [lineId]
+  );
+
+  return rows.map((r) => r.id);
+}

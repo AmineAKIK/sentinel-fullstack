@@ -153,7 +153,7 @@ export default function LinesPage() {
         onLineDeleted={(line) => {
           setLines((prev) => prev.filter((l) => l.id !== line.id));
           setSelected(null);
-          setSuccessMsg(`Ligne ${line.line_number} supprimée avec succès.`);
+          setSuccessMsg(`Ligne ${line.line_number} archivée avec succès.`);
           setTimeout(() => setSuccessMsg(''), 4000);
         }}
       />
