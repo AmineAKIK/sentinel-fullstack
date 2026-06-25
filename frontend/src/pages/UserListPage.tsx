@@ -276,16 +276,16 @@ export default function UserListPage() {
                       <td>
                         <strong>{user.last_name}</strong> {user.first_name}
                       </td>
-                      <td>{user.badge_number}</td>
-                      <td>
+                      <td className="td-shrink">{user.badge_number}</td>
+                      <td className="td-shrink">
                         <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
                       </td>
-                      <td>
+                      <td className="td-shrink">
                         <span className={`badge-status ${user.is_active ? 'active' : 'inactive'}`}>
                           {user.is_active ? 'Actif' : 'Inactif'}
                         </span>
                       </td>
-                      <td>{formatDate(user.created_at)}</td>
+                      <td className="td-shrink">{formatDate(user.created_at)}</td>
                       <td className="row-action" aria-hidden="true">
                         <svg
                           className="row-action-icon"
