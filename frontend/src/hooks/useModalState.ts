@@ -48,7 +48,7 @@ const initialState: ModalState = {
 function modalReducer(state: ModalState, action: ModalAction): ModalState {
   switch (action.type) {
     case 'OPEN':
-      return { ...state, activeModal: action.modal };
+      return { ...state, activeModal: action.modal, reviewError: '', reviewLoading: false };
     case 'CLOSE':
       return { ...state, activeModal: null };
     case 'OPEN_REVIEW':

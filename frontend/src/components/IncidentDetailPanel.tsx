@@ -344,6 +344,7 @@ export default function IncidentDetailPanel({
               ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
               : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."
           }
+          error={modal.state.reviewError}
           onClose={() => modal.closeModal()}
           onConfirm={() => onMaintenanceDeleteConfirm(modal.state.activeModal === 'maintenanceDirect' ? 'direct' : 'approve')}
         />

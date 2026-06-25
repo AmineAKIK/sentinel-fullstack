@@ -1,10 +1,11 @@
 import {
-  deleteWorkshopIncident,
+  cancelWorkshopIncident,
   followWorkshopIncident,
   reorderWorkshopIncidents,
   unfollowWorkshopIncident,
   updateWorkshopIncident,
 } from '../api/workshop';
+import { ApiResponseError } from '../api/client';
 import { WorkshopIncident } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
 import { ModalStateApi } from './useModalState';
@@ -21,6 +22,10 @@ interface IncidentActionsOptions {
   resetDragState: () => void;
   isMaintenance: boolean;
   userRole: string | undefined;
+}
+
+function actionErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiResponseError ? err.message : fallback;
 }
 
 export function useIncidentActions(opts: IncidentActionsOptions) {
@@ -105,7 +110,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      await deleteWorkshopIncident(modal.state.reviewIncident.id);
+      await cancelWorkshopIncident(modal.state.reviewIncident.id);
       const id = modal.state.reviewIncident.id;
       setIncidents((prev) =>
         sortIncidents(
@@ -120,7 +125,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       void refreshMetrics();
       modal.closeReview();
     } catch (_err) {
-      modal.setReviewError("Impossible d'annuler l'incident.");
+      modal.setReviewError(actionErrorMessage(_err, "Impossible d'annuler l'incident."));
     } finally {
       modal.setReviewLoading(false);
     }
@@ -188,38 +193,44 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
   }
 
   async function handleMaintenanceDeleteConfirm(mode: 'direct' | 'approve') {
-    if (mode === 'approve' && modal.state.reviewIncident) {
-      const id = modal.state.reviewIncident.id;
-      await deleteWorkshopIncident(id);
-      setIncidents((prev) =>
-        sortIncidents(
-          prev.map((item) =>
-            item.id === id
-              ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
-              : item
+    modal.setReviewError('');
+    try {
+      if (mode === 'approve' && modal.state.reviewIncident) {
+        const id = modal.state.reviewIncident.id;
+        await cancelWorkshopIncident(id);
+        setIncidents((prev) =>
+          sortIncidents(
+            prev.map((item) =>
+              item.id === id
+                ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
+                : item
+            )
           )
-        )
-      );
-      if (selectedIncident?.id === id) clearSelectedIncident();
-      void refreshMetrics();
-      modal.closeReview();
-    }
-    if (mode === 'direct' && selectedIncident) {
-      const id = selectedIncident.id;
-      await deleteWorkshopIncident(id);
-      setIncidents((prev) =>
-        sortIncidents(
-          prev.map((item) =>
-            item.id === id
-              ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
-              : item
+        );
+        if (selectedIncident?.id === id) clearSelectedIncident();
+        void refreshMetrics();
+        modal.closeReview();
+        return;
+      }
+      if (mode === 'direct' && selectedIncident) {
+        const id = selectedIncident.id;
+        await cancelWorkshopIncident(id);
+        setIncidents((prev) =>
+          sortIncidents(
+            prev.map((item) =>
+              item.id === id
+                ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
+                : item
+            )
           )
-        )
-      );
-      clearSelectedIncident();
-      void refreshMetrics();
+        );
+        clearSelectedIncident();
+        void refreshMetrics();
+        modal.closeModal();
+      }
+    } catch (err) {
+      modal.setReviewError(actionErrorMessage(err, "Impossible d'annuler l'incident."));
     }
-    modal.closeModal();
   }
 
   async function persistManualOrder(ordered: WorkshopIncident[]) {

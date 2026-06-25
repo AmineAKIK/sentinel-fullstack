@@ -186,7 +186,7 @@ export async function updateIncident(req: Request, res: Response): Promise<void>
   }
 }
 
-export async function deleteIncident(req: Request, res: Response): Promise<void> {
+export async function cancelIncident(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
@@ -194,7 +194,7 @@ export async function deleteIncident(req: Request, res: Response): Promise<void>
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {
-    handleControllerError(res, 'deleteIncident', err);
+    handleControllerError(res, 'cancelIncident', err);
   }
 }
 

@@ -109,7 +109,7 @@ export async function unfollowWorkshopIncident(id: number): Promise<WorkshopInci
   return api.delete<WorkshopIncident>(`/api/workshop/incidents/${id}/follow`);
 }
 
-export async function deleteWorkshopIncident(id: number): Promise<void> {
+export async function cancelWorkshopIncident(id: number): Promise<void> {
   return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {});
 }
 
