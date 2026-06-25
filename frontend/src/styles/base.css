@@ -129,7 +129,6 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 html,
@@ -530,7 +529,6 @@ a { color: var(--color-primary); text-decoration: none; }
   font-weight: 500;
   background-color: var(--color-primary-soft);
   color: var(--color-primary);
-  white-space: nowrap;
 }
 
 /* Badge de niveau d'attention (doctrine §5.1) — consomme la grammaire F1. */
