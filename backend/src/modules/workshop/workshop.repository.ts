@@ -30,12 +30,13 @@ const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.line_id, wi.line_number, wi.ma
             wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
             wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at`;
 
-const INCIDENT_ACTOR_COLS = `COALESCE(wi.declarant_first_name, su.first_name)       AS first_name,
-            COALESCE(wi.declarant_last_name,  su.last_name)        AS last_name,
-            COALESCE(wi.declarant_role,       su.role)             AS role,
-            COALESCE(wi.taken_by_first_name,  tu.first_name)       AS taken_by_first_name,
-            COALESCE(wi.taken_by_last_name,   tu.last_name)        AS taken_by_last_name,
-            COALESCE(wi.taken_by_role,        tu.role)             AS taken_by_role`;
+const INCIDENT_ACTOR_COLS = `COALESCE(wi.declarant_first_name,   su.first_name)    AS first_name,
+            COALESCE(wi.declarant_last_name,    su.last_name)     AS last_name,
+            COALESCE(wi.declarant_role,         su.role)          AS role,
+            COALESCE(wi.declarant_badge_number, su.badge_number)  AS badge_number,
+            COALESCE(wi.taken_by_first_name,    tu.first_name)    AS taken_by_first_name,
+            COALESCE(wi.taken_by_last_name,     tu.last_name)     AS taken_by_last_name,
+            COALESCE(wi.taken_by_role,          tu.role)          AS taken_by_role`;
 
 const INCIDENT_FOLLOWER_COLS = `(wif.id IS NOT NULL) AS is_followed,
             wif.created_at AS followed_at`;
@@ -405,10 +406,10 @@ export async function createIncidentData(input: {
     `INSERT INTO workshop_incidents (
       user_id, line_id, line_number, machine_id, machine_brand,
       robot_label, head_number, state, comment, current_product, display_order,
-      declarant_first_name, declarant_last_name, declarant_role
+      declarant_first_name, declarant_last_name, declarant_role, declarant_badge_number
      )
      SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-            su.first_name, su.last_name, su.role
+            su.first_name, su.last_name, su.role, su.badge_number
      FROM sentinel_users su
      WHERE su.id = $1
      RETURNING id`,

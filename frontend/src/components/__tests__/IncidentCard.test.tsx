@@ -36,6 +36,7 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
     updated_at: new Date().toISOString(),
     first_name: 'Jean',
     last_name: 'Dupont',
+    badge_number: null,
     role: 'OPERATOR',
     ...overrides,
   };

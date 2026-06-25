@@ -42,7 +42,7 @@ export interface WorkshopIncident {
   followed_at?: string | null;
   first_name: string;
   last_name: string;
-  badge_number?: string | null;
+  badge_number: string | null;
   role: Role;
 }
 

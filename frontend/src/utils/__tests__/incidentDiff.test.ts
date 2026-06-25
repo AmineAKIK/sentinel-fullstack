@@ -51,6 +51,7 @@ function incident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
     updated_at: '2024-01-01T00:00:00Z',
     first_name: 'Alice',
     last_name: 'Martin',
+    badge_number: null,
     role: 'OPERATOR',
     ...overrides,
   };
