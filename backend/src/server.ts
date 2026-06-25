@@ -20,6 +20,7 @@ import { adminRouter as adminSupportRoutes, workshopRouter as workshopSupportRou
 import { securityHeaders } from './middlewares/securityHeaders';
 import { loginRateLimit, globalApiRateLimit } from './middlewares/loginRateLimit';
 import { boardRouter } from './modules/board/board.auth';
+import { FIELD_LIMITS } from './domain/constants';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -70,6 +71,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/board', boardRouter);
 app.use('/api/workshop/support', workshopSupportRoutes);
 app.use('/api/workshop', workshopRoutes);
+
+app.get('/api/config', (_req, res) => {
+  res.json({ fieldLimits: FIELD_LIMITS });
+});
 
 app.get('/api/health', async (_req, res) => {
   try {

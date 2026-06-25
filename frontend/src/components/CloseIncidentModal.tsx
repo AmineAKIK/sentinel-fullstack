@@ -1,6 +1,6 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
-import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { useFieldLimits } from '../routes/FieldLimitsContext';
 
 interface CloseIncidentModalProps {
   incident: WorkshopIncident;
@@ -9,6 +9,7 @@ interface CloseIncidentModalProps {
 }
 
 export default function CloseIncidentModal({ incident, onClose, onConfirm }: CloseIncidentModalProps) {
+  const FIELD_LIMITS = useFieldLimits();
   return (
     <TextConfirmModal
       title="Clôturer l'incident"

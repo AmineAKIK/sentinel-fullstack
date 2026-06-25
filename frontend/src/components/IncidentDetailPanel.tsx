@@ -16,7 +16,7 @@ import CharCounter from './ui/CharCounter';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { Role } from '../types/common';
 import { formatDateTime } from '../utils/date';
-import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { useFieldLimits } from '../routes/FieldLimitsContext';
 import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
 import { ModalStateApi } from '../hooks/useModalState';
@@ -76,6 +76,7 @@ export default function IncidentDetailPanel({
   patchIncident,
 }: IncidentDetailPanelProps) {
   const navigate = useNavigate();
+  const FIELD_LIMITS = useFieldLimits();
   const [responsibleDraft, setResponsibleDraft] = useState(incident.responsible_comment ?? '');
 
   // Contexte machine : amène directement à l'historique / la connaissance de

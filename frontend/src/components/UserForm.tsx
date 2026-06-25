@@ -1,6 +1,6 @@
 import { Role } from '../types';
 import { ROLE_LABELS } from '../utils/labels';
-import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { useFieldLimits } from '../routes/FieldLimitsContext';
 import SelectField from './ui/SelectField';
 
 export interface UserFormData {
@@ -30,6 +30,7 @@ export default function UserForm({
   showStatus,
   badgeError,
 }: UserFormProps) {
+  const FIELD_LIMITS = useFieldLimits();
   function handleChange(field: keyof UserFormData, value: string | boolean) {
     onChange({ ...data, [field]: value });
   }

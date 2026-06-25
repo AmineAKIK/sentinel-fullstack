@@ -17,6 +17,7 @@ import AdminAuditPage from './pages/AdminAuditPage';
 import AdminSupportPage from './pages/AdminSupportPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { AppAuthProvider } from './routes/AppAuthContext';
+import { FieldLimitsProvider } from './routes/FieldLimitsContext';
 import AdminRoute from './routes/AdminRoute';
 import WorkshopRoute from './routes/WorkshopRoute';
 import GuestRoute from './routes/GuestRoute';
@@ -25,6 +26,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 export default function App() {
   return (
     <ErrorBoundary>
+      <FieldLimitsProvider>
       <AppAuthProvider>
         <a className="skip-link" href="#main-content">Passer au contenu principal</a>
         <Routes>
@@ -151,6 +153,7 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AppAuthProvider>
+      </FieldLimitsProvider>
     </ErrorBoundary>
   );
 }
