@@ -96,7 +96,9 @@ export function canPerform(
     case 'rejectCancel':
       return role === 'RESPONSABLE' && isActiveIncident(incident) && incident.cancel_request === true;
     case 'take':
-      return role === 'MAINTENANCE' && incident.status === 'OPEN' && !incident.is_taken;
+      // Any MAINTENANCE member can take or retake an OPEN incident — team play,
+      // every transfer is logged in the event history.
+      return role === 'MAINTENANCE' && incident.status === 'OPEN';
     case 'setPending':
       return role === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
     case 'resume':

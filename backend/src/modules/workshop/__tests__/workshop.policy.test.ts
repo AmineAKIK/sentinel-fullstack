@@ -77,8 +77,8 @@ describe('MAINTENANCE permissions', () => {
     expect(canPerform('MAINTENANCE', 'TAKE', incident({ status: 'OPEN', is_taken: false }))).toBe(true);
   });
 
-  it('cannot TAKE an already-taken incident', () => {
-    expect(canPerform('MAINTENANCE', 'TAKE', incident({ is_taken: true }))).toBe(false);
+  it('can TAKE an already-taken incident (retake — team play, every transfer is logged)', () => {
+    expect(canPerform('MAINTENANCE', 'TAKE', incident({ status: 'OPEN', is_taken: true }))).toBe(true);
   });
 
   it('cannot TAKE a PENDING incident', () => {

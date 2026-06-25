@@ -118,8 +118,9 @@ export function canPerform(
         hasCancelRequest(incident)
       );
     case 'TAKE':
-      // Reserved for MAINTENANCE only — RESPONSABLE monitors but does not intervene.
-      return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && !incident.is_taken;
+      // Any MAINTENANCE member can take or retake an OPEN incident at any time.
+      // Technicians are autonomous — the ball changes feet, every transfer is logged.
+      return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN';
     case 'SET_PENDING':
       return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
     case 'RESUME':
