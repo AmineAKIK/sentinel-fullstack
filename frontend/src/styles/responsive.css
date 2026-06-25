@@ -1094,6 +1094,9 @@ tbody tr:hover .row-action {
   font-size: var(--text-base);
   color: var(--color-text);
   font-weight: 500;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .back-link {
