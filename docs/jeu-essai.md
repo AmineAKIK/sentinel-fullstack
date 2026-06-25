@@ -149,8 +149,8 @@ invalide n'atteint le service ni la base.
 
 **Analyse des écarts : un écart mineur, expliqué.** Le blocage est survenu à la 19ᵉ tentative
 et non à la 21ᵉ : les requêtes des scénarios précédents, émises depuis la même adresse IP,
-avaient déjà consommé une partie du **limiteur global par IP** (300 requêtes / 15 min), qui se
-cumule avec le limiteur de login (20 tentatives / 15 min par IP + identifiant). Le comportement
+avaient déjà consommé une partie du **limiteur global par IP**. Ce quota est configurable et se
+cumule avec le limiteur de login (10 échecs / 5 min par IP + identifiant). Le comportement
 de protection est donc conforme, et même légèrement plus strict en situation de trafic réel.
 
 ---

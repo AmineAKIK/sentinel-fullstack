@@ -15,10 +15,20 @@ interface RateLimitOptions {
 
 interface RateLimiter {
   middleware: (req: Request, res: Response, next: NextFunction) => void;
+  // Vérifie puis consomme une tentative. Utilisé pour les quotas qui comptent
+  // toutes les requêtes, pas seulement les échecs.
+  consume: (req: Request, res: Response, next: NextFunction) => void;
   // Enregistre une tentative ratée pour la clé de la requête (login échoué).
   recordFailure: (req: Request) => void;
   // Efface le compteur (login réussi) : un bon identifiant repart de zéro.
   clear: (req: Request) => void;
+}
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function createRateLimit(options: RateLimitOptions): RateLimiter {
@@ -50,15 +60,9 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
     return `${req.method}:${req.baseUrl || req.path}:${ip}:${identity}`;
   }
 
-  function middleware(req: Request, res: Response, next: NextFunction): void {
-    const now = Date.now();
-    cleanup(now);
-
+  function rejectIfLimited(req: Request, res: Response, now: number): boolean {
     const entry = attempts.get(getKey(req));
 
-    // On ne fait que VÉRIFIER ici. L'incrément n'a lieu qu'en cas d'échec
-    // avéré, signalé par le contrôleur via recordFailure — un login réussi ne
-    // doit jamais consommer le quota.
     if (entry && now <= entry.resetAt && entry.count >= maxAttempts) {
       const retryAfterSecs = Math.ceil((entry.resetAt - now) / 1000);
       res.setHeader('Retry-After', String(retryAfterSecs));
@@ -68,9 +72,29 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
         'RATE_LIMITED',
         `Trop de tentatives. Réessayez dans ${Math.ceil(retryAfterSecs / 60)} minute(s).`
       );
-      return;
+      return true;
     }
 
+    return false;
+  }
+
+  function middleware(req: Request, res: Response, next: NextFunction): void {
+    const now = Date.now();
+    cleanup(now);
+
+    // On ne fait que VÉRIFIER ici. L'incrément n'a lieu qu'en cas d'échec
+    // avéré, signalé par le contrôleur via recordFailure — un login réussi ne
+    // doit jamais consommer le quota.
+    if (rejectIfLimited(req, res, now)) return;
+
+    next();
+  }
+
+  function consume(req: Request, res: Response, next: NextFunction): void {
+    const now = Date.now();
+    cleanup(now);
+    if (rejectIfLimited(req, res, now)) return;
+    recordFailure(req);
     next();
   }
 
@@ -89,7 +113,7 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
     attempts.delete(getKey(req));
   }
 
-  return { middleware, recordFailure, clear };
+  return { middleware, consume, recordFailure, clear };
 }
 
 // Limiteur de connexion : clé IP + identité, ne compte que les échecs.
@@ -102,19 +126,20 @@ export const loginLimiter = createRateLimit({
 
 export const loginRateLimit = loginLimiter.middleware;
 
-// Limiteur global d'API : clé IP seule, 300 requêtes / 15 min.
-// Protège contre un client emballé / un DoS basique au niveau applicatif.
-// Conserve le comportement « incrémente à chaque requête » via recordFailure
-// appelé sur le passage (cf. middleware ci-dessous).
+// Limiteur global d'API : clé IP seule, configurable par environnement.
+// Le défaut laisse de la marge à plusieurs postes derrière une même IP tout en
+// gardant un filet contre un client emballé / un DoS basique applicatif.
 const globalLimiter = createRateLimit({
-  windowMs: 15 * 60 * 1000,
-  maxAttempts: 300,
+  windowMs: envInt('GLOBAL_API_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
+  maxAttempts: envInt('GLOBAL_API_RATE_LIMIT_MAX', 3000),
   ipOnly: true,
 });
 
 export function globalApiRateLimit(req: Request, res: Response, next: NextFunction): void {
-  // Le limiteur global compte CHAQUE requête (pas seulement les échecs) : on
-  // enregistre le passage puis on laisse le middleware vérifier le plafond.
-  globalLimiter.recordFailure(req);
-  globalLimiter.middleware(req, res, next);
+  if (req.path === '/health' || req.originalUrl === '/api/health') {
+    next();
+    return;
+  }
+
+  globalLimiter.consume(req, res, next);
 }
