@@ -350,7 +350,6 @@ button.workshop-metric:hover,
 .incident-summary-primary strong {
   display: block;
   line-height: 1.35;
-  overflow-wrap: anywhere;
 }
 
 .incident-summary-product strong {
@@ -369,7 +368,6 @@ button.workshop-metric:hover,
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   margin-top: 0;
-  overflow-wrap: anywhere;
 }
 
 .incident-responsible-instruction {
@@ -400,7 +398,6 @@ button.workshop-metric:hover,
   font-size: var(--text-base);
   font-weight: 500;
   line-height: 1.45;
-  overflow-wrap: anywhere;
 }
 
 .incident-comment {

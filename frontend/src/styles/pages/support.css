@@ -62,7 +62,6 @@
   font-weight: 700;
   font-size: var(--text-base);
   line-height: 1.2;
-  overflow-wrap: anywhere;
 }
 
 .support-agent-subtitle {
@@ -142,7 +141,6 @@
   line-height: 1.2;
   font-weight: 700;
   color: var(--color-text);
-  overflow-wrap: anywhere;
 }
 
 .support-empty-sub {
@@ -187,7 +185,6 @@
   border-radius: var(--radius);
   font-size: var(--text-base);
   line-height: 1.6;
-  word-break: break-word;
 }
 
 .support-bubble--user {

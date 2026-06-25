@@ -128,6 +128,8 @@ body {
   font-size: var(--text-base);
   line-height: 1.5;
   min-height: 100vh;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 html,
@@ -195,9 +197,9 @@ body,
   box-shadow: 0 0 0 5px var(--color-focus-ring);
 }
 
-h1 { font-size: var(--text-xl); font-weight: 700; overflow-wrap: anywhere; }
-h2 { font-size: var(--text-lg); font-weight: 600; overflow-wrap: anywhere; }
-h3 { font-size: var(--text-md); font-weight: 600; overflow-wrap: anywhere; }
+h1 { font-size: var(--text-xl); font-weight: 700; }
+h2 { font-size: var(--text-lg); font-weight: 600; }
+h3 { font-size: var(--text-md); font-weight: 600; }
 
 a { color: var(--color-primary); text-decoration: none; }
 
@@ -764,7 +766,6 @@ a { color: var(--color-primary); text-decoration: none; }
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   max-width: 100%;
-  overflow-wrap: anywhere;
 }
 
 .audit-context-stat span {
