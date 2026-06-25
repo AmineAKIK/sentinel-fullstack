@@ -30,10 +30,12 @@ const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.line_id, wi.line_number, wi.ma
             wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
             wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at`;
 
-const INCIDENT_ACTOR_COLS = `su.first_name, su.last_name, su.role,
-            tu.first_name AS taken_by_first_name,
-            tu.last_name AS taken_by_last_name,
-            tu.role AS taken_by_role`;
+const INCIDENT_ACTOR_COLS = `COALESCE(wi.declarant_first_name, su.first_name)       AS first_name,
+            COALESCE(wi.declarant_last_name,  su.last_name)        AS last_name,
+            COALESCE(wi.declarant_role,       su.role)             AS role,
+            COALESCE(wi.taken_by_first_name,  tu.first_name)       AS taken_by_first_name,
+            COALESCE(wi.taken_by_last_name,   tu.last_name)        AS taken_by_last_name,
+            COALESCE(wi.taken_by_role,        tu.role)             AS taken_by_role`;
 
 const INCIDENT_FOLLOWER_COLS = `(wif.id IS NOT NULL) AS is_followed,
             wif.created_at AS followed_at`;
@@ -402,9 +404,13 @@ export async function createIncidentData(input: {
   const { rows } = await db.query<{ id: number }>(
     `INSERT INTO workshop_incidents (
       user_id, line_id, line_number, machine_id, machine_brand,
-      robot_label, head_number, state, comment, current_product, display_order
+      robot_label, head_number, state, comment, current_product, display_order,
+      declarant_first_name, declarant_last_name, declarant_role
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+            su.first_name, su.last_name, su.role
+     FROM sentinel_users su
+     WHERE su.id = $1
      RETURNING id`,
     [
       input.actorUserId,
@@ -630,6 +636,18 @@ export async function updateIncidentData(input: {
     ]
   );
 
+  if (tookOwnership && rows[0]?.id) {
+    await db.query(
+      `UPDATE workshop_incidents wi
+       SET taken_by_first_name = su.first_name,
+           taken_by_last_name  = su.last_name,
+           taken_by_role       = su.role
+       FROM sentinel_users su
+       WHERE wi.id = $1 AND su.id = $2`,
+      [input.incidentId, input.actorUserId]
+    );
+  }
+
   return rows[0]?.id ?? null;
 }
 
@@ -678,7 +696,10 @@ export async function listHistoryEvents(query: QueryParams) {
     `SELECT we.id, we.incident_id, we.event_type, we.payload, we.created_at,
             wi.line_id, wi.line_number, wi.machine_id, wi.robot_label, wi.head_number,
             wi.state, wi.status,
-            su.first_name, su.last_name, su.role
+            COALESCE(we.actor_first_name,    su.first_name)    AS first_name,
+            COALESCE(we.actor_last_name,     su.last_name)     AS last_name,
+            COALESCE(we.actor_role,          su.role)          AS role,
+            COALESCE(we.actor_badge_number,  su.badge_number)  AS badge_number
      FROM workshop_incident_events we
      JOIN workshop_incidents wi ON wi.id = we.incident_id
      LEFT JOIN sentinel_users su ON su.id = we.actor_user_id
@@ -694,7 +715,10 @@ export async function listHistoryEvents(query: QueryParams) {
 export async function listIncidentEvents(incidentId: number) {
   const { rows } = await pool.query(
     `SELECT we.id, we.event_type, we.payload, we.created_at,
-            su.first_name, su.last_name, su.role
+            COALESCE(we.actor_first_name,    su.first_name)    AS first_name,
+            COALESCE(we.actor_last_name,     su.last_name)     AS last_name,
+            COALESCE(we.actor_role,          su.role)          AS role,
+            COALESCE(we.actor_badge_number,  su.badge_number)  AS badge_number
      FROM workshop_incident_events we
      LEFT JOIN sentinel_users su ON su.id = we.actor_user_id
      WHERE we.incident_id = $1

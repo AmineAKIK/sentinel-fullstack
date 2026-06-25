@@ -35,8 +35,13 @@ export async function logIncidentEvent(
   const db = client ?? pool;
   try {
     await db.query(
-      `INSERT INTO workshop_incident_events (incident_id, actor_user_id, event_type, payload)
-       VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO workshop_incident_events
+         (incident_id, actor_user_id, event_type, payload,
+          actor_first_name, actor_last_name, actor_role, actor_badge_number)
+       SELECT $1, $2, $3, $4,
+              su.first_name, su.last_name, su.role, su.badge_number
+       FROM sentinel_users su
+       WHERE su.id = $2`,
       [incidentId, actorUserId, eventType, payload ? JSON.stringify(payload) : null]
     );
   } catch (err) {
