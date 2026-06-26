@@ -6,12 +6,13 @@ import {
 } from '../../auth/bcrypt';
 import { verifyWorkshopPasswordSetupCode } from '../../auth/setupCode';
 import {
-  findActiveWorkshopUserByBadge,
+  findWorkshopUserByBadge,
   setWorkshopUserPassword,
 } from './workshopCredentials.repository';
 
 export type LoginResult =
   | { kind: 'invalid_badge' }
+  | { kind: 'account_disabled' }
   | { kind: 'requires_password_setup'; badgeNumber: string }
   | { kind: 'invalid_setup_code' }
   | { kind: 'expired_setup_code' }
@@ -25,8 +26,9 @@ export async function loginWorkshopUserService(
   newPassword: string | undefined,
   setupCode: string | undefined
 ): Promise<LoginResult> {
-  const user = await findActiveWorkshopUserByBadge(badgeNumber);
+  const user = await findWorkshopUserByBadge(badgeNumber);
   if (!user) return { kind: 'invalid_badge' };
+  if (!user.is_active) return { kind: 'account_disabled' };
 
   if (!user.password_hash) {
     if (

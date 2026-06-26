@@ -44,6 +44,10 @@ export async function login(req: Request, res: Response): Promise<void> {
         res.status(200).json({ requiresPassword: true, badge_number: result.badgeNumber });
         return;
 
+      case 'workshop_account_disabled':
+        sendError(res, 403, 'FORBIDDEN', 'Votre accès atelier a été suspendu. Contactez votre responsable.');
+        return;
+
       case 'workshop_invalid_setup_code':
         loginLimiter.recordFailure(req);
         sendError(res, 401, 'UNAUTHORIZED', 'Code temporaire incorrect.');

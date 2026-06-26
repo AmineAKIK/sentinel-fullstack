@@ -1,7 +1,7 @@
 import { loginWorkshopUserService } from '../workshopCredentials.service';
 
 jest.mock('../workshopCredentials.repository', () => ({
-  findActiveWorkshopUserByBadge: jest.fn(),
+  findWorkshopUserByBadge: jest.fn(),
   setWorkshopUserPassword: jest.fn(),
 }));
 
@@ -26,6 +26,7 @@ function mockUser(overrides: Record<string, unknown> = {}) {
     last_name: 'Kaci',
     badge_number: '3002',
     role: 'OPERATOR',
+    is_active: true,
     password_hash: null,
     password_setup_token_hash: 'hashed-setup-code',
     password_setup_expires_at: new Date('2099-01-01T00:00:00Z'),
@@ -39,15 +40,23 @@ beforeEach(() => {
 
 describe('loginWorkshopUserService – setup initial', () => {
   it('retourne invalid_badge si le badge est inconnu', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(null);
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(null);
 
     const result = await loginWorkshopUserService('9999', undefined, undefined, undefined);
 
     expect(result).toEqual({ kind: 'invalid_badge' });
   });
 
-  it('demande le setup si aucun mot de passe nouveau valide n’est fourni', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser());
+  it('retourne account_disabled si le compte est inactif', async () => {
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ is_active: false }));
+
+    const result = await loginWorkshopUserService('3002', undefined, undefined, undefined);
+
+    expect(result).toEqual({ kind: 'account_disabled' });
+  });
+
+  it("demande le setup si aucun mot de passe nouveau valide n'est fourni", async () => {
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
 
     const result = await loginWorkshopUserService('3002', undefined, '123', 'ABCD234567');
 
@@ -56,7 +65,7 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('demande le setup si le code temporaire est absent', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser());
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
 
     const result = await loginWorkshopUserService('3002', undefined, 'secret1', undefined);
 
@@ -65,7 +74,7 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('rejette un setup sans code actif', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(
       mockUser({ password_setup_token_hash: null, password_setup_expires_at: null })
     );
 
@@ -75,7 +84,7 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('rejette un code temporaire expiré', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(
       mockUser({ password_setup_expires_at: new Date('2000-01-01T00:00:00Z') })
     );
 
@@ -85,7 +94,7 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('rejette un code temporaire incorrect', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser());
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
     jest.mocked(setupCode.verifyWorkshopPasswordSetupCode).mockResolvedValue(false);
 
     const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'WRONG');
@@ -95,7 +104,7 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('définit le mot de passe puis retourne la session si le code est valide', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser());
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
     jest.mocked(setupCode.verifyWorkshopPasswordSetupCode).mockResolvedValue(true);
 
     const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'ABCD234567');
@@ -117,7 +126,7 @@ describe('loginWorkshopUserService – setup initial', () => {
 
 describe('loginWorkshopUserService – mot de passe existant', () => {
   it('demande le mot de passe si le compte en possède déjà un', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
 
     const result = await loginWorkshopUserService('3002', undefined, undefined, undefined);
 
@@ -125,7 +134,7 @@ describe('loginWorkshopUserService – mot de passe existant', () => {
   });
 
   it('rejette un mot de passe incorrect', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
     jest.mocked(bcrypt.verifyPassword).mockResolvedValue(false);
 
     const result = await loginWorkshopUserService('3002', 'bad', undefined, undefined);
@@ -134,7 +143,7 @@ describe('loginWorkshopUserService – mot de passe existant', () => {
   });
 
   it('retourne la session si le mot de passe est correct', async () => {
-    jest.mocked(repo.findActiveWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
     jest.mocked(bcrypt.verifyPassword).mockResolvedValue(true);
 
     const result = await loginWorkshopUserService('3002', 'secret1', undefined, undefined);

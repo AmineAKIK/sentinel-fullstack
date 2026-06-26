@@ -10,6 +10,7 @@ export type AuthLoginResult =
   | { kind: 'workshop_requires_password'; badgeNumber: string }
   | { kind: 'workshop_invalid_setup_code' }
   | { kind: 'workshop_expired_setup_code' }
+  | { kind: 'workshop_account_disabled' }
   | { kind: 'workshop_success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string } }
   | { kind: 'invalid_credentials' };
 
@@ -73,6 +74,8 @@ export async function unifiedLoginService(
   switch (workshopResult.kind) {
     case 'invalid_badge':
       return { kind: 'invalid_credentials' };
+    case 'account_disabled':
+      return { kind: 'workshop_account_disabled' };
     case 'requires_password_setup':
       return { kind: 'workshop_requires_password_setup', badgeNumber: workshopResult.badgeNumber };
     case 'requires_password':

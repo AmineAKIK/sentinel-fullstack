@@ -13,12 +13,12 @@ export interface WorkshopCredentialUser {
 
 export type WorkshopSessionUser = Pick<WorkshopCredentialUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>;
 
-export async function findActiveWorkshopUserByBadge(badgeNumber: string): Promise<WorkshopCredentialUser | null> {
-  const { rows } = await pool.query<WorkshopCredentialUser>(
-    `SELECT id, first_name, last_name, badge_number, role, password_hash,
+export async function findWorkshopUserByBadge(badgeNumber: string): Promise<(WorkshopCredentialUser & { is_active: boolean }) | null> {
+  const { rows } = await pool.query<WorkshopCredentialUser & { is_active: boolean }>(
+    `SELECT id, first_name, last_name, badge_number, role, is_active, password_hash,
             password_setup_token_hash, password_setup_expires_at
      FROM sentinel_users
-     WHERE badge_number = $1 AND is_active = TRUE AND is_deleted = FALSE`,
+     WHERE badge_number = $1 AND is_deleted = FALSE`,
     [badgeNumber.trim()]
   );
 

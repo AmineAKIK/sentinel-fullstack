@@ -163,11 +163,10 @@ describeIntegration('Workshop login (real DB)', () => {
     expect(result.kind).toBe('invalid_credentials');
   });
 
-  it('returns invalid_credentials for inactive user', async () => {
+  it('returns workshop_account_disabled for inactive user', async () => {
     await insertWorkshopUser({ badge: `${BADGE_PREFIX}005`, withPassword: 'correct_pass_99', active: false });
     const result = await unifiedLoginService(`${BADGE_PREFIX}005`, 'correct_pass_99', undefined, undefined);
-    // Inactive users are treated as unknown badges (not_found in the credential service)
-    expect(result.kind).toBe('invalid_credentials');
+    expect(result.kind).toBe('workshop_account_disabled');
   });
 
   it('returns invalid_credentials for unknown badge number', async () => {

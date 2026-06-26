@@ -17,6 +17,7 @@ export default function WorkshopLoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [mode, setMode] = useState<Mode>('identifier');
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { setSession } = useAppAuth();
@@ -31,11 +32,13 @@ export default function WorkshopLoginPage() {
     setNewPassword('');
     setConfirmPassword('');
     setError('');
+    setWarning('');
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
+    setWarning('');
 
     if (!identifier.trim()) { setError('Renseignez votre identifiant.'); return; }
 
@@ -51,8 +54,12 @@ export default function WorkshopLoginPage() {
         } else {
           setError('Identifiant ou mot de passe incorrect.');
         }
-      } catch {
-        setError('Identifiant ou mot de passe incorrect.');
+      } catch (err) {
+        if (err instanceof ApiResponseError && err.status === 403) {
+          setWarning(err.message);
+        } else {
+          setError('Identifiant ou mot de passe incorrect.');
+        }
       } finally {
         setLoading(false);
       }
@@ -72,6 +79,7 @@ export default function WorkshopLoginPage() {
           setError('Identifiant ou mot de passe incorrect.');
           return;
         }
+
         setSession({
           accountType: 'workshop',
           user: {
@@ -84,7 +92,11 @@ export default function WorkshopLoginPage() {
         });
         navigate('/workshop/dashboard', { replace: true });
       } catch (err) {
-        setError(err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.');
+        if (err instanceof ApiResponseError && err.status === 403) {
+          setWarning(err.message);
+        } else {
+          setError(err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.');
+        }
       } finally {
         setLoading(false);
       }
@@ -231,6 +243,7 @@ export default function WorkshopLoginPage() {
             </>
           )}
 
+          {warning && <div id="workshop-login-warning" className="notice" role="alert">{warning}</div>}
           {error && <div id="workshop-login-error" className="error-message" role="alert">{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
