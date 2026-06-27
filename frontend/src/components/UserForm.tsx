@@ -8,6 +8,7 @@ export interface UserFormData {
   lastName: string;
   badgeNumber: string;
   role: Role | '';
+  email?: string;
   isActive?: boolean;
 }
 
@@ -80,6 +81,20 @@ export default function UserForm({
           maxLength={FIELD_LIMITS.BADGE}
         />
         {badgeError && <div className="field-error">{badgeError}</div>}
+      </div>
+      <div className="form-group">
+        <label className="form-label" htmlFor="email">Email (notifications)</label>
+        <input
+          id="email"
+          className="form-input"
+          type="email"
+          value={data.email ?? ''}
+          onChange={(e) => handleChange('email', e.target.value)}
+          disabled={disabled}
+          placeholder="jean.dupont@entreprise.fr"
+          autoComplete="email"
+          maxLength={254}
+        />
       </div>
       <div className="form-group">
         <label className="form-label" htmlFor="role">Rôle *</label>

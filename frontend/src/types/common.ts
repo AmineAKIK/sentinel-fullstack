@@ -32,6 +32,7 @@ export interface SentinelUser {
   badge_number: string;
   role: Role;
   is_active: boolean;
+  email?: string | null;
   has_password: boolean;
   has_password_setup_code: boolean;
   password_setup_expires_at: string | null;

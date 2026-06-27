@@ -32,6 +32,7 @@ function mockUser(overrides: Partial<SentinelUser> = {}): SentinelUser {
     badge_number: 'B001',
     role: 'OPERATOR',
     is_active: true,
+    email: null,
     has_password: true,
     has_password_setup_code: false,
     password_setup_expires_at: null,

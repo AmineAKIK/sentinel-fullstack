@@ -17,6 +17,7 @@ function userToForm(user: SentinelUser): UserFormData {
     lastName: user.last_name,
     badgeNumber: user.badge_number,
     role: user.role,
+    email: user.email ?? '',
     isActive: user.is_active,
   };
 }
@@ -31,6 +32,7 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
     form.lastName.trim() !== user.last_name ||
     form.badgeNumber.trim() !== user.badge_number ||
     form.role !== user.role ||
+    (form.email?.trim() || null) !== (user.email || null) ||
     form.isActive !== user.is_active;
 
   function handleConfirm() {
@@ -41,6 +43,7 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
       form.lastName.trim() === user.last_name &&
       form.badgeNumber.trim() === user.badge_number &&
       form.role === user.role &&
+      (form.email?.trim() || null) === (user.email || null) &&
       form.isActive === user.is_active;
     if (noChanges) {
       onClose();

@@ -67,4 +67,11 @@ export function assertProductionConfig(): void {
       '[config] WARNING: DEEPSEEK_API_KEY is not set. The support chat feature will be disabled.'
     );
   }
+
+  // SMTP is optional — email notifications degrade gracefully when absent.
+  if (!process.env.SMTP_HOST || !process.env.ADMIN_EMAIL) {
+    console.warn(
+      '[config] WARNING: SMTP_HOST or ADMIN_EMAIL is not set. Email notifications will be disabled.'
+    );
+  }
 }

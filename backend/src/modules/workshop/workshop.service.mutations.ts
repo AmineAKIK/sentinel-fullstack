@@ -4,6 +4,20 @@ import { logIncidentEvent } from './workshop.events';
 import { canPerform } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import type { ReorderIncidentsInput } from './workshop.validation';
+import {
+  notifyFollowersIncidentTaken,
+  notifyFollowersIncidentSetPending,
+  notifyFollowersIncidentClosed,
+  notifyFollowersIncidentCanceled,
+  notifyMaintenanceIncidentUrgent,
+  notifyTechnicianResponsibleComment,
+  notifyTechnicianIncidentCanceled,
+  notifyTechnicianIncidentInvalidated,
+  notifyDeclarantIncidentTaken,
+  notifyDeclarantCancelApproved,
+  notifyDeclarantCancelRejected,
+  notifyResponsablesCancelRequested,
+} from '../notifications/notifications.service';
 
 export async function autoFollowForResponsable(
   incidentId: number,
@@ -44,6 +58,8 @@ export async function takeIncidentService(
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Prise en charge non autorisée pour ce rôle ou ce statut.');
+  void notifyFollowersIncidentTaken(result.id, actorUserId);
+  void notifyDeclarantIncidentTaken(result.id, actorUserId);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -81,6 +97,7 @@ export async function setPendingIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Suspension non autorisée pour ce rôle ou ce statut.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  void notifyFollowersIncidentSetPending(result.id, actorUserId, diagnostic ?? '');
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -156,6 +173,7 @@ export async function closeIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Clôture non autorisée pour ce rôle ou ce statut.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  void notifyFollowersIncidentClosed(result.id, actorUserId);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -187,6 +205,7 @@ export async function invalidateIncidentService(
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Seul le responsable peut invalider un incident clôturé.');
+  void notifyTechnicianIncidentInvalidated(result.id, actorUserId, invalidationReason!.trim());
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -222,6 +241,7 @@ export async function setPriorityIncidentService(
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden("Seul le responsable peut modifier la priorité d'un incident actif.");
+  if (isPriority) void notifyMaintenanceIncidentUrgent(result.id, actorUserId);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -257,6 +277,7 @@ export async function setResponsibleCommentService(
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Seul le responsable peut gérer la consigne.');
+  void notifyTechnicianResponsibleComment(result.id, actorUserId, responsibleComment);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -320,6 +341,7 @@ export async function requestCancelIncidentService(
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden("Demande d'annulation non autorisée pour ce rôle ou ce statut.");
+  void notifyResponsablesCancelRequested(result.id, actorUserId, reason.trim());
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -351,6 +373,7 @@ export async function rejectCancelIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden("Seul le responsable peut refuser une annulation.");
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  void notifyDeclarantCancelRejected(result.id, actorUserId);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -379,11 +402,14 @@ export async function cancelIncidentService(
       previousStatus: incident.status,
     }, client);
     await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
-    return { kind: 'ok' as const };
+    return { kind: 'ok' as const, mode: action, takenByUserId: incident.taken_by_user_id as number | null };
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Annulation non autorisée pour ce rôle ou ce statut.');
+  void notifyFollowersIncidentCanceled(incidentId, actorUserId);
+  if (result.takenByUserId) void notifyTechnicianIncidentCanceled(incidentId, actorUserId);
+  if (result.mode === 'APPROVE_CANCEL') void notifyDeclarantCancelApproved(incidentId, actorUserId);
   return { ok: true, data: { message: 'Incident annulé.' } };
 }
 

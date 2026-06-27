@@ -51,6 +51,7 @@ function mockAccount(overrides: Record<string, unknown> = {}) {
     badge_number: 'B001',
     role: 'OPERATOR' as const,
     is_active: true,
+    email: null as string | null,
     has_password: false,
     has_password_setup_code: true,
     password_setup_expires_at: new Date('2025-01-02T00:00:00Z'),

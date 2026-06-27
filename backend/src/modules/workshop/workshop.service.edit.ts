@@ -5,6 +5,11 @@ import { canPerform } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
 import { autoFollowForResponsable } from './workshop.service.mutations';
+import {
+  notifyResponsablesEditRequested,
+  notifyDeclarantEditApproved,
+  notifyDeclarantEditRejected,
+} from '../notifications/notifications.service';
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
 
@@ -208,6 +213,7 @@ export async function requestEditIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Demande de correction non autorisée pour ce statut.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  void notifyResponsablesEditRequested(result.id, actorUserId, Object.keys(editPayload).join(', '));
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -271,6 +277,7 @@ export async function approveEditIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Seul le responsable peut appliquer une correction.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  void notifyDeclarantEditApproved(result.id, actorUserId);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -299,5 +306,6 @@ export async function rejectEditIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Seul le responsable peut refuser une correction.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  void notifyDeclarantEditRejected(result.id, actorUserId);
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }

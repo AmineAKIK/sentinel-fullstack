@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { unifiedLogin } from '../api/unifiedAuth';
+import { unifiedLogin, requestPasswordReset } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -19,11 +19,24 @@ export default function WorkshopLoginPage() {
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const { setSession } = useAppAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const reason = (location.state as { reason?: string } | null)?.reason;
+
+  async function handleForgotPassword() {
+    setResetSent(false);
+    setError('');
+    setLoading(true);
+    try {
+      await requestPasswordReset(identifier.trim());
+    } finally {
+      setLoading(false);
+      setResetSent(true);
+    }
+  }
 
   function resetToIdentifier() {
     setMode('identifier');
@@ -186,6 +199,20 @@ export default function WorkshopLoginPage() {
                 aria-invalid={Boolean(error) || undefined}
                 aria-describedby={error ? 'workshop-login-error' : undefined}
               />
+              <button
+                type="button"
+                className="link-button"
+                style={{ marginTop: 6, fontSize: 13 }}
+                onClick={handleForgotPassword}
+                disabled={loading}
+              >
+                Mot de passe oublié ?
+              </button>
+              {resetSent && (
+                <div className="notice" style={{ marginTop: 8 }} role="status">
+                  Demande envoyée. L'administrateur vous contactera par voie interne.
+                </div>
+              )}
             </div>
           )}
 

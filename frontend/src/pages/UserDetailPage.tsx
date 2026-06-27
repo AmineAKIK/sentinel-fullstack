@@ -105,6 +105,7 @@ export default function UserDetailPage() {
               <DetailField label="Rôle">
                 <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
               </DetailField>
+              <DetailField label="Email">{user.email || '—'}</DetailField>
               <DetailField label="Mot de passe workshop">
                 {passwordStatusLabel(user)}
               </DetailField>

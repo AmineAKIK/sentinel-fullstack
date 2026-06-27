@@ -18,6 +18,7 @@ export interface AccountDto {
   badge_number: string;
   role: string;
   is_active: boolean;
+  email: string | null;
   has_password: boolean;
   has_password_setup_code: boolean;
   password_setup_expires_at: Date | null;
@@ -32,7 +33,7 @@ export interface AccountImpactDto {
   active_taken_incidents: number;
 }
 
-const accountSelect = `id, first_name, last_name, badge_number, role, is_active,
+const accountSelect = `id, first_name, last_name, badge_number, role, is_active, email,
   password_hash IS NOT NULL AS has_password,
   (
     password_hash IS NULL
@@ -90,12 +91,12 @@ export async function createAccountData(
   const db = client ?? pool;
   const { rows } = await db.query<AccountDto>(
     `INSERT INTO sentinel_users (
-       first_name, last_name, badge_number, role,
+       first_name, last_name, badge_number, role, email,
        password_setup_token_hash, password_setup_expires_at
      )
-     VALUES ($1, $2, $3, $4, $5, $6)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING ${accountSelect}`,
-    [input.firstName, input.lastName, input.badgeNumber, input.role, setupCodeHash, setupExpiresAt]
+    [input.firstName, input.lastName, input.badgeNumber, input.role, input.email ?? null, setupCodeHash, setupExpiresAt]
   );
 
   return rows[0];
@@ -145,6 +146,10 @@ export async function updateAccountData(
     params.push(updates.role);
     setClauses.push(`role = $${params.length}`);
   }
+  if (updates.email !== undefined && updates.email !== current.email) {
+    params.push(updates.email ?? null);
+    setClauses.push(`email = $${params.length}`);
+  }
 
   if (params.length === 0) {
     return toPublicAccount(current);
@@ -186,6 +191,7 @@ export async function softDeleteAccount(id: number, client?: PoolClient): Promis
          first_name = 'Utilisateur',
          last_name = 'Supprimé',
          badge_number = 'ANON-' || id,
+         email = NULL,
          password_hash = NULL,
          password_setup_token_hash = NULL,
          password_setup_expires_at = NULL

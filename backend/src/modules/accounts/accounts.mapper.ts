@@ -25,6 +25,7 @@ export function toPublicAccount(row: AccountRow): AccountDto {
     badge_number: row.badge_number,
     role: row.role,
     is_active: row.is_active,
+    email: row.email ?? null,
     has_password: hasPassword,
     has_password_setup_code: hasPasswordSetupCode,
     password_setup_expires_at: row.password_setup_expires_at ?? null,

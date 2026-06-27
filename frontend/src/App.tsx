@@ -15,6 +15,7 @@ import UserDetailPage from './pages/UserDetailPage';
 import LinesPage from './pages/LinesPage';
 import AdminAuditPage from './pages/AdminAuditPage';
 import AdminSupportPage from './pages/AdminSupportPage';
+import AdminSecurityPage from './pages/AdminSecurityPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { AppAuthProvider } from './routes/AppAuthContext';
 import { FieldLimitsProvider } from './routes/FieldLimitsContext';
@@ -146,6 +147,14 @@ export default function App() {
             element={
               <AdminRoute>
                 <AdminSupportPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/securite"
+            element={
+              <AdminRoute>
+                <AdminSecurityPage />
               </AdminRoute>
             }
           />

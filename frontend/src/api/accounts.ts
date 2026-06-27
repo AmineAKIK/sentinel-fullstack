@@ -13,6 +13,7 @@ export interface CreateAccountPayload {
   lastName: string;
   badgeNumber: string;
   role: Role;
+  email?: string | null;
 }
 
 export interface UpdateAccountPayload {
@@ -20,6 +21,7 @@ export interface UpdateAccountPayload {
   lastName?: string;
   badgeNumber?: string;
   role?: Role;
+  email?: string | null;
 }
 
 export async function listAccounts(params: ListAccountsParams = {}): Promise<SentinelUser[]> {

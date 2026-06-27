@@ -19,6 +19,7 @@ const FIELD_LABELS: Record<string, string> = {
   lastName: 'Nom',
   badgeNumber: 'Numéro de badge',
   role: 'Rôle',
+  email: 'Email',
   isActive: 'Statut',
 };
 
@@ -50,6 +51,16 @@ export default function EditSummaryModal({
   if (form.role !== user.role) {
     changes.push({ field: 'role', label: FIELD_LABELS.role, oldVal: roleLabel(user.role), newVal: roleLabel(form.role) });
   }
+  const formEmail = form.email?.trim() || null;
+  const userEmail = user.email || null;
+  if (formEmail !== userEmail) {
+    changes.push({
+      field: 'email',
+      label: FIELD_LABELS.email,
+      oldVal: userEmail ?? '—',
+      newVal: formEmail ?? '—',
+    });
+  }
   if (form.isActive !== undefined && form.isActive !== user.is_active) {
     changes.push({
       field: 'isActive',
@@ -65,11 +76,12 @@ export default function EditSummaryModal({
     setError('');
     setLoading(true);
 
-    const payload: Record<string, string> = {};
+    const payload: Record<string, string | null> = {};
     if (form.firstName.trim() !== user.first_name) payload.firstName = form.firstName.trim();
     if (form.lastName.trim() !== user.last_name) payload.lastName = form.lastName.trim();
     if (form.badgeNumber.trim() !== user.badge_number) payload.badgeNumber = form.badgeNumber.trim();
     if (form.role !== user.role) payload.role = form.role;
+    if (formEmail !== userEmail) payload.email = formEmail;
 
     try {
       let updated = user;

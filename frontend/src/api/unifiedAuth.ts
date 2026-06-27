@@ -43,3 +43,7 @@ export async function getUnifiedMe(): Promise<MeResponse> {
 export async function unifiedLogout(): Promise<void> {
   return api.post<void>('/api/auth/logout');
 }
+
+export async function requestPasswordReset(badgeNumber: string): Promise<void> {
+  await api.post<{ sent: true }>('/api/auth/password-reset/request', { badgeNumber });
+}
