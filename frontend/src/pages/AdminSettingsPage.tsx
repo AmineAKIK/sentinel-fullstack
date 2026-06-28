@@ -234,11 +234,13 @@ export default function AdminSettingsPage() {
                     <input
                       id="currentEmail"
                       className="form-input"
-                      type="email"
+                      type="text"
                       value={currentEmail}
                       onChange={(e) => { setCurrentEmail(e.target.value); setEmailError(''); }}
                       disabled={emailLoading}
                       autoComplete="off"
+                      readOnly={!currentEmail && !emailLoading}
+                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                       maxLength={254}
                       placeholder=""
                       aria-invalid={Boolean(emailError) || undefined}
@@ -258,11 +260,13 @@ export default function AdminSettingsPage() {
                   <input
                     id="newEmail"
                     className="form-input"
-                    type="email"
+                    type="text"
                     value={newEmail}
                     onChange={(e) => { setNewEmail(e.target.value); setEmailError(''); }}
                     disabled={emailLoading}
                     autoComplete="off"
+                    readOnly={!newEmail && !emailLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={254}
                     placeholder=""
                     aria-invalid={Boolean(emailError) || undefined}
@@ -281,8 +285,10 @@ export default function AdminSettingsPage() {
                     onChange={(e) => { setEmailPassword(e.target.value); setEmailError(''); }}
                     disabled={emailLoading}
                     autoComplete="off"
+                    readOnly={!emailPassword && !emailLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={MAX_PWD}
-                    placeholder="••••••••••••"
+                    placeholder=""
                     aria-invalid={Boolean(emailError) || undefined}
                     aria-describedby={emailError ? 'email-error' : undefined}
                   />
