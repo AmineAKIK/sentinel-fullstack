@@ -240,7 +240,7 @@ export default function AdminSettingsPage() {
                       disabled={emailLoading}
                       autoComplete="email"
                       maxLength={254}
-                      placeholder="Votre adresse actuelle"
+                      placeholder=""
                       aria-invalid={Boolean(emailError) || undefined}
                       aria-describedby={emailError ? 'email-error' : undefined}
                     />
@@ -264,7 +264,7 @@ export default function AdminSettingsPage() {
                     disabled={emailLoading}
                     autoComplete="off"
                     maxLength={254}
-                    placeholder="nouvelle@adresse.com"
+                    placeholder=""
                     aria-invalid={Boolean(emailError) || undefined}
                     aria-describedby={emailError ? 'email-error' : undefined}
                   />
