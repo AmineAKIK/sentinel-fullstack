@@ -470,29 +470,6 @@ export default function AdminSettingsPage() {
                     </label>
                   </div>
 
-                  <div className="notif-toggle-item">
-                    <div className="notif-toggle-label">
-                      <strong>Session illimitée</strong>
-                      <span>Pour écrans kiosque allumés en permanence</span>
-                    </div>
-                    <label className="toggle-switch" aria-label="Session board illimitée">
-                      <input
-                        type="checkbox"
-                        checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setAppSettingsDraftField('board_session_ttl_hours', 0);
-                          } else {
-                            const prev = appSettings.board_session_ttl_hours;
-                            setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
-                          }
-                        }}
-                        disabled={appSettingsSaving}
-                      />
-                      <span className="toggle-track" />
-                    </label>
-                  </div>
-
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 20px' }} />
 
                   <p className="settings-section-title" style={{ marginBottom: 4 }}>Code d'accès</p>
@@ -759,6 +736,29 @@ export default function AdminSettingsPage() {
                           disabled={appSettingsSaving}
                         />
                       )}
+                    </div>
+
+                    <div className="notif-toggle-item" style={{ gridColumn: '1 / -1', padding: '12px 0 0' }}>
+                      <div className="notif-toggle-label">
+                        <strong>Session board illimitée</strong>
+                        <span>Pour écrans kiosque allumés en permanence</span>
+                      </div>
+                      <label className="toggle-switch" aria-label="Session board illimitée">
+                        <input
+                          type="checkbox"
+                          checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAppSettingsDraftField('board_session_ttl_hours', 0);
+                            } else {
+                              const prev = appSettings.board_session_ttl_hours;
+                              setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
+                            }
+                          }}
+                          disabled={appSettingsSaving}
+                        />
+                        <span className="toggle-track" />
+                      </label>
                     </div>
 
                     <div className="form-group">
