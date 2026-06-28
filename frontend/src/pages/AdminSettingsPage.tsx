@@ -296,16 +296,14 @@ export default function AdminSettingsPage() {
                 {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
                 {emailSuccess && <div className="success-message" role="status">{emailSuccess}</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  {(newEmail || currentEmail || emailPassword) && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={resetEmailForm}
-                      disabled={emailLoading}
-                    >
-                      Annuler
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={resetEmailForm}
+                    disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
+                  >
+                    Annuler
+                  </button>
                   <button
                     type="submit"
                     className="btn btn-primary btn-sm"
@@ -352,7 +350,7 @@ export default function AdminSettingsPage() {
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
                 Minimum {MIN_PWD} caractères. Toutes vos sessions actives seront déconnectées.
               </p>
-              <form onSubmit={handlePasswordSubmit} noValidate>
+              <form onSubmit={handlePasswordSubmit} noValidate autoComplete="off">
                 <div className="form-group">
                   <label className="form-label" htmlFor="currentPassword">Mot de passe actuel</label>
                   <input
@@ -362,7 +360,9 @@ export default function AdminSettingsPage() {
                     value={currentPassword}
                     onChange={(e) => { setCurrentPassword(e.target.value); setPwdError(''); }}
                     disabled={pwdLoading}
-                    autoComplete="current-password"
+                    autoComplete="off"
+                    readOnly={!currentPassword && !pwdLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={MAX_PWD}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(pwdError) || undefined}
@@ -378,7 +378,9 @@ export default function AdminSettingsPage() {
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setPwdError(''); }}
                     disabled={pwdLoading}
-                    autoComplete="new-password"
+                    autoComplete="off"
+                    readOnly={!newPassword && !pwdLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={MAX_PWD}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(pwdError) || undefined}
@@ -394,7 +396,9 @@ export default function AdminSettingsPage() {
                     value={confirmPassword}
                     onChange={(e) => { setConfirmPassword(e.target.value); setPwdError(''); }}
                     disabled={pwdLoading}
-                    autoComplete="new-password"
+                    autoComplete="off"
+                    readOnly={!confirmPassword && !pwdLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={MAX_PWD}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(pwdError) || undefined}
@@ -403,16 +407,14 @@ export default function AdminSettingsPage() {
                 </div>
                 {pwdError && <div id="pwd-error" className="error-message" role="alert">{pwdError}</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  {(currentPassword || newPassword || confirmPassword) && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPwdError(''); }}
-                      disabled={pwdLoading}
-                    >
-                      Annuler
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPwdError(''); }}
+                    disabled={pwdLoading || (!currentPassword && !newPassword && !confirmPassword)}
+                  >
+                    Annuler
+                  </button>
                   <button type="submit" className="btn btn-primary btn-sm" disabled={pwdLoading}>
                     {pwdLoading ? <><span className="spinner" aria-hidden="true" /> Modification…</> : 'Changer le mot de passe'}
                   </button>
