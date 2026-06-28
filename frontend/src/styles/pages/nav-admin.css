@@ -677,17 +677,9 @@
   max-width: 960px;
 }
 
-.settings-grid .settings-notif {
-  grid-column: 1 / -1;
-}
-
 @media (max-width: 720px) {
   .settings-grid {
     grid-template-columns: 1fr;
-  }
-
-  .settings-grid .settings-notif {
-    grid-column: auto;
   }
 }
 

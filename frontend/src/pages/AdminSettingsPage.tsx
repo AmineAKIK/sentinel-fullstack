@@ -572,7 +572,7 @@ export default function AdminSettingsPage() {
           </div>
 
           {/* ── Card 4 : Notifications email ── */}
-          <div className="card settings-notif">
+          <div className="card">
             <div className="card-body">
               <p className="settings-section-title">Notifications email</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
