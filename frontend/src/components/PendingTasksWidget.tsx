@@ -47,34 +47,34 @@ export default function PendingTasksWidget({ requests, onHandled }: PendingTasks
                   className="pending-task-body"
                   onClick={() => navigate(`/admin/users/${req.user_id}`)}
                 >
-                  <div className="pending-task-meta">
-                    <span className="pending-task-type">Réinitialisation mot de passe</span>
-                    <small className="pending-task-time">il y a {formatElapsed(req.requested_at)}</small>
+                  <div className="pending-task-type">Réinitialisation mot de passe</div>
+                  <div className="pending-task-user">
+                    <strong>{req.last_name} {req.first_name}</strong>
+                    <span>Badge {req.badge_number}</span>
                   </div>
-                  <span className="pending-task-user">
-                    {req.last_name} {req.first_name}
-                    <small>Badge {req.badge_number}</small>
-                  </span>
+                  <div className="pending-task-time">il y a {formatElapsed(req.requested_at)}</div>
                 </button>
 
                 <div className="pending-task-actions">
                   {confirming === req.id ? (
                     <>
-                      <span className="pending-task-confirm-label">Confirmer ?</span>
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => handleConfirm(req.id)}
-                        disabled={loading === req.id}
-                      >
-                        {loading === req.id ? 'En cours…' : 'Oui'}
-                      </button>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => setConfirming(null)}
-                        disabled={loading === req.id}
-                      >
-                        Non
-                      </button>
+                      <span className="pending-task-confirm-label">Marquer comme traité ?</span>
+                      <div className="pending-task-confirm-btns">
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => handleConfirm(req.id)}
+                          disabled={loading === req.id}
+                        >
+                          {loading === req.id ? 'En cours…' : 'Confirmer'}
+                        </button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setConfirming(null)}
+                          disabled={loading === req.id}
+                        >
+                          Annuler
+                        </button>
+                      </div>
                     </>
                   ) : (
                     <button
