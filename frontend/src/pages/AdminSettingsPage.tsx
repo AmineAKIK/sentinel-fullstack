@@ -716,15 +716,27 @@ export default function AdminSettingsPage() {
 
                     <div className="form-group">
                       <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier (heures)</label>
-                      <input
-                        id="boardSessionTtl"
-                        className="form-input"
-                        type="number"
-                        min={1} max={168}
-                        value={appSettingsDraftValue('board_session_ttl_hours')}
-                        onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
-                        disabled={appSettingsSaving}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <input
+                          id="boardSessionTtl"
+                          className="form-input"
+                          type="number"
+                          min={1} max={168}
+                          value={appSettingsDraftValue('board_session_ttl_hours') || 12}
+                          onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                          disabled={appSettingsSaving || appSettingsDraftValue('board_session_ttl_hours') === 0}
+                          style={{ flex: 1 }}
+                        />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
+                            onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', e.target.checked ? 0 : 12)}
+                            disabled={appSettingsSaving}
+                          />
+                          Illimité
+                        </label>
+                      </div>
                     </div>
 
                     <div className="form-group">

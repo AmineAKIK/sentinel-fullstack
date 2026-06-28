@@ -158,7 +158,7 @@ export async function getAppSettingsHandler(req: Request, res: Response): Promis
 const APP_SETTINGS_BOUNDS: Record<keyof Omit<AppSettings, 'board_label'>, { min: number; max: number }> = {
   session_duration_hours:  { min: 1, max: 168 },
   workshop_session_hours:  { min: 1, max: 168 },
-  board_session_ttl_hours: { min: 1, max: 168 },
+  board_session_ttl_hours: { min: 0, max: 168 },  // 0 = illimité (kiosque)
   login_max_attempts:      { min: 3, max: 50 },
   setup_code_ttl_hours:    { min: 1, max: 72 },
 };

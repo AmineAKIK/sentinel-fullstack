@@ -6,9 +6,12 @@ export function getJwtSecret(): string | null {
   return secret;
 }
 
-export function signAuthToken(payload: object, durationHours: number): string | null {
+export function signAuthToken(payload: object, durationHours: number | 'unlimited'): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
+  if (durationHours === 'unlimited') {
+    return jwt.sign(payload, secret);
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return jwt.sign(payload, secret, { expiresIn: durationHours * 3600 } as any);
 }

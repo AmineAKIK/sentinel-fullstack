@@ -38,10 +38,10 @@ function timingSafeHashEquals(left: string, right: string): boolean {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function setBoardCookie(res: Response, token: string, ttlMs: number): void {
+function setBoardCookie(res: Response, token: string, ttlMs: number | 'unlimited'): void {
   res.cookie(BOARD_AUTH_COOKIE, token, {
     ...authCookieOptions,
-    maxAge: ttlMs,
+    ...(ttlMs !== 'unlimited' ? { maxAge: ttlMs } : {}),
   });
 }
 
@@ -201,15 +201,17 @@ boardRouter.post('/session', async (req, res) => {
 
     const { board_label, board_session_ttl_hours } = appSettings;
     const boardSessionVersion = boardSettings?.board_session_version ?? 0;
-    const ttlMs = board_session_ttl_hours * 60 * 60 * 1000;
+    const unlimited = board_session_ttl_hours === 0;
 
-    const token = jwt.sign(
-      { scope: 'board', label: board_label, boardSessionVersion },
-      secret,
-      { expiresIn: `${board_session_ttl_hours}h` }
-    );
+    const token = unlimited
+      ? jwt.sign({ scope: 'board', label: board_label, boardSessionVersion }, secret)
+      : jwt.sign(
+          { scope: 'board', label: board_label, boardSessionVersion },
+          secret,
+          { expiresIn: `${board_session_ttl_hours}h` }
+        );
 
-    setBoardCookie(res, token, ttlMs);
+    setBoardCookie(res, token, unlimited ? 'unlimited' : board_session_ttl_hours * 60 * 60 * 1000);
     res.json({ access: true, label: board_label, expiresInHours: board_session_ttl_hours });
   } catch (err) {
     logger.error({ err }, 'Board session error');
