@@ -47,11 +47,7 @@ const DEFAULT_PREFS: AdminNotifPrefs = {
   notif_operateurs: true,
 };
 
-const NOTIF_ITEMS: {
-  key: keyof AdminNotifPrefs;
-  label: string;
-  description: string;
-}[] = [
+const NOTIF_ITEMS: { key: keyof AdminNotifPrefs; label: string; description: string }[] = [
   {
     key: 'notif_admin',
     label: 'Alertes administrateur',
@@ -78,6 +74,46 @@ export default function AdminSettingsPage() {
   usePageTitle('Paramètres — Administration');
   const navigate = useNavigate();
   const { logout } = useAppAuth();
+
+  // ─── Mot de passe ─────────────────────────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdError, setPwdError] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+
+  function validatePassword(): string | null {
+    if (!currentPassword) return 'Renseignez votre mot de passe actuel.';
+    if (newPassword.length < MIN_PWD)
+      return `Le nouveau mot de passe doit contenir au moins ${MIN_PWD} caractères.`;
+    if (newPassword.length > MAX_PWD)
+      return `Le mot de passe ne peut pas dépasser ${MAX_PWD} caractères.`;
+    if (newPassword === currentPassword)
+      return 'Le nouveau mot de passe doit être différent de l\'actuel.';
+    if (newPassword !== confirmPassword)
+      return 'Les mots de passe ne correspondent pas.';
+    return null;
+  }
+
+  async function handlePasswordSubmit(e: FormEvent) {
+    e.preventDefault();
+    setPwdError('');
+    const err = validatePassword();
+    if (err) { setPwdError(err); return; }
+    setPwdLoading(true);
+    try {
+      await changeAdminPassword(currentPassword, newPassword);
+      await logout();
+      navigate('/admin/login', {
+        replace: true,
+        state: { reason: 'Mot de passe modifié. Reconnectez-vous.' },
+      });
+    } catch (err) {
+      setPwdError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setPwdLoading(false);
+    }
+  }
 
   // ─── Email ────────────────────────────────────────────────────────────────
   const [emailHint, setEmailHint] = useState<string | null>(null);
@@ -242,46 +278,6 @@ export default function AdminSettingsPage() {
     }
   }
 
-  // ─── Mot de passe ─────────────────────────────────────────────────────────
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [pwdError, setPwdError] = useState('');
-  const [pwdLoading, setPwdLoading] = useState(false);
-
-  function validatePassword(): string | null {
-    if (!currentPassword) return 'Renseignez votre mot de passe actuel.';
-    if (newPassword.length < MIN_PWD)
-      return `Le nouveau mot de passe doit contenir au moins ${MIN_PWD} caractères.`;
-    if (newPassword.length > MAX_PWD)
-      return `Le mot de passe ne peut pas dépasser ${MAX_PWD} caractères.`;
-    if (newPassword === currentPassword)
-      return 'Le nouveau mot de passe doit être différent de l\'actuel.';
-    if (newPassword !== confirmPassword)
-      return 'Les mots de passe ne correspondent pas.';
-    return null;
-  }
-
-  async function handlePasswordSubmit(e: FormEvent) {
-    e.preventDefault();
-    setPwdError('');
-    const err = validatePassword();
-    if (err) { setPwdError(err); return; }
-    setPwdLoading(true);
-    try {
-      await changeAdminPassword(currentPassword, newPassword);
-      await logout();
-      navigate('/admin/login', {
-        replace: true,
-        state: { reason: 'Mot de passe modifié. Reconnectez-vous.' },
-      });
-    } catch (err) {
-      setPwdError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
-    } finally {
-      setPwdLoading(false);
-    }
-  }
-
   return (
     <>
       <NavBar />
@@ -292,232 +288,13 @@ export default function AdminSettingsPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 520 }}>
 
-          {/* ── Compte ── */}
+          {/* ─────────────────────── SÉCURITÉ ─────────────────────── */}
           <div className="card">
             <div className="card-body">
-              <p className="settings-section-title">Compte</p>
-              <form onSubmit={handleEmailSubmit} noValidate>
-                {hasEmail && (
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="currentEmail">
-                      Adresse email actuelle
-                    </label>
-                    {emailHint && (
-                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                        Adresse configurée : <strong>{emailHint}</strong>
-                      </p>
-                    )}
-                    <input
-                      id="currentEmail"
-                      className="form-input"
-                      type="text"
-                      value={currentEmail}
-                      onChange={(e) => { setCurrentEmail(e.target.value); setEmailError(''); }}
-                      disabled={emailLoading}
-                      autoComplete="off"
-                      readOnly={!currentEmail && !emailLoading}
-                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                      maxLength={254}
-                      placeholder="Saisir l'adresse actuelle"
-                      aria-invalid={Boolean(emailError) || undefined}
-                      aria-describedby={emailError ? 'email-error' : undefined}
-                    />
-                  </div>
-                )}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="newEmail">
-                    {hasEmail ? 'Nouvelle adresse email' : 'Adresse email de notification'}
-                  </label>
-                  {!hasEmail && (
-                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                      Aucune adresse configurée. Laissez vide pour désactiver les notifications.
-                    </p>
-                  )}
-                  <input
-                    id="newEmail"
-                    className="form-input"
-                    type="text"
-                    value={newEmail}
-                    onChange={(e) => { setNewEmail(e.target.value); setEmailError(''); }}
-                    disabled={emailLoading}
-                    autoComplete="off"
-                    readOnly={!newEmail && !emailLoading}
-                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={254}
-                    placeholder="Saisir la nouvelle adresse"
-                    aria-invalid={Boolean(emailError) || undefined}
-                    aria-describedby={emailError ? 'email-error' : undefined}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="emailPassword">
-                    Mot de passe actuel
-                  </label>
-                  <input
-                    id="emailPassword"
-                    className="form-input"
-                    type="password"
-                    value={emailPassword}
-                    onChange={(e) => { setEmailPassword(e.target.value); setEmailError(''); }}
-                    disabled={emailLoading}
-                    autoComplete="off"
-                    readOnly={!emailPassword && !emailLoading}
-                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={MAX_PWD}
-                    placeholder="Saisir le mot de passe"
-                    aria-invalid={Boolean(emailError) || undefined}
-                    aria-describedby={emailError ? 'email-error' : undefined}
-                  />
-                </div>
-                {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
-                {emailSuccess && <div className="success-message" role="status">{emailSuccess}</div>}
-                <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={resetEmailForm}
-                    disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-sm"
-                    disabled={emailLoading}
-                  >
-                    {emailLoading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+              <p className="settings-section-title">Sécurité</p>
 
-          {/* ── Notifications ── */}
-          <div className="card">
-            <div className="card-body">
-              <p className="settings-section-title">Notifications email</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Activez ou désactivez les envois d'emails par canal. Les modifications sont sauvegardées immédiatement.
-              </p>
-              {prefsLoading || boardLoading ? (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
-              ) : (
-                <div className="notif-toggle-list">
-                  {NOTIF_ITEMS.map(({ key, label, description }) => (
-                    <NotifToggle
-                      key={key}
-                      id={key}
-                      label={label}
-                      description={description}
-                      checked={prefs[key]}
-                      disabled={savingPref === key}
-                      onChange={(val) => handleToggle(key, val)}
-                    />
-                  ))}
-                  <NotifToggle
-                    id="board_enabled"
-                    label="Board atelier"
-                    description="Accès public à l'écran de suivi — désactiver révoque toutes les sessions actives"
-                    checked={boardEnabled}
-                    disabled={savingBoardToggle}
-                    onChange={handleBoardToggle}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Code board ── */}
-          <div className="card">
-            <div className="card-body">
-              <p className="settings-section-title">Code board</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                {boardHasCode
-                  ? 'Modifier le code d\'accès à l\'écran board. Les sessions actives seront révoquées.'
-                  : <><strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré.</strong> Le board est inaccessible sans code.</>
-                }
-              </p>
-              {boardLoading ? (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
-              ) : (
-                <form onSubmit={handleBoardCodeSubmit} noValidate autoComplete="off">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="boardNewCode">
-                      {boardHasCode ? 'Nouveau code d\'accès' : 'Code d\'accès'}
-                    </label>
-                    <input
-                      id="boardNewCode"
-                      className="form-input"
-                      type="password"
-                      value={boardNewCode}
-                      onChange={(e) => { setBoardNewCode(e.target.value); setBoardError(''); }}
-                      disabled={boardSubmitting}
-                      autoComplete="off"
-                      readOnly={!boardNewCode && !boardSubmitting}
-                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                      maxLength={100}
-                      placeholder="Minimum 4 caractères"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="boardConfirmCode">Confirmer le code</label>
-                    <input
-                      id="boardConfirmCode"
-                      className="form-input"
-                      type="password"
-                      value={boardConfirmCode}
-                      onChange={(e) => { setBoardConfirmCode(e.target.value); setBoardError(''); }}
-                      disabled={boardSubmitting || !boardNewCode}
-                      autoComplete="off"
-                      readOnly={!boardConfirmCode && !boardSubmitting}
-                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                      maxLength={100}
-                      placeholder=""
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="boardPassword">Mot de passe administrateur</label>
-                    <input
-                      id="boardPassword"
-                      className="form-input"
-                      type="password"
-                      value={boardPassword}
-                      onChange={(e) => { setBoardPassword(e.target.value); setBoardError(''); }}
-                      disabled={boardSubmitting}
-                      autoComplete="off"
-                      readOnly={!boardPassword && !boardSubmitting}
-                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                      maxLength={128}
-                      placeholder="Saisir le mot de passe"
-                    />
-                  </div>
-                  {boardError && <div className="error-message" role="alert">{boardError}</div>}
-                  {boardSuccess && <div className="success-message" role="status">{boardSuccess}</div>}
-                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={resetBoardForm}
-                      disabled={boardSubmitting || (!boardNewCode && !boardConfirmCode && !boardPassword)}
-                    >
-                      Annuler
-                    </button>
-                    <button type="submit" className="btn btn-primary btn-sm" disabled={boardSubmitting}>
-                      {boardSubmitting
-                        ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</>
-                        : 'Enregistrer'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-
-          {/* ── Mot de passe ── */}
-          <div className="card">
-            <div className="card-body">
-              <p className="settings-section-title">Mot de passe</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
+              {/* Mot de passe */}
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
                 Minimum {MIN_PWD} caractères. Toutes vos sessions actives seront déconnectées.
               </p>
               <form onSubmit={handlePasswordSubmit} noValidate autoComplete="off">
@@ -590,6 +367,238 @@ export default function AdminSettingsPage() {
                   </button>
                 </div>
               </form>
+
+              {/* Séparateur email */}
+              <div style={{ borderTop: '1px solid var(--color-border)', margin: '28px 0 20px' }} />
+
+              {/* Email de notification */}
+              <p className="settings-section-title" style={{ marginBottom: 4 }}>Email de notification</p>
+              {emailHint ? (
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
+                  Adresse configurée : <strong>{emailHint}</strong>
+                </p>
+              ) : (
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
+                  Aucune adresse configurée. Laissez vide pour désactiver les notifications.
+                </p>
+              )}
+              <form onSubmit={handleEmailSubmit} noValidate>
+                {hasEmail && (
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="currentEmail">Adresse email actuelle</label>
+                    <input
+                      id="currentEmail"
+                      className="form-input"
+                      type="text"
+                      value={currentEmail}
+                      onChange={(e) => { setCurrentEmail(e.target.value); setEmailError(''); }}
+                      disabled={emailLoading}
+                      autoComplete="off"
+                      readOnly={!currentEmail && !emailLoading}
+                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                      maxLength={254}
+                      placeholder="Saisir l'adresse actuelle"
+                      aria-invalid={Boolean(emailError) || undefined}
+                      aria-describedby={emailError ? 'email-error' : undefined}
+                    />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label" htmlFor="newEmail">
+                    {hasEmail ? 'Nouvelle adresse email' : 'Adresse email'}
+                  </label>
+                  <input
+                    id="newEmail"
+                    className="form-input"
+                    type="text"
+                    value={newEmail}
+                    onChange={(e) => { setNewEmail(e.target.value); setEmailError(''); }}
+                    disabled={emailLoading}
+                    autoComplete="off"
+                    readOnly={!newEmail && !emailLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                    maxLength={254}
+                    placeholder="exemple@domaine.com"
+                    aria-invalid={Boolean(emailError) || undefined}
+                    aria-describedby={emailError ? 'email-error' : undefined}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="emailPassword">Mot de passe actuel</label>
+                  <input
+                    id="emailPassword"
+                    className="form-input"
+                    type="password"
+                    value={emailPassword}
+                    onChange={(e) => { setEmailPassword(e.target.value); setEmailError(''); }}
+                    disabled={emailLoading}
+                    autoComplete="off"
+                    readOnly={!emailPassword && !emailLoading}
+                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                    maxLength={MAX_PWD}
+                    placeholder="••••••••••••"
+                    aria-invalid={Boolean(emailError) || undefined}
+                    aria-describedby={emailError ? 'email-error' : undefined}
+                  />
+                </div>
+                {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
+                {emailSuccess && <div className="success-message" role="status">{emailSuccess}</div>}
+                <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={resetEmailForm}
+                    disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={emailLoading}
+                  >
+                    {emailLoading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* ─────────────────────── BOARD ATELIER ─────────────────────── */}
+          <div className="card">
+            <div className="card-body">
+              <p className="settings-section-title">Board atelier</p>
+
+              {boardLoading ? (
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
+              ) : (
+                <>
+                  {/* Toggle accès board */}
+                  <div className="notif-toggle-item" style={{ marginBottom: 4 }}>
+                    <div className="notif-toggle-label">
+                      <strong>Accès board</strong>
+                      <span>Activer ou désactiver l'écran public de suivi — la désactivation révoque toutes les sessions actives</span>
+                    </div>
+                    <label className="toggle-switch" aria-label="Activer le board atelier">
+                      <input
+                        type="checkbox"
+                        checked={boardEnabled}
+                        disabled={savingBoardToggle}
+                        onChange={(e) => handleBoardToggle(e.target.checked)}
+                      />
+                      <span className="toggle-track" />
+                    </label>
+                  </div>
+
+                  {/* Séparateur code */}
+                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 20px' }} />
+
+                  {/* Formulaire code board */}
+                  <p className="settings-section-title" style={{ marginBottom: 4 }}>Code d'accès</p>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
+                    {boardHasCode
+                      ? 'Modifier le code d\'accès au board. Les sessions actives seront révoquées.'
+                      : <><strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré.</strong> Le board est inaccessible sans code.</>
+                    }
+                  </p>
+                  <form onSubmit={handleBoardCodeSubmit} noValidate autoComplete="off">
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="boardNewCode">
+                        {boardHasCode ? 'Nouveau code' : 'Code d\'accès'}
+                      </label>
+                      <input
+                        id="boardNewCode"
+                        className="form-input"
+                        type="password"
+                        value={boardNewCode}
+                        onChange={(e) => { setBoardNewCode(e.target.value); setBoardError(''); }}
+                        disabled={boardSubmitting}
+                        autoComplete="off"
+                        readOnly={!boardNewCode && !boardSubmitting}
+                        onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                        maxLength={100}
+                        placeholder="Minimum 4 caractères"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="boardConfirmCode">Confirmer le code</label>
+                      <input
+                        id="boardConfirmCode"
+                        className="form-input"
+                        type="password"
+                        value={boardConfirmCode}
+                        onChange={(e) => { setBoardConfirmCode(e.target.value); setBoardError(''); }}
+                        disabled={boardSubmitting || !boardNewCode}
+                        autoComplete="off"
+                        readOnly={!boardConfirmCode && !boardSubmitting}
+                        onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                        maxLength={100}
+                        placeholder="••••••••••••"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="boardPassword">Mot de passe administrateur</label>
+                      <input
+                        id="boardPassword"
+                        className="form-input"
+                        type="password"
+                        value={boardPassword}
+                        onChange={(e) => { setBoardPassword(e.target.value); setBoardError(''); }}
+                        disabled={boardSubmitting}
+                        autoComplete="off"
+                        readOnly={!boardPassword && !boardSubmitting}
+                        onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                        maxLength={128}
+                        placeholder="••••••••••••"
+                      />
+                    </div>
+                    {boardError && <div className="error-message" role="alert">{boardError}</div>}
+                    {boardSuccess && <div className="success-message" role="status">{boardSuccess}</div>}
+                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={resetBoardForm}
+                        disabled={boardSubmitting || (!boardNewCode && !boardConfirmCode && !boardPassword)}
+                      >
+                        Annuler
+                      </button>
+                      <button type="submit" className="btn btn-primary btn-sm" disabled={boardSubmitting}>
+                        {boardSubmitting
+                          ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</>
+                          : 'Enregistrer'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ─────────────────────── NOTIFICATIONS EMAIL ─────────────────────── */}
+          <div className="card">
+            <div className="card-body">
+              <p className="settings-section-title">Notifications email</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
+                Activez ou désactivez les envois d'emails par canal. Les modifications sont sauvegardées immédiatement.
+              </p>
+              {prefsLoading ? (
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
+              ) : (
+                <div className="notif-toggle-list">
+                  {NOTIF_ITEMS.map(({ key, label, description }) => (
+                    <NotifToggle
+                      key={key}
+                      id={key}
+                      label={label}
+                      description={description}
+                      checked={prefs[key]}
+                      disabled={savingPref === key}
+                      onChange={(val) => handleToggle(key, val)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
