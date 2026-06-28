@@ -70,6 +70,63 @@ export async function patchNotifPrefs(req: Request, res: Response): Promise<void
   }
 }
 
+export async function patchBoardToggle(req: Request, res: Response): Promise<void> {
+  if (!req.admin) { sendUnauthenticated(res); return; }
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    sendError(res, 400, 'VALIDATION_ERROR', 'enabled doit être un booléen.');
+    return;
+  }
+  try {
+    await updateBoardEnabled(req.admin.adminId, enabled);
+    if (!enabled) await incrementBoardSessionVersion(req.admin.adminId);
+    const updated = await getBoardSettings(req.admin.adminId);
+    res.json({ board_enabled: updated?.board_enabled ?? true });
+  } catch (err) {
+    handleControllerError(res, 'patchBoardToggle', err);
+  }
+}
+
+export async function patchBoardCode(req: Request, res: Response): Promise<void> {
+  if (!req.admin) { sendUnauthenticated(res); return; }
+  const { newCode, confirmCode, currentPassword } = req.body || {};
+
+  if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length > MAX_PASSWORD_LENGTH) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
+    return;
+  }
+  if (typeof newCode !== 'string' || newCode.trim().length === 0) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Nouveau code requis.');
+    return;
+  }
+  const trimmed = newCode.trim();
+  if (trimmed.length < BOARD_CODE_MIN) {
+    sendError(res, 400, 'VALIDATION_ERROR', `Le code board doit contenir au moins ${BOARD_CODE_MIN} caractères.`);
+    return;
+  }
+  if (trimmed.length > FIELD_LIMITS.CODE) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Code board trop long.');
+    return;
+  }
+  if (trimmed !== (typeof confirmCode === 'string' ? confirmCode.trim() : '')) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Les deux codes ne correspondent pas.');
+    return;
+  }
+  try {
+    const passwordHash = await getAdminPasswordHash(req.admin.adminId);
+    if (!passwordHash) { sendUnauthenticated(res); return; }
+    const valid = await verifyPwd(currentPassword, passwordHash);
+    if (!valid) {
+      sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe incorrect.');
+      return;
+    }
+    await updateBoardCodeHash(req.admin.adminId, hashBoardCode(trimmed));
+    res.json({ ok: true });
+  } catch (err) {
+    handleControllerError(res, 'patchBoardCode', err);
+  }
+}
+
 export async function getBoardSettingsHandler(req: Request, res: Response): Promise<void> {
   if (!req.admin) { sendUnauthenticated(res); return; }
   try {

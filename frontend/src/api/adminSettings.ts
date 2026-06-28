@@ -26,11 +26,14 @@ export async function getBoardSettings(): Promise<BoardSettingsResponse> {
   return api.get<BoardSettingsResponse>('/api/admin/settings/board');
 }
 
-export async function patchBoardSettings(payload: {
-  enabled?: boolean;
-  newCode?: string;
-  confirmCode?: string;
+export async function patchBoardEnabled(enabled: boolean): Promise<{ board_enabled: boolean }> {
+  return api.patch<{ board_enabled: boolean }>('/api/admin/settings/board/toggle', { enabled });
+}
+
+export async function patchBoardCode(payload: {
+  newCode: string;
+  confirmCode: string;
   currentPassword: string;
-}): Promise<BoardSettingsResponse> {
-  return api.patch<BoardSettingsResponse>('/api/admin/settings/board', payload);
+}): Promise<{ ok: true }> {
+  return api.patch<{ ok: true }>('/api/admin/settings/board/code', payload);
 }

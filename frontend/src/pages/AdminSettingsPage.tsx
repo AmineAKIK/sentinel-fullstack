@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { changeAdminPassword, getAdminEmail, updateAdminEmail } from '../api/adminSecurity';
-import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardSettings } from '../api/adminSettings';
+import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardEnabled, patchBoardCode } from '../api/adminSettings';
 import { ApiResponseError } from '../api/client';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -168,6 +168,7 @@ export default function AdminSettingsPage() {
 
   // ─── Board ────────────────────────────────────────────────────────────────
   const [boardEnabled, setBoardEnabled] = useState(true);
+  const [savingBoardToggle, setSavingBoardToggle] = useState(false);
   const [boardHasCode, setBoardHasCode] = useState(false);
   const [boardLoading, setBoardLoading] = useState(true);
   const [boardNewCode, setBoardNewCode] = useState('');
@@ -187,6 +188,18 @@ export default function AdminSettingsPage() {
       .finally(() => setBoardLoading(false));
   }, []);
 
+  async function handleBoardToggle(value: boolean) {
+    setBoardEnabled(value);
+    setSavingBoardToggle(true);
+    try {
+      await patchBoardEnabled(value);
+    } catch {
+      setBoardEnabled(!value);
+    } finally {
+      setSavingBoardToggle(false);
+    }
+  }
+
   function resetBoardForm() {
     setBoardNewCode('');
     setBoardConfirmCode('');
@@ -195,40 +208,33 @@ export default function AdminSettingsPage() {
     setBoardSuccess('');
   }
 
-  async function handleBoardSubmit(e: FormEvent) {
+  async function handleBoardCodeSubmit(e: FormEvent) {
     e.preventDefault();
     setBoardError('');
     setBoardSuccess('');
-
+    if (boardNewCode.trim().length < 4) {
+      setBoardError('Le code board doit contenir au moins 4 caractères.');
+      return;
+    }
+    if (boardNewCode.trim() !== boardConfirmCode.trim()) {
+      setBoardError('Les deux codes ne correspondent pas.');
+      return;
+    }
     if (!boardPassword) {
       setBoardError('Renseignez votre mot de passe.');
       return;
     }
-
-    const hasCodeChange = boardNewCode.trim().length > 0;
-    if (hasCodeChange) {
-      if (boardNewCode.trim().length < 4) {
-        setBoardError('Le code board doit contenir au moins 4 caractères.');
-        return;
-      }
-      if (boardNewCode.trim() !== boardConfirmCode.trim()) {
-        setBoardError('Les deux codes ne correspondent pas.');
-        return;
-      }
-    }
-
     setBoardSubmitting(true);
     try {
-      const updated = await patchBoardSettings({
-        enabled: boardEnabled,
-        ...(hasCodeChange ? { newCode: boardNewCode.trim(), confirmCode: boardConfirmCode.trim() } : {}),
+      await patchBoardCode({
+        newCode: boardNewCode.trim(),
+        confirmCode: boardConfirmCode.trim(),
         currentPassword: boardPassword,
       });
-      setBoardEnabled(updated.board_enabled);
-      setBoardHasCode(updated.hasCode);
+      setBoardHasCode(true);
       resetBoardForm();
-      setBoardSuccess('Paramètres board mis à jour.');
-      setTimeout(() => setBoardSuccess(''), 4000);
+      setBoardSuccess('Code board mis à jour. Les sessions actives ont été révoquées.');
+      setTimeout(() => setBoardSuccess(''), 5000);
     } catch (err) {
       setBoardError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
     } finally {
@@ -393,7 +399,7 @@ export default function AdminSettingsPage() {
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
                 Activez ou désactivez les envois d'emails par canal. Les modifications sont sauvegardées immédiatement.
               </p>
-              {prefsLoading ? (
+              {prefsLoading || boardLoading ? (
                 <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
               ) : (
                 <div className="notif-toggle-list">
@@ -408,39 +414,36 @@ export default function AdminSettingsPage() {
                       onChange={(val) => handleToggle(key, val)}
                     />
                   ))}
+                  <NotifToggle
+                    id="board_enabled"
+                    label="Board atelier"
+                    description="Accès public à l'écran de suivi — désactiver révoque toutes les sessions actives"
+                    checked={boardEnabled}
+                    disabled={savingBoardToggle}
+                    onChange={handleBoardToggle}
+                  />
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Board atelier ── */}
+          {/* ── Code board ── */}
           <div className="card">
             <div className="card-body">
-              <p className="settings-section-title">Board atelier</p>
+              <p className="settings-section-title">Code board</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Accès public à l'écran de suivi atelier. Toute modification exige votre mot de passe.
-                {!boardHasCode && !boardLoading && (
-                  <> <strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré — board inaccessible.</strong></>
-                )}
+                {boardHasCode
+                  ? 'Modifier le code d\'accès à l\'écran board. Les sessions actives seront révoquées.'
+                  : <><strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré.</strong> Le board est inaccessible sans code.</>
+                }
               </p>
               {boardLoading ? (
                 <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
               ) : (
-                <form onSubmit={handleBoardSubmit} noValidate autoComplete="off">
-                  <div className="notif-toggle-list" style={{ marginBottom: 20 }}>
-                    <NotifToggle
-                      id="board_enabled"
-                      label="Board activé"
-                      description="Désactiver révoque immédiatement toutes les sessions board actives"
-                      checked={boardEnabled}
-                      disabled={boardSubmitting}
-                      onChange={(val) => { setBoardEnabled(val); setBoardError(''); setBoardSuccess(''); }}
-                    />
-                  </div>
-
+                <form onSubmit={handleBoardCodeSubmit} noValidate autoComplete="off">
                   <div className="form-group">
                     <label className="form-label" htmlFor="boardNewCode">
-                      {boardHasCode ? 'Nouveau code d\'accès' : 'Définir un code d\'accès'}
+                      {boardHasCode ? 'Nouveau code d\'accès' : 'Code d\'accès'}
                     </label>
                     <input
                       id="boardNewCode"
@@ -453,7 +456,7 @@ export default function AdminSettingsPage() {
                       readOnly={!boardNewCode && !boardSubmitting}
                       onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                       maxLength={100}
-                      placeholder={boardHasCode ? 'Laisser vide pour ne pas changer' : 'Minimum 4 caractères'}
+                      placeholder="Minimum 4 caractères"
                     />
                   </div>
                   <div className="form-group">
@@ -472,7 +475,6 @@ export default function AdminSettingsPage() {
                       placeholder=""
                     />
                   </div>
-
                   <div className="form-group">
                     <label className="form-label" htmlFor="boardPassword">Mot de passe administrateur</label>
                     <input
@@ -489,10 +491,8 @@ export default function AdminSettingsPage() {
                       placeholder="Saisir le mot de passe"
                     />
                   </div>
-
                   {boardError && <div className="error-message" role="alert">{boardError}</div>}
                   {boardSuccess && <div className="success-message" role="status">{boardSuccess}</div>}
-
                   <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                     <button
                       type="button"

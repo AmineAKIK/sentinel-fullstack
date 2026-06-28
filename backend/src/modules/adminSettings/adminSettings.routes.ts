@@ -4,7 +4,8 @@ import {
   getNotifPrefs,
   patchNotifPrefs,
   getBoardSettingsHandler,
-  patchBoardSettingsHandler,
+  patchBoardToggle,
+  patchBoardCode,
 } from './adminSettings.controller';
 
 const router = Router();
@@ -12,6 +13,7 @@ const router = Router();
 router.get('/notifications', adminAuthMiddleware, getNotifPrefs);
 router.patch('/notifications', adminAuthMiddleware, patchNotifPrefs);
 router.get('/board', adminAuthMiddleware, getBoardSettingsHandler);
-router.patch('/board', adminAuthMiddleware, patchBoardSettingsHandler);
+router.patch('/board/toggle', adminAuthMiddleware, patchBoardToggle);
+router.patch('/board/code', adminAuthMiddleware, patchBoardCode);
 
 export default router;
