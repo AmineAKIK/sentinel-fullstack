@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PasswordResetRequest, markPasswordResetRequestHandled } from '../api/admin';
 import { formatElapsed } from '../utils/date';
@@ -9,11 +10,18 @@ interface PendingTasksWidgetProps {
 
 export default function PendingTasksWidget({ requests, onHandled }: PendingTasksWidgetProps) {
   const navigate = useNavigate();
+  const [confirming, setConfirming] = useState<number | null>(null);
+  const [loading, setLoading] = useState<number | null>(null);
 
-  async function handleMark(e: React.MouseEvent, id: number) {
-    e.stopPropagation();
-    await markPasswordResetRequestHandled(id);
-    onHandled(id);
+  async function handleConfirm(id: number) {
+    setLoading(id);
+    try {
+      await markPasswordResetRequestHandled(id);
+      onHandled(id);
+    } finally {
+      setLoading(null);
+      setConfirming(null);
+    }
   }
 
   return (
@@ -32,31 +40,51 @@ export default function PendingTasksWidget({ requests, onHandled }: PendingTasks
         {requests.length === 0 ? (
           <div className="notice">Aucune action en attente.</div>
         ) : (
-          <div className="admin-action-list">
+          <div className="quality-list">
             {requests.map((req) => (
-              <div key={req.id} className="admin-action-row admin-task-row">
+              <div key={req.id} className="pending-task-item">
                 <button
-                  className="admin-task-main"
+                  className="pending-task-body"
                   onClick={() => navigate(`/admin/users/${req.user_id}`)}
                 >
-                  <span className="admin-task-label">
-                    Réinitialisation mot de passe
-                  </span>
-                  <span className="admin-task-user">
+                  <div className="pending-task-meta">
+                    <span className="pending-task-type">Réinitialisation mot de passe</span>
+                    <small className="pending-task-time">il y a {formatElapsed(req.requested_at)}</small>
+                  </div>
+                  <span className="pending-task-user">
                     {req.last_name} {req.first_name}
                     <small>Badge {req.badge_number}</small>
                   </span>
-                  <small className="admin-task-time">
-                    il y a {formatElapsed(req.requested_at)}
-                  </small>
                 </button>
-                <button
-                  className="btn btn-outline admin-task-done"
-                  onClick={(e) => handleMark(e, req.id)}
-                  title="Marquer comme traité"
-                >
-                  Traité
-                </button>
+
+                <div className="pending-task-actions">
+                  {confirming === req.id ? (
+                    <>
+                      <span className="pending-task-confirm-label">Confirmer ?</span>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleConfirm(req.id)}
+                        disabled={loading === req.id}
+                      >
+                        {loading === req.id ? 'En cours…' : 'Oui'}
+                      </button>
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => setConfirming(null)}
+                        disabled={loading === req.id}
+                      >
+                        Non
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() => setConfirming(req.id)}
+                    >
+                      Marquer traité
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
