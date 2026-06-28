@@ -169,7 +169,7 @@ boardRouter.post('/session', async (req, res) => {
     ]);
 
     if (boardSettings && !boardSettings.board_enabled) {
-      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Le tableau d\'atelier est fermé.');
+      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Le tableau n\'est pas disponible pour le moment.');
       return;
     }
 
