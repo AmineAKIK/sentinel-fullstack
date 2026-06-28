@@ -10,9 +10,11 @@ import {
   updateBoardEnabled,
   updateBoardCodeHash,
   incrementBoardSessionVersion,
+  incrementAdminSessionVersion,
   getAdminPasswordHash,
   getAppSettingsById,
   updateAppSettings,
+  incrementAllWorkshopSessionVersions,
   AppSettings,
 } from '../adminCredentials/adminCredentials.repository';
 import { verifyPassword as verifyPwd, MAX_PASSWORD_LENGTH } from '../../auth/bcrypt';
@@ -155,6 +157,7 @@ export async function getAppSettingsHandler(req: Request, res: Response): Promis
 
 const APP_SETTINGS_BOUNDS: Record<keyof Omit<AppSettings, 'board_label'>, { min: number; max: number }> = {
   session_duration_hours:  { min: 1, max: 168 },
+  workshop_session_hours:  { min: 1, max: 168 },
   board_session_ttl_hours: { min: 1, max: 168 },
   login_max_attempts:      { min: 3, max: 50 },
   setup_code_ttl_hours:    { min: 1, max: 72 },
@@ -186,13 +189,23 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
     patch.board_label = label.trim();
   }
 
-  if (Object.keys(patch).length === 0) {
+  const revokeAdmin     = body.revokeAdminSessions    === true;
+  const revokeWorkshop  = body.revokeWorkshopSessions === true;
+  const revokeBoard     = body.revokeBoardSessions    === true;
+
+  if (Object.keys(patch).length === 0 && !revokeAdmin && !revokeWorkshop && !revokeBoard) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Aucun paramètre à mettre à jour.');
     return;
   }
 
   try {
-    await updateAppSettings(req.admin.adminId, patch);
+    if (Object.keys(patch).length > 0) {
+      await updateAppSettings(req.admin.adminId, patch);
+    }
+    if (revokeAdmin)    await incrementAdminSessionVersion(req.admin.adminId);
+    if (revokeWorkshop) await incrementAllWorkshopSessionVersions();
+    if (revokeBoard)    await incrementBoardSessionVersion(req.admin.adminId);
+
     const updated = await getAppSettingsById(req.admin.adminId);
     res.json(updated);
   } catch (err) {

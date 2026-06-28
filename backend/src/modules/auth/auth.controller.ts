@@ -20,8 +20,14 @@ export async function login(req: Request, res: Response): Promise<void> {
   const { identifier, password, newPassword, setupCode } = parsed.data;
 
   try {
-    const result = await unifiedLoginService(identifier, password, newPassword, setupCode);
     const settings = await getAppSettings();
+
+    if (loginLimiter.isLimited(req, settings.login_max_attempts)) {
+      sendError(res, 429, 'RATE_LIMITED', `Trop de tentatives. Réessayez plus tard.`);
+      return;
+    }
+
+    const result = await unifiedLoginService(identifier, password, newPassword, setupCode);
 
     switch (result.kind) {
       case 'invalid_credentials':
@@ -69,12 +75,12 @@ export async function login(req: Request, res: Response): Promise<void> {
 
       case 'workshop_success': {
         const token = signAuthToken(
-          { userId: result.user.id, badgeNumber: result.user.badge_number, role: result.user.role },
-          settings.session_duration_hours
+          { userId: result.user.id, badgeNumber: result.user.badge_number, role: result.user.role, sessionVersion: result.user.sessionVersion },
+          settings.workshop_session_hours
         );
         if (!token) { sendInvalidServerConfig(res); return; }
         loginLimiter.clear(req);
-        setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token, settings.session_duration_hours);
+        setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token, settings.workshop_session_hours);
         res.json({
           accountType: 'workshop',
           id: result.user.id,

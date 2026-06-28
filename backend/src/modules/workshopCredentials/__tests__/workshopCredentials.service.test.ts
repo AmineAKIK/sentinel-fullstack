@@ -27,6 +27,7 @@ function mockUser(overrides: Record<string, unknown> = {}) {
     badge_number: '3002',
     role: 'OPERATOR',
     is_active: true,
+    session_version: 0,
     password_hash: null,
     password_setup_token_hash: 'hashed-setup-code',
     password_setup_expires_at: new Date('2099-01-01T00:00:00Z'),
@@ -117,6 +118,7 @@ describe('loginWorkshopUserService – setup initial', () => {
         last_name: 'Kaci',
         badge_number: '3002',
         role: 'OPERATOR',
+        sessionVersion: 0,
       },
     });
     expect(bcrypt.hashWorkshopPassword).toHaveBeenCalledWith('secret1');
@@ -156,6 +158,7 @@ describe('loginWorkshopUserService – mot de passe existant', () => {
         last_name: 'Kaci',
         badge_number: '3002',
         role: 'OPERATOR',
+        sessionVersion: 0,
       },
     });
     expect(bcrypt.verifyPassword).toHaveBeenCalledWith('secret1', 'hash');

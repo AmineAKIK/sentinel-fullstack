@@ -23,6 +23,8 @@ interface RateLimiter {
   recordFailure: (req: Request, maxAttempts?: number) => void;
   // Efface le compteur (login réussi) : un bon identifiant repart de zéro.
   clear: (req: Request) => void;
+  // Vérifie si la requête est limitée avec un seuil dynamique (sans bloquer).
+  isLimited: (req: Request, dynamicMax: number) => boolean;
 }
 
 function envInt(name: string, fallback: number): number {
@@ -110,7 +112,13 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
     attempts.delete(getKey(req));
   }
 
-  return { middleware, consume, recordFailure, clear };
+  function isLimited(req: Request, dynamicMax: number): boolean {
+    const now = Date.now();
+    const entry = attempts.get(getKey(req));
+    return !!(entry && now <= entry.resetAt && entry.count >= dynamicMax);
+  }
+
+  return { middleware, consume, recordFailure, clear, isLimited };
 }
 
 // Limiteur de connexion : clé IP + identité, ne compte que les échecs.

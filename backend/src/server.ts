@@ -61,7 +61,6 @@ app.use(express.json({ limit: '50kb' }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
 app.use('/api', globalApiRateLimit);
-app.use('/api/auth/login', loginRateLimit);
 app.use('/api/board/session', loginRateLimit);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/password-reset', passwordResetRoutes);

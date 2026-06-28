@@ -13,6 +13,7 @@ export interface WorkshopPayload {
   userId: number;
   badgeNumber: string;
   role: string;
+  sessionVersion: number;
 }
 
 declare global {
@@ -54,8 +55,8 @@ async function authenticateWorkshopRequest(
       sendInvalidServerConfig(res);
       return;
     }
-    const { rows } = await pool.query(
-      `SELECT id, badge_number, role
+    const { rows } = await pool.query<{ id: number; badge_number: string; role: string; session_version: number }>(
+      `SELECT id, badge_number, role, session_version
        FROM sentinel_users
        WHERE id = $1
          AND badge_number = $2
@@ -72,10 +73,18 @@ async function authenticateWorkshopRequest(
     }
 
     const user = rows[0];
+
+    if (user.session_version !== payload.sessionVersion) {
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+      sendError(res, 401, 'UNAUTHORIZED', 'Session expirée.');
+      return;
+    }
+
     req.workshopUser = {
       userId: user.id,
       badgeNumber: user.badge_number,
       role: user.role,
+      sessionVersion: user.session_version,
     };
     next();
   } catch (err) {

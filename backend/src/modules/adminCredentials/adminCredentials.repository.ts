@@ -150,6 +150,7 @@ export async function incrementBoardSessionVersion(adminId: number): Promise<voi
 
 export interface AppSettings {
   session_duration_hours: number;
+  workshop_session_hours: number;
   board_session_ttl_hours: number;
   login_max_attempts: number;
   setup_code_ttl_hours: number;
@@ -158,26 +159,27 @@ export interface AppSettings {
 
 const APP_SETTINGS_DEFAULTS: AppSettings = {
   session_duration_hours: 8,
+  workshop_session_hours: 8,
   board_session_ttl_hours: 12,
   login_max_attempts: 10,
   setup_code_ttl_hours: 24,
   board_label: 'Board atelier',
 };
 
+const SELECT_APP_SETTINGS = `
+  SELECT session_duration_hours, workshop_session_hours, board_session_ttl_hours,
+         login_max_attempts, setup_code_ttl_hours, board_label`;
+
 export async function getAppSettings(): Promise<AppSettings> {
   const { rows } = await pool.query<AppSettings>(
-    `SELECT session_duration_hours, board_session_ttl_hours,
-            login_max_attempts, setup_code_ttl_hours, board_label
-     FROM admin_accounts LIMIT 1`
+    `${SELECT_APP_SETTINGS} FROM admin_accounts LIMIT 1`
   );
   return rows[0] ?? APP_SETTINGS_DEFAULTS;
 }
 
 export async function getAppSettingsById(adminId: number): Promise<AppSettings> {
   const { rows } = await pool.query<AppSettings>(
-    `SELECT session_duration_hours, board_session_ttl_hours,
-            login_max_attempts, setup_code_ttl_hours, board_label
-     FROM admin_accounts WHERE id = $1`,
+    `${SELECT_APP_SETTINGS} FROM admin_accounts WHERE id = $1`,
     [adminId]
   );
   return rows[0] ?? APP_SETTINGS_DEFAULTS;
@@ -185,6 +187,7 @@ export async function getAppSettingsById(adminId: number): Promise<AppSettings> 
 
 const APP_SETTINGS_KEYS: (keyof AppSettings)[] = [
   'session_duration_hours',
+  'workshop_session_hours',
   'board_session_ttl_hours',
   'login_max_attempts',
   'setup_code_ttl_hours',
@@ -204,5 +207,19 @@ export async function updateAppSettings(
   await pool.query(
     `UPDATE admin_accounts SET ${setClauses} WHERE id = $1`,
     [adminId, ...values]
+  );
+}
+
+export async function getWorkshopSessionVersion(userId: number): Promise<number | null> {
+  const { rows } = await pool.query<{ session_version: number }>(
+    'SELECT session_version FROM sentinel_users WHERE id = $1 AND is_deleted = FALSE',
+    [userId]
+  );
+  return rows[0]?.session_version ?? null;
+}
+
+export async function incrementAllWorkshopSessionVersions(): Promise<void> {
+  await pool.query(
+    'UPDATE sentinel_users SET session_version = session_version + 1 WHERE is_deleted = FALSE'
   );
 }

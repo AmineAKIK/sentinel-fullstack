@@ -18,7 +18,7 @@ export type LoginResult =
   | { kind: 'expired_setup_code' }
   | { kind: 'requires_password'; badgeNumber: string }
   | { kind: 'invalid_password' }
-  | { kind: 'success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string } };
+  | { kind: 'success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string; sessionVersion: number } };
 
 export async function loginWorkshopUserService(
   badgeNumber: string,
@@ -69,6 +69,7 @@ export async function loginWorkshopUserService(
       last_name: user.last_name,
       badge_number: user.badge_number,
       role: user.role,
+      sessionVersion: user.session_version,
     },
   };
 }

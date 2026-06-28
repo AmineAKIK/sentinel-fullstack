@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { changeAdminPassword, getAdminEmail, updateAdminEmail } from '../api/adminSecurity';
-import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardEnabled, patchBoardCode, getAppSettings, patchAppSettings, AppSettings } from '../api/adminSettings';
+import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardEnabled, patchBoardCode, getAppSettings, patchAppSettings, AppSettings, AppSettingsPatch } from '../api/adminSettings';
 import { ApiResponseError } from '../api/client';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -281,6 +281,7 @@ export default function AdminSettingsPage() {
   // ─── App settings ─────────────────────────────────────────────────────────
   const [appSettings, setAppSettings] = useState<AppSettings>({
     session_duration_hours: 8,
+    workshop_session_hours: 8,
     board_session_ttl_hours: 12,
     login_max_attempts: 10,
     setup_code_ttl_hours: 24,
@@ -291,6 +292,9 @@ export default function AdminSettingsPage() {
   const [appSettingsSaving, setAppSettingsSaving] = useState(false);
   const [appSettingsError, setAppSettingsError] = useState('');
   const [appSettingsSuccess, setAppSettingsSuccess] = useState('');
+  const [revokeAdmin, setRevokeAdmin] = useState(false);
+  const [revokeWorkshop, setRevokeWorkshop] = useState(false);
+  const [revokeBoard, setRevokeBoard] = useState(false);
 
   useEffect(() => {
     getAppSettings()
@@ -310,12 +314,16 @@ export default function AdminSettingsPage() {
 
   function resetAppSettings() {
     setAppSettingsDraft(appSettings);
+    setRevokeAdmin(false);
+    setRevokeWorkshop(false);
+    setRevokeBoard(false);
     setAppSettingsError('');
     setAppSettingsSuccess('');
   }
 
-  const appSettingsDirty = appSettingsDraft !== null &&
-    JSON.stringify(appSettingsDraft) !== JSON.stringify(appSettings);
+  const appSettingsDirty = (appSettingsDraft !== null &&
+    JSON.stringify(appSettingsDraft) !== JSON.stringify(appSettings)) ||
+    revokeAdmin || revokeWorkshop || revokeBoard;
 
   async function handleAppSettingsSubmit(e: FormEvent) {
     e.preventDefault();
@@ -324,11 +332,22 @@ export default function AdminSettingsPage() {
     setAppSettingsSuccess('');
     setAppSettingsSaving(true);
     try {
-      const updated = await patchAppSettings(appSettingsDraft);
+      const patch: AppSettingsPatch = { ...appSettingsDraft };
+      if (revokeAdmin)    patch.revokeAdminSessions    = true;
+      if (revokeWorkshop) patch.revokeWorkshopSessions = true;
+      if (revokeBoard)    patch.revokeBoardSessions    = true;
+      const updated = await patchAppSettings(patch);
       setAppSettings(updated);
       setAppSettingsDraft(updated);
-      setAppSettingsSuccess('Paramètres enregistrés.');
-      setTimeout(() => setAppSettingsSuccess(''), 4000);
+      setRevokeAdmin(false);
+      setRevokeWorkshop(false);
+      setRevokeBoard(false);
+      const parts: string[] = ['Paramètres enregistrés.'];
+      if (revokeAdmin)    parts.push('Sessions admin révoquées.');
+      if (revokeWorkshop) parts.push('Sessions atelier révoquées.');
+      if (revokeBoard)    parts.push('Sessions board révoquées.');
+      setAppSettingsSuccess(parts.join(' '));
+      setTimeout(() => setAppSettingsSuccess(''), 5000);
     } catch (err) {
       setAppSettingsError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
     } finally {
@@ -683,6 +702,19 @@ export default function AdminSettingsPage() {
                     </div>
 
                     <div className="form-group">
+                      <label className="form-label" htmlFor="workshopSessionHours">Durée de session — Atelier (heures)</label>
+                      <input
+                        id="workshopSessionHours"
+                        className="form-input"
+                        type="number"
+                        min={1} max={168}
+                        value={appSettingsDraftValue('workshop_session_hours')}
+                        onChange={(e) => setAppSettingsDraftField('workshop_session_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                    </div>
+
+                    <div className="form-group">
                       <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier (heures)</label>
                       <input
                         id="boardSessionTtl"
@@ -721,7 +753,7 @@ export default function AdminSettingsPage() {
                       />
                     </div>
 
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <div className="form-group">
                       <label className="form-label" htmlFor="boardLabel">Nom affiché du board atelier</label>
                       <input
                         id="boardLabel"
@@ -736,6 +768,42 @@ export default function AdminSettingsPage() {
                     </div>
 
                   </div>
+
+                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 16px' }} />
+                  <p className="settings-section-title" style={{ marginBottom: 4 }}>Révoquer des sessions</p>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 12 }}>
+                    Cochez ce que vous souhaitez révoquer lors de l'enregistrement. Les utilisateurs concernés seront déconnectés immédiatement.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={revokeAdmin}
+                        onChange={(e) => setRevokeAdmin(e.target.checked)}
+                        disabled={appSettingsSaving}
+                      />
+                      Sessions administrateur
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={revokeWorkshop}
+                        onChange={(e) => setRevokeWorkshop(e.target.checked)}
+                        disabled={appSettingsSaving}
+                      />
+                      Sessions atelier (tous les utilisateurs)
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={revokeBoard}
+                        onChange={(e) => setRevokeBoard(e.target.checked)}
+                        disabled={appSettingsSaving}
+                      />
+                      Sessions board atelier
+                    </label>
+                  </div>
+
                   {appSettingsError && <div className="error-message" role="alert">{appSettingsError}</div>}
                   {appSettingsSuccess && <div className="success-message" role="status">{appSettingsSuccess}</div>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>

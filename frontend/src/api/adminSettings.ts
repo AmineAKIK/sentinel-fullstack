@@ -40,16 +40,23 @@ export async function patchBoardCode(payload: {
 
 export interface AppSettings {
   session_duration_hours: number;
+  workshop_session_hours: number;
   board_session_ttl_hours: number;
   login_max_attempts: number;
   setup_code_ttl_hours: number;
   board_label: string;
 }
 
+export interface AppSettingsPatch extends Partial<AppSettings> {
+  revokeAdminSessions?: boolean;
+  revokeWorkshopSessions?: boolean;
+  revokeBoardSessions?: boolean;
+}
+
 export async function getAppSettings(): Promise<AppSettings> {
   return api.get<AppSettings>('/api/admin/settings/app');
 }
 
-export async function patchAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+export async function patchAppSettings(patch: AppSettingsPatch): Promise<AppSettings> {
   return api.patch<AppSettings>('/api/admin/settings/app', patch);
 }

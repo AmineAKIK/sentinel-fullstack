@@ -6,6 +6,7 @@ export interface WorkshopCredentialUser {
   last_name: string;
   badge_number: string;
   role: string;
+  session_version: number;
   password_hash: string | null;
   password_setup_token_hash: string | null;
   password_setup_expires_at: Date | null;
@@ -15,8 +16,8 @@ export type WorkshopSessionUser = Pick<WorkshopCredentialUser, 'id' | 'first_nam
 
 export async function findWorkshopUserByBadge(badgeNumber: string): Promise<(WorkshopCredentialUser & { is_active: boolean }) | null> {
   const { rows } = await pool.query<WorkshopCredentialUser & { is_active: boolean }>(
-    `SELECT id, first_name, last_name, badge_number, role, is_active, password_hash,
-            password_setup_token_hash, password_setup_expires_at
+    `SELECT id, first_name, last_name, badge_number, role, is_active, session_version,
+            password_hash, password_setup_token_hash, password_setup_expires_at
      FROM sentinel_users
      WHERE badge_number = $1 AND is_deleted = FALSE`,
     [badgeNumber.trim()]

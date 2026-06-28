@@ -11,7 +11,7 @@ export type AuthLoginResult =
   | { kind: 'workshop_invalid_setup_code' }
   | { kind: 'workshop_expired_setup_code' }
   | { kind: 'workshop_account_disabled' }
-  | { kind: 'workshop_success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string } }
+  | { kind: 'workshop_success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string; sessionVersion: number } }
   | { kind: 'invalid_credentials' };
 
 export interface AdminSessionInfo {

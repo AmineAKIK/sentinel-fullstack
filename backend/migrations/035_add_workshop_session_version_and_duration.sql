@@ -1,0 +1,5 @@
+ALTER TABLE sentinel_users
+  ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE admin_accounts
+  ADD COLUMN IF NOT EXISTS workshop_session_hours INTEGER NOT NULL DEFAULT 8;
