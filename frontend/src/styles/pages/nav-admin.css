@@ -679,10 +679,9 @@
   grid-column: 1 / -1;
 }
 
-@media (max-width: 660px) {
+@media (max-width: 600px) {
   .settings-grid {
     grid-template-columns: 1fr;
-    max-width: 520px;
   }
 
   .settings-grid .settings-full {
@@ -716,7 +715,7 @@
   padding-left: 20px;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 600px) {
   .notif-toggle-grid {
     grid-template-columns: 1fr;
   }
