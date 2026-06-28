@@ -686,6 +686,28 @@ export default function AdminSettingsPage() {
                 <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
               ) : (
                 <form onSubmit={handleAppSettingsSubmit} noValidate>
+                  <div className="notif-toggle-item" style={{ paddingTop: 0, marginBottom: 20 }}>
+                    <div className="notif-toggle-label">
+                      <strong>Session board illimitée</strong>
+                      <span>Pour écrans kiosque allumés en permanence</span>
+                    </div>
+                    <label className="toggle-switch" aria-label="Session board illimitée">
+                      <input
+                        type="checkbox"
+                        checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAppSettingsDraftField('board_session_ttl_hours', 0);
+                          } else {
+                            const prev = appSettings.board_session_ttl_hours;
+                            setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
+                          }
+                        }}
+                        disabled={appSettingsSaving}
+                      />
+                      <span className="toggle-track" />
+                    </label>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
 
                     <div className="form-group">
@@ -738,28 +760,6 @@ export default function AdminSettingsPage() {
                       )}
                     </div>
 
-                    <div className="notif-toggle-item" style={{ gridColumn: '1 / -1', padding: '12px 0 0' }}>
-                      <div className="notif-toggle-label">
-                        <strong>Session board illimitée</strong>
-                        <span>Pour écrans kiosque allumés en permanence</span>
-                      </div>
-                      <label className="toggle-switch" aria-label="Session board illimitée">
-                        <input
-                          type="checkbox"
-                          checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setAppSettingsDraftField('board_session_ttl_hours', 0);
-                            } else {
-                              const prev = appSettings.board_session_ttl_hours;
-                              setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
-                            }
-                          }}
-                          disabled={appSettingsSaving}
-                        />
-                        <span className="toggle-track" />
-                      </label>
-                    </div>
 
                     <div className="form-group">
                       <label className="form-label" htmlFor="loginMaxAttempts">Tentatives de connexion avant blocage</label>
