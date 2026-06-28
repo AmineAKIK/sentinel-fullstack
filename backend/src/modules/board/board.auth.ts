@@ -10,9 +10,9 @@ import { getBoardData } from '../workshop/workshop.controller';
 import { FIELD_LIMITS } from '../../domain/constants';
 import { loginLimiter } from '../../middlewares/loginRateLimit';
 import logger from '../../logger';
+import { getBoardSettingsGlobal } from '../adminCredentials/adminCredentials.repository';
 
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
-const BOARD_ACCESS_CODE_HASH = process.env.BOARD_ACCESS_CODE_HASH || '';
 const BOARD_ACCESS_LABEL = process.env.BOARD_ACCESS_LABEL || 'Board atelier';
 const BOARD_SESSION_TTL_HOURS = Math.max(1, parseInt(process.env.BOARD_SESSION_TTL_HOURS || '12', 10));
 const BOARD_SESSION_TTL_MS = BOARD_SESSION_TTL_HOURS * 60 * 60 * 1000;
@@ -20,6 +20,7 @@ const BOARD_SESSION_TTL_MS = BOARD_SESSION_TTL_HOURS * 60 * 60 * 1000;
 interface BoardPayload {
   scope: 'board';
   label: string;
+  boardSessionVersion: number;
 }
 
 interface WorkshopPayload {
@@ -28,7 +29,7 @@ interface WorkshopPayload {
   role: string;
 }
 
-function hashAccessCode(code: string): string {
+export function hashBoardCode(code: string): string {
   return crypto.createHash('sha256').update(code.trim(), 'utf8').digest('hex');
 }
 
@@ -77,15 +78,29 @@ async function hasValidWorkshopSession(req: Request, res: Response): Promise<boo
   return true;
 }
 
-function hasValidBoardSession(req: Request, res: Response): boolean {
+async function hasValidBoardSession(req: Request, res: Response): Promise<boolean> {
   const token = req.cookies?.[BOARD_AUTH_COOKIE];
   if (!token) return false;
 
   const payload = verifyAuthToken<BoardPayload>(token);
-  if (payload?.scope === 'board') return true;
+  if (payload?.scope !== 'board') {
+    clearBoardCookie(res);
+    return false;
+  }
 
-  clearBoardCookie(res);
-  return false;
+  // Vérifier que la session n'a pas été révoquée (changement de code ou désactivation)
+  const settings = await getBoardSettingsGlobal();
+  if (!settings) return false;
+  if (!settings.board_enabled) {
+    clearBoardCookie(res);
+    return false;
+  }
+  if (payload.boardSessionVersion !== settings.board_session_version) {
+    clearBoardCookie(res);
+    return false;
+  }
+
+  return true;
 }
 
 export async function boardReadAuthMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -95,11 +110,10 @@ export async function boardReadAuthMiddleware(req: Request, res: Response, next:
   }
 
   try {
-    if (hasValidBoardSession(req, res) || await hasValidWorkshopSession(req, res)) {
+    if (await hasValidBoardSession(req, res) || await hasValidWorkshopSession(req, res)) {
       next();
       return;
     }
-
     sendMissingAuth(res);
   } catch (err) {
     if (isJwtSessionError(err)) {
@@ -128,12 +142,11 @@ boardRouter.get('/me', async (req, res) => {
   }
 
   try {
-    const hasAccess = hasValidBoardSession(req, res) || await hasValidWorkshopSession(req, res);
+    const hasAccess = await hasValidBoardSession(req, res) || await hasValidWorkshopSession(req, res);
     if (!hasAccess) {
       sendMissingAuth(res);
       return;
     }
-
     res.json({ access: true, label: BOARD_ACCESS_LABEL, expiresInHours: BOARD_SESSION_TTL_HOURS });
   } catch (err) {
     if (isJwtSessionError(err)) {
@@ -146,47 +159,60 @@ boardRouter.get('/me', async (req, res) => {
   }
 });
 
-boardRouter.post('/session', (req, res) => {
+boardRouter.post('/session', async (req, res) => {
   if (!getJwtSecret()) {
     sendInvalidServerConfig(res);
     return;
   }
 
-  if (!BOARD_ACCESS_CODE_HASH) {
-    sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Accès board non configuré.');
-    return;
+  try {
+    const settings = await getBoardSettingsGlobal();
+
+    if (settings && !settings.board_enabled) {
+      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Board temporairement indisponible.');
+      return;
+    }
+
+    // Code depuis DB en priorité, fallback .env
+    const activeHash = settings?.board_code_hash || process.env.BOARD_ACCESS_CODE_HASH || '';
+    if (!activeHash) {
+      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Accès board non configuré.');
+      return;
+    }
+
+    const code = typeof req.body?.code === 'string' ? req.body.code : '';
+    if (!code.trim() || code.length > FIELD_LIMITS.CODE) {
+      sendError(res, 400, 'VALIDATION_ERROR', 'Code board requis.');
+      return;
+    }
+
+    if (!timingSafeHashEquals(hashBoardCode(code), activeHash)) {
+      loginLimiter.recordFailure(req);
+      sendError(res, 401, 'UNAUTHORIZED', 'Code board incorrect.');
+      return;
+    }
+
+    loginLimiter.clear(req);
+
+    const secret = getJwtSecret();
+    if (!secret) {
+      sendInvalidServerConfig(res);
+      return;
+    }
+
+    const boardSessionVersion = settings?.board_session_version ?? 0;
+    const token = jwt.sign(
+      { scope: 'board', label: BOARD_ACCESS_LABEL, boardSessionVersion },
+      secret,
+      { expiresIn: `${BOARD_SESSION_TTL_HOURS}h` }
+    );
+
+    setBoardCookie(res, token);
+    res.json({ access: true, label: BOARD_ACCESS_LABEL, expiresInHours: BOARD_SESSION_TTL_HOURS });
+  } catch (err) {
+    logger.error({ err }, 'Board session error');
+    sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');
   }
-
-  const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  if (!code.trim() || code.length > FIELD_LIMITS.CODE) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Code board requis.');
-    return;
-  }
-
-  if (!timingSafeHashEquals(hashAccessCode(code), BOARD_ACCESS_CODE_HASH)) {
-    // Code board partagé (pas d'identité) → le limiteur clé par IP. On compte
-    // l'échec ici, comme pour le login utilisateur.
-    loginLimiter.recordFailure(req);
-    sendError(res, 401, 'UNAUTHORIZED', 'Code board incorrect.');
-    return;
-  }
-
-  loginLimiter.clear(req);
-
-  const secret = getJwtSecret();
-  if (!secret) {
-    sendInvalidServerConfig(res);
-    return;
-  }
-
-  const token = jwt.sign(
-    { scope: 'board', label: BOARD_ACCESS_LABEL },
-    secret,
-    { expiresIn: `${BOARD_SESSION_TTL_HOURS}h` }
-  );
-
-  setBoardCookie(res, token);
-  res.json({ access: true, label: BOARD_ACCESS_LABEL, expiresInHours: BOARD_SESSION_TTL_HOURS });
 });
 
 boardRouter.post('/logout', (_req, res) => {

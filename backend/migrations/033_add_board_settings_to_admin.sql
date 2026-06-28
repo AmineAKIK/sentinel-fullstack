@@ -1,0 +1,4 @@
+ALTER TABLE admin_accounts
+  ADD COLUMN IF NOT EXISTS board_enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS board_code_hash        VARCHAR(64),
+  ADD COLUMN IF NOT EXISTS board_session_version  INTEGER NOT NULL DEFAULT 0;

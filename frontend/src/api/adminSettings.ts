@@ -16,3 +16,21 @@ export async function patchAdminNotifPrefs(
 ): Promise<AdminNotifPrefs> {
   return api.patch<AdminNotifPrefs>('/api/admin/settings/notifications', patch);
 }
+
+export interface BoardSettingsResponse {
+  board_enabled: boolean;
+  hasCode: boolean;
+}
+
+export async function getBoardSettings(): Promise<BoardSettingsResponse> {
+  return api.get<BoardSettingsResponse>('/api/admin/settings/board');
+}
+
+export async function patchBoardSettings(payload: {
+  enabled?: boolean;
+  newCode?: string;
+  confirmCode?: string;
+  currentPassword: string;
+}): Promise<BoardSettingsResponse> {
+  return api.patch<BoardSettingsResponse>('/api/admin/settings/board', payload);
+}

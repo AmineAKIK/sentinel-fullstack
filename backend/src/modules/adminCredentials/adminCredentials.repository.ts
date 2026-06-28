@@ -101,3 +101,49 @@ export async function getAdminNotifPref(pref: keyof AdminNotifPrefs): Promise<bo
   );
   return rows[0]?.[pref] ?? true;
 }
+
+export interface BoardSettings {
+  board_enabled: boolean;
+  board_code_hash: string | null;
+  board_session_version: number;
+}
+
+export async function getBoardSettings(adminId: number): Promise<BoardSettings | null> {
+  const { rows } = await pool.query<BoardSettings>(
+    `SELECT board_enabled, board_code_hash, board_session_version
+     FROM admin_accounts WHERE id = $1`,
+    [adminId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function getBoardSettingsGlobal(): Promise<BoardSettings | null> {
+  const { rows } = await pool.query<BoardSettings>(
+    `SELECT board_enabled, board_code_hash, board_session_version
+     FROM admin_accounts LIMIT 1`
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateBoardEnabled(adminId: number, enabled: boolean): Promise<void> {
+  await pool.query(
+    `UPDATE admin_accounts SET board_enabled = $1 WHERE id = $2`,
+    [enabled, adminId]
+  );
+}
+
+export async function updateBoardCodeHash(adminId: number, hash: string): Promise<void> {
+  await pool.query(
+    `UPDATE admin_accounts
+     SET board_code_hash = $1, board_session_version = board_session_version + 1
+     WHERE id = $2`,
+    [hash, adminId]
+  );
+}
+
+export async function incrementBoardSessionVersion(adminId: number): Promise<void> {
+  await pool.query(
+    `UPDATE admin_accounts SET board_session_version = board_session_version + 1 WHERE id = $1`,
+    [adminId]
+  );
+}

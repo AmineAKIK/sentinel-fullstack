@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { changeAdminPassword, getAdminEmail, updateAdminEmail } from '../api/adminSecurity';
-import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs } from '../api/adminSettings';
+import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardSettings } from '../api/adminSettings';
 import { ApiResponseError } from '../api/client';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -163,6 +163,76 @@ export default function AdminSettingsPage() {
       setPrefs((p) => ({ ...p, [key]: !value }));
     } finally {
       setSavingPref(null);
+    }
+  }
+
+  // ─── Board ────────────────────────────────────────────────────────────────
+  const [boardEnabled, setBoardEnabled] = useState(true);
+  const [boardHasCode, setBoardHasCode] = useState(false);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const [boardNewCode, setBoardNewCode] = useState('');
+  const [boardConfirmCode, setBoardConfirmCode] = useState('');
+  const [boardPassword, setBoardPassword] = useState('');
+  const [boardError, setBoardError] = useState('');
+  const [boardSuccess, setBoardSuccess] = useState('');
+  const [boardSubmitting, setBoardSubmitting] = useState(false);
+
+  useEffect(() => {
+    getBoardSettings()
+      .then(({ board_enabled, hasCode }) => {
+        setBoardEnabled(board_enabled);
+        setBoardHasCode(hasCode);
+      })
+      .catch(() => {})
+      .finally(() => setBoardLoading(false));
+  }, []);
+
+  function resetBoardForm() {
+    setBoardNewCode('');
+    setBoardConfirmCode('');
+    setBoardPassword('');
+    setBoardError('');
+    setBoardSuccess('');
+  }
+
+  async function handleBoardSubmit(e: FormEvent) {
+    e.preventDefault();
+    setBoardError('');
+    setBoardSuccess('');
+
+    if (!boardPassword) {
+      setBoardError('Renseignez votre mot de passe.');
+      return;
+    }
+
+    const hasCodeChange = boardNewCode.trim().length > 0;
+    if (hasCodeChange) {
+      if (boardNewCode.trim().length < 4) {
+        setBoardError('Le code board doit contenir au moins 4 caractères.');
+        return;
+      }
+      if (boardNewCode.trim() !== boardConfirmCode.trim()) {
+        setBoardError('Les deux codes ne correspondent pas.');
+        return;
+      }
+    }
+
+    setBoardSubmitting(true);
+    try {
+      const updated = await patchBoardSettings({
+        enabled: boardEnabled,
+        ...(hasCodeChange ? { newCode: boardNewCode.trim(), confirmCode: boardConfirmCode.trim() } : {}),
+        currentPassword: boardPassword,
+      });
+      setBoardEnabled(updated.board_enabled);
+      setBoardHasCode(updated.hasCode);
+      resetBoardForm();
+      setBoardSuccess('Paramètres board mis à jour.');
+      setTimeout(() => setBoardSuccess(''), 4000);
+    } catch (err) {
+      setBoardError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setBoardSubmitting(false);
     }
   }
 
@@ -339,6 +409,106 @@ export default function AdminSettingsPage() {
                     />
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Board atelier ── */}
+          <div className="card">
+            <div className="card-body">
+              <p className="settings-section-title">Board atelier</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
+                Accès public à l'écran de suivi atelier. Toute modification exige votre mot de passe.
+                {!boardHasCode && !boardLoading && (
+                  <> <strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré — board inaccessible.</strong></>
+                )}
+              </p>
+              {boardLoading ? (
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
+              ) : (
+                <form onSubmit={handleBoardSubmit} noValidate autoComplete="off">
+                  <div className="notif-toggle-list" style={{ marginBottom: 20 }}>
+                    <NotifToggle
+                      id="board_enabled"
+                      label="Board activé"
+                      description="Désactiver révoque immédiatement toutes les sessions board actives"
+                      checked={boardEnabled}
+                      disabled={boardSubmitting}
+                      onChange={(val) => { setBoardEnabled(val); setBoardError(''); setBoardSuccess(''); }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="boardNewCode">
+                      {boardHasCode ? 'Nouveau code d\'accès' : 'Définir un code d\'accès'}
+                    </label>
+                    <input
+                      id="boardNewCode"
+                      className="form-input"
+                      type="password"
+                      value={boardNewCode}
+                      onChange={(e) => { setBoardNewCode(e.target.value); setBoardError(''); }}
+                      disabled={boardSubmitting}
+                      autoComplete="off"
+                      readOnly={!boardNewCode && !boardSubmitting}
+                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                      maxLength={100}
+                      placeholder={boardHasCode ? 'Laisser vide pour ne pas changer' : 'Minimum 4 caractères'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="boardConfirmCode">Confirmer le code</label>
+                    <input
+                      id="boardConfirmCode"
+                      className="form-input"
+                      type="password"
+                      value={boardConfirmCode}
+                      onChange={(e) => { setBoardConfirmCode(e.target.value); setBoardError(''); }}
+                      disabled={boardSubmitting || !boardNewCode}
+                      autoComplete="off"
+                      readOnly={!boardConfirmCode && !boardSubmitting}
+                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                      maxLength={100}
+                      placeholder=""
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="boardPassword">Mot de passe administrateur</label>
+                    <input
+                      id="boardPassword"
+                      className="form-input"
+                      type="password"
+                      value={boardPassword}
+                      onChange={(e) => { setBoardPassword(e.target.value); setBoardError(''); }}
+                      disabled={boardSubmitting}
+                      autoComplete="off"
+                      readOnly={!boardPassword && !boardSubmitting}
+                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                      maxLength={128}
+                      placeholder="Saisir le mot de passe"
+                    />
+                  </div>
+
+                  {boardError && <div className="error-message" role="alert">{boardError}</div>}
+                  {boardSuccess && <div className="success-message" role="status">{boardSuccess}</div>}
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={resetBoardForm}
+                      disabled={boardSubmitting || (!boardNewCode && !boardConfirmCode && !boardPassword)}
+                    >
+                      Annuler
+                    </button>
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={boardSubmitting}>
+                      {boardSubmitting
+                        ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</>
+                        : 'Enregistrer'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>
