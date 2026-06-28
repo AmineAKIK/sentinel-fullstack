@@ -680,7 +680,7 @@
   grid-column: 1 / -1;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 660px) {
   .settings-grid {
     grid-template-columns: 1fr;
     max-width: 520px;
