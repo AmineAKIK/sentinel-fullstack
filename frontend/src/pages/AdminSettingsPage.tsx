@@ -242,7 +242,7 @@ export default function AdminSettingsPage() {
                       readOnly={!currentEmail && !emailLoading}
                       onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                       maxLength={254}
-                      placeholder=""
+                      placeholder="Saisir l'adresse actuelle"
                       aria-invalid={Boolean(emailError) || undefined}
                       aria-describedby={emailError ? 'email-error' : undefined}
                     />
@@ -268,7 +268,7 @@ export default function AdminSettingsPage() {
                     readOnly={!newEmail && !emailLoading}
                     onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={254}
-                    placeholder=""
+                    placeholder="Saisir la nouvelle adresse"
                     aria-invalid={Boolean(emailError) || undefined}
                     aria-describedby={emailError ? 'email-error' : undefined}
                   />
@@ -288,7 +288,7 @@ export default function AdminSettingsPage() {
                     readOnly={!emailPassword && !emailLoading}
                     onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
                     maxLength={MAX_PWD}
-                    placeholder=""
+                    placeholder="Saisir le mot de passe"
                     aria-invalid={Boolean(emailError) || undefined}
                     aria-describedby={emailError ? 'email-error' : undefined}
                   />
