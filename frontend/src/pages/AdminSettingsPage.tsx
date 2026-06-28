@@ -477,7 +477,7 @@ export default function AdminSettingsPage() {
           </div>
 
           {/* ── Card 3 : Email de notification ── */}
-          <div className="card">
+          <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Email de notification</p>
               {emailHint ? (
@@ -572,7 +572,7 @@ export default function AdminSettingsPage() {
           </div>
 
           {/* ── Card 4 : Notifications email ── */}
-          <div className="card">
+          <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Notifications email</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
