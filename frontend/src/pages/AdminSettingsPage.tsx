@@ -82,6 +82,7 @@ export default function AdminSettingsPage() {
   // ─── Email ────────────────────────────────────────────────────────────────
   const [email, setEmail] = useState('');
   const [emailInitial, setEmailInitial] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [emailSuccess, setEmailSuccess] = useState('');
@@ -104,11 +105,16 @@ export default function AdminSettingsPage() {
       setEmailError('Adresse email invalide.');
       return;
     }
+    if (!emailPassword) {
+      setEmailError('Confirmez avec votre mot de passe actuel.');
+      return;
+    }
     setEmailLoading(true);
     try {
-      const { email: saved } = await updateAdminEmail(normalized || null);
+      const { email: saved } = await updateAdminEmail(normalized || null, emailPassword);
       setEmail(saved ?? '');
       setEmailInitial(saved ?? '');
+      setEmailPassword('');
       setEmailSuccess('Email mis à jour.');
       setTimeout(() => setEmailSuccess(''), 4000);
     } catch (err) {
@@ -219,14 +225,32 @@ export default function AdminSettingsPage() {
                     aria-describedby={emailError ? 'email-error' : undefined}
                   />
                 </div>
+                <div className="form-group" style={{ marginTop: 12 }}>
+                  <label className="form-label" htmlFor="emailPassword">
+                    Confirmer avec votre mot de passe
+                  </label>
+                  <input
+                    id="emailPassword"
+                    className="form-input"
+                    type="password"
+                    value={emailPassword}
+                    onChange={(e) => { setEmailPassword(e.target.value); setEmailError(''); }}
+                    disabled={emailLoading}
+                    autoComplete="current-password"
+                    maxLength={MAX_PWD}
+                    placeholder="••••••••••••"
+                    aria-invalid={Boolean(emailError) || undefined}
+                    aria-describedby={emailError ? 'email-error' : undefined}
+                  />
+                </div>
                 {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
                 {emailSuccess && <div className="success-message" role="status">{emailSuccess}</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => { setEmail(emailInitial); setEmailError(''); setEmailSuccess(''); }}
-                    disabled={emailLoading || !emailDirty}
+                    onClick={() => { setEmail(emailInitial); setEmailPassword(''); setEmailError(''); setEmailSuccess(''); }}
+                    disabled={emailLoading || (!emailDirty && !emailPassword)}
                   >
                     Annuler
                   </button>
