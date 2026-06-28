@@ -50,7 +50,7 @@ const DEFAULT_PREFS: AdminNotifPrefs = {
 const NOTIF_ITEMS: { key: keyof AdminNotifPrefs; label: string; description: string }[] = [
   {
     key: 'notif_admin',
-    label: 'Alertes administrateur',
+    label: 'Vous (administrateur)',
     description: 'Demandes de réinitialisation de mot de passe',
   },
   {
@@ -370,7 +370,7 @@ export default function AdminSettingsPage() {
             <div className="card-body">
               <p className="settings-section-title">Mot de passe</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Minimum {MIN_PWD} caractères. Toutes vos sessions seront déconnectées.
+                Minimum {MIN_PWD} caractères. Vous serez reconnecté après la modification.
               </p>
               <form onSubmit={handlePasswordSubmit} noValidate autoComplete="off">
                 <div className="form-group">
@@ -410,7 +410,7 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="confirmPassword">Confirmer</label>
+                  <label className="form-label" htmlFor="confirmPassword">Confirmer le nouveau mot de passe</label>
                   <input
                     id="confirmPassword"
                     className="form-input"
@@ -475,7 +475,7 @@ export default function AdminSettingsPage() {
                   <p className="settings-section-title" style={{ marginBottom: 4 }}>Code d'accès</p>
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
                     {boardHasCode
-                      ? "Modifier le code révoque les sessions actives."
+                      ? <>Modifier le code révoque immédiatement toutes les sessions board actives.</>
                       : <><strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré.</strong> Le board est inaccessible sans code.</>
                     }
                   </p>
@@ -559,17 +559,17 @@ export default function AdminSettingsPage() {
               <p className="settings-section-title">Email de notification</p>
               {emailHint ? (
                 <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                  Adresse configurée : <strong>{emailHint}</strong>
+                  Adresse configurée : <strong>{emailHint}</strong>. Laissez le champ "Nouvelle adresse" vide pour la supprimer.
                 </p>
               ) : (
                 <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                  Aucune adresse configurée. Laissez vide pour désactiver les notifications.
+                  Aucune adresse configurée — les notifications par email sont désactivées.
                 </p>
               )}
               <form onSubmit={handleEmailSubmit} noValidate>
                 {hasEmail && (
                   <div className="form-group">
-                    <label className="form-label" htmlFor="currentEmail">Adresse actuelle</label>
+                    <label className="form-label" htmlFor="currentEmail">Confirmer l'adresse actuelle</label>
                     <input
                       id="currentEmail"
                       className="form-input"
@@ -653,7 +653,7 @@ export default function AdminSettingsPage() {
             <div className="card-body">
               <p className="settings-section-title">Notifications email</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Activez ou désactivez les envois d'emails par canal. Sauvegarde immédiate.
+                Activez ou désactivez les envois d'emails par canal. Sauvegarde immédiate, sans bouton Enregistrer.
               </p>
               {prefsLoading ? (
                 <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
@@ -686,7 +686,106 @@ export default function AdminSettingsPage() {
                 <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
               ) : (
                 <form onSubmit={handleAppSettingsSubmit} noValidate>
-                  <div className="notif-toggle-item" style={{ paddingTop: 0, marginBottom: 20 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="sessionDuration">Durée de session — Administration</label>
+                      <input
+                        id="sessionDuration"
+                        className="form-input"
+                        type="number"
+                        min={1} max={168}
+                        value={appSettingsDraftValue('session_duration_hours')}
+                        onChange={(e) => setAppSettingsDraftField('session_duration_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 168</span>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="workshopSessionHours">Durée de session — Atelier</label>
+                      <input
+                        id="workshopSessionHours"
+                        className="form-input"
+                        type="number"
+                        min={1} max={168}
+                        value={appSettingsDraftValue('workshop_session_hours')}
+                        onChange={(e) => setAppSettingsDraftField('workshop_session_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 168</span>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier</label>
+                      {appSettingsDraftValue('board_session_ttl_hours') === 0 ? (
+                        <input
+                          className="form-input"
+                          type="text"
+                          value=""
+                          placeholder='Désactivez "Session illimitée" pour choisir une durée'
+                          disabled
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          id="boardSessionTtl"
+                          className="form-input"
+                          type="number"
+                          min={1} max={168}
+                          value={appSettingsDraftValue('board_session_ttl_hours')}
+                          onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                          disabled={appSettingsSaving}
+                        />
+                      )}
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 168</span>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="loginMaxAttempts">Tentatives de connexion avant blocage</label>
+                      <input
+                        id="loginMaxAttempts"
+                        className="form-input"
+                        type="number"
+                        min={3} max={50}
+                        value={appSettingsDraftValue('login_max_attempts')}
+                        onChange={(e) => setAppSettingsDraftField('login_max_attempts', Math.max(3, Math.min(50, parseInt(e.target.value) || 3)))}
+                        disabled={appSettingsSaving}
+                      />
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Blocage temporaire de 5 minutes — entre 3 et 50</span>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="setupCodeTtl">Validité des codes de création de mot de passe</label>
+                      <input
+                        id="setupCodeTtl"
+                        className="form-input"
+                        type="number"
+                        min={1} max={72}
+                        value={appSettingsDraftValue('setup_code_ttl_hours')}
+                        onChange={(e) => setAppSettingsDraftField('setup_code_ttl_hours', Math.max(1, Math.min(72, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 72</span>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="boardLabel">Nom affiché du board atelier</label>
+                      <input
+                        id="boardLabel"
+                        className="form-input"
+                        type="text"
+                        maxLength={64}
+                        value={appSettingsDraftValue('board_label')}
+                        onChange={(e) => setAppSettingsDraftField('board_label', e.target.value)}
+                        disabled={appSettingsSaving}
+                        placeholder="Board atelier"
+                      />
+                    </div>
+
+                  </div>
+
+                  <div className="notif-toggle-item" style={{ margin: '8px 0 4px' }}>
                     <div className="notif-toggle-label">
                       <strong>Session board illimitée</strong>
                       <span>Pour écrans kiosque allumés en permanence</span>
@@ -708,105 +807,11 @@ export default function AdminSettingsPage() {
                       <span className="toggle-track" />
                     </label>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="sessionDuration">Durée de session — Administration (heures)</label>
-                      <input
-                        id="sessionDuration"
-                        className="form-input"
-                        type="number"
-                        min={1} max={168}
-                        value={appSettingsDraftValue('session_duration_hours')}
-                        onChange={(e) => setAppSettingsDraftField('session_duration_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
-                        disabled={appSettingsSaving}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="workshopSessionHours">Durée de session — Atelier (heures)</label>
-                      <input
-                        id="workshopSessionHours"
-                        className="form-input"
-                        type="number"
-                        min={1} max={168}
-                        value={appSettingsDraftValue('workshop_session_hours')}
-                        onChange={(e) => setAppSettingsDraftField('workshop_session_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
-                        disabled={appSettingsSaving}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier (heures)</label>
-                      {appSettingsDraftValue('board_session_ttl_hours') === 0 ? (
-                        <input
-                          className="form-input"
-                          type="text"
-                          value=""
-                          placeholder='Désactivez "Session illimitée" pour choisir une durée'
-                          disabled
-                          readOnly
-                        />
-                      ) : (
-                        <input
-                          id="boardSessionTtl"
-                          className="form-input"
-                          type="number"
-                          min={1} max={168}
-                          value={appSettingsDraftValue('board_session_ttl_hours')}
-                          onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
-                          disabled={appSettingsSaving}
-                        />
-                      )}
-                    </div>
-
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="loginMaxAttempts">Tentatives de connexion avant blocage</label>
-                      <input
-                        id="loginMaxAttempts"
-                        className="form-input"
-                        type="number"
-                        min={3} max={50}
-                        value={appSettingsDraftValue('login_max_attempts')}
-                        onChange={(e) => setAppSettingsDraftField('login_max_attempts', Math.max(3, Math.min(50, parseInt(e.target.value) || 3)))}
-                        disabled={appSettingsSaving}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="setupCodeTtl">Validité des codes de setup mot de passe (heures)</label>
-                      <input
-                        id="setupCodeTtl"
-                        className="form-input"
-                        type="number"
-                        min={1} max={72}
-                        value={appSettingsDraftValue('setup_code_ttl_hours')}
-                        onChange={(e) => setAppSettingsDraftField('setup_code_ttl_hours', Math.max(1, Math.min(72, parseInt(e.target.value) || 1)))}
-                        disabled={appSettingsSaving}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="boardLabel">Nom affiché du board atelier</label>
-                      <input
-                        id="boardLabel"
-                        className="form-input"
-                        type="text"
-                        maxLength={64}
-                        value={appSettingsDraftValue('board_label')}
-                        onChange={(e) => setAppSettingsDraftField('board_label', e.target.value)}
-                        disabled={appSettingsSaving}
-                        placeholder="Board atelier"
-                      />
-                    </div>
-
-                  </div>
 
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 16px' }} />
                   <p className="settings-section-title" style={{ marginBottom: 4 }}>Révoquer des sessions</p>
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 12 }}>
-                    Cochez ce que vous souhaitez révoquer lors de l'enregistrement. Les utilisateurs concernés seront déconnectés immédiatement.
+                    Cochez les sessions à révoquer lors de l'enregistrement. Action irréversible — les utilisateurs concernés seront déconnectés immédiatement à leur prochaine requête.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
