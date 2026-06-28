@@ -680,7 +680,7 @@ export default function AdminSettingsPage() {
             <div className="card-body">
               <p className="settings-section-title">Comportement</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Ces paramètres s'appliquent aux nouvelles sessions uniquement. Les sessions actives conservent leur configuration d'origine.
+                Ces paramètres s'appliquent aux nouvelles sessions uniquement. Les sessions actives conservent leur configuration d'origine. Pour une application immédiate, utilisez la révocation ci-dessous.
               </p>
               {appSettingsLoading ? (
                 <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
