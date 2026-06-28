@@ -739,19 +739,25 @@ export default function AdminSettingsPage() {
 
                     <div className="form-group">
                       <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier (heures)</label>
-                      <input
-                        id="boardSessionTtl"
-                        className="form-input"
-                        type="number"
-                        min={1} max={168}
-                        value={appSettingsDraftValue('board_session_ttl_hours') || 12}
-                        onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
-                        disabled={appSettingsSaving || appSettingsDraftValue('board_session_ttl_hours') === 0}
-                      />
-                      {appSettingsDraftValue('board_session_ttl_hours') === 0 && (
-                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4 }}>
-                          Désactivez "Session illimitée" dans la card Board pour choisir une durée.
-                        </p>
+                      {appSettingsDraftValue('board_session_ttl_hours') === 0 ? (
+                        <input
+                          className="form-input"
+                          type="text"
+                          value=""
+                          placeholder='Désactivez "Session illimitée" pour choisir une durée'
+                          disabled
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          id="boardSessionTtl"
+                          className="form-input"
+                          type="number"
+                          min={1} max={168}
+                          value={appSettingsDraftValue('board_session_ttl_hours')}
+                          onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                          disabled={appSettingsSaving}
+                        />
                       )}
                     </div>
 
