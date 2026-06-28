@@ -238,7 +238,7 @@ export default function AdminSettingsPage() {
                       value={currentEmail}
                       onChange={(e) => { setCurrentEmail(e.target.value); setEmailError(''); }}
                       disabled={emailLoading}
-                      autoComplete="email"
+                      autoComplete="off"
                       maxLength={254}
                       placeholder=""
                       aria-invalid={Boolean(emailError) || undefined}
@@ -280,7 +280,7 @@ export default function AdminSettingsPage() {
                     value={emailPassword}
                     onChange={(e) => { setEmailPassword(e.target.value); setEmailError(''); }}
                     disabled={emailLoading}
-                    autoComplete="current-password"
+                    autoComplete="off"
                     maxLength={MAX_PWD}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(emailError) || undefined}
