@@ -366,7 +366,7 @@ export default function AdminSettingsPage() {
         <div className="settings-grid">
 
           {/* ── Card 1 : Mot de passe ── */}
-          <div className="card">
+          <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Mot de passe</p>
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
@@ -446,7 +446,7 @@ export default function AdminSettingsPage() {
           </div>
 
           {/* ── Card 2 : Board atelier ── */}
-          <div className="card">
+          <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Board atelier</p>
 
