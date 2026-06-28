@@ -15,7 +15,7 @@ import UserDetailPage from './pages/UserDetailPage';
 import LinesPage from './pages/LinesPage';
 import AdminAuditPage from './pages/AdminAuditPage';
 import AdminSupportPage from './pages/AdminSupportPage';
-import AdminSecurityPage from './pages/AdminSecurityPage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { AppAuthProvider } from './routes/AppAuthContext';
 import { FieldLimitsProvider } from './routes/FieldLimitsContext';
@@ -151,10 +151,10 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/securite"
+            path="/admin/parametres"
             element={
               <AdminRoute>
-                <AdminSecurityPage />
+                <AdminSettingsPage />
               </AdminRoute>
             }
           />

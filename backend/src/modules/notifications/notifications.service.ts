@@ -1,6 +1,7 @@
 import pool from '../../db/pool';
 import logger from '../../logger';
 import { getAdminEmail, getMailer, getSenderAddress } from './mailer';
+import { getAdminNotifPref } from '../adminCredentials/adminCredentials.repository';
 import * as adminResetTemplate from './templates/admin-password-reset-requested';
 import * as actionRequiredTemplate from './templates/responsable-action-required';
 import * as incidentUpdateTemplate from './templates/incident-update';
@@ -104,6 +105,7 @@ export function notifyAdminPasswordResetRequested(data: {
   requestedAt: Date;
 }): void {
   void (async () => {
+    if (!await getAdminNotifPref('notif_admin')) return;
     const adminEmail = await getAdminEmail();
     if (!adminEmail) return;
     sendMail(
@@ -120,6 +122,7 @@ export function notifyAdminPasswordResetRequested(data: {
 // ─── Notifications responsable — action requise ───────────────────────────────
 
 export async function notifyResponsablesEditRequested(incidentId: number, actorUserId: number, detail: string): Promise<void> {
+  if (!await getAdminNotifPref('notif_responsables')) return;
   const [emails, incident, actorName] = await Promise.all([
     getResponsablesEmails(),
     getIncidentSnapshot(incidentId),
@@ -143,6 +146,7 @@ export async function notifyResponsablesEditRequested(incidentId: number, actorU
 }
 
 export async function notifyResponsablesCancelRequested(incidentId: number, actorUserId: number, reason: string): Promise<void> {
+  if (!await getAdminNotifPref('notif_responsables')) return;
   const [emails, incident, actorName] = await Promise.all([
     getResponsablesEmails(),
     getIncidentSnapshot(incidentId),
@@ -168,6 +172,7 @@ export async function notifyResponsablesCancelRequested(incidentId: number, acto
 // ─── Notifications responsable — followers ────────────────────────────────────
 
 export async function notifyFollowersIncidentTaken(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -187,6 +192,7 @@ export async function notifyFollowersIncidentTaken(incidentId: number, actorUser
 }
 
 export async function notifyFollowersIncidentSetPending(incidentId: number, actorUserId: number, diagnostic: string): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -206,6 +212,7 @@ export async function notifyFollowersIncidentSetPending(incidentId: number, acto
 }
 
 export async function notifyFollowersIncidentClosed(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -225,6 +232,7 @@ export async function notifyFollowersIncidentClosed(incidentId: number, actorUse
 }
 
 export async function notifyFollowersIncidentCanceled(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -246,6 +254,7 @@ export async function notifyFollowersIncidentCanceled(incidentId: number, actorU
 // ─── Notifications maintenance ────────────────────────────────────────────────
 
 export async function notifyMaintenanceIncidentUrgent(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_techniciens')) return;
   const [emails, incident, actorName] = await Promise.all([
     getMaintenanceEmails(),
     getIncidentSnapshot(incidentId),
@@ -266,6 +275,7 @@ export async function notifyMaintenanceIncidentUrgent(incidentId: number, actorU
 }
 
 export async function notifyTechnicianResponsibleComment(incidentId: number, actorUserId: number, comment: string): Promise<void> {
+  if (!await getAdminNotifPref('notif_techniciens')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -287,6 +297,7 @@ export async function notifyTechnicianResponsibleComment(incidentId: number, act
 }
 
 export async function notifyTechnicianIncidentCanceled(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_techniciens')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -309,6 +320,7 @@ export async function notifyTechnicianIncidentCanceled(incidentId: number, actor
 }
 
 export async function notifyTechnicianIncidentInvalidated(incidentId: number, actorUserId: number, reason: string): Promise<void> {
+  if (!await getAdminNotifPref('notif_techniciens')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -332,6 +344,7 @@ export async function notifyTechnicianIncidentInvalidated(incidentId: number, ac
 // ─── Notifications opérateur déclarant ───────────────────────────────────────
 
 export async function notifyDeclarantIncidentTaken(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -354,6 +367,7 @@ export async function notifyDeclarantIncidentTaken(incidentId: number, actorUser
 }
 
 export async function notifyDeclarantEditApproved(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -376,6 +390,7 @@ export async function notifyDeclarantEditApproved(incidentId: number, actorUserI
 }
 
 export async function notifyDeclarantEditRejected(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -398,6 +413,7 @@ export async function notifyDeclarantEditRejected(incidentId: number, actorUserI
 }
 
 export async function notifyDeclarantCancelApproved(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -420,6 +436,7 @@ export async function notifyDeclarantCancelApproved(incidentId: number, actorUse
 }
 
 export async function notifyDeclarantCancelRejected(incidentId: number, actorUserId: number): Promise<void> {
+  if (!await getAdminNotifPref('notif_operateurs')) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),

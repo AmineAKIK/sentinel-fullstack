@@ -13,6 +13,7 @@ import seedAdminAccount from './db/seed';
 import authRoutes from './modules/auth/auth.routes';
 import passwordResetRoutes from './modules/passwordReset/passwordReset.routes';
 import adminSecurityRoutes from './modules/adminSecurity/adminSecurity.routes';
+import adminSettingsRoutes from './modules/adminSettings/adminSettings.routes';
 import accountsRoutes from './modules/accounts/accounts.routes';
 import linesRoutes from './modules/lines/lines.routes';
 import workshopRoutes from './modules/workshop/workshop.routes';
@@ -66,6 +67,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auth/password-reset', passwordResetRoutes);
 // Routes admin spécifiques montées avant le routeur générique /api/admin.
 app.use('/api/admin/security', adminSecurityRoutes);
+app.use('/api/admin/settings', adminSettingsRoutes);
 app.use('/api/admin/accounts', accountsRoutes);
 app.use('/api/admin/lines', linesRoutes);
 app.use('/api/admin/support', adminSupportRoutes);

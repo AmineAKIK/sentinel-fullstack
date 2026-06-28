@@ -8,7 +8,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Lignes', path: '/admin/lines', match: ['/admin/lines'] },
   { label: 'Journal', path: '/admin/audit', match: ['/admin/audit'] },
   { label: 'Assistance', path: '/admin/support', match: ['/admin/support'] },
-  { label: 'Sécurité', path: '/admin/securite', match: ['/admin/securite'] },
+  { label: 'Paramètres', path: '/admin/parametres', match: ['/admin/parametres'] },
 ];
 
 export default function NavBar() {

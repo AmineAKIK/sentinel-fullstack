@@ -63,3 +63,41 @@ export async function updateAdminEmail(adminId: number, email: string | null): P
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+export interface AdminNotifPrefs {
+  notif_admin: boolean;
+  notif_responsables: boolean;
+  notif_techniciens: boolean;
+  notif_operateurs: boolean;
+}
+
+export async function getAdminNotifPrefs(adminId: number): Promise<AdminNotifPrefs | null> {
+  const { rows } = await pool.query<AdminNotifPrefs>(
+    `SELECT notif_admin, notif_responsables, notif_techniciens, notif_operateurs
+     FROM admin_accounts WHERE id = $1`,
+    [adminId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateAdminNotifPrefs(
+  adminId: number,
+  prefs: Partial<AdminNotifPrefs>
+): Promise<boolean> {
+  const keys = Object.keys(prefs) as (keyof AdminNotifPrefs)[];
+  if (keys.length === 0) return false;
+  const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  const values = keys.map((k) => prefs[k]);
+  const result = await pool.query(
+    `UPDATE admin_accounts SET ${setClauses} WHERE id = $1`,
+    [adminId, ...values]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function getAdminNotifPref(pref: keyof AdminNotifPrefs): Promise<boolean> {
+  const { rows } = await pool.query<Pick<AdminNotifPrefs, typeof pref>>(
+    `SELECT ${pref} FROM admin_accounts LIMIT 1`
+  );
+  return rows[0]?.[pref] ?? true;
+}
