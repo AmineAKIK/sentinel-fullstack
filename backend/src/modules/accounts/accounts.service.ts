@@ -5,6 +5,7 @@ import {
   getWorkshopPasswordSetupExpiry,
   hashWorkshopPasswordSetupCode,
 } from '../../auth/setupCode';
+import { getAppSettings } from '../adminCredentials/adminCredentials.repository';
 import { createAccountAuditEvent } from './accounts.events';
 import {
   accountBadgeExists,
@@ -49,8 +50,9 @@ export async function createAccountService(input: CreateAccountInput, adminId: n
     return { ok: false, status: 409, code: 'BADGE_ALREADY_EXISTS', message: 'Ce numéro de badge est déjà utilisé.' };
   }
 
+  const { setup_code_ttl_hours } = await getAppSettings();
   const setupCode = generateWorkshopPasswordSetupCode();
-  const setupExpiresAt = getWorkshopPasswordSetupExpiry();
+  const setupExpiresAt = getWorkshopPasswordSetupExpiry(setup_code_ttl_hours);
   const setupCodeHash = await hashWorkshopPasswordSetupCode(setupCode);
 
   const created = await withTransaction(async (client) => {
@@ -187,8 +189,9 @@ export async function getAccountImpactService(id: number): Promise<AccountImpact
 }
 
 export async function resetAccountPasswordService(id: number, adminId: number): Promise<ServiceResult<AccountDto>> {
+  const { setup_code_ttl_hours } = await getAppSettings();
   const setupCode = generateWorkshopPasswordSetupCode();
-  const setupExpiresAt = getWorkshopPasswordSetupExpiry();
+  const setupExpiresAt = getWorkshopPasswordSetupExpiry(setup_code_ttl_hours);
   const setupCodeHash = await hashWorkshopPasswordSetupCode(setupCode);
 
   const account = await withTransaction(async (client) => {

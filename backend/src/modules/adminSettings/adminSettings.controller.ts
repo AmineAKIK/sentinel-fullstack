@@ -11,6 +11,9 @@ import {
   updateBoardCodeHash,
   incrementBoardSessionVersion,
   getAdminPasswordHash,
+  getAppSettingsById,
+  updateAppSettings,
+  AppSettings,
 } from '../adminCredentials/adminCredentials.repository';
 import { verifyPassword as verifyPwd, MAX_PASSWORD_LENGTH } from '../../auth/bcrypt';
 import { hashBoardCode } from '../board/board.auth';
@@ -137,6 +140,63 @@ export async function getBoardSettingsHandler(req: Request, res: Response): Prom
     });
   } catch (err) {
     handleControllerError(res, 'getBoardSettings', err);
+  }
+}
+
+export async function getAppSettingsHandler(req: Request, res: Response): Promise<void> {
+  if (!req.admin) { sendUnauthenticated(res); return; }
+  try {
+    const settings = await getAppSettingsById(req.admin.adminId);
+    res.json(settings);
+  } catch (err) {
+    handleControllerError(res, 'getAppSettings', err);
+  }
+}
+
+const APP_SETTINGS_BOUNDS: Record<keyof Omit<AppSettings, 'board_label'>, { min: number; max: number }> = {
+  session_duration_hours:  { min: 1, max: 168 },
+  board_session_ttl_hours: { min: 1, max: 168 },
+  login_max_attempts:      { min: 3, max: 50 },
+  setup_code_ttl_hours:    { min: 1, max: 72 },
+};
+
+export async function patchAppSettingsHandler(req: Request, res: Response): Promise<void> {
+  if (!req.admin) { sendUnauthenticated(res); return; }
+
+  const body = req.body || {};
+  const patch: Partial<AppSettings> = {};
+
+  for (const [key, bounds] of Object.entries(APP_SETTINGS_BOUNDS)) {
+    const k = key as keyof typeof APP_SETTINGS_BOUNDS;
+    if (!(k in body)) continue;
+    const val = body[k];
+    if (typeof val !== 'number' || !Number.isInteger(val) || val < bounds.min || val > bounds.max) {
+      sendError(res, 400, 'VALIDATION_ERROR', `${k} doit être un entier entre ${bounds.min} et ${bounds.max}.`);
+      return;
+    }
+    patch[k] = val;
+  }
+
+  if ('board_label' in body) {
+    const label = body.board_label;
+    if (typeof label !== 'string' || label.trim().length === 0 || label.trim().length > 64) {
+      sendError(res, 400, 'VALIDATION_ERROR', 'board_label doit être une chaîne de 1 à 64 caractères.');
+      return;
+    }
+    patch.board_label = label.trim();
+  }
+
+  if (Object.keys(patch).length === 0) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Aucun paramètre à mettre à jour.');
+    return;
+  }
+
+  try {
+    await updateAppSettings(req.admin.adminId, patch);
+    const updated = await getAppSettingsById(req.admin.adminId);
+    res.json(updated);
+  } catch (err) {
+    handleControllerError(res, 'patchAppSettings', err);
   }
 }
 

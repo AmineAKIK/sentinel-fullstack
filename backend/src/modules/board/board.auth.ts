@@ -10,12 +10,9 @@ import { getBoardData } from '../workshop/workshop.controller';
 import { FIELD_LIMITS } from '../../domain/constants';
 import { loginLimiter } from '../../middlewares/loginRateLimit';
 import logger from '../../logger';
-import { getBoardSettingsGlobal } from '../adminCredentials/adminCredentials.repository';
+import { getBoardSettingsGlobal, getAppSettings } from '../adminCredentials/adminCredentials.repository';
 
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
-const BOARD_ACCESS_LABEL = process.env.BOARD_ACCESS_LABEL || 'Board atelier';
-const BOARD_SESSION_TTL_HOURS = Math.max(1, parseInt(process.env.BOARD_SESSION_TTL_HOURS || '12', 10));
-const BOARD_SESSION_TTL_MS = BOARD_SESSION_TTL_HOURS * 60 * 60 * 1000;
 
 interface BoardPayload {
   scope: 'board';
@@ -41,10 +38,10 @@ function timingSafeHashEquals(left: string, right: string): boolean {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function setBoardCookie(res: Response, token: string): void {
+function setBoardCookie(res: Response, token: string, ttlMs: number): void {
   res.cookie(BOARD_AUTH_COOKIE, token, {
     ...authCookieOptions,
-    maxAge: BOARD_SESSION_TTL_MS,
+    maxAge: ttlMs,
   });
 }
 
@@ -88,7 +85,6 @@ async function hasValidBoardSession(req: Request, res: Response): Promise<boolea
     return false;
   }
 
-  // Vérifier que la session n'a pas été révoquée (changement de code ou désactivation)
   const settings = await getBoardSettingsGlobal();
   if (!settings) return false;
   if (!settings.board_enabled) {
@@ -147,7 +143,8 @@ boardRouter.get('/me', async (req, res) => {
       sendMissingAuth(res);
       return;
     }
-    res.json({ access: true, label: BOARD_ACCESS_LABEL, expiresInHours: BOARD_SESSION_TTL_HOURS });
+    const { board_label, board_session_ttl_hours } = await getAppSettings();
+    res.json({ access: true, label: board_label, expiresInHours: board_session_ttl_hours });
   } catch (err) {
     if (isJwtSessionError(err)) {
       clearBoardCookie(res);
@@ -166,17 +163,19 @@ boardRouter.post('/session', async (req, res) => {
   }
 
   try {
-    const settings = await getBoardSettingsGlobal();
+    const [boardSettings, appSettings] = await Promise.all([
+      getBoardSettingsGlobal(),
+      getAppSettings(),
+    ]);
 
-    if (settings && !settings.board_enabled) {
-      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Board temporairement indisponible.');
+    if (boardSettings && !boardSettings.board_enabled) {
+      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Le tableau d\'atelier est fermé.');
       return;
     }
 
-    // Code depuis DB en priorité, fallback .env
-    const activeHash = settings?.board_code_hash || process.env.BOARD_ACCESS_CODE_HASH || '';
+    const activeHash = boardSettings?.board_code_hash || process.env.BOARD_ACCESS_CODE_HASH || '';
     if (!activeHash) {
-      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Accès board non configuré.');
+      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Le tableau d\'atelier n\'est pas encore configuré.');
       return;
     }
 
@@ -200,15 +199,18 @@ boardRouter.post('/session', async (req, res) => {
       return;
     }
 
-    const boardSessionVersion = settings?.board_session_version ?? 0;
+    const { board_label, board_session_ttl_hours } = appSettings;
+    const boardSessionVersion = boardSettings?.board_session_version ?? 0;
+    const ttlMs = board_session_ttl_hours * 60 * 60 * 1000;
+
     const token = jwt.sign(
-      { scope: 'board', label: BOARD_ACCESS_LABEL, boardSessionVersion },
+      { scope: 'board', label: board_label, boardSessionVersion },
       secret,
-      { expiresIn: `${BOARD_SESSION_TTL_HOURS}h` }
+      { expiresIn: `${board_session_ttl_hours}h` }
     );
 
-    setBoardCookie(res, token);
-    res.json({ access: true, label: BOARD_ACCESS_LABEL, expiresInHours: BOARD_SESSION_TTL_HOURS });
+    setBoardCookie(res, token, ttlMs);
+    res.json({ access: true, label: board_label, expiresInHours: board_session_ttl_hours });
   } catch (err) {
     logger.error({ err }, 'Board session error');
     sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Service temporairement indisponible.');

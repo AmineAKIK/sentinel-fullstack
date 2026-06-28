@@ -147,3 +147,62 @@ export async function incrementBoardSessionVersion(adminId: number): Promise<voi
     [adminId]
   );
 }
+
+export interface AppSettings {
+  session_duration_hours: number;
+  board_session_ttl_hours: number;
+  login_max_attempts: number;
+  setup_code_ttl_hours: number;
+  board_label: string;
+}
+
+const APP_SETTINGS_DEFAULTS: AppSettings = {
+  session_duration_hours: 8,
+  board_session_ttl_hours: 12,
+  login_max_attempts: 10,
+  setup_code_ttl_hours: 24,
+  board_label: 'Board atelier',
+};
+
+export async function getAppSettings(): Promise<AppSettings> {
+  const { rows } = await pool.query<AppSettings>(
+    `SELECT session_duration_hours, board_session_ttl_hours,
+            login_max_attempts, setup_code_ttl_hours, board_label
+     FROM admin_accounts LIMIT 1`
+  );
+  return rows[0] ?? APP_SETTINGS_DEFAULTS;
+}
+
+export async function getAppSettingsById(adminId: number): Promise<AppSettings> {
+  const { rows } = await pool.query<AppSettings>(
+    `SELECT session_duration_hours, board_session_ttl_hours,
+            login_max_attempts, setup_code_ttl_hours, board_label
+     FROM admin_accounts WHERE id = $1`,
+    [adminId]
+  );
+  return rows[0] ?? APP_SETTINGS_DEFAULTS;
+}
+
+const APP_SETTINGS_KEYS: (keyof AppSettings)[] = [
+  'session_duration_hours',
+  'board_session_ttl_hours',
+  'login_max_attempts',
+  'setup_code_ttl_hours',
+  'board_label',
+];
+
+export async function updateAppSettings(
+  adminId: number,
+  patch: Partial<AppSettings>
+): Promise<void> {
+  const keys = (Object.keys(patch) as (keyof AppSettings)[]).filter((k) =>
+    APP_SETTINGS_KEYS.includes(k)
+  );
+  if (keys.length === 0) return;
+  const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  const values = keys.map((k) => patch[k]);
+  await pool.query(
+    `UPDATE admin_accounts SET ${setClauses} WHERE id = $1`,
+    [adminId, ...values]
+  );
+}

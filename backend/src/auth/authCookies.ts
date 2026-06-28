@@ -1,5 +1,5 @@
 import type { CookieOptions, Response } from 'express';
-import { SESSION_DURATION_MS } from './session';
+import { sessionDurationMs } from './session';
 
 export const ADMIN_AUTH_COOKIE = 'sentinel_admin_token';
 export const WORKSHOP_AUTH_COOKIE = 'sentinel_workshop_token';
@@ -12,13 +12,11 @@ export const authCookieOptions: CookieOptions = {
   secure: isProduction,
 };
 
-export const persistentAuthCookieOptions = {
-  ...authCookieOptions,
-  maxAge: SESSION_DURATION_MS,
-};
-
-export function setAuthCookie(res: Response, name: string, token: string): void {
-  res.cookie(name, token, persistentAuthCookieOptions);
+export function setAuthCookie(res: Response, name: string, token: string, durationHours: number): void {
+  res.cookie(name, token, {
+    ...authCookieOptions,
+    maxAge: sessionDurationMs(durationHours),
+  });
 }
 
 export function clearAuthCookie(res: Response, name: string): void {

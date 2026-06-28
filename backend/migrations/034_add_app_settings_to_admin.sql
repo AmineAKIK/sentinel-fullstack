@@ -1,0 +1,6 @@
+ALTER TABLE admin_accounts
+  ADD COLUMN IF NOT EXISTS session_duration_hours  INTEGER NOT NULL DEFAULT 8,
+  ADD COLUMN IF NOT EXISTS board_session_ttl_hours INTEGER NOT NULL DEFAULT 12,
+  ADD COLUMN IF NOT EXISTS login_max_attempts      INTEGER NOT NULL DEFAULT 10,
+  ADD COLUMN IF NOT EXISTS setup_code_ttl_hours    INTEGER NOT NULL DEFAULT 24,
+  ADD COLUMN IF NOT EXISTS board_label             VARCHAR(64) NOT NULL DEFAULT 'Board atelier';

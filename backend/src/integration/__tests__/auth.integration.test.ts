@@ -77,7 +77,7 @@ async function insertWorkshopUser(opts: {
   const { badge, role = 'OPERATOR', withPassword, active = true } = opts;
   const passwordHash = withPassword ? await hashWorkshopPassword(withPassword) : null;
   const setupTokenHash = withPassword ? null : await hashWorkshopPasswordSetupCode(generateWorkshopPasswordSetupCode());
-  const setupExpiry = withPassword ? null : getWorkshopPasswordSetupExpiry();
+  const setupExpiry = withPassword ? null : getWorkshopPasswordSetupExpiry(24);
 
   const { rows } = await pool.query<{ id: number }>(
     `INSERT INTO sentinel_users

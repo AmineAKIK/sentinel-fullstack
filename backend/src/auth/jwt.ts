@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import { SESSION_DURATION_JWT } from './session';
 
 export function getJwtSecret(): string | null {
   const secret = process.env.JWT_SECRET || null;
@@ -7,17 +6,16 @@ export function getJwtSecret(): string | null {
   return secret;
 }
 
-export function signAuthToken(payload: object): string | null {
+export function signAuthToken(payload: object, durationHours: number): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
-
-  return jwt.sign(payload, secret, { expiresIn: SESSION_DURATION_JWT });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return jwt.sign(payload, secret, { expiresIn: durationHours * 3600 } as any);
 }
 
 export function verifyAuthToken<TPayload>(token: string): TPayload | null {
   const secret = getJwtSecret();
   if (!secret) return null;
-
   return jwt.verify(token, secret) as TPayload;
 }
 

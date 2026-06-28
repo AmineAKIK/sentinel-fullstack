@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { changeAdminPassword, getAdminEmail, updateAdminEmail } from '../api/adminSecurity';
-import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardEnabled, patchBoardCode } from '../api/adminSettings';
+import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardEnabled, patchBoardCode, getAppSettings, patchAppSettings, AppSettings } from '../api/adminSettings';
 import { ApiResponseError } from '../api/client';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -275,6 +275,64 @@ export default function AdminSettingsPage() {
       setBoardError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
     } finally {
       setBoardSubmitting(false);
+    }
+  }
+
+  // ─── App settings ─────────────────────────────────────────────────────────
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    session_duration_hours: 8,
+    board_session_ttl_hours: 12,
+    login_max_attempts: 10,
+    setup_code_ttl_hours: 24,
+    board_label: 'Board atelier',
+  });
+  const [appSettingsLoading, setAppSettingsLoading] = useState(true);
+  const [appSettingsDraft, setAppSettingsDraft] = useState<AppSettings | null>(null);
+  const [appSettingsSaving, setAppSettingsSaving] = useState(false);
+  const [appSettingsError, setAppSettingsError] = useState('');
+  const [appSettingsSuccess, setAppSettingsSuccess] = useState('');
+
+  useEffect(() => {
+    getAppSettings()
+      .then((s) => { setAppSettings(s); setAppSettingsDraft(s); })
+      .catch(() => {})
+      .finally(() => setAppSettingsLoading(false));
+  }, []);
+
+  function appSettingsDraftValue<K extends keyof AppSettings>(key: K): AppSettings[K] {
+    return (appSettingsDraft ?? appSettings)[key];
+  }
+
+  function setAppSettingsDraftField<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    setAppSettingsDraft((d) => ({ ...(d ?? appSettings), [key]: value }));
+    setAppSettingsError('');
+  }
+
+  function resetAppSettings() {
+    setAppSettingsDraft(appSettings);
+    setAppSettingsError('');
+    setAppSettingsSuccess('');
+  }
+
+  const appSettingsDirty = appSettingsDraft !== null &&
+    JSON.stringify(appSettingsDraft) !== JSON.stringify(appSettings);
+
+  async function handleAppSettingsSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!appSettingsDraft) return;
+    setAppSettingsError('');
+    setAppSettingsSuccess('');
+    setAppSettingsSaving(true);
+    try {
+      const updated = await patchAppSettings(appSettingsDraft);
+      setAppSettings(updated);
+      setAppSettingsDraft(updated);
+      setAppSettingsSuccess('Paramètres enregistrés.');
+      setTimeout(() => setAppSettingsSuccess(''), 4000);
+    } catch (err) {
+      setAppSettingsError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setAppSettingsSaving(false);
     }
   }
 
@@ -594,6 +652,110 @@ export default function AdminSettingsPage() {
                     />
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Card 5 : Comportement ── */}
+          <div className="card settings-full">
+            <div className="card-body">
+              <p className="settings-section-title">Comportement</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
+                Ces paramètres s'appliquent aux nouvelles sessions uniquement. Les sessions actives conservent leur configuration d'origine.
+              </p>
+              {appSettingsLoading ? (
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
+              ) : (
+                <form onSubmit={handleAppSettingsSubmit} noValidate>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="sessionDuration">Durée de session — Administration (heures)</label>
+                      <input
+                        id="sessionDuration"
+                        className="form-input"
+                        type="number"
+                        min={1} max={168}
+                        value={appSettingsDraftValue('session_duration_hours')}
+                        onChange={(e) => setAppSettingsDraftField('session_duration_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier (heures)</label>
+                      <input
+                        id="boardSessionTtl"
+                        className="form-input"
+                        type="number"
+                        min={1} max={168}
+                        value={appSettingsDraftValue('board_session_ttl_hours')}
+                        onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="loginMaxAttempts">Tentatives de connexion avant blocage</label>
+                      <input
+                        id="loginMaxAttempts"
+                        className="form-input"
+                        type="number"
+                        min={3} max={50}
+                        value={appSettingsDraftValue('login_max_attempts')}
+                        onChange={(e) => setAppSettingsDraftField('login_max_attempts', Math.max(3, Math.min(50, parseInt(e.target.value) || 3)))}
+                        disabled={appSettingsSaving}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="setupCodeTtl">Validité des codes de setup mot de passe (heures)</label>
+                      <input
+                        id="setupCodeTtl"
+                        className="form-input"
+                        type="number"
+                        min={1} max={72}
+                        value={appSettingsDraftValue('setup_code_ttl_hours')}
+                        onChange={(e) => setAppSettingsDraftField('setup_code_ttl_hours', Math.max(1, Math.min(72, parseInt(e.target.value) || 1)))}
+                        disabled={appSettingsSaving}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                      <label className="form-label" htmlFor="boardLabel">Nom affiché du board atelier</label>
+                      <input
+                        id="boardLabel"
+                        className="form-input"
+                        type="text"
+                        maxLength={64}
+                        value={appSettingsDraftValue('board_label')}
+                        onChange={(e) => setAppSettingsDraftField('board_label', e.target.value)}
+                        disabled={appSettingsSaving}
+                        placeholder="Board atelier"
+                      />
+                    </div>
+
+                  </div>
+                  {appSettingsError && <div className="error-message" role="alert">{appSettingsError}</div>}
+                  {appSettingsSuccess && <div className="success-message" role="status">{appSettingsSuccess}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={resetAppSettings}
+                      disabled={appSettingsSaving || !appSettingsDirty}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-sm"
+                      disabled={appSettingsSaving || !appSettingsDirty}
+                    >
+                      {appSettingsSaving ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>

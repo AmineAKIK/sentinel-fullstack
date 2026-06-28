@@ -1,3 +1,9 @@
-export const SESSION_DURATION_HOURS = 8;
-export const SESSION_DURATION_JWT = `${SESSION_DURATION_HOURS}h` as const;
-export const SESSION_DURATION_MS = SESSION_DURATION_HOURS * 60 * 60 * 1000;
+export const SESSION_DURATION_HOURS_DEFAULT = 8;
+
+export function sessionDurationJwt(hours: number): string {
+  return `${hours}h`;
+}
+
+export function sessionDurationMs(hours: number): number {
+  return hours * 60 * 60 * 1000;
+}

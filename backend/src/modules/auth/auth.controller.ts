@@ -9,6 +9,7 @@ import { loginSchema } from './auth.validation';
 import { loginLimiter } from '../../middlewares/loginRateLimit';
 import { AdminPayload } from '../../middlewares/adminAuth';
 import { WorkshopPayload } from '../../middlewares/workshopAuth';
+import { getAppSettings } from '../adminCredentials/adminCredentials.repository';
 
 export async function login(req: Request, res: Response): Promise<void> {
   const parsed = loginSchema.safeParse(req.body);
@@ -19,16 +20,12 @@ export async function login(req: Request, res: Response): Promise<void> {
   const { identifier, password, newPassword, setupCode } = parsed.data;
 
   try {
-    const result = await unifiedLoginService(
-      identifier,
-      password,
-      newPassword,
-      setupCode
-    );
+    const result = await unifiedLoginService(identifier, password, newPassword, setupCode);
+    const settings = await getAppSettings();
 
     switch (result.kind) {
       case 'invalid_credentials':
-        loginLimiter.recordFailure(req);
+        loginLimiter.recordFailure(req, settings.login_max_attempts);
         sendError(res, 401, 'UNAUTHORIZED', 'Identifiants incorrects.');
         return;
 
@@ -49,33 +46,35 @@ export async function login(req: Request, res: Response): Promise<void> {
         return;
 
       case 'workshop_invalid_setup_code':
-        loginLimiter.recordFailure(req);
+        loginLimiter.recordFailure(req, settings.login_max_attempts);
         sendError(res, 401, 'UNAUTHORIZED', 'Code temporaire incorrect.');
         return;
 
       case 'workshop_expired_setup_code':
-        loginLimiter.recordFailure(req);
+        loginLimiter.recordFailure(req, settings.login_max_attempts);
         sendError(res, 401, 'UNAUTHORIZED', "Code temporaire expiré ou absent. Demandez une réinitialisation à l'administrateur.");
         return;
 
       case 'admin_success': {
-        const token = signAuthToken({ adminId: result.admin.id, username: result.admin.username, sessionVersion: result.admin.sessionVersion });
+        const token = signAuthToken(
+          { adminId: result.admin.id, username: result.admin.username, sessionVersion: result.admin.sessionVersion },
+          settings.session_duration_hours
+        );
         if (!token) { sendInvalidServerConfig(res); return; }
         loginLimiter.clear(req);
-        setAuthCookie(res, ADMIN_AUTH_COOKIE, token);
+        setAuthCookie(res, ADMIN_AUTH_COOKIE, token, settings.session_duration_hours);
         res.json({ accountType: 'admin', id: result.admin.id, username: result.admin.username });
         return;
       }
 
       case 'workshop_success': {
-        const token = signAuthToken({
-          userId: result.user.id,
-          badgeNumber: result.user.badge_number,
-          role: result.user.role,
-        });
+        const token = signAuthToken(
+          { userId: result.user.id, badgeNumber: result.user.badge_number, role: result.user.role },
+          settings.session_duration_hours
+        );
         if (!token) { sendInvalidServerConfig(res); return; }
         loginLimiter.clear(req);
-        setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token);
+        setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token, settings.session_duration_hours);
         res.json({
           accountType: 'workshop',
           id: result.user.id,

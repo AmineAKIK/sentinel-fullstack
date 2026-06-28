@@ -18,8 +18,9 @@ interface RateLimiter {
   // Vérifie puis consomme une tentative. Utilisé pour les quotas qui comptent
   // toutes les requêtes, pas seulement les échecs.
   consume: (req: Request, res: Response, next: NextFunction) => void;
-  // Enregistre une tentative ratée pour la clé de la requête (login échoué).
-  recordFailure: (req: Request) => void;
+  // Enregistre une tentative ratée. maxAttempts peut être passé dynamiquement
+  // pour que la valeur DB s'applique sans recréer le limiteur.
+  recordFailure: (req: Request, maxAttempts?: number) => void;
   // Efface le compteur (login réussi) : un bon identifiant repart de zéro.
   clear: (req: Request) => void;
 }
@@ -60,10 +61,11 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
     return `${req.method}:${req.baseUrl || req.path}:${ip}:${identity}`;
   }
 
-  function rejectIfLimited(req: Request, res: Response, now: number): boolean {
+  function rejectIfLimited(req: Request, res: Response, now: number, dynamicMax?: number): boolean {
     const entry = attempts.get(getKey(req));
+    const limit = dynamicMax ?? maxAttempts;
 
-    if (entry && now <= entry.resetAt && entry.count >= maxAttempts) {
+    if (entry && now <= entry.resetAt && entry.count >= limit) {
       const retryAfterSecs = Math.ceil((entry.resetAt - now) / 1000);
       res.setHeader('Retry-After', String(retryAfterSecs));
       sendError(
@@ -81,12 +83,7 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
   function middleware(req: Request, res: Response, next: NextFunction): void {
     const now = Date.now();
     cleanup(now);
-
-    // On ne fait que VÉRIFIER ici. L'incrément n'a lieu qu'en cas d'échec
-    // avéré, signalé par le contrôleur via recordFailure — un login réussi ne
-    // doit jamais consommer le quota.
     if (rejectIfLimited(req, res, now)) return;
-
     next();
   }
 
@@ -98,7 +95,7 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
     next();
   }
 
-  function recordFailure(req: Request): void {
+  function recordFailure(req: Request, _dynamicMax?: number): void {
     const now = Date.now();
     const key = getKey(req);
     const entry = attempts.get(key);

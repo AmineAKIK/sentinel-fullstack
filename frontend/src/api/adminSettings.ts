@@ -37,3 +37,19 @@ export async function patchBoardCode(payload: {
 }): Promise<{ ok: true }> {
   return api.patch<{ ok: true }>('/api/admin/settings/board/code', payload);
 }
+
+export interface AppSettings {
+  session_duration_hours: number;
+  board_session_ttl_hours: number;
+  login_max_attempts: number;
+  setup_code_ttl_hours: number;
+  board_label: string;
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  return api.get<AppSettings>('/api/admin/settings/app');
+}
+
+export async function patchAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+  return api.patch<AppSettings>('/api/admin/settings/app', patch);
+}
