@@ -296,14 +296,16 @@ export default function AdminSettingsPage() {
                 {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
                 {emailSuccess && <div className="success-message" role="status">{emailSuccess}</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={resetEmailForm}
-                    disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
-                  >
-                    Annuler
-                  </button>
+                  {(newEmail || currentEmail || emailPassword) && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={resetEmailForm}
+                      disabled={emailLoading}
+                    >
+                      Annuler
+                    </button>
+                  )}
                   <button
                     type="submit"
                     className="btn btn-primary btn-sm"
@@ -401,14 +403,16 @@ export default function AdminSettingsPage() {
                 </div>
                 {pwdError && <div id="pwd-error" className="error-message" role="alert">{pwdError}</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => navigate('/admin/accueil')}
-                    disabled={pwdLoading}
-                  >
-                    Annuler
-                  </button>
+                  {(currentPassword || newPassword || confirmPassword) && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPwdError(''); }}
+                      disabled={pwdLoading}
+                    >
+                      Annuler
+                    </button>
+                  )}
                   <button type="submit" className="btn btn-primary btn-sm" disabled={pwdLoading}>
                     {pwdLoading ? <><span className="spinner" aria-hidden="true" /> Modification…</> : 'Changer le mot de passe'}
                   </button>
