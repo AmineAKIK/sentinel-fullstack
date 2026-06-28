@@ -80,41 +80,58 @@ export default function AdminSettingsPage() {
   const { logout } = useAppAuth();
 
   // ─── Email ────────────────────────────────────────────────────────────────
-  const [email, setEmail] = useState('');
-  const [emailInitial, setEmailInitial] = useState('');
+  const [emailHint, setEmailHint] = useState<string | null>(null);
+  const [hasEmail, setHasEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [currentEmail, setCurrentEmail] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [emailSuccess, setEmailSuccess] = useState('');
 
   useEffect(() => {
-    getAdminEmail().then(({ email: e }) => {
-      setEmail(e ?? '');
-      setEmailInitial(e ?? '');
+    getAdminEmail().then(({ hasEmail: has, hint }) => {
+      setHasEmail(has);
+      setEmailHint(hint);
     }).catch(() => {});
   }, []);
 
-  const emailDirty = email.trim() !== emailInitial;
+  function resetEmailForm() {
+    setNewEmail('');
+    setCurrentEmail('');
+    setEmailPassword('');
+    setEmailError('');
+    setEmailSuccess('');
+  }
 
   async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault();
     setEmailError('');
     setEmailSuccess('');
-    const normalized = email.trim().toLowerCase();
+    const normalized = newEmail.trim().toLowerCase();
     if (normalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-      setEmailError('Adresse email invalide.');
+      setEmailError('Nouvelle adresse email invalide.');
+      return;
+    }
+    if (hasEmail && !currentEmail.trim()) {
+      setEmailError('Renseignez l\'adresse email actuelle.');
       return;
     }
     if (!emailPassword) {
-      setEmailError('Confirmez avec votre mot de passe actuel.');
+      setEmailError('Renseignez votre mot de passe.');
       return;
     }
     setEmailLoading(true);
     try {
-      const { email: saved } = await updateAdminEmail(normalized || null, emailPassword);
-      setEmail(saved ?? '');
-      setEmailInitial(saved ?? '');
-      setEmailPassword('');
+      await updateAdminEmail({
+        email: normalized || null,
+        ...(hasEmail ? { currentEmail: currentEmail.trim().toLowerCase() } : {}),
+        currentPassword: emailPassword,
+      });
+      const updated = await getAdminEmail();
+      setHasEmail(updated.hasEmail);
+      setEmailHint(updated.hint);
+      resetEmailForm();
       setEmailSuccess('Email mis à jour.');
       setTimeout(() => setEmailSuccess(''), 4000);
     } catch (err) {
@@ -204,30 +221,57 @@ export default function AdminSettingsPage() {
             <div className="card-body">
               <p className="settings-section-title">Compte</p>
               <form onSubmit={handleEmailSubmit} noValidate>
+                {hasEmail && (
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="currentEmail">
+                      Adresse email actuelle
+                    </label>
+                    {emailHint && (
+                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                        Adresse configurée : <strong>{emailHint}</strong>
+                      </p>
+                    )}
+                    <input
+                      id="currentEmail"
+                      className="form-input"
+                      type="email"
+                      value={currentEmail}
+                      onChange={(e) => { setCurrentEmail(e.target.value); setEmailError(''); }}
+                      disabled={emailLoading}
+                      autoComplete="email"
+                      maxLength={254}
+                      placeholder="Votre adresse actuelle"
+                      aria-invalid={Boolean(emailError) || undefined}
+                      aria-describedby={emailError ? 'email-error' : undefined}
+                    />
+                  </div>
+                )}
                 <div className="form-group">
-                  <label className="form-label" htmlFor="adminEmail">
-                    Email de notification
+                  <label className="form-label" htmlFor="newEmail">
+                    {hasEmail ? 'Nouvelle adresse email' : 'Adresse email de notification'}
                   </label>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 8 }}>
-                    Adresse qui reçoit les alertes Sentinel. Laissez vide pour désactiver.
-                  </p>
+                  {!hasEmail && (
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                      Aucune adresse configurée. Laissez vide pour désactiver les notifications.
+                    </p>
+                  )}
                   <input
-                    id="adminEmail"
+                    id="newEmail"
                     className="form-input"
                     type="email"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); setEmailError(''); setEmailSuccess(''); }}
+                    value={newEmail}
+                    onChange={(e) => { setNewEmail(e.target.value); setEmailError(''); }}
                     disabled={emailLoading}
-                    autoComplete="email"
+                    autoComplete="off"
                     maxLength={254}
-                    placeholder="contact@akiksystems.com"
+                    placeholder="nouvelle@adresse.com"
                     aria-invalid={Boolean(emailError) || undefined}
                     aria-describedby={emailError ? 'email-error' : undefined}
                   />
                 </div>
-                <div className="form-group" style={{ marginTop: 12 }}>
+                <div className="form-group">
                   <label className="form-label" htmlFor="emailPassword">
-                    Confirmer avec votre mot de passe
+                    Mot de passe actuel
                   </label>
                   <input
                     id="emailPassword"
@@ -249,15 +293,15 @@ export default function AdminSettingsPage() {
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => { setEmail(emailInitial); setEmailPassword(''); setEmailError(''); setEmailSuccess(''); }}
-                    disabled={emailLoading || (!emailDirty && !emailPassword)}
+                    onClick={resetEmailForm}
+                    disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
                     className="btn btn-primary btn-sm"
-                    disabled={emailLoading || !emailDirty}
+                    disabled={emailLoading}
                   >
                     {emailLoading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
                   </button>

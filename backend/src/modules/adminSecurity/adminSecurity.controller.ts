@@ -63,8 +63,16 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 export async function getEmail(req: Request, res: Response): Promise<void> {
   if (!req.admin) { sendUnauthenticated(res); return; }
   try {
-    const email = await getAdminEmailFromDb(req.admin.adminId);
-    res.json({ email: email ?? process.env.ADMIN_EMAIL ?? null });
+    const raw = await getAdminEmailFromDb(req.admin.adminId)
+      ?? process.env.ADMIN_EMAIL
+      ?? null;
+    if (!raw) {
+      res.json({ hasEmail: false, hint: null });
+      return;
+    }
+    const [local, domain] = raw.split('@');
+    const hint = `${local.slice(0, 2)}${'*'.repeat(Math.max(local.length - 2, 1))}@${domain}`;
+    res.json({ hasEmail: true, hint });
   } catch (err) {
     handleControllerError(res, 'getEmail', err);
   }
@@ -73,21 +81,25 @@ export async function getEmail(req: Request, res: Response): Promise<void> {
 export async function updateEmail(req: Request, res: Response): Promise<void> {
   if (!req.admin) { sendUnauthenticated(res); return; }
 
-  const { email, currentPassword } = req.body || {};
+  const { email, currentEmail, currentPassword } = req.body || {};
 
   if (!currentPassword || typeof currentPassword !== 'string') {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
     return;
   }
 
-  const normalized = typeof email === 'string' ? email.trim().toLowerCase() : null;
-  if (normalized && (normalized.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Adresse email invalide.');
+  const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : null;
+  if (newEmail && (newEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail))) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Nouvelle adresse email invalide.');
     return;
   }
 
   try {
-    const passwordHash = await getAdminPasswordHash(req.admin.adminId);
+    const [passwordHash, existingEmail] = await Promise.all([
+      getAdminPasswordHash(req.admin.adminId),
+      getAdminEmailFromDb(req.admin.adminId),
+    ]);
+
     if (!passwordHash) { sendUnauthenticated(res); return; }
 
     const valid = await verifyPwd(currentPassword, passwordHash);
@@ -96,8 +108,17 @@ export async function updateEmail(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    await updateAdminEmail(req.admin.adminId, normalized || null);
-    res.json({ email: normalized || null });
+    const resolvedCurrent = existingEmail ?? process.env.ADMIN_EMAIL ?? null;
+    if (resolvedCurrent) {
+      const providedCurrent = typeof currentEmail === 'string' ? currentEmail.trim().toLowerCase() : '';
+      if (providedCurrent !== resolvedCurrent) {
+        sendError(res, 401, 'UNAUTHORIZED', 'Adresse email actuelle incorrecte.');
+        return;
+      }
+    }
+
+    await updateAdminEmail(req.admin.adminId, newEmail || null);
+    res.json({ ok: true });
   } catch (err) {
     handleControllerError(res, 'updateEmail', err);
   }

@@ -14,13 +14,19 @@ export async function changeAdminPassword(
   });
 }
 
-export async function getAdminEmail(): Promise<{ email: string | null }> {
-  return api.get<{ email: string | null }>('/api/admin/security/email');
+export interface AdminEmailStatus {
+  hasEmail: boolean;
+  hint: string | null;
 }
 
-export async function updateAdminEmail(
-  email: string | null,
-  currentPassword: string
-): Promise<{ email: string | null }> {
-  return api.patch<{ email: string | null }>('/api/admin/security/email', { email, currentPassword });
+export async function getAdminEmail(): Promise<AdminEmailStatus> {
+  return api.get<AdminEmailStatus>('/api/admin/security/email');
+}
+
+export async function updateAdminEmail(payload: {
+  email: string | null;
+  currentEmail?: string;
+  currentPassword: string;
+}): Promise<{ ok: true }> {
+  return api.patch<{ ok: true }>('/api/admin/security/email', payload);
 }
