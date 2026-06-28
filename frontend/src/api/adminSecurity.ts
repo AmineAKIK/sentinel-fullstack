@@ -13,3 +13,11 @@ export async function changeAdminPassword(
     newPassword,
   });
 }
+
+export async function getAdminEmail(): Promise<{ email: string | null }> {
+  return api.get<{ email: string | null }>('/api/admin/security/email');
+}
+
+export async function updateAdminEmail(email: string | null): Promise<{ email: string | null }> {
+  return api.patch<{ email: string | null }>('/api/admin/security/email', { email });
+}

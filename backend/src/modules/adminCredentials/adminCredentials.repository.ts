@@ -47,3 +47,19 @@ export async function incrementAdminSessionVersion(adminId: number): Promise<boo
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+export async function getAdminEmailFromDb(adminId: number): Promise<string | null> {
+  const { rows } = await pool.query<{ email: string | null }>(
+    'SELECT email FROM admin_accounts WHERE id = $1',
+    [adminId]
+  );
+  return rows[0]?.email ?? null;
+}
+
+export async function updateAdminEmail(adminId: number, email: string | null): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE admin_accounts SET email = $1 WHERE id = $2',
+    [email, adminId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}

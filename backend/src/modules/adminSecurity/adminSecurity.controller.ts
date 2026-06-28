@@ -9,7 +9,7 @@ import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
 import { sendUnauthenticated } from '../../auth/authResponses';
 import { sendError } from '../../utils/errors';
 import { handleControllerError } from '../../utils/controller';
-import { getAdminPasswordHash, incrementAdminSessionVersion, updateAdminPasswordHash } from '../adminCredentials/adminCredentials.repository';
+import { getAdminPasswordHash, incrementAdminSessionVersion, updateAdminPasswordHash, getAdminEmailFromDb, updateAdminEmail } from '../adminCredentials/adminCredentials.repository';
 import { createRateLimit } from '../../utils/inMemoryRateLimit';
 
 const verifyFailures = createRateLimit(3, 30 * 60 * 1000);
@@ -57,6 +57,35 @@ export async function changePassword(req: Request, res: Response): Promise<void>
     res.json({ message: 'Mot de passe modifié. Reconnectez-vous.' });
   } catch (err) {
     handleControllerError(res, 'changePassword', err);
+  }
+}
+
+export async function getEmail(req: Request, res: Response): Promise<void> {
+  if (!req.admin) { sendUnauthenticated(res); return; }
+  try {
+    const email = await getAdminEmailFromDb(req.admin.adminId);
+    res.json({ email: email ?? process.env.ADMIN_EMAIL ?? null });
+  } catch (err) {
+    handleControllerError(res, 'getEmail', err);
+  }
+}
+
+export async function updateEmail(req: Request, res: Response): Promise<void> {
+  if (!req.admin) { sendUnauthenticated(res); return; }
+
+  const { email } = req.body || {};
+  const normalized = typeof email === 'string' ? email.trim().toLowerCase() : null;
+
+  if (normalized && (normalized.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Adresse email invalide.');
+    return;
+  }
+
+  try {
+    await updateAdminEmail(req.admin.adminId, normalized || null);
+    res.json({ email: normalized || null });
+  } catch (err) {
+    handleControllerError(res, 'updateEmail', err);
   }
 }
 

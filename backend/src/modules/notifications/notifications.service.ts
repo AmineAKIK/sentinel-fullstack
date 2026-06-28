@@ -103,17 +103,18 @@ export function notifyAdminPasswordResetRequested(data: {
   badgeNumber: string;
   requestedAt: Date;
 }): void {
-  const adminEmail = getAdminEmail();
-  if (!adminEmail) return;
-
-  sendMail(
-    adminEmail,
-    adminResetTemplate.subject(),
-    adminResetTemplate.html({
-      ...data,
-      adminUrl: `${clientOrigin()}/admin/users`,
-    })
-  );
+  void (async () => {
+    const adminEmail = await getAdminEmail();
+    if (!adminEmail) return;
+    sendMail(
+      adminEmail,
+      adminResetTemplate.subject(),
+      adminResetTemplate.html({
+        ...data,
+        adminUrl: `${clientOrigin()}/admin/users`,
+      })
+    );
+  })();
 }
 
 // ─── Notifications responsable — action requise ───────────────────────────────
