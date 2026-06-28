@@ -3,10 +3,13 @@ import {
   getReferenceDashboardData,
   getReferenceQualityRawData,
   listReferenceAuditData,
+  listPendingPasswordResetRequestsData,
+  markPasswordResetRequestHandledData,
   ListReferenceAuditFilters,
   ReferenceAuditEventDto,
   ReferenceDashboardDto,
   ReferenceQualityDto,
+  PasswordResetRequestDto,
 } from './admin.repository';
 
 export interface ReferenceAuditQuery {
@@ -88,4 +91,12 @@ export async function getReferenceQualityService(): Promise<ReferenceQualityDto>
 
 export async function listReferenceAuditService(query: ReferenceAuditQuery): Promise<ReferenceAuditEventDto[]> {
   return listReferenceAuditData(normalizeReferenceAuditFilters(query));
+}
+
+export async function listPendingPasswordResetRequestsService(): Promise<PasswordResetRequestDto[]> {
+  return listPendingPasswordResetRequestsData();
+}
+
+export async function markPasswordResetRequestHandledService(id: number): Promise<boolean> {
+  return markPasswordResetRequestHandledData(id);
 }

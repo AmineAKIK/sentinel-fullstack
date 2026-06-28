@@ -4,7 +4,8 @@ import NavBar from '../components/NavBar';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import KpiCard from '../components/ui/KpiCard';
-import { getReferenceDashboard, getReferenceQuality } from '../api/admin';
+import PendingTasksWidget from '../components/PendingTasksWidget';
+import { getReferenceDashboard, getReferenceQuality, listPendingPasswordResetRequests, PasswordResetRequest } from '../api/admin';
 import { ReferenceDashboard, ReferenceQuality } from '../types';
 import { formatDateTime } from '../utils/date';
 import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
@@ -15,13 +16,15 @@ export default function AdminHomePage() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<ReferenceDashboard | null>(null);
   const [quality, setQuality] = useState<ReferenceQuality | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<PasswordResetRequest[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([getReferenceDashboard(), getReferenceQuality()])
-      .then(([dashboardData, qualityData]) => {
+    Promise.all([getReferenceDashboard(), getReferenceQuality(), listPendingPasswordResetRequests()])
+      .then(([dashboardData, qualityData, requestsData]) => {
         setDashboard(dashboardData);
         setQuality(qualityData);
+        setPendingRequests(requestsData);
       })
       .catch(() => setError("Impossible de charger l'accueil administration."));
   }, []);
@@ -53,32 +56,10 @@ export default function AdminHomePage() {
         </div>
 
         <div className="admin-overview-grid">
-          <section className="card admin-action-card">
-            <div className="card-body">
-              <div className="admin-section-header">
-                <div>
-                  <h2>Accès rapides</h2>
-                  <span>Référentiels opérationnels</span>
-                </div>
-              </div>
-
-              <div className="admin-action-list">
-                <button className="admin-action-row" onClick={() => navigate('/admin/users')}>
-                  <span>
-                    <strong>Utilisateurs</strong>
-                    <small>{dashboard ? `${dashboard.users_total} compte(s), ${dashboard.users_active} actif(s)` : 'Chargement...'}</small>
-                  </span>
-                </button>
-
-                <button className="admin-action-row" onClick={() => navigate('/admin/lines')}>
-                  <span>
-                    <strong>Lignes</strong>
-                    <small>{dashboard ? `${dashboard.lines_total} ligne(s), ${dashboard.machines_total} machine(s)` : 'Chargement...'}</small>
-                  </span>
-                </button>
-              </div>
-            </div>
-          </section>
+          <PendingTasksWidget
+            requests={pendingRequests}
+            onHandled={(id) => setPendingRequests((prev) => prev.filter((r) => r.id !== id))}
+          />
 
           <section className="card admin-quality-card">
             <div className="card-body">

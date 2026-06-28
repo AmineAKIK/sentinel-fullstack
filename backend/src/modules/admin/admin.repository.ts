@@ -189,6 +189,36 @@ export async function getReferenceQualityRawData(): Promise<ReferenceQualityRawD
   };
 }
 
+export interface PasswordResetRequestDto {
+  id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  badge_number: string;
+  requested_at: Date;
+}
+
+export async function listPendingPasswordResetRequestsData(): Promise<PasswordResetRequestDto[]> {
+  const { rows } = await pool.query<PasswordResetRequestDto>(
+    `SELECT prr.id, prr.user_id, su.first_name, su.last_name, prr.badge_number, prr.requested_at
+     FROM password_reset_requests prr
+     JOIN sentinel_users su ON su.id = prr.user_id
+     WHERE prr.handled_at IS NULL
+     ORDER BY prr.requested_at ASC`
+  );
+  return rows;
+}
+
+export async function markPasswordResetRequestHandledData(id: number): Promise<boolean> {
+  const { rows } = await pool.query<{ id: number }>(
+    `UPDATE password_reset_requests SET handled_at = NOW()
+     WHERE id = $1 AND handled_at IS NULL
+     RETURNING id`,
+    [id]
+  );
+  return rows.length > 0;
+}
+
 export async function listReferenceAuditData(filters: ListReferenceAuditFilters): Promise<ReferenceAuditEventDto[]> {
   const params: unknown[] = [];
   const conditions: string[] = [];
