@@ -470,6 +470,29 @@ export default function AdminSettingsPage() {
                     </label>
                   </div>
 
+                  <div className="notif-toggle-item">
+                    <div className="notif-toggle-label">
+                      <strong>Session illimitée</strong>
+                      <span>Pour écrans kiosque allumés en permanence</span>
+                    </div>
+                    <label className="toggle-switch" aria-label="Session board illimitée">
+                      <input
+                        type="checkbox"
+                        checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAppSettingsDraftField('board_session_ttl_hours', 0);
+                          } else {
+                            const prev = appSettings.board_session_ttl_hours;
+                            setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
+                          }
+                        }}
+                        disabled={appSettingsSaving}
+                      />
+                      <span className="toggle-track" />
+                    </label>
+                  </div>
+
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 20px' }} />
 
                   <p className="settings-section-title" style={{ marginBottom: 4 }}>Code d'accès</p>
@@ -714,37 +737,20 @@ export default function AdminSettingsPage() {
                       />
                     </div>
 
-                    <div className="form-group">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <label className="form-label" htmlFor="boardSessionTtl" style={{ margin: 0 }}>Durée de session — Board atelier (heures)</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          <input
-                            type="checkbox"
-                            checked={appSettingsDraftValue('board_session_ttl_hours') === 0}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setAppSettingsDraftField('board_session_ttl_hours', 0);
-                              } else {
-                                const prev = appSettings.board_session_ttl_hours;
-                                setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
-                              }
-                            }}
-                            disabled={appSettingsSaving}
-                          />
-                          Illimitée
-                        </label>
+                    {appSettingsDraftValue('board_session_ttl_hours') !== 0 && (
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier (heures)</label>
+                        <input
+                          id="boardSessionTtl"
+                          className="form-input"
+                          type="number"
+                          min={1} max={168}
+                          value={appSettingsDraftValue('board_session_ttl_hours')}
+                          onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                          disabled={appSettingsSaving}
+                        />
                       </div>
-                      <input
-                        id="boardSessionTtl"
-                        className="form-input"
-                        type="number"
-                        min={1} max={168}
-                        value={appSettingsDraftValue('board_session_ttl_hours') || 12}
-                        onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
-                        disabled={appSettingsSaving || appSettingsDraftValue('board_session_ttl_hours') === 0}
-                        style={appSettingsDraftValue('board_session_ttl_hours') === 0 ? { opacity: 0.4 } : undefined}
-                      />
-                    </div>
+                    )}
 
                     <div className="form-group">
                       <label className="form-label" htmlFor="loginMaxAttempts">Tentatives de connexion avant blocage</label>
