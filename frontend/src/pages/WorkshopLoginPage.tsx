@@ -157,15 +157,15 @@ export default function WorkshopLoginPage() {
         <div className="board-access-title">
           <span>ACCÈS ATELIER</span>
           <h1>{mode === 'setup' ? 'Première connexion' : 'Flux atelier'}</h1>
-          {mode === 'identifier' && <p>Saisissez votre identifiant ou numéro de badge.</p>}
-          {mode === 'setup' && <p>Saisissez votre code temporaire et choisissez un mot de passe.</p>}
+          {mode === 'identifier' && <p>Identifiez-vous pour accéder à votre espace.</p>}
+          {mode === 'setup' && <p>Activez votre compte avec le code reçu.</p>}
         </div>
 
         <form className="board-access-form" onSubmit={handleSubmit} noValidate>
           {reason && <div className="notice">{reason}</div>}
 
           <div className="form-group">
-            <label className="form-label" htmlFor="identifier">Identifiant ou numéro de badge</label>
+            <label className="form-label" htmlFor="identifier">Numéro de badge</label>
             <input
               id="identifier"
               className="form-input"
@@ -275,8 +275,8 @@ export default function WorkshopLoginPage() {
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading
-              ? <><span className="spinner" aria-hidden="true" /> Vérification...</>
-              : mode === 'setup' ? 'Créer le mot de passe'
+              ? <><span className="spinner" aria-hidden="true" /> Vérification…</>
+              : mode === 'setup' ? 'Activer mon compte'
               : mode === 'password' ? 'Se connecter'
               : 'Continuer'}
           </button>
