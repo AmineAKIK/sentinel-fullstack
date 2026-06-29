@@ -34,7 +34,6 @@ type BoardSettings = {
   viewDurationSec: number;
   rowsPerPage: number;
   compactMetrics: boolean;
-  startView: BoardView | 'auto';
 };
 
 const BOARD_SETTINGS_KEY = 'sentinel.board.settings.v1';
@@ -50,7 +49,6 @@ const DEFAULT_SETTINGS: BoardSettings = {
   viewDurationSec: 12,
   rowsPerPage: 6,
   compactMetrics: false,
-  startView: 'auto',
 };
 const PRESET_LABELS: Record<BoardPreset, string> = {
   default: 'Standard',
@@ -81,10 +79,10 @@ function saveBoardSettings(storageKey: string, settings: BoardSettings) {
 function applyPreset(preset: BoardPreset, current: BoardSettings): BoardSettings {
   const display = { viewDurationSec: current.viewDurationSec, rowsPerPage: current.rowsPerPage, compactMetrics: current.compactMetrics };
   if (preset === 'maintenance') {
-    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: true, showOpenCases: false, showLineSummary: false, startView: 'alerts' };
+    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: true, showOpenCases: false, showLineSummary: false };
   }
   if (preset === 'responsable') {
-    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: false, showOpenCases: false, showLineSummary: true, startView: 'lines' };
+    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: false, showOpenCases: false, showLineSummary: true };
   }
   return { ...DEFAULT_SETTINGS, ...display, preset };
 }
@@ -245,14 +243,10 @@ export default function WorkshopBoardPage() {
   }, [pages.length, safeViews.length, settings.viewDurationSec]);
 
   useEffect(() => {
-    const startIdx =
-      settings.startView !== 'auto'
-        ? safeViews.indexOf(settings.startView)
-        : 0;
-    setViewIndex(startIdx >= 0 ? startIdx : 0);
+    setViewIndex(0);
     setPageIndex(0);
     setDraftSettings(settings);
-  }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   function updateDraftSettings(updates: Partial<BoardSettings>) {
     setDraftSettings((prev) => ({ ...prev, ...updates, preset: 'custom' }));
@@ -483,19 +477,6 @@ export default function WorkshopBoardPage() {
                       { value: '6', label: '6 lignes — standard' },
                       { value: '8', label: '8 lignes — grand écran' },
                       { value: '10', label: '10 lignes — très grand écran' },
-                    ]}
-                  />
-                </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Vue de démarrage</label>
-                  <SelectField
-                    value={draftSettings.startView}
-                    onChange={(v) => updateDraftSettings({ startView: v as BoardSettings['startView'] })}
-                    options={[
-                      { value: 'auto', label: 'Automatique (première vue active)' },
-                      { value: 'alerts', label: 'Alertes à traiter' },
-                      { value: 'all', label: 'Tous les incidents ouverts' },
-                      { value: 'lines', label: 'Situation par ligne' },
                     ]}
                   />
                 </div>
