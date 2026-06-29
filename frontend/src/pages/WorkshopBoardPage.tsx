@@ -47,7 +47,7 @@ const DEFAULT_SETTINGS: BoardSettings = {
   onlyPriority: false,
   onlyNotTaken: false,
   lineIds: [],
-  viewDurationSec: 12,
+  viewDurationSec: 10,
   rowsPerPage: 6,
   compactMetrics: false,
 };
