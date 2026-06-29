@@ -339,12 +339,19 @@
 .modal-confirm-overlay {
   position: fixed;
   inset: 0;
-  background-color: var(--color-overlay);
+  background-color: rgba(11, 18, 32, 0.18);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1100;
   padding: var(--space-4);
+}
+
+.modal-confirm {
+  border: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-border);
 }
 
 .modal-confirm .modal-body {
@@ -354,6 +361,7 @@
 .modal-confirm .modal-body p {
   color: var(--color-text-secondary);
   margin: 0;
+  font-size: var(--text-sm);
 }
 
 .modal-confirm-actions {

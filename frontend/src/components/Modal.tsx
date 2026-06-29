@@ -25,7 +25,7 @@ export default function Modal({
   isLoading = false,
   size = 'md',
   variant = 'default',
-  dirtyMessage = 'Des modifications ne sont pas enregistrées. Quitter quand même ?',
+  dirtyMessage = 'Les modifications en cours seront perdues.',
 }: ModalProps) {
   const [confirmClose, setConfirmClose] = useState(false);
   const modalRef = useRef<HTMLDivElement | null>(null);
@@ -167,11 +167,11 @@ export default function Modal({
             <div className="modal-body">
               <p>{dirtyMessage}</p>
               <div className="modal-confirm-actions">
-                <button className="btn btn-secondary" type="button" onClick={() => setConfirmClose(false)}>
-                  Continuer l’édition
+                <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>
+                  Quitter sans enregistrer
                 </button>
-                <button className="btn btn-danger" type="button" onClick={onClose}>
-                  Quitter
+                <button className="btn btn-primary" type="button" onClick={() => setConfirmClose(false)}>
+                  Continuer l'édition
                 </button>
               </div>
             </div>
