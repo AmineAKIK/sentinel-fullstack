@@ -255,9 +255,41 @@
   margin: 0 0 4px;
 }
 
+.privacy-content ul.privacy-list {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.privacy-content ul.privacy-list li {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.privacy-content ul.privacy-list li strong {
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.88rem;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.01em;
+}
+
 .privacy-footer {
   margin-top: var(--space-5);
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.privacy-update {
+  color: var(--color-text-muted, var(--color-text-secondary));
+  font-size: 0.8rem;
+  margin: 0;
 }
 
 .privacy-back-link {

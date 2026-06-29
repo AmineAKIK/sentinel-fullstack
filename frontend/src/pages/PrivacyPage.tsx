@@ -8,25 +8,31 @@ export default function PrivacyPage() {
       <section className="login-hub-shell privacy-shell">
         <header className="privacy-header">
           <h1>Confidentialité des données</h1>
-          <p>Comment Sentinel traite les données personnelles.</p>
+          <p>Politique de traitement des données personnelles au sein de Sentinel.</p>
         </header>
 
         <div className="privacy-content">
-          <h2>Données traitées</h2>
+          <h2>Responsable de traitement</h2>
           <p>
-            Sentinel traite uniquement les données nécessaires au suivi des incidents
-            d'atelier : nom, prénom et numéro de badge des utilisateurs, ainsi que les
-            événements liés aux incidents (déclarations, prises en charge, clôtures).
-            Aucune autre donnée personnelle n'est collectée : pas d'adresse e-mail,
-            pas de photo, pas de données de localisation.
+            Le traitement des données est opéré par l'administrateur de l'instance Sentinel
+            au sein de l'établissement. Pour toute demande relative à vos données, adressez-vous
+            directement à l'administrateur via l'espace d'administration.
+          </p>
+
+          <h2>Données collectées</h2>
+          <p>
+            Sentinel traite les données strictement nécessaires au fonctionnement du suivi
+            d'atelier : nom, prénom, numéro de badge et, le cas échéant, adresse e-mail
+            (utilisée uniquement pour les notifications de réinitialisation de mot de passe).
+            Aucune donnée biométrique, de localisation ou de navigation n'est collectée.
           </p>
 
           <h2>Finalité et base légale</h2>
           <p>
             Ces données servent exclusivement à la traçabilité des interventions de
-            production : savoir qui a déclaré un incident, qui l'a traité et quand.
-            Ce traitement repose sur l'intérêt légitime de l'exploitant de l'atelier
-            au titre du suivi de son activité industrielle.
+            production : identification des déclarants, suivi des prises en charge et
+            horodatage des clôtures. Le traitement repose sur l'intérêt légitime de
+            l'exploitant au titre du pilotage de son activité industrielle.
           </p>
 
           <h2>Durée de conservation</h2>
@@ -40,21 +46,36 @@ export default function PrivacyPage() {
 
           <h2>Vos droits</h2>
           <p>
-            Conformément au RGPD, chaque utilisateur peut demander l'accès, la
-            rectification ou l'effacement de ses données auprès de l'administrateur
-            de l'application, qui dispose des outils nécessaires dans l'espace
-            d'administration.
+            Conformément au RGPD (articles 15 à 22), vous disposez d'un droit d'accès,
+            de rectification, d'effacement et d'opposition. Ces droits s'exercent auprès
+            de l'administrateur de l'application, qui dispose des outils nécessaires dans
+            l'espace d'administration.
           </p>
 
           <h2>Cookies</h2>
           <p>
-            Sentinel utilise uniquement des cookies de session strictement nécessaires
-            à l'authentification (cookies HTTP-only). Aucun cookie de mesure d'audience
-            ou de publicité n'est déposé : aucun consentement n'est donc requis.
+            Sentinel dépose exclusivement des cookies de session strictement nécessaires
+            à l'authentification, sans consentement préalable requis :
           </p>
+          <ul className="privacy-list">
+            <li>
+              <strong>sentinel_auth_token</strong> — session administration et atelier
+              (HTTP-only, durée de session)
+            </li>
+            <li>
+              <strong>sentinel_refresh_token</strong> — renouvellement silencieux de
+              session (HTTP-only, durée étendue)
+            </li>
+            <li>
+              <strong>sentinel_board_token</strong> — accès au tableau d'atelier partagé
+              (HTTP-only, durée de session)
+            </li>
+          </ul>
+          <p>Aucun cookie analytique, publicitaire ou tiers n'est déposé.</p>
         </div>
 
         <footer className="privacy-footer">
+          <p className="privacy-update">Mis à jour le 28 juin 2026</p>
           <Link to="/login" className="privacy-back-link">Retour à l'accueil</Link>
         </footer>
       </section>
