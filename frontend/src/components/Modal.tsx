@@ -29,7 +29,6 @@ export default function Modal({
 }: ModalProps) {
   const [confirmClose, setConfirmClose] = useState(false);
   const modalRef = useRef<HTMLDivElement | null>(null);
-  const confirmRef = useRef<HTMLDivElement | null>(null);
   const titleIdStr = `modal-title-${useId()}`;
   const canClose = Boolean(onClose) && !isLoading;
   const escapeEnabled = closeOnEscape ?? closeOnOverlay;
@@ -55,7 +54,6 @@ export default function Modal({
     '[tabindex]:not([tabindex="-1"])',
   ].join(',');
 
-  // Focus the first input (not the close button) on mount only
   useEffect(() => {
     const previousActiveElement = document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -104,28 +102,17 @@ export default function Modal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Focus trap for the main dialog
   useEffect(() => {
-    if (confirmClose) return undefined;
-    const handler = trapFocus(modalRef, escapeEnabled ? requestClose : undefined);
+    const onEscape = escapeEnabled
+      ? confirmClose
+        ? () => setConfirmClose(false)
+        : requestClose
+      : undefined;
+    const handler = trapFocus(modalRef, onEscape);
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canClose, escapeEnabled, isDirty, isLoading, onClose, confirmClose]);
-
-  // Focus trap for the confirmation sub-dialog — activates only when confirmClose is true
-  useEffect(() => {
-    if (!confirmClose) return undefined;
-    const handler = trapFocus(confirmRef, () => setConfirmClose(false));
-    // Focus the first focusable element inside the confirm dialog
-    window.setTimeout(() => {
-      const first = confirmRef.current?.querySelector<HTMLElement>(focusableSelector);
-      first?.focus();
-    }, 0);
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmClose]);
 
   return (
     <div
@@ -153,31 +140,22 @@ export default function Modal({
           )}
         </div>
         <div className="modal-body">{children}</div>
-        <div className="modal-footer">{footer}</div>
-      </div>
-      {confirmClose && (
-        <div className="modal-confirm-overlay" role="presentation">
-          <div className="modal modal-sm modal-confirm" role="dialog" aria-modal="true" aria-label="Quitter sans enregistrer" ref={confirmRef} tabIndex={-1}>
-            <div className="modal-header">
-              <span className="modal-title">Quitter sans enregistrer ?</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmClose(false)} aria-label="Fermer">
-                <span aria-hidden="true">✕</span>
+        {confirmClose ? (
+          <div className="modal-footer modal-footer--confirm" role="region" aria-label="Confirmation">
+            <p className="modal-confirm-message">{dirtyMessage}</p>
+            <div className="modal-confirm-actions">
+              <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>
+                Quitter
+              </button>
+              <button className="btn btn-primary" type="button" onClick={() => setConfirmClose(false)}>
+                Continuer l'édition
               </button>
             </div>
-            <div className="modal-body">
-              <p>{dirtyMessage}</p>
-              <div className="modal-confirm-actions">
-                <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>
-                  Quitter sans enregistrer
-                </button>
-                <button className="btn btn-primary" type="button" onClick={() => setConfirmClose(false)}>
-                  Continuer l'édition
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="modal-footer">{footer}</div>
+        )}
+      </div>
     </div>
   );
 }
