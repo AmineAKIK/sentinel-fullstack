@@ -23,7 +23,7 @@ export default function LoginPage() {
             <span>Administration</span>
             <div className="login-space-card-body">
               <strong>Pilotage interne</strong>
-              <p>Accès, paramètres et supervision.</p>
+              <p>Accès, paramètres et supervision opérationnelle.</p>
             </div>
           </Link>
           <Link to="/workshop/login" className="login-space-card">
