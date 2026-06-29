@@ -94,7 +94,7 @@ export default function AdminLoginPage() {
               autoComplete="username"
               autoFocus
               maxLength={FIELD_LIMITS.IDENTIFIER}
-              placeholder="admin"
+              placeholder="Nom d'utilisateur"
               aria-invalid={Boolean(error) || undefined}
               aria-describedby={error ? 'admin-login-error' : undefined}
             />
