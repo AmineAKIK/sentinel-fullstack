@@ -29,6 +29,7 @@ export default function Modal({
 }: ModalProps) {
   const [confirmClose, setConfirmClose] = useState(false);
   const modalRef = useRef<HTMLDivElement | null>(null);
+  const confirmRef = useRef<HTMLDivElement | null>(null);
   const titleIdStr = `modal-title-${useId()}`;
   const canClose = Boolean(onClose) && !isLoading;
   const escapeEnabled = closeOnEscape ?? closeOnOverlay;
@@ -102,17 +103,26 @@ export default function Modal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Focus trap for main dialog (disabled when confirm is open)
   useEffect(() => {
-    const onEscape = escapeEnabled
-      ? confirmClose
-        ? () => setConfirmClose(false)
-        : requestClose
-      : undefined;
-    const handler = trapFocus(modalRef, onEscape);
+    if (confirmClose) return undefined;
+    const handler = trapFocus(modalRef, escapeEnabled ? requestClose : undefined);
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canClose, escapeEnabled, isDirty, isLoading, onClose, confirmClose]);
+
+  // Focus trap for confirm dialog
+  useEffect(() => {
+    if (!confirmClose) return undefined;
+    const handler = trapFocus(confirmRef, () => setConfirmClose(false));
+    window.setTimeout(() => {
+      confirmRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
+    }, 0);
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmClose]);
 
   return (
     <div
@@ -140,20 +150,30 @@ export default function Modal({
           )}
         </div>
         <div className="modal-body">{children}</div>
-        {confirmClose ? (
-          <div className="modal-footer modal-footer--confirm" role="region" aria-label="Confirmation">
-            <p className="modal-confirm-message">{dirtyMessage}</p>
-            <div className="modal-confirm-actions">
-              <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>
-                Quitter
-              </button>
-              <button className="btn btn-primary" type="button" onClick={() => setConfirmClose(false)}>
-                Continuer l'édition
-              </button>
+        <div className="modal-footer">{footer}</div>
+
+        {confirmClose && (
+          <div className="modal-confirm-backdrop" role="presentation">
+            <div
+              className="modal-confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Quitter sans enregistrer"
+              ref={confirmRef}
+              tabIndex={-1}
+            >
+              <p className="modal-confirm-title">Quitter sans enregistrer ?</p>
+              <p className="modal-confirm-body">{dirtyMessage}</p>
+              <div className="modal-confirm-actions">
+                <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>
+                  Quitter
+                </button>
+                <button className="btn btn-primary" type="button" onClick={() => setConfirmClose(false)}>
+                  Continuer l'édition
+                </button>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="modal-footer">{footer}</div>
         )}
       </div>
     </div>
