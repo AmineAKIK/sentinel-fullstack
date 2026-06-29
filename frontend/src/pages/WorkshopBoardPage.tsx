@@ -19,8 +19,6 @@ import {
 } from '../utils/boardUtils';
 import { usePageTitle } from '../hooks/usePageTitle';
 
-const VIEW_DURATION_MS = 12000;
-const ROWS_PER_PAGE = 6;
 type BoardView = 'alerts' | 'all' | 'lines';
 const VIEWS: BoardView[] = ['alerts', 'all', 'lines'];
 type BoardMode = 'normal' | 'watch' | 'critical';
@@ -33,6 +31,10 @@ type BoardSettings = {
   onlyPriority: boolean;
   onlyNotTaken: boolean;
   lineIds: string[];
+  viewDurationSec: number;
+  rowsPerPage: number;
+  compactMetrics: boolean;
+  startView: BoardView | 'auto';
 };
 
 const BOARD_SETTINGS_KEY = 'sentinel.board.settings.v1';
@@ -45,6 +47,10 @@ const DEFAULT_SETTINGS: BoardSettings = {
   onlyPriority: false,
   onlyNotTaken: false,
   lineIds: [],
+  viewDurationSec: 12,
+  rowsPerPage: 6,
+  compactMetrics: false,
+  startView: 'auto',
 };
 const PRESET_LABELS: Record<BoardPreset, string> = {
   default: 'Standard',
@@ -72,14 +78,15 @@ function saveBoardSettings(storageKey: string, settings: BoardSettings) {
   window.localStorage.setItem(storageKey, JSON.stringify(settings));
 }
 
-function applyPreset(preset: BoardPreset): BoardSettings {
+function applyPreset(preset: BoardPreset, current: BoardSettings): BoardSettings {
+  const display = { viewDurationSec: current.viewDurationSec, rowsPerPage: current.rowsPerPage, compactMetrics: current.compactMetrics };
   if (preset === 'maintenance') {
-    return { preset, showAlerts: true, showOpenCases: false, showLineSummary: false, onlyPriority: false, onlyNotTaken: false, lineIds: [] };
+    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: true, showOpenCases: false, showLineSummary: false, startView: 'alerts' };
   }
   if (preset === 'responsable') {
-    return { preset, showAlerts: false, showOpenCases: false, showLineSummary: true, onlyPriority: false, onlyNotTaken: false, lineIds: [] };
+    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: false, showOpenCases: false, showLineSummary: true, startView: 'lines' };
   }
-  return { ...DEFAULT_SETTINGS, preset };
+  return { ...DEFAULT_SETTINGS, ...display, preset };
 }
 
 export default function WorkshopBoardPage() {
@@ -210,8 +217,8 @@ export default function WorkshopBoardPage() {
   }, [activeIncidents]);
 
   const activeView = safeViews[viewIndex] ?? safeViews[0] ?? 'alerts';
-  const incidentPages = paginate(activeView === 'alerts' ? alertIncidents : activeIncidents, ROWS_PER_PAGE);
-  const linePages = paginate(lineGroups, ROWS_PER_PAGE);
+  const incidentPages = paginate(activeView === 'alerts' ? alertIncidents : activeIncidents, settings.rowsPerPage);
+  const linePages = paginate(lineGroups, settings.rowsPerPage);
   const pages = activeView === 'lines' ? linePages : incidentPages;
   const safePageIndex = Math.min(pageIndex, pages.length - 1);
   const currentItemCount =
@@ -233,15 +240,19 @@ export default function WorkshopBoardPage() {
         setViewIndex((currentView) => (currentView + 1) % safeViews.length);
         return 0;
       });
-    }, VIEW_DURATION_MS);
+    }, settings.viewDurationSec * 1000);
     return () => window.clearInterval(timer);
-  }, [pages.length, safeViews.length]);
+  }, [pages.length, safeViews.length, settings.viewDurationSec]);
 
   useEffect(() => {
-    setViewIndex(0);
+    const startIdx =
+      settings.startView !== 'auto'
+        ? safeViews.indexOf(settings.startView)
+        : 0;
+    setViewIndex(startIdx >= 0 ? startIdx : 0);
     setPageIndex(0);
     setDraftSettings(settings);
-  }, [settings]);
+  }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateDraftSettings(updates: Partial<BoardSettings>) {
     setDraftSettings((prev) => ({ ...prev, ...updates, preset: 'custom' }));
@@ -333,28 +344,30 @@ export default function WorkshopBoardPage() {
         </div>
       </section>
 
-      <section className="board-metrics">
-        <div className="board-metric">
-          <span>Ouverts</span>
-          <strong>{openCount}</strong>
-        </div>
-        <div className="board-metric board-metric-danger">
-          <span>Urgents</span>
-          <strong>{priorityCount}</strong>
-        </div>
-        <div className="board-metric">
-          <span>Non pris</span>
-          <strong>{notTakenCount}</strong>
-        </div>
-        <div className="board-metric">
-          <span>En attente</span>
-          <strong>{pendingCount}</strong>
-        </div>
-        <div className="board-metric">
-          <span>Ouverts &gt; 7j</span>
-          <strong>{openOverSevenDaysCount}</strong>
-        </div>
-      </section>
+      {!settings.compactMetrics && (
+        <section className="board-metrics">
+          <div className="board-metric">
+            <span>Ouverts</span>
+            <strong>{openCount}</strong>
+          </div>
+          <div className="board-metric board-metric-danger">
+            <span>Urgents</span>
+            <strong>{priorityCount}</strong>
+          </div>
+          <div className="board-metric">
+            <span>Non pris</span>
+            <strong>{notTakenCount}</strong>
+          </div>
+          <div className="board-metric">
+            <span>En attente</span>
+            <strong>{pendingCount}</strong>
+          </div>
+          <div className="board-metric">
+            <span>Ouverts &gt; 7j</span>
+            <strong>{openOverSevenDaysCount}</strong>
+          </div>
+        </section>
+      )}
 
       <section className={`board-viewport ${currentItemCount <= 4 ? 'is-compact' : ''}`}>
         {activeIncidents.length === 0 ? (
@@ -426,7 +439,7 @@ export default function WorkshopBoardPage() {
                 <label className="form-label">Type d'écran</label>
                 <SelectField
                   value={draftSettings.preset}
-                  onChange={(value) => setDraftSettings(applyPreset(value as BoardPreset))}
+                  onChange={(value) => setDraftSettings(applyPreset(value as BoardPreset, draftSettings))}
                   options={[
                     { value: 'default', label: `${PRESET_LABELS.default} · rotation complète` },
                     { value: 'maintenance', label: `${PRESET_LABELS.maintenance} · alertes à traiter` },
@@ -434,6 +447,66 @@ export default function WorkshopBoardPage() {
                     { value: 'custom', label: `${PRESET_LABELS.custom} · filtres avancés` },
                   ]}
                 />
+              </div>
+            </section>
+
+            <section className="board-settings-section">
+              <div>
+                <h3>Affichage</h3>
+                <p>Paramètres physiques de l'écran.</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span>Vitesse de rotation</span>
+                    <strong>{draftSettings.viewDurationSec} s</strong>
+                  </label>
+                  <input
+                    type="range"
+                    min={5} max={60} step={5}
+                    value={draftSettings.viewDurationSec}
+                    onChange={(e) => updateDraftSettings({ viewDurationSec: Number(e.target.value) })}
+                    style={{ width: '100%' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                    <span>5 s (rapide)</span>
+                    <span>60 s (lent)</span>
+                  </div>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Incidents par page</label>
+                  <SelectField
+                    value={String(draftSettings.rowsPerPage)}
+                    onChange={(v) => updateDraftSettings({ rowsPerPage: Number(v) })}
+                    options={[
+                      { value: '4', label: '4 lignes — petit écran' },
+                      { value: '6', label: '6 lignes — standard' },
+                      { value: '8', label: '8 lignes — grand écran' },
+                      { value: '10', label: '10 lignes — très grand écran' },
+                    ]}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Vue de démarrage</label>
+                  <SelectField
+                    value={draftSettings.startView}
+                    onChange={(v) => updateDraftSettings({ startView: v as BoardSettings['startView'] })}
+                    options={[
+                      { value: 'auto', label: 'Automatique (première vue active)' },
+                      { value: 'alerts', label: 'Alertes à traiter' },
+                      { value: 'all', label: 'Tous les incidents ouverts' },
+                      { value: 'lines', label: 'Situation par ligne' },
+                    ]}
+                  />
+                </div>
+                <label className="board-line-option">
+                  <input
+                    type="checkbox"
+                    checked={draftSettings.compactMetrics}
+                    onChange={(e) => updateDraftSettings({ compactMetrics: e.target.checked })}
+                  />
+                  Masquer les compteurs (mode compact)
+                </label>
               </div>
             </section>
 
