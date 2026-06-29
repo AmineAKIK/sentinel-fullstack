@@ -27,7 +27,7 @@ export default function BoardAccessPage() {
     setError('');
 
     if (!code.trim()) {
-      setError('Saisissez le code du tableau.');
+      setError('Le code d\'accès est requis.');
       return;
     }
 
@@ -37,7 +37,7 @@ export default function BoardAccessPage() {
       setCode('');
       setState('ready');
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Accès au tableau impossible.');
+      setError(err instanceof ApiResponseError ? err.message : 'Accès impossible. Vérifiez votre code.');
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function BoardAccessPage() {
       <main className="board-access-page" id="main-content">
         <section className="board-access-card" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Vérification de l’accès au tableau...</p>
+          <p>Vérification en cours…</p>
         </section>
       </main>
     );
@@ -65,12 +65,12 @@ export default function BoardAccessPage() {
         <div className="board-access-title">
           <span>SENTINEL</span>
           <h1>Tableau d’atelier</h1>
-          <p>Saisissez le code pour ouvrir le tableau.</p>
+          <p>Accès réservé. Saisissez votre code d'accès.</p>
         </div>
 
         <form className="board-access-form" onSubmit={handleSubmit} noValidate>
           <div className="form-group">
-            <label className="form-label" htmlFor="board-code">Code du tableau</label>
+            <label className="form-label" htmlFor="board-code">Code d'accès</label>
             <input
               id="board-code"
               className="form-input"
@@ -81,7 +81,7 @@ export default function BoardAccessPage() {
               autoFocus
               disabled={loading}
               maxLength={FIELD_LIMITS.CODE}
-              placeholder="Code du tableau"
+              placeholder="Code d'accès"
               aria-invalid={Boolean(error) || undefined}
               aria-describedby={error ? 'board-access-error' : undefined}
             />
@@ -90,7 +90,7 @@ export default function BoardAccessPage() {
           {error && <div id="board-access-error" className="error-message" role="alert">{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? <><span className="spinner" aria-hidden="true" /> Ouverture…</> : 'Ouvrir le tableau'}
+            {loading ? <><span className="spinner" aria-hidden="true" /> Connexion…</> : 'Accéder au tableau'}
           </button>
         </form>
       </section>
