@@ -342,8 +342,7 @@ export default function WorkshopBoardPage() {
         </div>
       </section>
 
-      {!settings.compactMetrics && (
-        <section className="board-metrics">
+      <section className={`board-metrics${settings.compactMetrics ? ' board-metrics--hidden' : ''}`} aria-hidden={settings.compactMetrics}>
           <div className="board-metric">
             <span>Ouverts</span>
             <strong>{openCount}</strong>
@@ -364,8 +363,7 @@ export default function WorkshopBoardPage() {
             <span>Ouverts &gt; 7j</span>
             <strong>{openOverSevenDaysCount}</strong>
           </div>
-        </section>
-      )}
+      </section>
 
       <section className={`board-viewport ${currentItemCount <= 4 ? 'is-compact' : ''}`}>
         {activeIncidents.length === 0 ? (
