@@ -422,12 +422,12 @@ export default function WorkshopBoardPage() {
           }
         >
           <div className="board-settings-panel">
-            <div className="notice">Portée : écran {screenId} uniquement.</div>
+            <div className="notice">Paramètres locaux — écran {screenLabel} uniquement.</div>
 
             <section className="board-settings-section">
               <div>
-                <h3>Profil</h3>
-                <p>Choisit le scénario d'affichage principal.</p>
+                <h3>Profil d'écran</h3>
+                <p>Scénario prédéfini ou configuration manuelle.</p>
               </div>
               <div className="form-group">
                 <label className="form-label">Type d'écran</label>
@@ -447,7 +447,7 @@ export default function WorkshopBoardPage() {
             <section className="board-settings-section">
               <div>
                 <h3>Affichage</h3>
-                <p>Paramètres physiques de l'écran.</p>
+                <p>Cadence de rotation et densité d'affichage.</p>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
@@ -494,7 +494,7 @@ export default function WorkshopBoardPage() {
             <section className="board-settings-section">
               <div>
                 <h3>Contenu</h3>
-                <p>Définit les vues qui tournent automatiquement.</p>
+                <p>Vues incluses dans la rotation automatique.</p>
               </div>
               <div className="board-setting-options">
                 <label className="board-line-option">
@@ -527,7 +527,7 @@ export default function WorkshopBoardPage() {
             <section className="board-settings-section">
               <div>
                 <h3>Filtres</h3>
-                <p>Réduit les incidents visibles sur cet écran uniquement.</p>
+                <p>Restriction du périmètre affiché sur cet écran.</p>
               </div>
               <div className="board-setting-options board-setting-options--col">
                 <label className="board-line-option">

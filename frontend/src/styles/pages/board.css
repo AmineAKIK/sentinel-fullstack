@@ -166,16 +166,19 @@
 }
 
 .board-settings-section h3 {
-  margin: 0 0 3px;
-  font-size: var(--text-base);
+  margin: 0 0 4px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.01em;
 }
 
 .board-settings-section p,
 .board-settings-section small {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   font-size: var(--text-xs);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .board-setting-options {
