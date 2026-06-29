@@ -165,10 +165,10 @@ export default function Modal({
               <p className="modal-confirm-title">Quitter sans enregistrer ?</p>
               <p className="modal-confirm-body">{dirtyMessage}</p>
               <div className="modal-confirm-actions">
-                <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={onClose}>
                   Quitter
                 </button>
-                <button className="btn btn-primary" type="button" onClick={() => setConfirmClose(false)}>
+                <button className="btn btn-primary btn-sm" type="button" onClick={() => setConfirmClose(false)}>
                   Continuer l'édition
                 </button>
               </div>
