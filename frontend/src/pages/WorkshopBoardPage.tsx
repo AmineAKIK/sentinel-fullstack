@@ -97,11 +97,11 @@ export default function WorkshopBoardPage() {
   const screenId = normalizeScreenId(screenParam ?? getOrCreateSessionScreenId());
   const storageKey = getBoardSettingsKey(screenId);
 
-  const [incidents, setIncidents] = useState<WorkshopBoardIncident[]>([]);
-  const [lines, setLines] = useState<WorkshopBoardLine[]>([]);
+  const [incidents, setIncidents] = useState<WorkshopBoardIncident[] | null>(null);
+  const [lines, setLines] = useState<WorkshopBoardLine[] | null>(null);
   const [now, setNow] = useState(new Date());
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [error, setError] = useState('');
+  const [dataError, setDataError] = useState(false);
   const [viewIndex, setViewIndex] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -128,9 +128,10 @@ export default function WorkshopBoardPage() {
       setIncidents(boardData.incidents);
       setLines(boardData.lines);
       setLastUpdated(new Date());
-      setError('');
+      setDataError(false);
     } catch {
-      setError('Données temporairement indisponibles');
+      setDataError(true);
+      // données précédentes conservées — stale-while-revalidate
     }
   }
 
@@ -152,8 +153,11 @@ export default function WorkshopBoardPage() {
     setPageIndex(0);
   }, [storageKey]);
 
+  const safeIncidents = incidents ?? [];
+  const safeLines = lines ?? [];
+
   const activeIncidents = useMemo(() => {
-    const filtered = incidents
+    const filtered = safeIncidents
       .filter((inc) => {
         if (settings.lineIds.length === 0) return true;
         if (settings.lineIds.includes(NO_LINES_SELECTED)) return false;
@@ -162,7 +166,7 @@ export default function WorkshopBoardPage() {
       .filter((inc) => !settings.onlyPriority || inc.is_priority)
       .filter((inc) => !settings.onlyNotTaken || !inc.is_taken);
     return sortIncidents(filtered);
-  }, [incidents, settings.lineIds, settings.onlyNotTaken, settings.onlyPriority]);
+  }, [safeIncidents, settings.lineIds, settings.onlyNotTaken, settings.onlyPriority]);
 
   const priorityCount = activeIncidents.filter((inc) => inc.is_priority).length;
   const openCount = activeIncidents.filter((inc) => inc.status === 'OPEN').length;
@@ -228,7 +232,7 @@ export default function WorkshopBoardPage() {
 
   useEffect(() => {
     setPageIndex(0);
-  }, [viewIndex, incidents.length]);
+  }, [viewIndex, safeIncidents.length]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -265,7 +269,7 @@ export default function WorkshopBoardPage() {
 
   function handleLineToggle(lineId: string) {
     setDraftSettings((prev) => {
-      const allLineIds = lines.map((line) => String(line.id));
+      const allLineIds = safeLines.map((line) => String(line.id));
       const currentIds =
         prev.lineIds.length === 0
           ? allLineIds
@@ -320,7 +324,7 @@ export default function WorkshopBoardPage() {
         </div>
       </header>
 
-      {error && <div className="board-error">{error}</div>}
+      {dataError && <div className="board-error">Données temporairement indisponibles{lastUpdated ? ` — dernière mise à jour à ${formatTime(lastUpdated.toISOString())}` : ''}</div>}
 
       <section className="board-status-panel">
         <div className="board-status-copy">
@@ -583,7 +587,7 @@ export default function WorkshopBoardPage() {
                   </button>
                 </div>
                 <div className="board-line-chip-grid">
-                  {lines.map((line) => {
+                  {safeLines.map((line) => {
                     const selected =
                       draftSettings.lineIds.length === 0 ||
                       (!draftSettings.lineIds.includes(NO_LINES_SELECTED) &&
@@ -615,7 +619,7 @@ export default function WorkshopBoardPage() {
                   !draftSettings.lineIds.includes(NO_LINES_SELECTED) && (
                     <div className="board-lines-selected-summary">
                       {draftSettings.lineIds.length} ligne(s) affichée(s) :{' '}
-                      {lines
+                      {safeLines
                         .filter((line) => draftSettings.lineIds.includes(String(line.id)))
                         .map((line) => `Ligne ${line.line_number}`)
                         .join(', ')}
