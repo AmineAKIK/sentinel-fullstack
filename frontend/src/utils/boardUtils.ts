@@ -29,6 +29,16 @@ export function isOpenOverSevenDays(incident: WorkshopBoardIncident): boolean {
   return incident.status === 'OPEN' && isOlderThanDays(incident.created_at, 7);
 }
 
+export function formatStaleDuration(since: Date, now: Date): string {
+  const diffMs = now.getTime() - since.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'moins d\'1 min';
+  if (diffMin === 1) return '1 min';
+  if (diffMin < 60) return `${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  return diffH === 1 ? '1 h' : `${diffH} h`;
+}
+
 export function paginate<T>(items: T[], size: number): T[][] {
   if (items.length === 0) return [[]];
   const pages: T[][] = [];

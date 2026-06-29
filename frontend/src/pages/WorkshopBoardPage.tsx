@@ -10,6 +10,7 @@ import { WorkshopBoardIncident, WorkshopBoardLine } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
 import {
   formatClock,
+  formatStaleDuration,
   formatTime,
   getOrCreateSessionScreenId,
   isOpenOverSevenDays,
@@ -291,7 +292,7 @@ export default function WorkshopBoardPage() {
   const screenLabel = screenId.replace(/^ecran[-_]/i, '').toUpperCase();
 
   return (
-    <main id="main-content" className={`board-page board-page-${boardMode}`}>
+    <main id="main-content" className={`board-page board-page-${boardMode}${dataError ? ' board-page--stale' : ''}`}>
       <header className="board-header">
         <div>
           <div className="board-brand">SENTINEL · {profileLabel}</div>
@@ -324,7 +325,15 @@ export default function WorkshopBoardPage() {
         </div>
       </header>
 
-      {dataError && <div className="board-error">Données temporairement indisponibles{lastUpdated ? ` — dernière mise à jour à ${formatTime(lastUpdated.toISOString())}` : ''}</div>}
+      {dataError && (
+        <div className="board-stale-banner" role="alert">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>
+            Affichage en pause — données figées
+            {lastUpdated ? ` depuis ${formatStaleDuration(lastUpdated, now)}` : ''}
+          </span>
+        </div>
+      )}
 
       <section className="board-status-panel">
         <div className="board-status-copy">
