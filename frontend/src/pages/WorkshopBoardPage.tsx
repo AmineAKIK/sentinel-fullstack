@@ -529,7 +529,7 @@ export default function WorkshopBoardPage() {
                 <h3>Filtres</h3>
                 <p>Réduit les incidents visibles sur cet écran uniquement.</p>
               </div>
-              <div className="board-setting-options">
+              <div className="board-setting-options board-setting-options--col">
                 <label className="board-line-option">
                   <input
                     type="checkbox"
