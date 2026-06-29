@@ -17,7 +17,7 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
     label: 'Mises à jour',
     events: ['USER_UPDATED', 'LINE_UPDATED', 'LINE_SUMMARY_UPDATED', 'LINE_MACHINE_UPDATED', 'LINE_PLAN_UPDATED'],
   },
-  status: { label: 'Activations', events: ['USER_ACTIVATED', 'USER_DEACTIVATED'] },
+  status: { label: 'Activations/Désactivations', events: ['USER_ACTIVATED', 'USER_DEACTIVATED'] },
   deletion: { label: 'Suppressions', events: ['USER_SOFT_DELETED', 'LINE_SOFT_DELETED'] },
   access: { label: 'Accès utilisateurs', events: ['USER_PASSWORD_RESET'] },
 };
