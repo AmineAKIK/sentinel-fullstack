@@ -7,6 +7,7 @@ import {
   listPendingPasswordResetRequestsService,
   markPasswordResetRequestHandledService,
 } from './admin.service';
+import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
 
 export async function getReferenceDashboard(_req: Request, res: Response): Promise<void> {
   try {
@@ -46,6 +47,9 @@ export async function markPasswordResetRequestHandled(req: Request, res: Respons
     if (isNaN(id)) { res.status(400).json({ error: { code: 'INVALID_ID', message: 'ID invalide.' } }); return; }
     const ok = await markPasswordResetRequestHandledService(id);
     if (!ok) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Demande introuvable ou déjà traitée.' } }); return; }
+    if (req.admin) {
+      await createAdminSystemAuditEvent(req.admin.adminId, 'PASSWORD_RESET_REQUEST_HANDLED', { requestId: id });
+    }
     res.json({ ok: true });
   } catch (err) {
     handleControllerError(res, 'markPasswordResetRequestHandled', err);

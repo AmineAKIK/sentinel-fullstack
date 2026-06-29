@@ -32,6 +32,14 @@ export const ADMIN_EVENT_LABELS: Record<string, string> = {
   LINE_MACHINE_UPDATED: 'Machine modifiée',
   LINE_PLAN_UPDATED: 'Ordre machines modifié',
   LINE_SOFT_DELETED: 'Ligne supprimée',
+  ADMIN_PASSWORD_CHANGED: 'Mot de passe admin modifié',
+  ADMIN_EMAIL_CHANGED: 'Email admin modifié',
+  ADMIN_NOTIF_UPDATED: 'Préférences notifications modifiées',
+  BOARD_TOGGLED: 'Board activé / désactivé',
+  BOARD_CODE_CHANGED: 'Code board modifié',
+  APP_SETTINGS_CHANGED: 'Paramètres application modifiés',
+  SESSIONS_REVOKED: 'Sessions révoquées',
+  PASSWORD_RESET_REQUEST_HANDLED: 'Demande de reset traitée',
 };
 
 export interface AuditEventTarget {
@@ -43,6 +51,7 @@ export interface AuditEventTarget {
 }
 
 export function formatAuditEventTarget(event: AuditEventTarget, includeBadge = false): string {
+  if (event.scope === 'system') return 'Système';
   if (event.scope === 'line') return event.line_number || 'Ligne archivée';
   const name = `${event.first_name || ''} ${event.last_name || ''}`.trim();
   if (includeBadge && event.badge_number) return `${name || 'Utilisateur'} (${event.badge_number})`;

@@ -20,6 +20,19 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   status: { label: 'Activations/Désactivations', events: ['USER_ACTIVATED', 'USER_DEACTIVATED'] },
   deletion: { label: 'Suppressions', events: ['USER_SOFT_DELETED', 'LINE_SOFT_DELETED'] },
   access: { label: 'Accès utilisateurs', events: ['USER_PASSWORD_RESET'] },
+  system: {
+    label: 'Système & sécurité',
+    events: [
+      'ADMIN_PASSWORD_CHANGED',
+      'ADMIN_EMAIL_CHANGED',
+      'ADMIN_NOTIF_UPDATED',
+      'BOARD_TOGGLED',
+      'BOARD_CODE_CHANGED',
+      'APP_SETTINGS_CHANGED',
+      'SESSIONS_REVOKED',
+      'PASSWORD_RESET_REQUEST_HANDLED',
+    ],
+  },
 };
 
 
@@ -106,8 +119,9 @@ export default function AdminAuditPage() {
   const summary = useMemo(() => {
     const accountCount = filtered.filter((event) => event.scope === 'account').length;
     const lineCount = filtered.filter((event) => event.scope === 'line').length;
+    const systemCount = filtered.filter((event) => event.scope === 'system').length;
     const lastEvent = filtered[0];
-    return { accountCount, lineCount, lastEvent };
+    return { accountCount, lineCount, systemCount, lastEvent };
   }, [filtered]);
 
   function resetFilters() {
@@ -171,7 +185,7 @@ export default function AdminAuditPage() {
         </div>
 
         <div className="audit-context">
-          <span className="audit-context-text">Journal des changements administratifs sur les utilisateurs et les lignes.</span>
+          <span className="audit-context-text">Journal des changements administratifs : utilisateurs, lignes et paramètres système.</span>
           <span className="audit-context-stats" aria-label="Résumé du journal">
             <span className="audit-context-stat">
               <span>résultats</span>
@@ -184,6 +198,10 @@ export default function AdminAuditPage() {
             <span className="audit-context-stat">
               <span>lignes</span>
               <strong>{summary.lineCount}</strong>
+            </span>
+            <span className="audit-context-stat">
+              <span>système</span>
+              <strong>{summary.systemCount}</strong>
             </span>
           </span>
         </div>
@@ -219,6 +237,7 @@ export default function AdminAuditPage() {
                   { value: 'all', label: 'Tout' },
                   { value: 'account', label: 'Utilisateurs' },
                   { value: 'line', label: 'Lignes' },
+                  { value: 'system', label: 'Système' },
                 ]}
               />
             </div>
@@ -300,7 +319,7 @@ export default function AdminAuditPage() {
                     {filtered.map((event) => (
                       <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
                         <td>{formatDateTime(event.created_at)}</td>
-                        <td>{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</td>
+                        <td>{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</td>
                         <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
                         <td>{formatAuditEventTarget(event, true)}</td>
                         <td>{changesLabel(event.changes)}</td>
@@ -320,7 +339,7 @@ export default function AdminAuditPage() {
                       <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
                     </span>
                     <span className="user-card-meta">
-                      <span className="badge-role">{event.scope === 'line' ? 'Ligne' : 'Utilisateur'}</span>
+                      <span className="badge-role">{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</span>
                       {event.changes && changesLabel(event.changes) !== '-' && (
                         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                           {changesLabel(event.changes)}

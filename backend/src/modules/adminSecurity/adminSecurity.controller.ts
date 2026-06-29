@@ -11,6 +11,7 @@ import { sendError } from '../../utils/errors';
 import { handleControllerError } from '../../utils/controller';
 import { getAdminPasswordHash, incrementAdminSessionVersion, updateAdminPasswordHash, getAdminEmailFromDb, updateAdminEmail } from '../adminCredentials/adminCredentials.repository';
 import { createRateLimit } from '../../utils/inMemoryRateLimit';
+import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
 
 const verifyFailures = createRateLimit(3, 30 * 60 * 1000);
 
@@ -52,6 +53,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
     const newHash = await hashAdminPassword(newPassword);
     await updateAdminPasswordHash(req.admin.adminId, newHash);
     await incrementAdminSessionVersion(req.admin.adminId);
+    await createAdminSystemAuditEvent(req.admin.adminId, 'ADMIN_PASSWORD_CHANGED', null);
 
     clearAuthCookie(res, ADMIN_AUTH_COOKIE);
     res.json({ message: 'Mot de passe modifié. Reconnectez-vous.' });
@@ -118,6 +120,10 @@ export async function updateEmail(req: Request, res: Response): Promise<void> {
     }
 
     await updateAdminEmail(req.admin.adminId, newEmail || null);
+    await createAdminSystemAuditEvent(req.admin.adminId, 'ADMIN_EMAIL_CHANGED', {
+      hadEmail: resolvedCurrent !== null,
+      cleared: !newEmail,
+    });
     res.json({ ok: true });
   } catch (err) {
     handleControllerError(res, 'updateEmail', err);

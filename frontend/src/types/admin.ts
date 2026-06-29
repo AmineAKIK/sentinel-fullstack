@@ -2,7 +2,7 @@ import type { SentinelUser } from './common';
 
 export interface ReferenceAuditEvent {
   id: number;
-  scope: 'account' | 'line';
+  scope: 'account' | 'line' | 'system';
   event_type: string;
   changes: Record<string, unknown> | null;
   created_at: string;

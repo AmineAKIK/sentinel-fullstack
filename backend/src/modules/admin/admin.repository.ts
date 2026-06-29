@@ -19,7 +19,7 @@ interface LineStatsDto {
 
 export interface ReferenceAuditEventDto {
   id: number;
-  scope: 'account' | 'line';
+  scope: 'account' | 'line' | 'system';
   event_type: string;
   changes: Record<string, unknown> | null;
   created_at: Date;
@@ -90,6 +90,16 @@ const taskGroups: Record<string, string[]> = {
   status: ['USER_ACTIVATED', 'USER_DEACTIVATED'],
   deletion: ['USER_SOFT_DELETED', 'LINE_SOFT_DELETED'],
   access: ['USER_PASSWORD_RESET'],
+  system: [
+    'ADMIN_PASSWORD_CHANGED',
+    'ADMIN_EMAIL_CHANGED',
+    'ADMIN_NOTIF_UPDATED',
+    'BOARD_TOGGLED',
+    'BOARD_CODE_CHANGED',
+    'APP_SETTINGS_CHANGED',
+    'SESSIONS_REVOKED',
+    'PASSWORD_RESET_REQUEST_HANDLED',
+  ],
 };
 
 // On affiche l'identité FIGÉE dans l'event (target_*) : un journal d'audit
@@ -105,15 +115,23 @@ const accountAuditSql = `
   FROM account_audit_events ae
   LEFT JOIN sentinel_users su ON su.id = ae.target_user_id`;
 
+// target_line_number est un snapshot figé (migration 036) — on ne dépend plus
+// d'une jointure live qui retournerait NULL pour les lignes archivées.
 const lineAuditSql = `
   SELECT le.id, 'line' AS scope, le.event_type, le.changes, le.created_at,
          NULL::varchar AS first_name, NULL::varchar AS last_name, NULL::varchar AS badge_number,
-         pl.line_number
+         COALESCE(le.target_line_number, pl.line_number) AS line_number
   FROM line_audit_events le
   LEFT JOIN production_lines pl ON pl.id = le.target_line_id`;
 
+const systemAuditSql = `
+  SELECT se.id, 'system' AS scope, se.event_type, se.changes, se.created_at,
+         NULL::varchar AS first_name, NULL::varchar AS last_name, NULL::varchar AS badge_number,
+         NULL::varchar AS line_number
+  FROM admin_system_audit_events se`;
+
 export async function getReferenceDashboardData(): Promise<ReferenceDashboardDto> {
-  const [userStats, lineStats, recentAccountEvents, recentLineEvents] = await Promise.all([
+  const [userStats, lineStats, recentAccountEvents, recentLineEvents, recentSystemEvents] = await Promise.all([
     pool.query<UserStatsDto>(
       `SELECT
          COUNT(*) FILTER (WHERE is_deleted = FALSE)::int AS users_total,
@@ -133,9 +151,10 @@ export async function getReferenceDashboardData(): Promise<ReferenceDashboardDto
     ),
     pool.query<ReferenceAuditEventDto>(`${accountAuditSql} ORDER BY ae.created_at DESC LIMIT 5`),
     pool.query<ReferenceAuditEventDto>(`${lineAuditSql} ORDER BY le.created_at DESC LIMIT 5`),
+    pool.query<ReferenceAuditEventDto>(`${systemAuditSql} ORDER BY se.created_at DESC LIMIT 5`),
   ]);
 
-  const recentEvents = [...recentAccountEvents.rows, ...recentLineEvents.rows]
+  const recentEvents = [...recentAccountEvents.rows, ...recentLineEvents.rows, ...recentSystemEvents.rows]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 8);
 
@@ -252,7 +271,9 @@ export async function listReferenceAuditData(filters: ListReferenceAuditFilters)
     ? accountAuditSql
     : filters.scope === 'line'
       ? lineAuditSql
-      : `${accountAuditSql} UNION ALL ${lineAuditSql}`;
+      : filters.scope === 'system'
+        ? systemAuditSql
+        : `${accountAuditSql} UNION ALL ${lineAuditSql} UNION ALL ${systemAuditSql}`;
   const baseSql = `SELECT * FROM (${scopedSql}) events`;
 
   params.push(filters.limit);

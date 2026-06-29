@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { sendUnauthenticated } from '../../auth/authResponses';
 import { sendError } from '../../utils/errors';
 import { handleControllerError } from '../../utils/controller';
+import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
 import {
   getAdminNotifPrefs,
   updateAdminNotifPrefs,
@@ -68,6 +69,7 @@ export async function patchNotifPrefs(req: Request, res: Response): Promise<void
 
   try {
     await updateAdminNotifPrefs(req.admin.adminId, patch);
+    await createAdminSystemAuditEvent(req.admin.adminId, 'ADMIN_NOTIF_UPDATED', patch as Record<string, unknown>);
     const updated = await getAdminNotifPrefs(req.admin.adminId);
     res.json(updated);
   } catch (err) {
@@ -85,6 +87,7 @@ export async function patchBoardToggle(req: Request, res: Response): Promise<voi
   try {
     await updateBoardEnabled(req.admin.adminId, enabled);
     if (!enabled) await incrementBoardSessionVersion(req.admin.adminId);
+    await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_TOGGLED', { enabled });
     const updated = await getBoardSettings(req.admin.adminId);
     res.json({ board_enabled: updated?.board_enabled ?? true });
   } catch (err) {
@@ -126,6 +129,7 @@ export async function patchBoardCode(req: Request, res: Response): Promise<void>
       return;
     }
     await updateBoardCodeHash(req.admin.adminId, hashBoardCode(trimmed));
+    await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_CODE_CHANGED', null);
     res.json({ ok: true });
   } catch (err) {
     handleControllerError(res, 'patchBoardCode', err);
@@ -201,10 +205,20 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
   try {
     if (Object.keys(patch).length > 0) {
       await updateAppSettings(req.admin.adminId, patch);
+      await createAdminSystemAuditEvent(req.admin.adminId, 'APP_SETTINGS_CHANGED', patch as Record<string, unknown>);
     }
-    if (revokeAdmin)    await incrementAdminSessionVersion(req.admin.adminId);
-    if (revokeWorkshop) await incrementAllWorkshopSessionVersions();
-    if (revokeBoard)    await incrementBoardSessionVersion(req.admin.adminId);
+    if (revokeAdmin) {
+      await incrementAdminSessionVersion(req.admin.adminId);
+      await createAdminSystemAuditEvent(req.admin.adminId, 'SESSIONS_REVOKED', { scope: 'admin' });
+    }
+    if (revokeWorkshop) {
+      await incrementAllWorkshopSessionVersions();
+      await createAdminSystemAuditEvent(req.admin.adminId, 'SESSIONS_REVOKED', { scope: 'workshop' });
+    }
+    if (revokeBoard) {
+      await incrementBoardSessionVersion(req.admin.adminId);
+      await createAdminSystemAuditEvent(req.admin.adminId, 'SESSIONS_REVOKED', { scope: 'board' });
+    }
 
     const updated = await getAppSettingsById(req.admin.adminId);
     res.json(updated);
@@ -262,10 +276,12 @@ export async function patchBoardSettingsHandler(req: Request, res: Response): Pr
       if (!(enabled as boolean)) {
         await incrementBoardSessionVersion(req.admin.adminId);
       }
+      await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_TOGGLED', { enabled: enabled as boolean });
     }
 
     if (hasCodeChange) {
       await updateBoardCodeHash(req.admin.adminId, hashBoardCode(newCode.trim()));
+      await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_CODE_CHANGED', null);
     }
 
     const updated = await getBoardSettings(req.admin.adminId);
