@@ -49,6 +49,21 @@ function changesLabel(changes: Record<string, unknown> | null): string {
     machines: 'machines',
     machinesCount: 'machines',
     isActive: 'statut',
+    enabled: 'état',
+    cleared: 'supprimé',
+    hadEmail: 'email précédent',
+    scope: 'portée',
+    requestId: 'demande',
+    notif_admin: 'notif. admin',
+    notif_responsables: 'notif. responsables',
+    notif_techniciens: 'notif. techniciens',
+    notif_operateurs: 'notif. opérateurs',
+    session_duration_hours: 'durée session',
+    workshop_session_hours: 'durée session atelier',
+    board_session_ttl_hours: 'durée session board',
+    login_max_attempts: 'tentatives max',
+    setup_code_ttl_hours: 'durée code setup',
+    board_label: 'nom du board',
   };
   return keys.map((key) => labels[key] || key).join(', ');
 }
