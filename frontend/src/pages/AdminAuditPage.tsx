@@ -36,10 +36,48 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
 };
 
 
-function changesLabel(changes: Record<string, unknown> | null): string {
+function changesLabel(changes: Record<string, unknown> | null, eventType?: string): string {
   if (!changes) return '-';
   const keys = Object.keys(changes);
   if (keys.length === 0) return '-';
+
+  // Événements système : on interprète les valeurs, pas juste les clés
+  if (eventType === 'BOARD_TOGGLED') {
+    return changes.enabled === true ? 'Board activé' : 'Board désactivé';
+  }
+  if (eventType === 'SESSIONS_REVOKED') {
+    const scopeLabels: Record<string, string> = { admin: 'sessions admin', workshop: 'sessions atelier', board: 'sessions board' };
+    return scopeLabels[String(changes.scope)] ?? 'sessions révoquées';
+  }
+  if (eventType === 'ADMIN_EMAIL_CHANGED') {
+    if (changes.cleared) return 'Email supprimé';
+    return changes.hadEmail ? 'Email modifié' : 'Email ajouté';
+  }
+  if (eventType === 'APP_SETTINGS_CHANGED') {
+    const settingLabels: Record<string, string> = {
+      session_duration_hours: 'durée session admin',
+      workshop_session_hours: 'durée session atelier',
+      board_session_ttl_hours: 'durée session board',
+      login_max_attempts: 'tentatives max',
+      setup_code_ttl_hours: 'durée code setup',
+      board_label: 'nom du board',
+    };
+    return keys.map((k) => settingLabels[k] ?? k).join(', ');
+  }
+  if (eventType === 'ADMIN_NOTIF_UPDATED') {
+    const notifLabels: Record<string, string> = {
+      notif_admin: 'notif. admin',
+      notif_responsables: 'notif. responsables',
+      notif_techniciens: 'notif. techniciens',
+      notif_operateurs: 'notif. opérateurs',
+    };
+    return keys.map((k) => {
+      const label = notifLabels[k] ?? k;
+      return `${label} : ${changes[k] ? 'activé' : 'désactivé'}`;
+    }).join(', ');
+  }
+
+  // Événements référentiel (utilisateurs / lignes)
   const labels: Record<string, string> = {
     firstName: 'prénom',
     lastName: 'nom',
@@ -49,21 +87,6 @@ function changesLabel(changes: Record<string, unknown> | null): string {
     machines: 'machines',
     machinesCount: 'machines',
     isActive: 'statut',
-    enabled: 'état',
-    cleared: 'supprimé',
-    hadEmail: 'email précédent',
-    scope: 'portée',
-    requestId: 'demande',
-    notif_admin: 'notif. admin',
-    notif_responsables: 'notif. responsables',
-    notif_techniciens: 'notif. techniciens',
-    notif_operateurs: 'notif. opérateurs',
-    session_duration_hours: 'durée session',
-    workshop_session_hours: 'durée session atelier',
-    board_session_ttl_hours: 'durée session board',
-    login_max_attempts: 'tentatives max',
-    setup_code_ttl_hours: 'durée code setup',
-    board_label: 'nom du board',
   };
   return keys.map((key) => labels[key] || key).join(', ');
 }
@@ -337,7 +360,7 @@ export default function AdminAuditPage() {
                         <td>{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</td>
                         <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
                         <td>{formatAuditEventTarget(event, true)}</td>
-                        <td>{changesLabel(event.changes)}</td>
+                        <td>{changesLabel(event.changes, event.event_type)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -357,7 +380,7 @@ export default function AdminAuditPage() {
                       <span className="badge-role">{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</span>
                       {event.changes && changesLabel(event.changes) !== '-' && (
                         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                          {changesLabel(event.changes)}
+                          {changesLabel(event.changes, event.event_type)}
                         </span>
                       )}
                     </span>
