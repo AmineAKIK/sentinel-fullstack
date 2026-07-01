@@ -335,21 +335,34 @@ export default function AdminSettingsPage() {
     setAppSettingsError('');
     setAppSettingsSuccess('');
     setAppSettingsSaving(true);
+    const didRevokeAdmin = revokeAdmin;
+    const didRevokeWorkshop = revokeWorkshop;
+    const didRevokeBoard = revokeBoard;
     try {
       const patch: AppSettingsPatch = { ...appSettingsDraft };
-      if (revokeAdmin)    patch.revokeAdminSessions    = true;
-      if (revokeWorkshop) patch.revokeWorkshopSessions = true;
-      if (revokeBoard)    patch.revokeBoardSessions    = true;
+      if (didRevokeAdmin)    patch.revokeAdminSessions    = true;
+      if (didRevokeWorkshop) patch.revokeWorkshopSessions = true;
+      if (didRevokeBoard)    patch.revokeBoardSessions    = true;
       const updated = await patchAppSettings(patch);
       setAppSettings(updated);
       setAppSettingsDraft(updated);
       setRevokeAdmin(false);
       setRevokeWorkshop(false);
       setRevokeBoard(false);
+
+      if (didRevokeAdmin) {
+        // La session courante vient d'être révoquée — logout immédiat
+        await logout();
+        navigate('/login', {
+          replace: true,
+          state: { reason: 'Sessions administrateur révoquées. Reconnectez-vous.' },
+        });
+        return;
+      }
+
       const parts: string[] = ['Paramètres enregistrés.'];
-      if (revokeAdmin)    parts.push('Sessions admin révoquées.');
-      if (revokeWorkshop) parts.push('Sessions atelier révoquées.');
-      if (revokeBoard)    parts.push('Sessions board révoquées.');
+      if (didRevokeWorkshop) parts.push('Sessions atelier révoquées.');
+      if (didRevokeBoard)    parts.push('Sessions board révoquées.');
       setAppSettingsSuccess(parts.join(' '));
       setTimeout(() => setAppSettingsSuccess(''), 5000);
     } catch (err) {
