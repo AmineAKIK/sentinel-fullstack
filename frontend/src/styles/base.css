@@ -740,11 +740,11 @@ a { color: var(--color-primary); text-decoration: none; }
 
 .audit-context-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  grid-template-columns: repeat(4, minmax(64px, 1fr));
   align-items: stretch;
   justify-content: end;
   gap: var(--space-2);
-  flex: 0 1 360px;
+  flex: 0 1 420px;
   min-width: 0;
 }
 

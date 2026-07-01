@@ -200,7 +200,7 @@ export default function AdminAuditPage() {
         </div>
 
         <div className="audit-context">
-          <span className="audit-context-text">Journal des changements administratifs : utilisateurs, lignes et paramètres système.</span>
+          <span className="audit-context-text">Traçabilité complète des actions administratives.</span>
           <span className="audit-context-stats" aria-label="Résumé du journal">
             <span className="audit-context-stat">
               <span>résultats</span>
