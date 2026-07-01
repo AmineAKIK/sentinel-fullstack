@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ConfirmModal from './ConfirmModal';
+import SuccessBanner from './ui/SuccessBanner';
 import { resetAccountPassword } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
 import { SentinelUser } from '../types';
@@ -58,9 +59,9 @@ export default function ResetPasswordConfirmModal({
     >
       {updatedUser ? (
         <div>
-          <div className="success-message" style={{ marginBottom: 16 }}>
+          <SuccessBanner style={{ marginBottom: 16 }}>
             Code temporaire généré pour {updatedUser.first_name} {updatedUser.last_name}.
-          </div>
+          </SuccessBanner>
           <div className="detail-field" style={{ marginBottom: 14 }}>
             <span className="detail-field-label">Code temporaire</span>
             <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>

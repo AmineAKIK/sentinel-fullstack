@@ -6,6 +6,9 @@ import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSett
 import { ApiResponseError } from '../api/client';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
+import SuccessBanner from '../components/ui/SuccessBanner';
+import BoardToggleConfirmModal from '../components/BoardToggleConfirmModal';
+import RevokeSessionsConfirmModal from '../components/RevokeSessionsConfirmModal';
 
 const MIN_PWD = 12;
 const MAX_PWD = 128;
@@ -204,7 +207,6 @@ export default function AdminSettingsPage() {
 
   // ─── Board ────────────────────────────────────────────────────────────────
   const [boardEnabled, setBoardEnabled] = useState(true);
-  const [savingBoardToggle, setSavingBoardToggle] = useState(false);
   const [boardHasCode, setBoardHasCode] = useState(false);
   const [boardLoading, setBoardLoading] = useState(true);
   const [boardNewCode, setBoardNewCode] = useState('');
@@ -213,6 +215,7 @@ export default function AdminSettingsPage() {
   const [boardError, setBoardError] = useState('');
   const [boardSuccess, setBoardSuccess] = useState('');
   const [boardSubmitting, setBoardSubmitting] = useState(false);
+  const [boardTogglePending, setBoardTogglePending] = useState<boolean | null>(null);
 
   useEffect(() => {
     getBoardSettings()
@@ -224,16 +227,16 @@ export default function AdminSettingsPage() {
       .finally(() => setBoardLoading(false));
   }, []);
 
-  async function handleBoardToggle(value: boolean) {
+  function handleBoardToggle(value: boolean) {
+    setBoardTogglePending(value);
+  }
+
+  async function confirmBoardToggle() {
+    if (boardTogglePending === null) return;
+    const value = boardTogglePending;
+    await patchBoardEnabled(value);
     setBoardEnabled(value);
-    setSavingBoardToggle(true);
-    try {
-      await patchBoardEnabled(value);
-    } catch {
-      setBoardEnabled(!value);
-    } finally {
-      setSavingBoardToggle(false);
-    }
+    setBoardTogglePending(null);
   }
 
   function resetBoardForm() {
@@ -295,6 +298,7 @@ export default function AdminSettingsPage() {
   const [revokeAdmin, setRevokeAdmin] = useState(false);
   const [revokeWorkshop, setRevokeWorkshop] = useState(false);
   const [revokeBoard, setRevokeBoard] = useState(false);
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
 
   useEffect(() => {
     getAppSettings()
@@ -463,7 +467,7 @@ export default function AdminSettingsPage() {
                       <input
                         type="checkbox"
                         checked={boardEnabled}
-                        disabled={savingBoardToggle}
+                        disabled={boardTogglePending !== null}
                         onChange={(e) => handleBoardToggle(e.target.checked)}
                       />
                       <span className="toggle-track" />
@@ -531,7 +535,7 @@ export default function AdminSettingsPage() {
                       />
                     </div>
                     {boardError && <div className="error-message" role="alert">{boardError}</div>}
-                    {boardSuccess && <div className="success-message" role="status">{boardSuccess}</div>}
+                    {boardSuccess && <SuccessBanner>{boardSuccess}</SuccessBanner>}
                     <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                       <button
                         type="button"
@@ -626,7 +630,7 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
-                {emailSuccess && <div className="success-message" role="status">{emailSuccess}</div>}
+                {emailSuccess && <SuccessBanner>{emailSuccess}</SuccessBanner>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                   <button
                     type="button"
@@ -844,7 +848,7 @@ export default function AdminSettingsPage() {
                   </div>
 
                   {appSettingsError && <div className="error-message" role="alert">{appSettingsError}</div>}
-                  {appSettingsSuccess && <div className="success-message" role="status">{appSettingsSuccess}</div>}
+                  {appSettingsSuccess && <SuccessBanner>{appSettingsSuccess}</SuccessBanner>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                     <button
                       type="button"
@@ -858,6 +862,7 @@ export default function AdminSettingsPage() {
                       type="submit"
                       className="btn btn-primary btn-sm"
                       disabled={appSettingsSaving || !appSettingsDirty}
+                      onClick={(revokeAdmin || revokeWorkshop || revokeBoard) ? (e) => { e.preventDefault(); setShowRevokeConfirm(true); } : undefined}
                     >
                       {appSettingsSaving ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
                     </button>
@@ -869,6 +874,28 @@ export default function AdminSettingsPage() {
 
         </div>
       </main>
+
+      {boardTogglePending !== null && (
+        <BoardToggleConfirmModal
+          enabling={boardTogglePending}
+          onClose={() => setBoardTogglePending(null)}
+          onConfirm={confirmBoardToggle}
+        />
+      )}
+
+      {showRevokeConfirm && (
+        <RevokeSessionsConfirmModal
+          revokeAdmin={revokeAdmin}
+          revokeWorkshop={revokeWorkshop}
+          revokeBoard={revokeBoard}
+          onClose={() => setShowRevokeConfirm(false)}
+          onConfirm={async () => {
+            setShowRevokeConfirm(false);
+            const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+            await handleAppSettingsSubmit(fakeEvent);
+          }}
+        />
+      )}
     </>
   );
 }

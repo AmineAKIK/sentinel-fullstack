@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
+import SuccessBanner from './ui/SuccessBanner';
 import UserForm from './UserForm';
 import { createAccount } from '../api/accounts';
 import { SentinelUser, Role } from '../types';
@@ -93,9 +94,9 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
     >
       {step === 'created' && createdUser ? (
         <div>
-          <div className="success-message" style={{ marginBottom: 16 }}>
+          <SuccessBanner style={{ marginBottom: 16 }}>
             Utilisateur créé. Communiquez ce code temporaire à {createdUser.first_name} {createdUser.last_name}.
-          </div>
+          </SuccessBanner>
           <div className="detail-field" style={{ marginBottom: 14 }}>
             <span className="detail-field-label">Code temporaire</span>
             <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>

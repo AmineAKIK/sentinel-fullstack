@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import SuccessBanner from '../components/ui/SuccessBanner';
 import SelectField from '../components/ui/SelectField';
 import Spinner from '../components/ui/Spinner';
 import { listAccounts } from '../api/accounts';
@@ -188,11 +189,7 @@ export default function UserListPage() {
           </button>
         </div>
 
-        {successMsg && (
-          <div className="success-message" style={{ marginBottom: 16 }}>
-            {successMsg}
-          </div>
-        )}
+        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
 
         <div className="filters-row">
           <div className="filter-group">
@@ -351,7 +348,7 @@ export default function UserListPage() {
             setShowCreate(false);
             setUsers((prev) => [user, ...prev]);
             setSuccessMsg(`Utilisateur ${user.first_name} ${user.last_name} créé avec succès.`);
-            setTimeout(() => setSuccessMsg(''), 4000);
+            setTimeout(() => setSuccessMsg(''), 5000);
           }}
         />
       )}

@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import SuccessBanner from '../components/ui/SuccessBanner';
 import SelectField from '../components/ui/SelectField';
 import Spinner from '../components/ui/Spinner';
 import { listLines } from '../api/lines';
@@ -148,13 +149,13 @@ export default function LinesPage() {
           setSelected(updated);
           setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
           setSuccessMsg(message);
-          setTimeout(() => setSuccessMsg(''), 4000);
+          setTimeout(() => setSuccessMsg(''), 5000);
         }}
         onLineDeleted={(line) => {
           setLines((prev) => prev.filter((l) => l.id !== line.id));
           setSelected(null);
           setSuccessMsg(`Ligne ${line.line_number} archivée avec succès.`);
-          setTimeout(() => setSuccessMsg(''), 4000);
+          setTimeout(() => setSuccessMsg(''), 5000);
         }}
       />
     );
@@ -172,7 +173,7 @@ export default function LinesPage() {
           </button>
         </div>
 
-        {successMsg && <div className="success-message" style={{ marginBottom: 16 }}>{successMsg}</div>}
+        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
 
         <div className="filters-row">
           <div className="filter-group">
@@ -320,7 +321,7 @@ export default function LinesPage() {
             setShowCreate(false);
             setLines((prev) => [line, ...prev]);
             setSuccessMsg(`Ligne ${line.line_number} créée avec succès.`);
-            setTimeout(() => setSuccessMsg(''), 4000);
+            setTimeout(() => setSuccessMsg(''), 5000);
           }}
         />
       )}

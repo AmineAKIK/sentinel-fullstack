@@ -6,6 +6,7 @@ import EditMachineModal from './EditMachineModal';
 import LinePlanModal from './LinePlanModal';
 import DetailField from './ui/DetailField';
 import ErrorBanner from './ui/ErrorBanner';
+import SuccessBanner from './ui/SuccessBanner';
 import { LineMachine, ProductionLine } from '../types';
 import { formatDate } from '../utils/date';
 
@@ -55,7 +56,7 @@ export default function LineDetailView({
           </div>
         </div>
 
-        {successMsg && <div className="success-message" style={{ marginBottom: 16 }}>{successMsg}</div>}
+        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="card">

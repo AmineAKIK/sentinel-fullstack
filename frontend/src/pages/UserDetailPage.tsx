@@ -5,6 +5,7 @@ import EditUserModal from '../components/EditUserModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DetailField from '../components/ui/DetailField';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import SuccessBanner from '../components/ui/SuccessBanner';
 import FullPageLoader from '../components/ui/FullPageLoader';
 import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
@@ -41,7 +42,7 @@ export default function UserDetailPage() {
 
   function showSuccess(msg: string) {
     setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setTimeout(() => setSuccessMsg(''), 5000);
   }
 
   function passwordStatusLabel(account: SentinelUser): string {
@@ -90,11 +91,7 @@ export default function UserDetailPage() {
           </span>
         </div>
 
-        {successMsg && (
-          <div className="success-message" style={{ marginBottom: 16 }}>
-            {successMsg}
-          </div>
-        )}
+        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
 
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-body">
