@@ -302,7 +302,19 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     getAppSettings()
-      .then((s) => { setAppSettings(s); setAppSettingsDraft(s); })
+      .then((raw) => {
+        // Normalise les champs numériques — le driver pg peut retourner des strings
+        const s: AppSettings = {
+          session_duration_hours:  Number(raw.session_duration_hours),
+          workshop_session_hours:  Number(raw.workshop_session_hours),
+          board_session_ttl_hours: Number(raw.board_session_ttl_hours),
+          login_max_attempts:      Number(raw.login_max_attempts),
+          setup_code_ttl_hours:    Number(raw.setup_code_ttl_hours),
+          board_label:             raw.board_label,
+        };
+        setAppSettings(s);
+        setAppSettingsDraft(s);
+      })
       .catch(() => {})
       .finally(() => setAppSettingsLoading(false));
   }, []);
@@ -350,7 +362,15 @@ export default function AdminSettingsPage() {
       if (didRevokeAdmin)    patch.revokeAdminSessions    = true;
       if (didRevokeWorkshop) patch.revokeWorkshopSessions = true;
       if (didRevokeBoard)    patch.revokeBoardSessions    = true;
-      const updated = await patchAppSettings(patch);
+      const raw = await patchAppSettings(patch);
+      const updated: AppSettings = {
+        session_duration_hours:  Number(raw.session_duration_hours),
+        workshop_session_hours:  Number(raw.workshop_session_hours),
+        board_session_ttl_hours: Number(raw.board_session_ttl_hours),
+        login_max_attempts:      Number(raw.login_max_attempts),
+        setup_code_ttl_hours:    Number(raw.setup_code_ttl_hours),
+        board_label:             raw.board_label,
+      };
       setAppSettings(updated);
       setAppSettingsDraft(updated);
       setRevokeAdmin(false);
