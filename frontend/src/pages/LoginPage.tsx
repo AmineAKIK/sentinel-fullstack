@@ -1,10 +1,19 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function LoginPage() {
   usePageTitle('Accueil');
-  const location = useLocation();
-  const reason = (location.state as { reason?: string } | null)?.reason;
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    const msg = sessionStorage.getItem('sentinel.login.reason');
+    if (msg) {
+      setReason(msg);
+      sessionStorage.removeItem('sentinel.login.reason');
+    }
+  }, []);
+
   return (
     <main className="login-hub-page" id="main-content">
       <section className="login-hub-shell">

@@ -30,16 +30,14 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const redirectingRef = useRef(false);
 
-  // Callback stable appelé sur 401 — navigue directement, protégé par ref pour ne déclencher qu'une fois.
+  // Callback stable appelé sur 401 — protégé par ref pour ne déclencher qu'une fois.
   const markExpired = useCallback(() => {
     if (redirectingRef.current) return;
     redirectingRef.current = true;
     unifiedLogout().catch(() => {});
     setSession(null);
-    navigate('/login', {
-      replace: true,
-      state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
-    });
+    sessionStorage.setItem('sentinel.login.reason', 'Session expirée ou révoquée. Reconnectez-vous.');
+    navigate('/login', { replace: true });
   }, [navigate]);
 
   // Reset du flag à chaque changement de route (nouvelle navigation = nouvelle session potentielle).
