@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminInfo, WorkshopUser } from '../types';
 import { getUnifiedMe, unifiedLogout, MeResponse } from '../api/unifiedAuth';
+import { setOn401Handler, ApiResponseError } from '../api/client';
 
 export type AuthSession =
   | { accountType: 'admin'; admin: AdminInfo }
@@ -20,6 +21,7 @@ const PUBLIC_AUTHLESS_PATHS = ['/login', '/board', '/admin/login', '/workshop/lo
 
 export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [session, setSession] = useState<AuthSession>(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +49,16 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
       })
-      .catch(() => setSession(null))
+      .catch((err: unknown) => {
+        if (err instanceof ApiResponseError && err.status === 401) {
+          unifiedLogout().catch(() => {});
+          navigate('/login', {
+            replace: true,
+            state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
+          });
+        }
+        setSession(null);
+      })
       .finally(() => setLoading(false));
   }, [location.pathname]);
 
@@ -55,6 +66,24 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
     await unifiedLogout().catch(() => {});
     setSession(null);
   }, []);
+
+  // Intercepteur global 401 : session révoquée depuis un autre appareil.
+  // On ne branche le handler que sur les routes authentifiées pour éviter
+  // les boucles de redirection sur les pages publiques.
+  useEffect(() => {
+    if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) return;
+
+    setOn401Handler(() => {
+      unifiedLogout().catch(() => {});
+      setSession(null);
+      navigate('/login', {
+        replace: true,
+        state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
+      });
+    });
+
+    return () => setOn401Handler(() => {});
+  }, [location.pathname, navigate]);
 
   return (
     <AppAuthContext.Provider value={{ session, loading, setSession, logout }}>
