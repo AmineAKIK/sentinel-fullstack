@@ -28,28 +28,24 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [session, setSession] = useState<AuthSession>(null);
   const [loading, setLoading] = useState(true);
-  const [sessionExpired, setSessionExpired] = useState(false);
-  const expiredRef = useRef(false);
+  const redirectingRef = useRef(false);
 
-  // Redirection déclenchée via état React — dans le cycle de rendu, pas depuis un callback externe.
-  useEffect(() => {
-    if (!sessionExpired) return;
-    expiredRef.current = false;
-    setSessionExpired(false);
+  // Callback stable appelé sur 401 — navigue directement, protégé par ref pour ne déclencher qu'une fois.
+  const markExpired = useCallback(() => {
+    if (redirectingRef.current) return;
+    redirectingRef.current = true;
     unifiedLogout().catch(() => {});
     setSession(null);
     navigate('/login', {
       replace: true,
       state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
     });
-  }, [sessionExpired, navigate]);
+  }, [navigate]);
 
-  // Callback stable qui marque la session comme expirée (une seule fois).
-  const markExpired = useCallback(() => {
-    if (expiredRef.current) return;
-    expiredRef.current = true;
-    setSessionExpired(true);
-  }, []);
+  // Reset du flag à chaque changement de route (nouvelle navigation = nouvelle session potentielle).
+  useEffect(() => {
+    redirectingRef.current = false;
+  }, [location.pathname]);
 
   // Enregistre le handler 401 pour les appels API mid-session.
   useEffect(() => {
