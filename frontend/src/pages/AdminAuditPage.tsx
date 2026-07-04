@@ -131,11 +131,15 @@ export default function AdminAuditPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [truncated, setTruncated] = useState(false);
+
+  const LIMIT = 1000;
 
   useEffect(() => {
     const { start, end } = dateBoundary(period, customStart, customEnd);
     setLoading(true);
     setError('');
+    setTruncated(false);
     listReferenceAudit({
       scope,
       taskGroup,
@@ -143,9 +147,12 @@ export default function AdminAuditPage() {
       start: start?.toISOString(),
       end: end?.toISOString(),
       order: sortOrder,
-      limit: 250,
+      limit: LIMIT,
     })
-      .then(setEvents)
+      .then((data) => {
+        setEvents(data);
+        setTruncated(data.length === LIMIT);
+      })
       .catch(() => setError('Impossible de charger le journal.'))
       .finally(() => setLoading(false));
   }, [scope, taskGroup, period, customStart, customEnd, query, sortOrder]);
@@ -321,6 +328,12 @@ export default function AdminAuditPage() {
           />
         </div>
 
+        {truncated && (
+          <div className="notice" style={{ marginBottom: 12 }}>
+            Seuls les {LIMIT} événements les plus récents sont affichés. Affinez les filtres pour voir des résultats plus anciens.
+          </div>
+        )}
+
         <div className="card user-list-panel">
           {loading ? (
             <EmptyState>Chargement...</EmptyState>
@@ -333,11 +346,10 @@ export default function AdminAuditPage() {
               <div className="table-wrapper audit-table-wrapper">
                 <table style={{ tableLayout: 'fixed' }}>
                   <colgroup>
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '9%' }} />
-                    <col style={{ width: '9%' }} />
-                    <col style={{ width: '19%' }} />
-                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '20%' }} />
                     <col />
                   </colgroup>
                   <thead>
@@ -349,7 +361,6 @@ export default function AdminAuditPage() {
                         </button>
                       </th>
                       <th scope="col">Référentiel</th>
-                      <th scope="col">Auteur</th>
                       <th scope="col">Action</th>
                       <th scope="col">Cible</th>
                       <th scope="col">Champs modifiés</th>
@@ -360,7 +371,6 @@ export default function AdminAuditPage() {
                       <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
                         <td>{formatDateTime(event.created_at)}</td>
                         <td>{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</td>
-                        <td>{event.actor_username ?? '—'}</td>
                         <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
                         <td>{formatAuditEventTarget(event, true)}</td>
                         <td>{changesLabel(event.changes, event.event_type)}</td>
@@ -378,7 +388,6 @@ export default function AdminAuditPage() {
                         {ADMIN_EVENT_LABELS[event.event_type] || event.event_type}
                       </span>
                       <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
-                      {event.actor_username && <span className="user-card-badge" style={{ color: 'var(--color-text-secondary)' }}>par {event.actor_username}</span>}
                     </span>
                     <span className="user-card-meta">
                       <span className="badge-role">{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</span>

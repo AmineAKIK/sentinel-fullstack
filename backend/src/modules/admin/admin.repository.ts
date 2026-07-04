@@ -23,7 +23,6 @@ export interface ReferenceAuditEventDto {
   event_type: string;
   changes: Record<string, unknown> | null;
   created_at: Date;
-  actor_username: string | null;
   first_name: string | null;
   last_name: string | null;
   badge_number: string | null;
@@ -109,33 +108,27 @@ const taskGroups: Record<string, string[]> = {
 // pour d'éventuels anciens events sans snapshot.
 const accountAuditSql = `
   SELECT ae.id, 'account' AS scope, ae.event_type, ae.changes, ae.created_at,
-         aa.username AS actor_username,
          COALESCE(ae.target_first_name, su.first_name) AS first_name,
          COALESCE(ae.target_last_name, su.last_name) AS last_name,
          COALESCE(ae.target_badge_number, su.badge_number) AS badge_number,
          NULL::varchar AS line_number
   FROM account_audit_events ae
-  LEFT JOIN sentinel_users su ON su.id = ae.target_user_id
-  LEFT JOIN admin_accounts aa ON aa.id = ae.admin_id`;
+  LEFT JOIN sentinel_users su ON su.id = ae.target_user_id`;
 
 // target_line_number est un snapshot figé (migration 036) — on ne dépend plus
 // d'une jointure live qui retournerait NULL pour les lignes archivées.
 const lineAuditSql = `
   SELECT le.id, 'line' AS scope, le.event_type, le.changes, le.created_at,
-         aa.username AS actor_username,
          NULL::varchar AS first_name, NULL::varchar AS last_name, NULL::varchar AS badge_number,
          COALESCE(le.target_line_number, pl.line_number) AS line_number
   FROM line_audit_events le
-  LEFT JOIN production_lines pl ON pl.id = le.target_line_id
-  LEFT JOIN admin_accounts aa ON aa.id = le.admin_id`;
+  LEFT JOIN production_lines pl ON pl.id = le.target_line_id`;
 
 const systemAuditSql = `
   SELECT se.id, 'system' AS scope, se.event_type, se.changes, se.created_at,
-         aa.username AS actor_username,
          NULL::varchar AS first_name, NULL::varchar AS last_name, NULL::varchar AS badge_number,
          NULL::varchar AS line_number
-  FROM admin_system_audit_events se
-  LEFT JOIN admin_accounts aa ON aa.id = se.admin_id`;
+  FROM admin_system_audit_events se`;
 
 export async function getReferenceDashboardData(): Promise<ReferenceDashboardDto> {
   const [userStats, lineStats, recentAccountEvents, recentLineEvents, recentSystemEvents] = await Promise.all([
