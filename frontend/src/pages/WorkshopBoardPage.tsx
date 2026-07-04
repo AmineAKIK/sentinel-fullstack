@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getBoardData, logoutBoardSession } from '../api/board';
+import { ApiResponseError } from '../api/client';
 import Modal from '../components/Modal';
 import SelectField from '../components/ui/SelectField';
 import BoardIncidentGrid, { BoardEmptyState } from '../components/board/BoardIncidentGrid';
@@ -130,9 +131,14 @@ export default function WorkshopBoardPage() {
       setLines(boardData.lines);
       setLastUpdated(new Date());
       setDataError(false);
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiResponseError && err.status === 401) {
+        // Session board révoquée ou board désactivé — retour à l'accueil
+        await logoutBoardSession().catch(() => {});
+        navigate('/login', { replace: true, state: { reason: 'Session board expirée ou révoquée.' } });
+        return;
+      }
       setDataError(true);
-      // données précédentes conservées — stale-while-revalidate
     }
   }
 
