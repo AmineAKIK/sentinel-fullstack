@@ -194,7 +194,7 @@ export default function AdminAuditPage() {
     }] : []),
     ...(scope !== 'all' ? [{
       key: 'scope',
-      label: `Référentiel: ${scope === 'account' ? 'Utilisateurs' : 'Lignes'}`,
+      label: `Référentiel: ${scope === 'account' ? 'Utilisateurs' : scope === 'line' ? 'Lignes' : 'Système'}`,
       onRemove: () => setScope('all'),
     }] : []),
     ...(period !== 'all' ? [{
@@ -333,10 +333,11 @@ export default function AdminAuditPage() {
               <div className="table-wrapper audit-table-wrapper">
                 <table style={{ tableLayout: 'fixed' }}>
                   <colgroup>
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '10%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '19%' }} />
                     <col />
                   </colgroup>
                   <thead>
@@ -348,6 +349,7 @@ export default function AdminAuditPage() {
                         </button>
                       </th>
                       <th scope="col">Référentiel</th>
+                      <th scope="col">Auteur</th>
                       <th scope="col">Action</th>
                       <th scope="col">Cible</th>
                       <th scope="col">Champs modifiés</th>
@@ -358,6 +360,7 @@ export default function AdminAuditPage() {
                       <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
                         <td>{formatDateTime(event.created_at)}</td>
                         <td>{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</td>
+                        <td>{event.actor_username ?? '—'}</td>
                         <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
                         <td>{formatAuditEventTarget(event, true)}</td>
                         <td>{changesLabel(event.changes, event.event_type)}</td>
@@ -375,10 +378,11 @@ export default function AdminAuditPage() {
                         {ADMIN_EVENT_LABELS[event.event_type] || event.event_type}
                       </span>
                       <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
+                      {event.actor_username && <span className="user-card-badge" style={{ color: 'var(--color-text-secondary)' }}>par {event.actor_username}</span>}
                     </span>
                     <span className="user-card-meta">
                       <span className="badge-role">{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</span>
-                      {event.changes && changesLabel(event.changes) !== '-' && (
+                      {changesLabel(event.changes, event.event_type) !== '-' && (
                         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                           {changesLabel(event.changes, event.event_type)}
                         </span>

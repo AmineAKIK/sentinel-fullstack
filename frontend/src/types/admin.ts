@@ -6,6 +6,7 @@ export interface ReferenceAuditEvent {
   event_type: string;
   changes: Record<string, unknown> | null;
   created_at: string;
+  actor_username: string | null;
   first_name: string | null;
   last_name: string | null;
   badge_number: string | null;
