@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminInfo, WorkshopUser } from '../types';
 import { getUnifiedMe, unifiedLogout, MeResponse } from '../api/unifiedAuth';
-import { setOn401Handler, ApiResponseError } from '../api/client';
+import { setOn401Handler, isRedirecting, ApiResponseError } from '../api/client';
 
 export type AuthSession =
   | { accountType: 'admin'; admin: AdminInfo }
@@ -34,15 +34,23 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [navigate]);
 
+  // Handler mid-session : actif dès qu'on est sur une route authentifiée.
+  // Intercepte les 401 des appels API de page (session révoquée depuis un autre appareil).
   useEffect(() => {
     if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) {
       setOn401Handler(() => {});
+      return;
+    }
+    setOn401Handler(handleExpiredSession);
+    return () => setOn401Handler(() => {});
+  }, [location.pathname, handleExpiredSession]);
+
+  useEffect(() => {
+    if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) {
       setLoading(false);
       return;
     }
 
-    // Désactive le handler pendant getUnifiedMe — son 401 est géré dans le catch ci-dessous.
-    setOn401Handler(() => {});
     setLoading(true);
     getUnifiedMe()
       .then((response: MeResponse) => {
@@ -60,19 +68,15 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
             },
           });
         }
-        // Session valide : branche le handler pour les appels API suivants.
-        setOn401Handler(handleExpiredSession);
       })
       .catch((err: unknown) => {
-        if (err instanceof ApiResponseError && err.status === 401) {
+        if (err instanceof ApiResponseError && err.status === 401 && !isRedirecting()) {
           handleExpiredSession();
         } else {
           setSession(null);
         }
       })
       .finally(() => setLoading(false));
-
-    return () => setOn401Handler(() => {});
   }, [location.pathname, handleExpiredSession]);
 
   const logout = useCallback(async () => {

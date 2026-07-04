@@ -22,6 +22,10 @@ export function setOn401Handler(handler: () => void) {
   _redirecting = false;
 }
 
+export function isRedirecting(): boolean {
+  return _redirecting;
+}
+
 async function request<T>(
   method: string,
   path: string,
