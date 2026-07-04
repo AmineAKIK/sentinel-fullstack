@@ -331,7 +331,6 @@ export default function AdminSettingsPage() {
 
   async function handleAppSettingsSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!appSettingsDraft) return;
     setAppSettingsError('');
     setAppSettingsSuccess('');
     setAppSettingsSaving(true);
@@ -339,7 +338,15 @@ export default function AdminSettingsPage() {
     const didRevokeWorkshop = revokeWorkshop;
     const didRevokeBoard = revokeBoard;
     try {
-      const patch: AppSettingsPatch = { ...appSettingsDraft };
+      // N'envoyer que les champs effectivement modifiés par rapport à la valeur serveur
+      const patch: AppSettingsPatch = {};
+      if (appSettingsDraft) {
+        (Object.keys(appSettingsDraft) as (keyof AppSettings)[]).forEach((key) => {
+          if (appSettingsDraft[key] !== appSettings[key]) {
+            (patch as Record<string, unknown>)[key] = appSettingsDraft[key];
+          }
+        });
+      }
       if (didRevokeAdmin)    patch.revokeAdminSessions    = true;
       if (didRevokeWorkshop) patch.revokeWorkshopSessions = true;
       if (didRevokeBoard)    patch.revokeBoardSessions    = true;
