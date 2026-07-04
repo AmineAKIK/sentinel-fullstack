@@ -15,8 +15,11 @@ export class ApiResponseError extends Error {
 // Permet de délogguer l'utilisateur sans couplage direct entre le client HTTP
 // et le contexte React (qui ne serait pas accessible ici sans hook).
 let _on401: (() => void) | null = null;
+let _redirecting = false;
+
 export function setOn401Handler(handler: () => void) {
   _on401 = handler;
+  _redirecting = false;
 }
 
 async function request<T>(
@@ -32,8 +35,9 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    // 401 global : session expirée ou révoquée — logout immédiat
-    if (res.status === 401 && _on401) {
+    // 401 global : session expirée ou révoquée — logout immédiat (une seule fois)
+    if (res.status === 401 && _on401 && !_redirecting) {
+      _redirecting = true;
       _on401();
     }
 

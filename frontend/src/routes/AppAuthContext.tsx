@@ -25,12 +25,24 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession>(null);
   const [loading, setLoading] = useState(true);
 
+  const handleExpiredSession = useCallback(() => {
+    unifiedLogout().catch(() => {});
+    setSession(null);
+    navigate('/login', {
+      replace: true,
+      state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
+    });
+  }, [navigate]);
+
   useEffect(() => {
-    if (PUBLIC_AUTHLESS_PATHS.includes(location.pathname)) {
+    if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) {
+      setOn401Handler(() => {});
       setLoading(false);
       return;
     }
 
+    // Désactive le handler pendant getUnifiedMe — son 401 est géré dans le catch ci-dessous.
+    setOn401Handler(() => {});
     setLoading(true);
     getUnifiedMe()
       .then((response: MeResponse) => {
@@ -48,42 +60,25 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
             },
           });
         }
+        // Session valide : branche le handler pour les appels API suivants.
+        setOn401Handler(handleExpiredSession);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiResponseError && err.status === 401) {
-          unifiedLogout().catch(() => {});
-          navigate('/login', {
-            replace: true,
-            state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
-          });
+          handleExpiredSession();
+        } else {
+          setSession(null);
         }
-        setSession(null);
       })
       .finally(() => setLoading(false));
-  }, [location.pathname]);
+
+    return () => setOn401Handler(() => {});
+  }, [location.pathname, handleExpiredSession]);
 
   const logout = useCallback(async () => {
     await unifiedLogout().catch(() => {});
     setSession(null);
   }, []);
-
-  // Intercepteur global 401 : session révoquée depuis un autre appareil.
-  // On ne branche le handler que sur les routes authentifiées pour éviter
-  // les boucles de redirection sur les pages publiques.
-  useEffect(() => {
-    if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) return;
-
-    setOn401Handler(() => {
-      unifiedLogout().catch(() => {});
-      setSession(null);
-      navigate('/login', {
-        replace: true,
-        state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
-      });
-    });
-
-    return () => setOn401Handler(() => {});
-  }, [location.pathname, navigate]);
 
   return (
     <AppAuthContext.Provider value={{ session, loading, setSession, logout }}>
