@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminInfo, WorkshopUser } from '../types';
 import { getUnifiedMe, unifiedLogout, MeResponse } from '../api/unifiedAuth';
-import { setOn401Handler, isRedirecting, ApiResponseError } from '../api/client';
+import { setOn401Handler, ApiResponseError } from '../api/client';
 
 export type AuthSession =
   | { accountType: 'admin'; admin: AdminInfo }
@@ -19,34 +19,51 @@ interface AppAuthContextValue {
 const AppAuthContext = createContext<AppAuthContextValue | null>(null);
 const PUBLIC_AUTHLESS_PATHS = ['/login', '/board', '/admin/login', '/workshop/login'];
 
+function isPublic(pathname: string) {
+  return PUBLIC_AUTHLESS_PATHS.some((p) => pathname.startsWith(p));
+}
+
 export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [session, setSession] = useState<AuthSession>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const expiredRef = useRef(false);
 
-  const handleExpiredSession = useCallback(() => {
+  // Redirection déclenchée via état React — dans le cycle de rendu, pas depuis un callback externe.
+  useEffect(() => {
+    if (!sessionExpired) return;
+    expiredRef.current = false;
+    setSessionExpired(false);
     unifiedLogout().catch(() => {});
     setSession(null);
     navigate('/login', {
       replace: true,
       state: { reason: 'Session expirée ou révoquée. Reconnectez-vous.' },
     });
-  }, [navigate]);
+  }, [sessionExpired, navigate]);
 
-  // Handler mid-session : actif dès qu'on est sur une route authentifiée.
-  // Intercepte les 401 des appels API de page (session révoquée depuis un autre appareil).
+  // Callback stable qui marque la session comme expirée (une seule fois).
+  const markExpired = useCallback(() => {
+    if (expiredRef.current) return;
+    expiredRef.current = true;
+    setSessionExpired(true);
+  }, []);
+
+  // Enregistre le handler 401 pour les appels API mid-session.
   useEffect(() => {
-    if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) {
+    if (isPublic(location.pathname)) {
       setOn401Handler(() => {});
       return;
     }
-    setOn401Handler(handleExpiredSession);
+    setOn401Handler(markExpired);
     return () => setOn401Handler(() => {});
-  }, [location.pathname, handleExpiredSession]);
+  }, [location.pathname, markExpired]);
 
+  // Vérifie la session à chaque changement de route.
   useEffect(() => {
-    if (PUBLIC_AUTHLESS_PATHS.some((p) => location.pathname.startsWith(p))) {
+    if (isPublic(location.pathname)) {
       setLoading(false);
       return;
     }
@@ -70,14 +87,14 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((err: unknown) => {
-        if (err instanceof ApiResponseError && err.status === 401 && !isRedirecting()) {
-          handleExpiredSession();
+        if (err instanceof ApiResponseError && err.status === 401) {
+          markExpired();
         } else {
           setSession(null);
         }
       })
       .finally(() => setLoading(false));
-  }, [location.pathname, handleExpiredSession]);
+  }, [location.pathname, markExpired]);
 
   const logout = useCallback(async () => {
     await unifiedLogout().catch(() => {});

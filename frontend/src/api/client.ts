@@ -11,19 +11,11 @@ export class ApiResponseError extends Error {
   }
 }
 
-// Callback global déclenché sur tout 401 — branché par AppAuthContext au montage.
-// Permet de délogguer l'utilisateur sans couplage direct entre le client HTTP
-// et le contexte React (qui ne serait pas accessible ici sans hook).
+// Callback global déclenché sur tout 401 — branché par AppAuthContext.
+// La déduplication est gérée côté React (expiredRef), pas ici.
 let _on401: (() => void) | null = null;
-let _redirecting = false;
-
 export function setOn401Handler(handler: () => void) {
   _on401 = handler;
-  _redirecting = false;
-}
-
-export function isRedirecting(): boolean {
-  return _redirecting;
 }
 
 async function request<T>(
@@ -39,9 +31,7 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    // 401 global : session expirée ou révoquée — logout immédiat (une seule fois)
-    if (res.status === 401 && _on401 && !_redirecting) {
-      _redirecting = true;
+    if (res.status === 401 && _on401) {
       _on401();
     }
 
