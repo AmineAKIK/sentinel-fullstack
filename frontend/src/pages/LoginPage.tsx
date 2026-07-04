@@ -1,8 +1,10 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function LoginPage() {
   usePageTitle('Accueil');
+  const location = useLocation();
+  const reason = (location.state as { reason?: string } | null)?.reason;
   return (
     <main className="login-hub-page" id="main-content">
       <section className="login-hub-shell">
@@ -10,6 +12,8 @@ export default function LoginPage() {
           <h1>Sentinel</h1>
           <p>Votre espace de travail.</p>
         </header>
+
+        {reason && <div className="notice" style={{ marginBottom: 24 }}>{reason}</div>}
 
         <div className="login-space-grid" aria-label="Espaces Sentinel">
           <Link to="/board" className="login-space-card login-space-board">
