@@ -231,10 +231,10 @@ export default function AdminSettingsPage() {
     setBoardTogglePending(value);
   }
 
-  async function confirmBoardToggle() {
+  async function confirmBoardToggle(password: string) {
     if (boardTogglePending === null) return;
     const value = boardTogglePending;
-    await patchBoardEnabled(value);
+    await patchBoardEnabled(value, password);
     setBoardEnabled(value);
     setBoardTogglePending(null);
   }
@@ -341,8 +341,14 @@ export default function AdminSettingsPage() {
     JSON.stringify(appSettingsDraft) !== JSON.stringify(appSettings)) ||
     revokeAdmin || revokeWorkshop || revokeBoard;
 
-  async function handleAppSettingsSubmit(e: FormEvent) {
+  async function handleAppSettingsSubmit(e: FormEvent, confirmPassword?: string) {
     e.preventDefault();
+    // Toute révocation passe par le modal de confirmation par mot de passe —
+    // couvre aussi la soumission par touche Entrée qui contourne le bouton.
+    if ((revokeAdmin || revokeWorkshop || revokeBoard) && !confirmPassword) {
+      setShowRevokeConfirm(true);
+      return;
+    }
     setAppSettingsError('');
     setAppSettingsSuccess('');
     setAppSettingsSaving(true);
@@ -362,6 +368,8 @@ export default function AdminSettingsPage() {
       if (didRevokeAdmin)    patch.revokeAdminSessions    = true;
       if (didRevokeWorkshop) patch.revokeWorkshopSessions = true;
       if (didRevokeBoard)    patch.revokeBoardSessions    = true;
+      // L'API exige le mot de passe pour toute révocation (fourni par le modal).
+      if (confirmPassword) patch.currentPassword = confirmPassword;
       const raw = await patchAppSettings(patch);
       const updated: AppSettings = {
         session_duration_hours:  Number(raw.session_duration_hours),
@@ -929,10 +937,10 @@ export default function AdminSettingsPage() {
           revokeWorkshop={revokeWorkshop}
           revokeBoard={revokeBoard}
           onClose={() => setShowRevokeConfirm(false)}
-          onConfirm={async () => {
+          onConfirm={async (password) => {
             setShowRevokeConfirm(false);
             const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-            await handleAppSettingsSubmit(fakeEvent);
+            await handleAppSettingsSubmit(fakeEvent, password);
           }}
         />
       )}

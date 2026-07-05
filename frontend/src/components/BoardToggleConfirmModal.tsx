@@ -3,7 +3,7 @@ import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 type BoardToggleConfirmModalProps = {
   enabling: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  onConfirm: (password: string) => Promise<void>;
 };
 
 export default function BoardToggleConfirmModal({ enabling, onClose, onConfirm }: BoardToggleConfirmModalProps) {

@@ -5,7 +5,7 @@ type RevokeSessionsConfirmModalProps = {
   revokeWorkshop: boolean;
   revokeBoard: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  onConfirm: (password: string) => Promise<void>;
 };
 
 export default function RevokeSessionsConfirmModal({

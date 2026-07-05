@@ -26,8 +26,8 @@ export async function getBoardSettings(): Promise<BoardSettingsResponse> {
   return api.get<BoardSettingsResponse>('/api/admin/settings/board');
 }
 
-export async function patchBoardEnabled(enabled: boolean): Promise<{ board_enabled: boolean }> {
-  return api.patch<{ board_enabled: boolean }>('/api/admin/settings/board/toggle', { enabled });
+export async function patchBoardEnabled(enabled: boolean, currentPassword: string): Promise<{ board_enabled: boolean }> {
+  return api.patch<{ board_enabled: boolean }>('/api/admin/settings/board/toggle', { enabled, currentPassword });
 }
 
 export async function patchBoardCode(payload: {
@@ -51,6 +51,8 @@ export interface AppSettingsPatch extends Partial<AppSettings> {
   revokeAdminSessions?: boolean;
   revokeWorkshopSessions?: boolean;
   revokeBoardSessions?: boolean;
+  // Exigé par l'API dès qu'un flag de révocation est présent.
+  currentPassword?: string;
 }
 
 export async function getAppSettings(): Promise<AppSettings> {

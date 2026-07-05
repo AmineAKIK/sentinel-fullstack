@@ -9,7 +9,9 @@ type AdminPasswordConfirmModalProps = {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  // Reçoit le mot de passe vérifié : les mutations critiques le retransmettent
+  // à leur API, qui le revérifie elle-même (defense in depth).
+  onConfirm: (password: string) => Promise<void>;
   disabled?: boolean;
   confirmLabel?: string;
   loadingLabel?: string;
@@ -43,7 +45,7 @@ export default function AdminPasswordConfirmModal({
     setLoading(true);
     try {
       await verifyAdminPassword(password);
-      await onConfirm();
+      await onConfirm(password);
     } catch (err) {
       if (err instanceof ApiResponseError) {
         if (err.code === 'UNAUTHORIZED') {

@@ -79,12 +79,26 @@ export async function patchNotifPrefs(req: Request, res: Response): Promise<void
 
 export async function patchBoardToggle(req: Request, res: Response): Promise<void> {
   if (!req.admin) { sendUnauthenticated(res); return; }
-  const { enabled } = req.body || {};
+  const { enabled, currentPassword } = req.body || {};
   if (typeof enabled !== 'boolean') {
     sendError(res, 400, 'VALIDATION_ERROR', 'enabled doit être un booléen.');
     return;
   }
+  // Opération critique : le mot de passe est exigé par l'API elle-même, pas
+  // seulement par le modal de confirmation côté UI (defense in depth).
+  if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length > MAX_PASSWORD_LENGTH) {
+    sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
+    return;
+  }
   try {
+    const passwordHash = await getAdminPasswordHash(req.admin.adminId);
+    if (!passwordHash) { sendUnauthenticated(res); return; }
+    const valid = await verifyPwd(currentPassword, passwordHash);
+    if (!valid) {
+      sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe incorrect.');
+      return;
+    }
+
     await updateBoardEnabled(req.admin.adminId, enabled);
     if (!enabled) await incrementBoardSessionVersion(req.admin.adminId);
     await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_TOGGLED', { enabled });
@@ -196,13 +210,33 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
   const revokeAdmin     = body.revokeAdminSessions    === true;
   const revokeWorkshop  = body.revokeWorkshopSessions === true;
   const revokeBoard     = body.revokeBoardSessions    === true;
+  const anyRevoke = revokeAdmin || revokeWorkshop || revokeBoard;
 
-  if (Object.keys(patch).length === 0 && !revokeAdmin && !revokeWorkshop && !revokeBoard) {
+  if (Object.keys(patch).length === 0 && !anyRevoke) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Aucun paramètre à mettre à jour.');
     return;
   }
 
+  // Révoquer des sessions est critique : mot de passe exigé par l'API,
+  // pas seulement par le modal de confirmation côté UI.
+  if (anyRevoke) {
+    const { currentPassword } = body;
+    if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length > MAX_PASSWORD_LENGTH) {
+      sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis pour révoquer des sessions.');
+      return;
+    }
+  }
+
   try {
+    if (anyRevoke) {
+      const passwordHash = await getAdminPasswordHash(req.admin.adminId);
+      if (!passwordHash) { sendUnauthenticated(res); return; }
+      const valid = await verifyPwd(body.currentPassword as string, passwordHash);
+      if (!valid) {
+        sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe incorrect.');
+        return;
+      }
+    }
     if (Object.keys(patch).length > 0) {
       await updateAppSettings(req.admin.adminId, patch);
       await createAdminSystemAuditEvent(req.admin.adminId, 'APP_SETTINGS_CHANGED', patch as Record<string, unknown>);
@@ -227,69 +261,3 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
   }
 }
 
-export async function patchBoardSettingsHandler(req: Request, res: Response): Promise<void> {
-  if (!req.admin) { sendUnauthenticated(res); return; }
-
-  const { enabled, newCode, confirmCode, currentPassword } = req.body || {};
-
-  if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length > MAX_PASSWORD_LENGTH) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
-    return;
-  }
-
-  const hasEnabledChange = typeof enabled === 'boolean';
-  const hasCodeChange = typeof newCode === 'string' && newCode.trim().length > 0;
-
-  if (!hasEnabledChange && !hasCodeChange) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Aucune modification à appliquer.');
-    return;
-  }
-
-  if (hasCodeChange) {
-    const trimmed = newCode.trim();
-    if (trimmed.length < BOARD_CODE_MIN) {
-      sendError(res, 400, 'VALIDATION_ERROR', `Le code board doit contenir au moins ${BOARD_CODE_MIN} caractères.`);
-      return;
-    }
-    if (trimmed.length > FIELD_LIMITS.CODE) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Code board trop long.');
-      return;
-    }
-    if (trimmed !== (typeof confirmCode === 'string' ? confirmCode.trim() : '')) {
-      sendError(res, 400, 'VALIDATION_ERROR', 'Les deux codes ne correspondent pas.');
-      return;
-    }
-  }
-
-  try {
-    const passwordHash = await getAdminPasswordHash(req.admin.adminId);
-    if (!passwordHash) { sendUnauthenticated(res); return; }
-
-    const valid = await verifyPwd(currentPassword, passwordHash);
-    if (!valid) {
-      sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe incorrect.');
-      return;
-    }
-
-    if (hasEnabledChange) {
-      await updateBoardEnabled(req.admin.adminId, enabled as boolean);
-      if (!(enabled as boolean)) {
-        await incrementBoardSessionVersion(req.admin.adminId);
-      }
-      await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_TOGGLED', { enabled: enabled as boolean });
-    }
-
-    if (hasCodeChange) {
-      await updateBoardCodeHash(req.admin.adminId, hashBoardCode(newCode.trim()));
-      await createAdminSystemAuditEvent(req.admin.adminId, 'BOARD_CODE_CHANGED', null);
-    }
-
-    const updated = await getBoardSettings(req.admin.adminId);
-    res.json({
-      board_enabled: updated?.board_enabled ?? true,
-      hasCode: !!(updated?.board_code_hash || process.env.BOARD_ACCESS_CODE_HASH),
-    });
-  } catch (err) {
-    handleControllerError(res, 'patchBoardSettings', err);
-  }
-}
