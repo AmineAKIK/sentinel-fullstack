@@ -201,7 +201,7 @@ export default function WorkshopLoginPage() {
               />
               <button
                 type="button"
-                className="link-button"
+                className="inline-link-button"
                 style={{ marginTop: 6, fontSize: 13 }}
                 onClick={handleForgotPassword}
                 disabled={loading}
