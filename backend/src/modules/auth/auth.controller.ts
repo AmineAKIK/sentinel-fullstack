@@ -105,7 +105,7 @@ export async function me(req: Request, res: Response): Promise<void> {
     if (adminToken) {
       const payload = verifyAuthToken<AdminPayload>(adminToken);
       if (payload) {
-        const admin = await verifyAdminSession(payload.adminId);
+        const admin = await verifyAdminSession(payload.adminId, payload.sessionVersion);
         if (admin) {
           res.json({ accountType: 'admin', id: admin.id, username: admin.username });
           return;
@@ -117,7 +117,7 @@ export async function me(req: Request, res: Response): Promise<void> {
     if (workshopToken) {
       const payload = verifyAuthToken<WorkshopPayload>(workshopToken);
       if (payload) {
-        const user = await verifyWorkshopSession(payload.userId, payload.badgeNumber);
+        const user = await verifyWorkshopSession(payload.userId, payload.badgeNumber, payload.sessionVersion);
         if (user) {
           res.json({ accountType: 'workshop', id: user.id, first_name: user.first_name, last_name: user.last_name, badge_number: user.badge_number, role: user.role });
           return;

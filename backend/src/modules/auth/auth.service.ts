@@ -27,22 +27,46 @@ export interface WorkshopSessionInfo {
   role: string;
 }
 
-export async function verifyAdminSession(adminId: number): Promise<AdminSessionInfo | null> {
-  const { rows } = await pool.query<AdminSessionInfo>(
-    'SELECT id, username FROM admin_accounts WHERE id = $1',
+// Vérifie l'existence du compte ET la version de session : un token émis avant
+// une révocation (session_version incrémentée) est rejeté, comme dans les
+// middlewares. /me doit donner la même réponse que n'importe quelle route protégée.
+export async function verifyAdminSession(adminId: number, tokenSessionVersion?: number): Promise<AdminSessionInfo | null> {
+  const { rows } = await pool.query<AdminSessionInfo & { session_version: number }>(
+    'SELECT id, username, session_version FROM admin_accounts WHERE id = $1',
     [adminId]
   );
-  return rows[0] ?? null;
+  const admin = rows[0];
+  if (!admin) return null;
+  // Tokens émis avant la migration 022 (sans version) : acceptés jusqu'à expiration.
+  if (tokenSessionVersion !== undefined && tokenSessionVersion !== admin.session_version) {
+    return null;
+  }
+  return { id: admin.id, username: admin.username };
 }
 
-export async function verifyWorkshopSession(userId: number, badgeNumber: string): Promise<WorkshopSessionInfo | null> {
-  const { rows } = await pool.query<WorkshopSessionInfo>(
-    `SELECT id, first_name, last_name, badge_number, role
+export async function verifyWorkshopSession(
+  userId: number,
+  badgeNumber: string,
+  tokenSessionVersion?: number
+): Promise<WorkshopSessionInfo | null> {
+  const { rows } = await pool.query<WorkshopSessionInfo & { session_version: number }>(
+    `SELECT id, first_name, last_name, badge_number, role, session_version
      FROM sentinel_users
      WHERE id = $1 AND badge_number = $2 AND is_active = TRUE AND is_deleted = FALSE AND password_hash IS NOT NULL`,
     [userId, badgeNumber]
   );
-  return rows[0] ?? null;
+  const user = rows[0];
+  if (!user) return null;
+  if (tokenSessionVersion !== undefined && tokenSessionVersion !== user.session_version) {
+    return null;
+  }
+  return {
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    badge_number: user.badge_number,
+    role: user.role,
+  };
 }
 
 export async function unifiedLoginService(

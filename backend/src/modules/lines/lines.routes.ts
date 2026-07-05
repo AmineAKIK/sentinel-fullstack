@@ -13,12 +13,13 @@ import {
 
 const router = Router();
 
-// Routes de validation sans authentification (appelées depuis les formulaires de création/édition)
+// Toutes les routes lignes exigent une session admin — y compris les
+// vérifications de disponibilité, appelées uniquement depuis les formulaires
+// admin (le cookie est envoyé automatiquement avec credentials: include).
+router.use(adminAuthMiddleware);
+
 router.get('/check-line', checkLineAvailability);
 router.post('/check-line-conflicts', checkLineConflicts);
-
-// Routes CRUD protégées
-router.use(adminAuthMiddleware);
 router.get('/', listLines);
 router.post('/', createLine);
 router.get('/:id', getLine);

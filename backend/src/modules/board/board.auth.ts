@@ -24,6 +24,7 @@ interface WorkshopPayload {
   userId: number;
   badgeNumber: string;
   role: string;
+  sessionVersion: number;
 }
 
 export function hashBoardCode(code: string): string {
@@ -56,8 +57,8 @@ async function hasValidWorkshopSession(req: Request, res: Response): Promise<boo
   const payload = verifyAuthToken<WorkshopPayload>(token);
   if (!payload) return false;
 
-  const { rows } = await pool.query(
-    `SELECT id
+  const { rows } = await pool.query<{ id: number; session_version: number }>(
+    `SELECT id, session_version
      FROM sentinel_users
      WHERE id = $1
        AND badge_number = $2
@@ -68,6 +69,13 @@ async function hasValidWorkshopSession(req: Request, res: Response): Promise<boo
   );
 
   if (rows.length === 0) {
+    clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+    return false;
+  }
+
+  // Même règle que workshopAuthMiddleware : un token émis avant une révocation
+  // (session_version incrémentée) ne donne plus accès au board.
+  if (rows[0].session_version !== payload.sessionVersion) {
     clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
     return false;
   }
