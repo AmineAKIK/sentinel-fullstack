@@ -20,6 +20,7 @@ export default function WorkshopLoginPage() {
   const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const { setSession } = useAppAuth();
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ export default function WorkshopLoginPage() {
       await requestPasswordReset(identifier.trim());
     } finally {
       setLoading(false);
+      setConfirmingReset(false);
       setResetSent(true);
     }
   }
@@ -46,6 +48,8 @@ export default function WorkshopLoginPage() {
     setConfirmPassword('');
     setError('');
     setWarning('');
+    setConfirmingReset(false);
+    setResetSent(false);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -199,19 +203,44 @@ export default function WorkshopLoginPage() {
                 aria-invalid={Boolean(error) || undefined}
                 aria-describedby={error ? 'workshop-login-error' : undefined}
               />
-              <button
-                type="button"
-                className="inline-link-button"
-                style={{ marginTop: 6, fontSize: 13 }}
-                onClick={handleForgotPassword}
-                disabled={loading}
-              >
-                Mot de passe oublié ?
-              </button>
-              {resetSent && (
+              {resetSent ? (
                 <div className="notice" style={{ marginTop: 8 }} role="status">
                   Demande envoyée. L'administrateur vous contactera par voie interne.
                 </div>
+              ) : confirmingReset ? (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                    Envoyer une demande à l'administrateur ?
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-link-button"
+                    style={{ fontSize: 13 }}
+                    onClick={handleForgotPassword}
+                    disabled={loading}
+                  >
+                    Confirmer
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-link-button"
+                    style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}
+                    onClick={() => setConfirmingReset(false)}
+                    disabled={loading}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-link-button"
+                  style={{ marginTop: 6, fontSize: 13 }}
+                  onClick={() => setConfirmingReset(true)}
+                  disabled={loading}
+                >
+                  Mot de passe oublié ?
+                </button>
               )}
             </div>
           )}
