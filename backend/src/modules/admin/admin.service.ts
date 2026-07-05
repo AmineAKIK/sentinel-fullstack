@@ -30,7 +30,9 @@ function normalizeReferenceAuditFilters(query: ReferenceAuditQuery): ListReferen
     start: String(query.start || '').trim(),
     end: String(query.end || '').trim(),
     order: query.order === 'asc' ? 'ASC' : 'DESC',
-    limit: boundedInt(query.limit, 100, 1, 250),
+    // Borne alignée sur la limite du frontend (AdminAuditPage LIMIT = 1000) :
+    // si elles divergent, l'avertissement de troncature ne se déclenche jamais.
+    limit: boundedInt(query.limit, 100, 1, 1000),
   };
 }
 

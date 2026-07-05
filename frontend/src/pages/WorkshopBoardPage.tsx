@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import SelectField from '../components/ui/SelectField';
 import BoardIncidentGrid, { BoardEmptyState } from '../components/board/BoardIncidentGrid';
 import BoardLineGrid, { LineGroup } from '../components/board/BoardLineGrid';
-import { useAppAuth } from '../routes/AppAuthContext';
+import { getUnifiedMe } from '../api/unifiedAuth';
 import { WorkshopBoardIncident, WorkshopBoardLine } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
 import {
@@ -93,8 +93,19 @@ export default function WorkshopBoardPage() {
   usePageTitle('Tableau temps réel');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { session } = useAppAuth();
-  const user = session?.accountType === 'workshop' ? session.user : null;
+  // /board est une route publique : AppAuthContext n'y charge pas la session.
+  // On détecte localement un utilisateur atelier connecté (échec silencieux
+  // pour un écran kiosque sans session) pour afficher le retour dashboard.
+  const [isWorkshopUser, setIsWorkshopUser] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getUnifiedMe()
+      .then((me) => {
+        if (!cancelled && me.accountType === 'workshop') setIsWorkshopUser(true);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const screenParam = searchParams.get('screen');
   const screenId = normalizeScreenId(screenParam ?? getOrCreateSessionScreenId());
   const storageKey = getBoardSettingsKey(screenId);
@@ -317,7 +328,7 @@ export default function WorkshopBoardPage() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'middle' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Réglages
           </button>
-          {user ? (
+          {isWorkshopUser ? (
             <button className="board-exit" onClick={() => void navigate('/workshop/dashboard')} aria-label="Tableau de bord">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'middle' }}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
               Tableau de bord
