@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: sentinel_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sentinel}
       POSTGRES_USER: ${POSTGRES_USER:-sentinel}
@@ -23,6 +24,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sentinel_backend
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +67,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     container_name: sentinel_frontend
+    restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
@@ -74,6 +77,7 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: sentinel_caddy
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
