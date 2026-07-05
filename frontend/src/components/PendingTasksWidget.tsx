@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PasswordResetRequest, markPasswordResetRequestHandled } from '../api/admin';
 import { formatElapsed } from '../utils/date';
+import ConfirmModal from './ConfirmModal';
 
 interface PendingTasksWidgetProps {
   requests: PasswordResetRequest[];
@@ -10,17 +11,18 @@ interface PendingTasksWidgetProps {
 
 export default function PendingTasksWidget({ requests, onHandled }: PendingTasksWidgetProps) {
   const navigate = useNavigate();
-  const [confirming, setConfirming] = useState<number | null>(null);
-  const [loading, setLoading] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState<PasswordResetRequest | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleConfirm(id: number) {
-    setLoading(id);
+  async function handleConfirm() {
+    if (!confirming) return;
+    setLoading(true);
     try {
-      await markPasswordResetRequestHandled(id);
-      onHandled(id);
-    } finally {
-      setLoading(null);
+      await markPasswordResetRequestHandled(confirming.id);
+      onHandled(confirming.id);
       setConfirming(null);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -56,40 +58,36 @@ export default function PendingTasksWidget({ requests, onHandled }: PendingTasks
                 </button>
 
                 <div className="pending-task-actions">
-                  {confirming === req.id ? (
-                    <>
-                      <span className="pending-task-confirm-label">Marquer comme traité ?</span>
-                      <div className="pending-task-confirm-btns">
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => handleConfirm(req.id)}
-                          disabled={loading === req.id}
-                        >
-                          {loading === req.id ? 'En cours…' : 'Confirmer'}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => setConfirming(null)}
-                          disabled={loading === req.id}
-                        >
-                          Annuler
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() => setConfirming(req.id)}
-                    >
-                      Marquer traité
-                    </button>
-                  )}
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() => setConfirming(req)}
+                  >
+                    Marquer traité
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {confirming && (
+        <ConfirmModal
+          title="Marquer la demande comme traitée ?"
+          onClose={() => setConfirming(null)}
+          onConfirm={handleConfirm}
+          confirmLabel="Marquer traité"
+          loadingLabel="En cours…"
+          loading={loading}
+        >
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+            La demande de réinitialisation de{' '}
+            <strong>{confirming.first_name} {confirming.last_name}</strong> (badge {confirming.badge_number})
+            sera retirée de la liste des actions à traiter. Assurez-vous d'avoir communiqué un nouveau
+            code temporaire avant de confirmer.
+          </p>
+        </ConfirmModal>
+      )}
     </section>
   );
 }
