@@ -13,8 +13,8 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const STATE_LABELS: Record<string, string> = {
-  SKIPEE_PAR_MACHINE: 'Saut machine',
-  SKIPEE_PAR_CONDUCTEUR: 'Saut opérateur',
+  SKIPEE_PAR_MACHINE: 'Skip machine',
+  SKIPEE_PAR_CONDUCTEUR: 'Skip opérateur',
   DEGRADEE: 'Dégradée',
   INDISPONIBLE: 'Indisponible',
 };
