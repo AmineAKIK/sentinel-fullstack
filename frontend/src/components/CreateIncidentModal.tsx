@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { getRobotOptions } from '../utils/lineMachines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { STATE_LABELS } from '../utils/labels';
 
 interface CreateIncidentModalProps {
   lines: ProductionLine[];
@@ -21,10 +22,10 @@ interface CreateIncidentModalProps {
 }
 
 const STATES: { value: IncidentState; label: string }[] = [
-  { value: 'SKIPEE_PAR_MACHINE', label: 'Skipée par machine' },
-  { value: 'SKIPEE_PAR_CONDUCTEUR', label: 'Skipée par conducteur' },
-  { value: 'DEGRADEE', label: 'Dégradée' },
-  { value: 'INDISPONIBLE', label: 'Indisponible' },
+  { value: 'SKIPEE_PAR_MACHINE', label: STATE_LABELS.SKIPEE_PAR_MACHINE },
+  { value: 'SKIPEE_PAR_CONDUCTEUR', label: STATE_LABELS.SKIPEE_PAR_CONDUCTEUR },
+  { value: 'DEGRADEE', label: STATE_LABELS.DEGRADEE },
+  { value: 'INDISPONIBLE', label: STATE_LABELS.INDISPONIBLE },
 ];
 
 export default function CreateIncidentModal({

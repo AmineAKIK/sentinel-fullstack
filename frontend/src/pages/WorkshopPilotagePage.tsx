@@ -16,13 +16,6 @@ import { HistoryPeriod } from '../utils/workshopHistory';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { usePilotageData } from '../hooks/usePilotageData';
 
-const STATE_DESCRIPTIONS: Record<string, string> = {
-  SKIPEE_PAR_MACHINE: 'Saut machine',
-  SKIPEE_PAR_CONDUCTEUR: 'Saut conducteur',
-  DEGRADEE: 'Dégradée',
-  INDISPONIBLE: 'Indisponible',
-};
-
 const PERIOD_LABELS: Record<HistoryPeriod, string> = {
   today: "Aujourd'hui",
   '7d': '7 derniers jours',
@@ -145,7 +138,6 @@ export default function WorkshopPilotagePage() {
     states: (analytics?.by_state ?? []).map((item) => ({
       label: STATE_LABELS[item.state] ?? item.state,
       count: item.count,
-      description: STATE_DESCRIPTIONS[item.state],
     })),
   };
 
