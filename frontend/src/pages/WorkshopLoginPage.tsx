@@ -5,6 +5,7 @@ import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
+import ConfirmModal from '../components/ConfirmModal';
 
 type Mode = 'identifier' | 'password' | 'setup';
 
@@ -207,30 +208,6 @@ export default function WorkshopLoginPage() {
                 <div className="notice" style={{ marginTop: 8 }} role="status">
                   Demande envoyée. L'administrateur vous contactera par voie interne.
                 </div>
-              ) : confirmingReset ? (
-                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                    Envoyer une demande à l'administrateur ?
-                  </span>
-                  <button
-                    type="button"
-                    className="inline-link-button"
-                    style={{ fontSize: 13 }}
-                    onClick={handleForgotPassword}
-                    disabled={loading}
-                  >
-                    Confirmer
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-link-button"
-                    style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}
-                    onClick={() => setConfirmingReset(false)}
-                    disabled={loading}
-                  >
-                    Annuler
-                  </button>
-                </div>
               ) : (
                 <button
                   type="button"
@@ -311,6 +288,22 @@ export default function WorkshopLoginPage() {
           </button>
         </form>
       </section>
+
+      {confirmingReset && (
+        <ConfirmModal
+          title="Demande de réinitialisation"
+          onClose={() => setConfirmingReset(false)}
+          onConfirm={handleForgotPassword}
+          confirmLabel="Envoyer la demande"
+          loadingLabel="Envoi…"
+          loading={loading}
+        >
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+            Une demande de réinitialisation sera envoyée à l'administrateur, qui vous
+            contactera par voie interne pour vous communiquer un nouveau code d'accès.
+          </p>
+        </ConfirmModal>
+      )}
     </main>
   );
 }
