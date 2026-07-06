@@ -51,6 +51,24 @@ jest.mock('../../../db/transaction', () => ({
   withTransaction: jest.fn((fn: (client: null) => Promise<unknown>) => fn(null)),
 }));
 
+jest.mock('../../notifications/notifications.service', () => ({
+  notifyDeclarantCancelApproved: jest.fn(() => Promise.resolve()),
+  notifyDeclarantCancelRejected: jest.fn(() => Promise.resolve()),
+  notifyDeclarantEditApproved: jest.fn(() => Promise.resolve()),
+  notifyDeclarantEditRejected: jest.fn(() => Promise.resolve()),
+  notifyDeclarantIncidentTaken: jest.fn(() => Promise.resolve()),
+  notifyFollowersIncidentCanceled: jest.fn(() => Promise.resolve()),
+  notifyFollowersIncidentClosed: jest.fn(() => Promise.resolve()),
+  notifyFollowersIncidentSetPending: jest.fn(() => Promise.resolve()),
+  notifyFollowersIncidentTaken: jest.fn(() => Promise.resolve()),
+  notifyMaintenanceIncidentUrgent: jest.fn(() => Promise.resolve()),
+  notifyResponsablesCancelRequested: jest.fn(() => Promise.resolve()),
+  notifyResponsablesEditRequested: jest.fn(() => Promise.resolve()),
+  notifyTechnicianIncidentCanceled: jest.fn(() => Promise.resolve()),
+  notifyTechnicianIncidentInvalidated: jest.fn(() => Promise.resolve()),
+  notifyTechnicianResponsibleComment: jest.fn(() => Promise.resolve()),
+}));
+
 import * as repo from '../workshop.repository';
 import * as events from '../workshop.events';
 

@@ -38,6 +38,10 @@ jest.mock('../../../auth/setupCode', () => ({
   hashWorkshopPasswordSetupCode: jest.fn(() => Promise.resolve('hashed-setup-code')),
 }));
 
+jest.mock('../../adminCredentials/adminCredentials.repository', () => ({
+  getAppSettings: jest.fn(() => Promise.resolve({ setup_code_ttl_hours: 24 })),
+}));
+
 import * as repo from '../accounts.repository';
 import * as events from '../accounts.events';
 
