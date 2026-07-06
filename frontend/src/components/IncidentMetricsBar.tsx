@@ -135,8 +135,16 @@ export default function IncidentMetricsBar({
   onSetFilters,
 }: IncidentMetricsBarProps) {
   const extras: ExtraCounts = { createdByMe: createdByMeCount, requests: requestsCount };
+  const roleMetrics = ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? ''));
+  // Nombre réel de tuiles rendues : pilote le nombre de colonnes de la grille
+  // (voir workshop.css) pour qu'aucune configuration ne laisse un orphelin
+  // en fin de grille — pas de dépendance à la largeur de viewport ici.
+  const tileCount =
+    metricsLoading || !metrics
+      ? 0
+      : METRIC_CONFIGS.length + roleMetrics.length + ((metrics.closed_today ?? 0) > 0 ? 1 : 0);
   return (
-    <div className="workshop-metrics">
+    <div className="workshop-metrics" data-tile-count={tileCount || undefined}>
       {!metricsLoading && metrics && (
         <div className="sr-only" aria-live="polite" aria-atomic="true">
           {`${metrics.priority} urgent${metrics.priority !== 1 ? 's' : ''}, ${metrics.not_taken} non pris`}
@@ -174,7 +182,7 @@ export default function IncidentMetricsBar({
               <strong>{metrics.closed_today}</strong>
             </div>
           )}
-          {ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? '')).map((cfg) => {
+          {roleMetrics.map((cfg) => {
             const value = cfg.getValue(metrics, extras);
             const toneClass =
               cfg.tone && typeof value === 'number' && value > 0

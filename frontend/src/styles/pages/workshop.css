@@ -90,12 +90,61 @@
 }
 
 
+/* Grille à colonnes fixes (pas auto-fit) : le nombre de colonnes ne dépend
+   que du palier de largeur d'écran, jamais du nombre de tuiles — donc on
+   sait, à chaque palier, exactement combien de colonnes sont actives et on
+   peut faire que la dernière tuile occupe toute la ligne quand le compte
+   total (data-tile-count, calculé côté React) laisserait un orphelin seul
+   sur la dernière ligne à ce nombre de colonnes précis. En 1 colonne,
+   chaque tuile occupe déjà toute la largeur : pas de correction nécessaire.
+   4 colonnes desktop, 3 tablette, 2 mobile large, 1 mobile étroit. */
 .workshop-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: var(--space-4);
   min-width: 0;
+}
+
+/* Chaque règle est bornée par min-width ET max-width : sans ça, une règle
+   "orphelin" écrite pour 4 colonnes resterait active dans les media queries
+   de paliers inférieurs (la cascade CSS ne désactive rien par elle-même)
+   et étirerait une tuile qui n'est plus orpheline à moins de colonnes. */
+
+/* 4 colonnes (desktop) : orphelin quand total % 4 == 1. */
+@media (min-width: 901px) {
+  .workshop-metrics[data-tile-count='5'] > :last-child,
+  .workshop-metrics[data-tile-count='9'] > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .workshop-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 621px) and (max-width: 900px) {
+  /* 3 colonnes : orphelin quand total % 3 == 1. */
+  .workshop-metrics[data-tile-count='7'] > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .workshop-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 2 colonnes : orphelin quand total est impair. */
+  .workshop-metrics[data-tile-count='5'] > :last-child,
+  .workshop-metrics[data-tile-count='7'] > :last-child,
+  .workshop-metrics[data-tile-count='9'] > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 420px) {
+  .workshop-metrics { grid-template-columns: 1fr; }
+  .workshop-metrics > :last-child {
+    grid-column: auto;
+  }
 }
 
 .workshop-metric {
