@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CreateIncidentModal from './CreateIncidentModal';
 import DeleteRequestModal from './DeleteRequestModal';
@@ -30,6 +30,13 @@ interface IncidentDetailPanelProps {
   userId: number | undefined;
   isMaintenance: boolean;
   isResponsable: boolean;
+  // Navigation dans la liste visible (triée/filtrée) sans quitter le drawer.
+  navigation?: {
+    index: number;
+    total: number;
+    onPrev: () => void;
+    onNext: () => void;
+  };
   onBack: () => void;
   onToggleFollow: (incident: WorkshopIncident) => Promise<void>;
   onToggleUrgent: (incident: WorkshopIncident) => Promise<void>;
@@ -57,6 +64,7 @@ export default function IncidentDetailPanel({
   userId,
   isMaintenance: _isMaintenance,
   isResponsable,
+  navigation,
   onBack,
   onToggleFollow,
   onToggleUrgent,
@@ -79,6 +87,12 @@ export default function IncidentDetailPanel({
   const FIELD_LIMITS = useFieldLimits();
   const [responsibleDraft, setResponsibleDraft] = useState(incident.responsible_comment ?? '');
 
+  // Le panneau reste monté quand on navigue d'un incident à l'autre (le focus
+  // des boutons prev/next survit) : le brouillon se resynchronise ici.
+  useEffect(() => {
+    setResponsibleDraft(incident.responsible_comment ?? '');
+  }, [incident.id, incident.responsible_comment]);
+
   // Contexte machine : amène directement à l'historique / la connaissance de
   // cette ligne+machine, filtre pré-rempli (P3 — répondre, pas faire chercher).
   const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
@@ -96,20 +110,86 @@ export default function IncidentDetailPanel({
   const canSetPriority = canPerform(userRole, 'setPriority', incident);
   const canEditResponsibleComment = canPerform(userRole, 'responsibleComment', incident);
   const canInvalidateClosed = canPerform(userRole, 'invalidateClosed', incident);
-  const detailHasTreatmentActions = canSetPending || canResume || canClose || canSetPriority || canEditResponsibleComment;
+  const detailHasTreatmentActions =
+    canSetPending || canResume || canClose || canSetPriority || canEditResponsibleComment;
 
   return (
     <>
       <div className="incident-detail-topbar">
-        <h2 className="incident-detail-title">Incident {incident.line_number} · {incident.machine_id}</h2>
+        <h2 className="incident-detail-title">
+          Incident {incident.line_number} · {incident.machine_id}
+        </h2>
+        {navigation && navigation.total > 1 && (
+          <div
+            className="incident-detail-nav"
+            role="group"
+            aria-label="Navigation entre les incidents de la liste"
+          >
+            <button
+              type="button"
+              className="incident-detail-iconbtn"
+              onClick={navigation.onPrev}
+              disabled={navigation.index <= 0}
+              aria-label="Incident précédent"
+              title="Incident précédent"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+            <span className="incident-detail-position" aria-live="polite">
+              {navigation.index + 1}/{navigation.total}
+            </span>
+            <button
+              type="button"
+              className="incident-detail-iconbtn"
+              onClick={navigation.onNext}
+              disabled={navigation.index >= navigation.total - 1}
+              aria-label="Incident suivant"
+              title="Incident suivant"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
+        )}
         <button
           type="button"
-          className="incident-detail-close"
+          className="incident-detail-iconbtn"
           onClick={onBack}
           aria-label="Fermer le détail"
-          autoFocus
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -148,9 +228,7 @@ export default function IncidentDetailPanel({
             <button
               className="btn btn-danger"
               onClick={() =>
-                canCancel
-                  ? modal.openModal('maintenanceDirect')
-                  : modal.openModal('deleteRequest')
+                canCancel ? modal.openModal('maintenanceDirect') : modal.openModal('deleteRequest')
               }
             >
               {canCancel ? 'Annuler' : 'Demander annulation'}
@@ -167,11 +245,17 @@ export default function IncidentDetailPanel({
       <div className="card">
         <div className="card-body">
           <div className="detail-grid">
-            <DetailField label="Utilisateur">{incident.first_name} {incident.last_name}</DetailField>
-            <DetailField label="Rôle créateur">{ROLE_LABELS[incident.role] ?? incident.role}</DetailField>
+            <DetailField label="Utilisateur">
+              {incident.first_name} {incident.last_name}
+            </DetailField>
+            <DetailField label="Rôle créateur">
+              {ROLE_LABELS[incident.role] ?? incident.role}
+            </DetailField>
             <DetailField label="État">{STATE_LABELS[incident.state]}</DetailField>
             <DetailField label="Ligne">{incident.line_number}</DetailField>
-            <DetailField label="Machine">{incident.machine_id} · {incident.machine_brand}</DetailField>
+            <DetailField label="Machine">
+              {incident.machine_id} · {incident.machine_brand}
+            </DetailField>
             <DetailField label="Robot">{incident.robot_label}</DetailField>
             <DetailField label="Tête">{incident.head_number}</DetailField>
             <DetailField label="Prise en charge">{incident.is_taken ? 'Oui' : 'Non'}</DetailField>
@@ -181,7 +265,9 @@ export default function IncidentDetailPanel({
                 : '-'}
             </DetailField>
             <DetailField label="Priorité">{incident.is_priority ? 'Oui' : 'Non'}</DetailField>
-            <DetailField label="Statut">{STATUS_LABELS[incident.status] ?? incident.status}</DetailField>
+            <DetailField label="Statut">
+              {STATUS_LABELS[incident.status] ?? incident.status}
+            </DetailField>
             <DetailField label="Produit en cours">{incident.current_product ?? '-'}</DetailField>
             <DetailField label="Création">{formatDateTime(incident.created_at)}</DetailField>
           </div>
@@ -206,16 +292,24 @@ export default function IncidentDetailPanel({
           </div>
           {incident.comment && <p className="incident-comment">{incident.comment}</p>}
           {incident.diagnostic && (
-            <p className="incident-comment"><strong>Diagnostic :</strong> {incident.diagnostic}</p>
+            <p className="incident-comment">
+              <strong>Diagnostic :</strong> {incident.diagnostic}
+            </p>
           )}
           {incident.intervention_note && (
-            <p className="incident-comment"><strong>Intervention :</strong> {incident.intervention_note}</p>
+            <p className="incident-comment">
+              <strong>Intervention :</strong> {incident.intervention_note}
+            </p>
           )}
           {incident.edit_request && (
-            <div className="notice" style={{ marginTop: 16 }}>Demande de modification opérateur en attente.</div>
+            <div className="notice" style={{ marginTop: 16 }}>
+              Demande de modification opérateur en attente.
+            </div>
           )}
           {incident.cancel_request && (
-            <div className="notice" style={{ marginTop: 16 }}>Demande d'annulation opérateur en attente.</div>
+            <div className="notice" style={{ marginTop: 16 }}>
+              Demande d'annulation opérateur en attente.
+            </div>
           )}
         </div>
       </div>
@@ -254,7 +348,10 @@ export default function IncidentDetailPanel({
             {canEditResponsibleComment && (
               <div className="incident-comment">
                 <div className="form-group">
-                  <label className="form-label" htmlFor={`responsible-comment-detail-${incident.id}`}>
+                  <label
+                    className="form-label"
+                    htmlFor={`responsible-comment-detail-${incident.id}`}
+                  >
                     Consigne responsable
                   </label>
                   <textarea
@@ -262,7 +359,9 @@ export default function IncidentDetailPanel({
                     className="form-input"
                     rows={3}
                     value={responsibleDraft}
-                    onChange={(e) => setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))}
+                    onChange={(e) =>
+                      setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))
+                    }
                     maxLength={FIELD_LIMITS.COMMENT}
                     placeholder="Consigne courte pour orienter le traitement"
                   />
@@ -271,7 +370,11 @@ export default function IncidentDetailPanel({
                 <div className="action-bar">
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => void patchIncident(incident.id, { responsibleComment: responsibleDraft.trim() })}
+                    onClick={() =>
+                      void patchIncident(incident.id, {
+                        responsibleComment: responsibleDraft.trim(),
+                      })
+                    }
                     disabled={!responsibleDraft.trim()}
                   >
                     {incident.responsible_comment ? 'Mettre à jour' : 'Ajouter'}
@@ -346,21 +449,34 @@ export default function IncidentDetailPanel({
           onConfirm={onInvalidateIncident}
         />
       )}
-      {(modal.state.activeModal === 'maintenanceDirect' || modal.state.activeModal === 'maintenanceApprove') &&
+      {(modal.state.activeModal === 'maintenanceDirect' ||
+        modal.state.activeModal === 'maintenanceApprove') &&
         (modal.state.activeModal === 'maintenanceDirect' || modal.state.reviewIncident) && (
-        <MaintenanceDeleteConfirmModal
-          incident={modal.state.activeModal === 'maintenanceApprove' ? modal.state.reviewIncident! : incident}
-          title={modal.state.activeModal === 'maintenanceApprove' ? "Valider l'annulation" : "Annuler l'incident"}
-          message={
-            modal.state.activeModal === 'maintenanceApprove'
-              ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
-              : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."
-          }
-          error={modal.state.reviewError}
-          onClose={() => modal.closeModal()}
-          onConfirm={() => onMaintenanceDeleteConfirm(modal.state.activeModal === 'maintenanceDirect' ? 'direct' : 'approve')}
-        />
-      )}
+          <MaintenanceDeleteConfirmModal
+            incident={
+              modal.state.activeModal === 'maintenanceApprove'
+                ? modal.state.reviewIncident!
+                : incident
+            }
+            title={
+              modal.state.activeModal === 'maintenanceApprove'
+                ? "Valider l'annulation"
+                : "Annuler l'incident"
+            }
+            message={
+              modal.state.activeModal === 'maintenanceApprove'
+                ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
+                : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."
+            }
+            error={modal.state.reviewError}
+            onClose={() => modal.closeModal()}
+            onConfirm={() =>
+              onMaintenanceDeleteConfirm(
+                modal.state.activeModal === 'maintenanceDirect' ? 'direct' : 'approve'
+              )
+            }
+          />
+        )}
       {modal.state.reviewIncident && modal.state.reviewType && (
         <ReviewIncidentRequestModal
           incident={modal.state.reviewIncident}
@@ -375,7 +491,9 @@ export default function IncidentDetailPanel({
           onRejectDelete={onRejectDeleteRequest}
           allowDeleteApproval={canPerform(userRole, 'approveCancel', modal.state.reviewIncident)}
           allowDeleteReject={canPerform(userRole, 'rejectCancel', modal.state.reviewIncident)}
-          deleteApprovalDisabled={!canPerform(userRole, 'approveCancel', modal.state.reviewIncident)}
+          deleteApprovalDisabled={
+            !canPerform(userRole, 'approveCancel', modal.state.reviewIncident)
+          }
           deleteWarning={
             canPerform(userRole, 'approveCancel', modal.state.reviewIncident)
               ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."

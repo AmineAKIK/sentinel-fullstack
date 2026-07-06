@@ -8,15 +8,22 @@ interface IncidentMetricsBarProps {
   filters: Filters;
   role?: string;
   createdByMeCount?: number;
+  requestsCount?: number;
   onSetFilters: Dispatch<SetStateAction<Filters>>;
 }
 
 const RESET = { status: 'all', aging: 'all', priority: 'all', taken: 'all', scope: 'all' };
 
+// Compteurs calculés côté client (hors endpoint métriques serveur).
+interface ExtraCounts {
+  createdByMe: number;
+  requests: number;
+}
+
 interface MetricConfig {
   key: string;
   label: string;
-  getValue: (m: WorkshopIncidentMetrics, extra?: number) => React.ReactNode;
+  getValue: (m: WorkshopIncidentMetrics, extras: ExtraCounts) => React.ReactNode;
   isActive: (f: Filters) => boolean;
   getFilter: (f: Filters) => Partial<Filters>;
   roles?: string[];
@@ -30,7 +37,12 @@ const METRIC_CONFIGS: MetricConfig[] = [
     key: 'total',
     label: 'Total',
     getValue: (m) => m.total,
-    isActive: (f) => f.status === 'all' && f.aging === 'all' && f.priority === 'all' && f.taken === 'all' && (f.scope ?? 'all') === 'all',
+    isActive: (f) =>
+      f.status === 'all' &&
+      f.aging === 'all' &&
+      f.priority === 'all' &&
+      f.taken === 'all' &&
+      (f.scope ?? 'all') === 'all',
     getFilter: () => RESET,
   },
   {
@@ -77,7 +89,7 @@ const ROLE_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: 'created_by_me',
     label: 'Créés par moi',
-    getValue: (_m, extra = 0) => extra,
+    getValue: (_m, extras) => extras.createdByMe,
     isActive: (f) => f.scope === 'created_by_me',
     getFilter: (f) => ({ ...RESET, scope: f.scope === 'created_by_me' ? 'all' : 'created_by_me' }),
     roles: ['OPERATOR'],
@@ -87,8 +99,21 @@ const ROLE_METRIC_CONFIGS: MetricConfig[] = [
     label: 'Pris par moi',
     getValue: (m) => m.assigned_to_me ?? 0,
     isActive: (f) => f.scope === 'assigned_to_me',
-    getFilter: (f) => ({ ...RESET, scope: f.scope === 'assigned_to_me' ? 'all' : 'assigned_to_me' }),
+    getFilter: (f) => ({
+      ...RESET,
+      scope: f.scope === 'assigned_to_me' ? 'all' : 'assigned_to_me',
+    }),
     roles: ['MAINTENANCE'],
+  },
+  {
+    // Inbox d'arbitrage : demandes de correction/annulation en attente de décision.
+    key: 'requests',
+    label: 'À arbitrer',
+    getValue: (_m, extras) => extras.requests,
+    isActive: (f) => f.scope === 'requests',
+    getFilter: (f) => ({ ...RESET, scope: f.scope === 'requests' ? 'all' : 'requests' }),
+    roles: ['RESPONSABLE'],
+    tone: 'act',
   },
   {
     key: 'followed',
@@ -106,8 +131,10 @@ export default function IncidentMetricsBar({
   filters,
   role,
   createdByMeCount = 0,
+  requestsCount = 0,
   onSetFilters,
 }: IncidentMetricsBarProps) {
+  const extras: ExtraCounts = { createdByMe: createdByMeCount, requests: requestsCount };
   return (
     <div className="workshop-metrics">
       {!metricsLoading && metrics && (
@@ -122,14 +149,18 @@ export default function IncidentMetricsBar({
       ) : metrics ? (
         <>
           {METRIC_CONFIGS.map((cfg) => {
-            const value = cfg.getValue(metrics, createdByMeCount);
+            const value = cfg.getValue(metrics, extras);
             const toneClass =
-              cfg.tone && typeof value === 'number' && value > 0 ? ` workshop-metric--${cfg.tone}` : '';
+              cfg.tone && typeof value === 'number' && value > 0
+                ? ` workshop-metric--${cfg.tone}`
+                : '';
             return (
               <button
                 key={cfg.key}
                 className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
-                onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
+                onClick={() =>
+                  onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
+                }
                 type="button"
               >
                 <span>{cfg.label}</span>
@@ -143,20 +174,29 @@ export default function IncidentMetricsBar({
               <strong>{metrics.closed_today}</strong>
             </div>
           )}
-          {ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? '')).map((cfg) => (
-            <button
-              key={cfg.key}
-              className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}`}
-              onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
-              type="button"
-            >
-              <span>{cfg.label}</span>
-              <strong>{cfg.getValue(metrics, createdByMeCount)}</strong>
-              {cfg.key === 'followed' && (metrics.followed_resolved ?? 0) > 0 && (
-                <small>{metrics.followed_resolved} clôturé(s)</small>
-              )}
-            </button>
-          ))}
+          {ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? '')).map((cfg) => {
+            const value = cfg.getValue(metrics, extras);
+            const toneClass =
+              cfg.tone && typeof value === 'number' && value > 0
+                ? ` workshop-metric--${cfg.tone}`
+                : '';
+            return (
+              <button
+                key={cfg.key}
+                className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
+                onClick={() =>
+                  onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
+                }
+                type="button"
+              >
+                <span>{cfg.label}</span>
+                <strong>{value}</strong>
+                {cfg.key === 'followed' && (metrics.followed_resolved ?? 0) > 0 && (
+                  <small>{metrics.followed_resolved} clôturé(s)</small>
+                )}
+              </button>
+            );
+          })}
         </>
       ) : (
         <div className="workshop-metric">

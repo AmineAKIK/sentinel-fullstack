@@ -121,6 +121,8 @@ export default function WorkshopDashboardPage() {
     if (filters.scope === 'followed' && !incident.is_followed) return false;
     if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
     if (filters.scope === 'created_by_me' && incident.user_id !== user?.id) return false;
+    if (filters.scope === 'requests' && !incident.edit_request && !incident.cancel_request)
+      return false;
     if (
       filters.scope !== 'followed' &&
       (incident.status === 'CANCELED' || incident.status === 'INVALIDATED')
@@ -181,6 +183,15 @@ export default function WorkshopDashboardPage() {
       }).length
     : 0;
 
+  // Inbox d'arbitrage du responsable : demandes de correction/annulation en attente.
+  const requestsCount = isResponsable
+    ? incidents.filter((inc) => {
+        const isResolved =
+          inc.status === 'CLOSED' || inc.status === 'CANCELED' || inc.status === 'INVALIDATED';
+        return !isResolved && (Boolean(inc.edit_request) || Boolean(inc.cancel_request));
+      }).length
+    : 0;
+
   const sortedIncidents =
     sortOrder === 'default'
       ? filteredIncidents
@@ -207,6 +218,21 @@ export default function WorkshopDashboardPage() {
     const updated = await updateWorkshopIncident(incident.id, { responsibleComment: '' });
     upsertIncident(updated);
     modal.setDeleteCommentConfirm(null);
+  }
+
+  // Position de l'incident ouvert dans la liste affichée (triée + filtrée) :
+  // porte la navigation précédent/suivant du drawer.
+  const selectedIndex = selectedIncident
+    ? sortedIncidents.findIndex((inc) => inc.id === selectedIncident.id)
+    : -1;
+
+  function navigateToIncident(offset: number) {
+    if (selectedIndex === -1) return;
+    const next = sortedIncidents[selectedIndex + offset];
+    if (!next) return;
+    setSelectedIncident(next);
+    // replace : feuilleter les incidents ne doit pas empiler l'historique.
+    setIncidentUrlParam(next.id, true);
   }
 
   // Un modal ouvert capte déjà Escape : le panneau ne doit pas se fermer en dessous.
@@ -247,6 +273,7 @@ export default function WorkshopDashboardPage() {
           filters={filters}
           role={user?.role}
           createdByMeCount={createdByMeCount}
+          requestsCount={requestsCount}
           onSetFilters={setFilters}
         />
 
@@ -375,7 +402,6 @@ export default function WorkshopDashboardPage() {
             aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
           >
             <IncidentDetailPanel
-              key={selectedIncident.id}
               incident={selectedIncident}
               lines={lines}
               modal={modal}
@@ -383,6 +409,16 @@ export default function WorkshopDashboardPage() {
               userId={user?.id}
               isMaintenance={isMaintenance}
               isResponsable={isResponsable}
+              navigation={
+                selectedIndex >= 0
+                  ? {
+                      index: selectedIndex,
+                      total: sortedIncidents.length,
+                      onPrev: () => navigateToIncident(-1),
+                      onNext: () => navigateToIncident(1),
+                    }
+                  : undefined
+              }
               onBack={() => clearSelectedIncident()}
               onToggleFollow={actions.handleToggleFollow}
               onToggleUrgent={actions.handleToggleUrgent}
