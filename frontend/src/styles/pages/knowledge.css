@@ -174,7 +174,6 @@
   color: var(--color-text-secondary);
 }
 
-
 /* ── État vide ── */
 
 .kb-empty {
@@ -376,35 +375,3 @@
   justify-content: flex-end;
   padding-top: var(--space-1);
 }
-
-.request-badge {
-  border: none;
-  border-radius: var(--radius-pill);
-  padding: 2px 10px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
-  background-color: var(--color-primary-soft-strong);
-  color: var(--color-primary);
-  border: 1px solid transparent;
-}
-
-/* Une demande en attente attire l'œil par sa couleur d'attention (P1/P4),
-   pas par une pulsation en boucle (interdite par §5.2). */
-.request-badge-edit {
-  background-color: var(--attention-watch-bg);
-  border-color: var(--attention-watch-border);
-  color: var(--attention-watch-text);
-}
-
-.request-badge-delete {
-  background-color: var(--attention-critical-bg);
-  border-color: var(--attention-critical-border);
-  color: var(--attention-critical-text);
-}
-
-.request-badge-followed {
-  background-color: var(--color-primary-soft);
-  color: var(--color-primary);
-}
-

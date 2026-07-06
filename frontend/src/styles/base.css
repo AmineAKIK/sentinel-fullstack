@@ -186,7 +186,8 @@ body,
 .workshop-metric:focus-visible,
 .incident-card:focus-visible,
 .filter-chip:focus-visible,
-.request-badge:focus-visible,
+.incident-follow-toggle:focus-visible,
+.incident-request-action:focus-visible,
 .inline-link-button:focus-visible,
 .back-link:focus-visible,
 .support-input:focus-visible,
@@ -932,4 +933,3 @@ a { color: var(--color-primary); text-decoration: none; }
 /* ═══════════════════════════════════════════════════════════════
    PILOTAGE PAGE
    ═══════════════════════════════════════════════════════════════ */
-

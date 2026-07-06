@@ -1,7 +1,15 @@
 import { WorkshopIncident } from '../types';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { incidentAttentionLevel } from '../utils/attention';
-import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
+import { ROLE_LABELS } from '../utils/labels';
+import {
+  IncidentFollowedChip,
+  IncidentPriorityChip,
+  IncidentStateChip,
+  IncidentStatusChip,
+  IncidentTakenChip,
+  isIncidentResolved,
+} from './IncidentBadges';
 
 interface IncidentCardProps {
   incident: WorkshopIncident;
@@ -40,9 +48,9 @@ export default function IncidentCard({
   onReviewEdit,
   onReviewDelete,
 }: IncidentCardProps) {
-  const isResolvedFollowed = incident.is_followed &&
-    (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED');
-  const isActiveUrgent = incident.is_priority && !isResolvedFollowed;
+  const isResolved = isIncidentResolved(incident);
+  const isResolvedFollowed = incident.is_followed && isResolved;
+  const isActiveUrgent = incident.is_priority && !isResolved;
   const currentProduct = incident.current_product?.trim();
   // Niveau d'attention unifié (F1/F2) : le liseré gauche encode ce niveau, de
   // sorte que l'urgent émerge par contraste avec les autres, sans agression (P1).
@@ -98,53 +106,70 @@ export default function IncidentCard({
         </div>
       )}
       {canReorder && (
-        <span className="incident-drag-grip" title="Glisser pour changer l'ordre de traitement" aria-hidden="true">
+        <span
+          className="incident-drag-grip"
+          title="Glisser pour changer l'ordre de traitement"
+          aria-hidden="true"
+        >
           <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-            <circle cx="2.5" cy="2.5" r="1.5" /><circle cx="7.5" cy="2.5" r="1.5" />
-            <circle cx="2.5" cy="8" r="1.5" /><circle cx="7.5" cy="8" r="1.5" />
-            <circle cx="2.5" cy="13.5" r="1.5" /><circle cx="7.5" cy="13.5" r="1.5" />
+            <circle cx="2.5" cy="2.5" r="1.5" />
+            <circle cx="7.5" cy="2.5" r="1.5" />
+            <circle cx="2.5" cy="8" r="1.5" />
+            <circle cx="7.5" cy="8" r="1.5" />
+            <circle cx="2.5" cy="13.5" r="1.5" />
+            <circle cx="7.5" cy="13.5" r="1.5" />
           </svg>
         </span>
       )}
       <div className="incident-card-main">
-        <h2>Ligne {incident.line_number} · {incident.machine_id}</h2>
-        <div className="incident-card-status">
-          <span className="badge-role">{STATE_LABELS[incident.state] || incident.state}</span>
-          {isActiveUrgent && <span className="badge-status priority">Urgent</span>}
-          {incident.status === 'CLOSED' && <span className="badge-status neutral">Clôturé</span>}
-          {incident.status === 'CANCELED' && <span className="badge-status neutral">Annulé</span>}
-          {incident.status === 'INVALIDATED' && <span className="badge-status neutral">Invalidé</span>}
-          {incident.is_followed && <span className="badge-status followed">Suivi</span>}
-          {/* Le statut de prise en charge n'est badgé que pour l'opérateur :
-              technicien et responsable le lisent dans la ligne méta (un signal,
-              un canal — pas de redondance). */}
-          {!isMaintenance && !isResponsable && (
-            incident.is_taken ? (
-              <span className="badge-status active">Pris en charge</span>
-            ) : (
-              <span className="badge-status inactive">Non pris</span>
-            )
-          )}
-        </div>
-      </div>
-      {isResponsable && (!isResolvedFollowed || Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
-        <div className="incident-tags">
-          {!isResolvedFollowed && (
+        <h2>
+          Ligne {incident.line_number} · {incident.machine_id}
+        </h2>
+        <div className="incident-card-controls">
+          <div className="incident-card-status" aria-label="Statuts de l'incident">
+            <IncidentStateChip incident={incident} />
+            <IncidentPriorityChip incident={incident} />
+            <IncidentStatusChip incident={incident} />
+            {incident.is_followed && <IncidentFollowedChip />}
+            {/* Le statut de prise en charge n'est badgé que pour l'opérateur :
+                technicien et responsable le lisent dans la ligne méta (un signal,
+                un canal — pas de redondance). */}
+            {!isMaintenance && !isResponsable && <IncidentTakenChip incident={incident} />}
+          </div>
+          {isResponsable && !isResolvedFollowed && (
             <button
               type="button"
-              className={`request-badge ${incident.is_followed ? 'request-badge-followed' : ''}`}
+              className={`incident-follow-toggle${incident.is_followed ? ' is-active' : ''}`}
+              aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
+              title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
               onClick={(event) => {
                 event.stopPropagation();
                 onToggleFollow?.(incident);
               }}
             >
-              {incident.is_followed ? 'Retirer du suivi' : 'Suivre'}
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill={incident.is_followed ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2" />
+              </svg>
             </button>
           )}
+        </div>
+      </div>
+      {isResponsable && (Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
+        <div className="incident-card-actions">
           {incident.edit_request && (
             <button
               type="button"
-              className="request-badge request-badge-edit"
+              className="incident-request-action incident-request-action--edit"
               onClick={(event) => {
                 event.stopPropagation();
                 onReviewEdit(event, incident);
@@ -156,7 +181,7 @@ export default function IncidentCard({
           {incident.cancel_request && (
             <button
               type="button"
-              className="request-badge request-badge-delete"
+              className="incident-request-action incident-request-action--delete"
               onClick={(event) => {
                 event.stopPropagation();
                 onReviewDelete(event, incident);
@@ -170,23 +195,38 @@ export default function IncidentCard({
 
       <div className="incident-card-meta">
         {currentProduct ? (
-          <span className="incident-meta-item">Produit <strong>{currentProduct}</strong></span>
+          <span className="incident-meta-item">
+            Produit <strong>{currentProduct}</strong>
+          </span>
         ) : (
           <span className="incident-meta-item incident-meta-missing">Produit non renseigné</span>
         )}
-        <span className="incident-meta-sep" aria-hidden="true">·</span>
-        <span className="incident-meta-item">{incident.robot_label} · Tête {incident.head_number}</span>
-        <span className="incident-meta-sep" aria-hidden="true">·</span>
+        <span className="incident-meta-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="incident-meta-item">
+          {incident.robot_label} · Tête {incident.head_number}
+        </span>
+        <span className="incident-meta-sep" aria-hidden="true">
+          ·
+        </span>
         <span className="incident-meta-item" title={formatDateTime(incident.created_at)}>
           Depuis {formatElapsed(incident.created_at)}
         </span>
         {(isMaintenance || isResponsable) && (
           <>
-            <span className="incident-meta-sep" aria-hidden="true">·</span>
+            <span className="incident-meta-sep" aria-hidden="true">
+              ·
+            </span>
             {incident.taken_by_first_name ? (
               <span className="incident-meta-item">
-                Pris par <strong>{`${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()}</strong>
-                {incident.taken_by_role ? ` (${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role})` : ''}
+                Pris par{' '}
+                <strong>
+                  {`${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()}
+                </strong>
+                {incident.taken_by_role
+                  ? ` (${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role})`
+                  : ''}
               </span>
             ) : (
               <span className="incident-meta-item">Non pris</span>
@@ -195,7 +235,8 @@ export default function IncidentCard({
         )}
       </div>
       <div className="incident-card-footer">
-        Créé par {`${incident.first_name} ${incident.last_name}`.trim()} · {ROLE_LABELS[incident.role] || incident.role}
+        Créé par {`${incident.first_name} ${incident.last_name}`.trim()} ·{' '}
+        {ROLE_LABELS[incident.role] || incident.role}
       </div>
 
       {incident.responsible_comment && (

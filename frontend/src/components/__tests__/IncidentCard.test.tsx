@@ -59,7 +59,7 @@ const defaultProps = {
 };
 
 describe('IncidentCard – rendu', () => {
-  it('affiche le numéro de ligne et l\'identifiant machine', () => {
+  it("affiche le numéro de ligne et l'identifiant machine", () => {
     render(<IncidentCard incident={mockIncident()} {...defaultProps} />);
     expect(screen.getByText(/L01/)).toBeDefined();
     expect(screen.getByText(/M01/)).toBeDefined();
@@ -81,7 +81,7 @@ describe('IncidentCard – rendu', () => {
     expect(screen.queryByText(/action prioritaire/i)).toBeNull();
   });
 
-  it('n\'affiche pas le badge urgent si is_priority est faux', () => {
+  it("n'affiche pas le badge urgent si is_priority est faux", () => {
     render(<IncidentCard incident={mockIncident({ is_priority: false })} {...defaultProps} />);
     expect(screen.queryByText('Urgent')).toBeNull();
   });
@@ -110,21 +110,13 @@ describe('IncidentCard – rendu', () => {
 
   it('conserve le produit en cours dans la ligne méta de la carte', () => {
     render(
-      <IncidentCard
-        incident={mockIncident({ current_product: 'PRODUIT X45' })}
-        {...defaultProps}
-      />
+      <IncidentCard incident={mockIncident({ current_product: 'PRODUIT X45' })} {...defaultProps} />
     );
     expect(screen.getByText('PRODUIT X45')).toBeDefined();
   });
 
   it('signale un produit non renseigné dans la ligne méta', () => {
-    render(
-      <IncidentCard
-        incident={mockIncident({ current_product: '' })}
-        {...defaultProps}
-      />
-    );
+    render(<IncidentCard incident={mockIncident({ current_product: '' })} {...defaultProps} />);
     expect(screen.getByText('Produit non renseigné')).toBeDefined();
   });
 
@@ -139,7 +131,7 @@ describe('IncidentCard – rendu', () => {
     expect(screen.getByText('Correction demandée')).toBeDefined();
   });
 
-  it('n\'affiche pas le bouton correction si non responsable', () => {
+  it("n'affiche pas le bouton correction si non responsable", () => {
     render(
       <IncidentCard
         incident={mockIncident({ edit_request: { state: 'ARRET' } })}
@@ -159,6 +151,20 @@ describe('IncidentCard – rendu', () => {
       />
     );
     expect(screen.getByText('Annulation demandée')).toBeDefined();
+  });
+
+  it('présente le suivi responsable comme une action compacte, pas comme une rangée de tags', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ is_followed: true })}
+        {...defaultProps}
+        isResponsable
+      />
+    );
+
+    expect(screen.getByText('Suivi')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Retirer du suivi' })).toBeDefined();
+    expect(document.querySelector('.incident-card-actions')).toBeNull();
   });
 });
 
@@ -194,6 +200,26 @@ describe('IncidentCard – interactions', () => {
     );
     fireEvent.click(screen.getByText('Correction demandée'));
     expect(onReviewEdit).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('appelle onToggleFollow sans propager le click au parent', () => {
+    const onToggleFollow = vi.fn();
+    const onClick = vi.fn();
+    const incident = mockIncident();
+    render(
+      <IncidentCard
+        incident={incident}
+        {...defaultProps}
+        onClick={onClick}
+        onToggleFollow={onToggleFollow}
+        isResponsable
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suivre cet incident' }));
+
+    expect(onToggleFollow).toHaveBeenCalledWith(incident);
     expect(onClick).not.toHaveBeenCalled();
   });
 });

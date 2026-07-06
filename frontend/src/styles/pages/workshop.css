@@ -251,7 +251,7 @@ button.workshop-metric:hover,
   top: 0;
   z-index: 5;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0 -20px 16px;
@@ -260,15 +260,27 @@ button.workshop-metric:hover,
   border-bottom: 1px solid var(--color-border);
 }
 
-.incident-detail-title {
+.incident-detail-heading {
   flex: 1;
   min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.incident-detail-title {
   margin: 0;
   font-size: var(--text-xl);
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.incident-detail-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 /* Bouton icône du drawer (navigation, fermeture). */
@@ -315,6 +327,23 @@ button.workshop-metric:hover,
 
 .incident-detail-header {
   margin-bottom: var(--space-4);
+}
+
+.incident-detail-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.incident-action-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.incident-action-group--danger {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-danger-border);
 }
 
 /* Carte active dans la liste : anneau primaire, liseré d'attention préservé. */
@@ -453,13 +482,21 @@ button.workshop-metric:hover,
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-4);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .incident-card-main h2 {
   margin-top: 0;
   font-size: var(--text-lg);
   line-height: 1.3;
+}
+
+.incident-card-controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .incident-card-status {
@@ -470,22 +507,93 @@ button.workshop-metric:hover,
   flex-wrap: wrap;
 }
 
-.badge-status.neutral {
-  background-color: var(--color-neutral-bg);
-  color: var(--color-neutral-text);
-  font-weight: 700;
+.incident-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
-.badge-status.followed {
+.incident-chip--state {
+  border-radius: var(--radius);
   background-color: var(--color-primary-soft-strong);
   color: var(--color-primary);
 }
 
-.badge-status.priority {
-  border: 1px solid var(--color-danger-border);
+.incident-chip--critical {
+  border-color: var(--attention-critical-text);
+  background-color: var(--attention-critical-text);
+  color: var(--color-primary-text);
+}
+
+.incident-chip--act {
+  border-color: var(--attention-act-border);
+  background-color: var(--attention-act-bg);
+  color: var(--attention-act-text);
+}
+
+.incident-chip--watch {
+  border-color: var(--attention-watch-border);
+  background-color: var(--attention-watch-bg);
+  color: var(--attention-watch-text);
+}
+
+.incident-chip--success {
+  border-color: var(--color-success-border);
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.incident-chip--open,
+.incident-chip--neutral {
+  border-color: var(--color-neutral-bg);
+  background-color: var(--color-neutral-bg);
+  color: var(--color-neutral-text);
+}
+
+.incident-chip--followed {
+  border-color: var(--color-primary-border);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.incident-follow-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
   background-color: var(--color-surface);
-  color: var(--color-danger);
-  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.incident-follow-toggle:hover {
+  border-color: var(--color-primary-border);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.incident-follow-toggle.is-active {
+  border-color: var(--color-primary-border);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 /* Ligne méta compacte : une seule rangée scannable (produit · équipement ·
@@ -549,6 +657,84 @@ button.workshop-metric:hover,
   line-height: 1.45;
 }
 
+.incident-detail-card {
+  overflow: hidden;
+}
+
+.incident-detail-body {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.incident-detail-section {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.incident-detail-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.incident-section-title {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.incident-detail-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.detail-value-muted {
+  color: var(--color-text-muted);
+}
+
+.incident-detail-note {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.incident-detail-note p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+.incident-detail-request {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.incident-detail-request--edit {
+  border-color: var(--attention-watch-border);
+  border-left-color: var(--attention-watch-text);
+  background-color: var(--attention-watch-bg);
+  color: var(--attention-watch-text);
+}
+
+.incident-detail-request--delete {
+  border-color: var(--attention-critical-border);
+  border-left-color: var(--attention-critical-text);
+  background-color: var(--attention-critical-bg);
+  color: var(--attention-critical-text);
+}
+
 .incident-comment {
   margin-top: 14px;
   padding-top: var(--space-3);
@@ -558,19 +744,65 @@ button.workshop-metric:hover,
 
 /* Raccourcis vers le contexte machine (historique / connaissance filtrés) */
 .machine-context-actions {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.incident-tags {
+.incident-card-actions {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
+}
+
+.incident-request-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.incident-request-action--edit {
+  border-color: var(--attention-watch-border);
+  background-color: var(--attention-watch-bg);
+  color: var(--attention-watch-text);
+}
+
+.incident-request-action--edit:hover {
+  border-color: var(--attention-watch-text);
+}
+
+.incident-request-action--delete {
+  border-color: var(--attention-critical-border);
+  background-color: var(--attention-critical-bg);
+  color: var(--attention-critical-text);
+}
+
+.incident-request-action--delete:hover {
+  border-color: var(--attention-critical-text);
+}
+
+.incident-treatment-card {
+  margin-top: var(--space-4);
+}
+
+.incident-responsible-editor {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
 .incident-order-controls {
@@ -614,8 +846,23 @@ button.workshop-metric:hover,
     flex-direction: column;
   }
 
+  .incident-card-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .incident-card-status {
     justify-content: flex-start;
+  }
+
+  .incident-detail-section-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .incident-action-group .btn,
+  .machine-context-actions .btn {
+    flex: 1 1 180px;
   }
 
   .incident-drag-grip {
