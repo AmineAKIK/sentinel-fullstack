@@ -229,11 +229,8 @@ export default function WorkshopDashboardPage() {
   return (
     <>
       <WorkshopNavBar />
-      <main
-        id="main-content"
-        className={`page-container workshop-page${selectedIncident ? ' workshop-page--detail-open' : ''}`}
-      >
-        <div className="page-header workshop-dashboard-header">
+      <main id="main-content" className="page-container workshop-page">
+        <div className="page-header">
           <h1>Tableau de bord atelier</h1>
           <div className="action-bar" style={{ marginTop: 0 }}>
             <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
@@ -244,184 +241,180 @@ export default function WorkshopDashboardPage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        <div className="workshop-toolbar">
-          <IncidentMetricsBar
-            metricsLoading={metricsLoading}
-            metrics={metrics}
-            filters={filters}
-            role={user?.role}
-            createdByMeCount={createdByMeCount}
-            onSetFilters={setFilters}
-          />
+        <IncidentMetricsBar
+          metricsLoading={metricsLoading}
+          metrics={metrics}
+          filters={filters}
+          role={user?.role}
+          createdByMeCount={createdByMeCount}
+          onSetFilters={setFilters}
+        />
 
-          <div className="workshop-search-bar">
-            <div className="filter-group workshop-search-filter">
-              <label className="filter-label" htmlFor="dashboard-search">
-                Recherche
-              </label>
-              <input
-                id="dashboard-search"
-                className="form-input"
-                value={filters.query}
-                onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
-                placeholder="Ligne, machine, robot, produit..."
-              />
-            </div>
-            <div className="filter-group workshop-sort-filter">
-              <span className="filter-label" aria-hidden="true">
-                Tri
-              </span>
-              <SelectField
-                value={sortOrder}
-                onChange={(value) => setSortOrder(value as 'default' | 'date_desc' | 'date_asc')}
-                ariaLabel="Ordre de tri"
-                options={[
-                  { value: 'default', label: 'Ordre de traitement' },
-                  { value: 'date_desc', label: 'Plus récent' },
-                  { value: 'date_asc', label: 'Plus ancien' },
-                ]}
-              />
-            </div>
-            <button
-              className="btn btn-secondary workshop-filter-button"
-              type="button"
-              onClick={() => modal.openModal('filters')}
-            >
-              Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-            </button>
+        <div className="workshop-search-bar">
+          <div className="filter-group workshop-search-filter">
+            <label className="filter-label" htmlFor="dashboard-search">
+              Recherche
+            </label>
+            <input
+              id="dashboard-search"
+              className="form-input"
+              value={filters.query}
+              onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
+              placeholder="Ligne, machine, robot, produit..."
+            />
           </div>
-
-          <FilterSummary
-            count={filteredIncidents.length}
-            countLabel="incident(s) affiché(s)"
-            chips={filterChips}
-            onClear={clearAllFilters}
-          />
+          <div className="filter-group workshop-sort-filter">
+            <span className="filter-label" aria-hidden="true">
+              Tri
+            </span>
+            <SelectField
+              value={sortOrder}
+              onChange={(value) => setSortOrder(value as 'default' | 'date_desc' | 'date_asc')}
+              ariaLabel="Ordre de tri"
+              options={[
+                { value: 'default', label: 'Ordre de traitement' },
+                { value: 'date_desc', label: 'Plus récent' },
+                { value: 'date_asc', label: 'Plus ancien' },
+              ]}
+            />
+          </div>
+          <button
+            className="btn btn-secondary workshop-filter-button"
+            type="button"
+            onClick={() => modal.openModal('filters')}
+          >
+            Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
         </div>
 
-        <div className={`workshop-split${selectedIncident ? ' workshop-split--open' : ''}`}>
-          <div className="workshop-split-list">
-            {loading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <span
-                  className="spinner"
-                  aria-hidden="true"
-                  style={{ width: 24, height: 24, borderWidth: 3 }}
-                />
-              </div>
-            ) : sortedIncidents.length === 0 ? (
-              <div className="card">
-                <div className="empty-state incident-empty-state">
-                  {activeFilterCount > 0 ? (
-                    <>
-                      <p>Aucun incident ne correspond aux filtres.</p>
-                      <button className="btn btn-secondary" onClick={clearAllFilters}>
-                        Effacer les filtres
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p>Aucun incident à traiter. L'atelier est stable.</p>
-                      <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
-                        + Créer un incident
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="incident-list">
-                {sortedIncidents.map((incident) => (
-                  <IncidentCard
-                    key={incident.id}
-                    incident={incident}
-                    isSelected={selectedIncident?.id === incident.id}
-                    isDragging={draggedIncidentId === incident.id}
-                    isDropTarget={
-                      dragOverIncidentId === incident.id && draggedIncidentId !== incident.id
-                    }
-                    canReorder={
-                      sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)
-                    }
-                    isResponsable={isResponsable}
-                    isMaintenance={isMaintenance}
-                    onToggleFollow={actions.handleToggleFollow}
-                    onDragStart={(_e, id) => setDraggedIncidentId(id)}
-                    onDragOver={(_e, id, clientY) => {
-                      if (draggedIncidentId && draggedIncidentId !== id) {
-                        scheduleAutoScroll(clientY);
-                        setDropTarget(id);
-                      }
-                    }}
-                    onDragLeave={(id) => clearDropTarget(id)}
-                    onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
-                    onDragEnd={resetDragState}
-                    onClick={(inc) => {
-                      setSelectedIncident(inc);
-                      setIncidentUrlParam(inc.id);
-                      if (isResponsable && inc.cancel_request) {
-                        modal.openReview(inc, 'delete');
-                        return;
-                      }
-                      if (isResponsable && inc.edit_request) {
-                        modal.openReview(inc, 'edit');
-                      }
-                    }}
-                    onReviewEdit={(_e, inc) => modal.openReview(inc, 'edit')}
-                    onReviewDelete={(_e, inc) => modal.openReview(inc, 'delete')}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+        <FilterSummary
+          count={filteredIncidents.length}
+          countLabel="incident(s) affiché(s)"
+          chips={filterChips}
+          onClear={clearAllFilters}
+        />
 
-          {selectedIncident && (
-            <aside
-              className="workshop-split-detail"
-              aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
-            >
-              <IncidentDetailPanel
-                key={selectedIncident.id}
-                incident={selectedIncident}
-                lines={lines}
-                modal={modal}
-                userRole={user?.role}
-                userId={user?.id}
-                isMaintenance={isMaintenance}
-                isResponsable={isResponsable}
-                onBack={() => clearSelectedIncident()}
-                onToggleFollow={actions.handleToggleFollow}
-                onToggleUrgent={actions.handleToggleUrgent}
-                onConfirmTakeCharge={actions.handleConfirmTakeCharge}
-                onRequestDelete={actions.handleRequestDelete}
-                onSetPending={actions.handleSetPending}
-                onResumeIncident={actions.handleResumeIncident}
-                onCloseIncident={actions.handleCloseIncident}
-                onInvalidateIncident={actions.handleInvalidateIncident}
-                onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
-                onApplyEditRequest={actions.handleApplyEditRequest}
-                onRejectEditRequest={actions.handleRejectEditRequest}
-                onApproveDeleteRequest={actions.handleApproveDeleteRequest}
-                onRejectDeleteRequest={actions.handleRejectDeleteRequest}
-                onEditSuccess={(updated) => {
-                  upsertIncident(updated);
-                  setSelectedIncident(updated);
-                  void refreshMetrics();
-                }}
-                onDeleteCommentConfirm={handleDeleteCommentConfirm}
-                patchIncident={async (id, payload) => {
-                  const updated = await updateWorkshopIncident(id, payload);
-                  setIncidents((prev) =>
-                    sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-                  );
-                  setSelectedIncident(updated);
-                  void refreshMetrics();
-                  return updated;
-                }}
+        <div>
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+              <span
+                className="spinner"
+                aria-hidden="true"
+                style={{ width: 24, height: 24, borderWidth: 3 }}
               />
-            </aside>
+            </div>
+          ) : sortedIncidents.length === 0 ? (
+            <div className="card">
+              <div className="empty-state incident-empty-state">
+                {activeFilterCount > 0 ? (
+                  <>
+                    <p>Aucun incident ne correspond aux filtres.</p>
+                    <button className="btn btn-secondary" onClick={clearAllFilters}>
+                      Effacer les filtres
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p>Aucun incident à traiter. L'atelier est stable.</p>
+                    <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
+                      + Créer un incident
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="incident-list">
+              {sortedIncidents.map((incident) => (
+                <IncidentCard
+                  key={incident.id}
+                  incident={incident}
+                  isSelected={selectedIncident?.id === incident.id}
+                  isDragging={draggedIncidentId === incident.id}
+                  isDropTarget={
+                    dragOverIncidentId === incident.id && draggedIncidentId !== incident.id
+                  }
+                  canReorder={
+                    sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)
+                  }
+                  isResponsable={isResponsable}
+                  isMaintenance={isMaintenance}
+                  onToggleFollow={actions.handleToggleFollow}
+                  onDragStart={(_e, id) => setDraggedIncidentId(id)}
+                  onDragOver={(_e, id, clientY) => {
+                    if (draggedIncidentId && draggedIncidentId !== id) {
+                      scheduleAutoScroll(clientY);
+                      setDropTarget(id);
+                    }
+                  }}
+                  onDragLeave={(id) => clearDropTarget(id)}
+                  onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
+                  onDragEnd={resetDragState}
+                  onClick={(inc) => {
+                    setSelectedIncident(inc);
+                    setIncidentUrlParam(inc.id);
+                    if (isResponsable && inc.cancel_request) {
+                      modal.openReview(inc, 'delete');
+                      return;
+                    }
+                    if (isResponsable && inc.edit_request) {
+                      modal.openReview(inc, 'edit');
+                    }
+                  }}
+                  onReviewEdit={(_e, inc) => modal.openReview(inc, 'edit')}
+                  onReviewDelete={(_e, inc) => modal.openReview(inc, 'delete')}
+                />
+              ))}
+            </div>
           )}
         </div>
+
+        {selectedIncident && (
+          <aside
+            className="incident-detail-drawer"
+            aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
+          >
+            <IncidentDetailPanel
+              key={selectedIncident.id}
+              incident={selectedIncident}
+              lines={lines}
+              modal={modal}
+              userRole={user?.role}
+              userId={user?.id}
+              isMaintenance={isMaintenance}
+              isResponsable={isResponsable}
+              onBack={() => clearSelectedIncident()}
+              onToggleFollow={actions.handleToggleFollow}
+              onToggleUrgent={actions.handleToggleUrgent}
+              onConfirmTakeCharge={actions.handleConfirmTakeCharge}
+              onRequestDelete={actions.handleRequestDelete}
+              onSetPending={actions.handleSetPending}
+              onResumeIncident={actions.handleResumeIncident}
+              onCloseIncident={actions.handleCloseIncident}
+              onInvalidateIncident={actions.handleInvalidateIncident}
+              onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
+              onApplyEditRequest={actions.handleApplyEditRequest}
+              onRejectEditRequest={actions.handleRejectEditRequest}
+              onApproveDeleteRequest={actions.handleApproveDeleteRequest}
+              onRejectDeleteRequest={actions.handleRejectDeleteRequest}
+              onEditSuccess={(updated) => {
+                upsertIncident(updated);
+                setSelectedIncident(updated);
+                void refreshMetrics();
+              }}
+              onDeleteCommentConfirm={handleDeleteCommentConfirm}
+              patchIncident={async (id, payload) => {
+                const updated = await updateWorkshopIncident(id, payload);
+                setIncidents((prev) =>
+                  sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
+                );
+                setSelectedIncident(updated);
+                void refreshMetrics();
+                return updated;
+              }}
+            />
+          </aside>
+        )}
 
         {modal.state.activeModal === 'create' && (
           <CreateIncidentModal

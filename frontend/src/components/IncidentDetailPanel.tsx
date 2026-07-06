@@ -100,12 +100,23 @@ export default function IncidentDetailPanel({
 
   return (
     <>
-      <button className="back-link" onClick={onBack}>
-        Retour à la liste
-      </button>
-
-      <div className="page-header incident-detail-header">
+      <div className="incident-detail-topbar">
         <h2 className="incident-detail-title">Incident {incident.line_number} · {incident.machine_id}</h2>
+        <button
+          type="button"
+          className="incident-detail-close"
+          onClick={onBack}
+          aria-label="Fermer le détail"
+          autoFocus
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="incident-detail-header">
         <div className="action-bar" style={{ marginTop: 0 }}>
           {isResponsable && (
             <button
