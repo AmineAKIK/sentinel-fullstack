@@ -153,7 +153,7 @@ export default function Modal({
         <div className="modal-footer">{footer}</div>
 
         {confirmClose && (
-          <div className="modal-confirm-backdrop" role="presentation">
+          <div className="modal-confirm-overlay" role="presentation">
             <div
               className="modal-confirm-dialog"
               role="dialog"

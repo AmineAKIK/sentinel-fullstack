@@ -337,7 +337,7 @@
   padding-top: var(--space-1);
 }
 
-.modal-confirm-backdrop {
+.modal-confirm-overlay {
   position: absolute;
   inset: 0;
   background-color: rgba(11, 18, 32, 0.15);
@@ -1277,4 +1277,3 @@ tbody tr:hover .row-action {
   padding: 48px 16px;
   color: var(--color-text-muted);
 }
-
