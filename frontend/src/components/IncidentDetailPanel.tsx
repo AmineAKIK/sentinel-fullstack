@@ -104,8 +104,8 @@ export default function IncidentDetailPanel({
         Retour à la liste
       </button>
 
-      <div className="page-header">
-        <h1>Incident {incident.line_number} · {incident.machine_id}</h1>
+      <div className="page-header incident-detail-header">
+        <h2 className="incident-detail-title">Incident {incident.line_number} · {incident.machine_id}</h2>
         <div className="action-bar" style={{ marginTop: 0 }}>
           {isResponsable && (
             <button

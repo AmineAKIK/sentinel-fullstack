@@ -5,6 +5,7 @@ import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
 
 interface IncidentCardProps {
   incident: WorkshopIncident;
+  isSelected?: boolean;
   isDragging: boolean;
   isDropTarget: boolean;
   canReorder: boolean;
@@ -23,6 +24,7 @@ interface IncidentCardProps {
 
 export default function IncidentCard({
   incident,
+  isSelected = false,
   isDragging,
   isDropTarget,
   canReorder,
@@ -49,7 +51,8 @@ export default function IncidentCard({
   return (
     <div
       role="button"
-      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isSelected ? ' is-selected' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+      aria-current={isSelected || undefined}
       draggable={canReorder}
       onDragStart={(event) => {
         if (!canReorder) return;

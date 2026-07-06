@@ -18,7 +18,10 @@ import { WorkshopIncident } from '../types';
 import { canPerform } from '../utils/workshopPermissions';
 import { sortIncidents } from '../utils/incidentSort';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useDashboardFilters, DashboardFilters as DashboardFiltersState } from '../hooks/useDashboardFilters';
+import {
+  useDashboardFilters,
+  DashboardFilters as DashboardFiltersState,
+} from '../hooks/useDashboardFilters';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { useIncidentsData } from '../hooks/useIncidentsData';
 import { useModalState } from '../hooks/useModalState';
@@ -47,10 +50,23 @@ export default function WorkshopDashboardPage() {
     aging: searchParams.get('age') ?? 'all',
   });
 
-  const { lines, incidents, metrics, metricsLoading, loading, error, setIncidents, refreshMetrics, upsertIncident } =
-    useIncidentsData();
+  const {
+    lines,
+    incidents,
+    metrics,
+    metricsLoading,
+    loading,
+    error,
+    setIncidents,
+    refreshMetrics,
+    upsertIncident,
+  } = useIncidentsData();
   const modal = useModalState();
-  const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({ filters, setFilters, lines });
+  const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({
+    filters,
+    setFilters,
+    lines,
+  });
   const {
     draggedIncidentId,
     dragOverIncidentId,
@@ -94,7 +110,7 @@ export default function WorkshopDashboardPage() {
     if (!loading && incidents.length > 0) {
       setIncidentUrlParam(null, true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIncidentParam, incidents, loading]);
 
   const filteredIncidents = incidents.filter((incident) => {
@@ -105,7 +121,10 @@ export default function WorkshopDashboardPage() {
     if (filters.scope === 'followed' && !incident.is_followed) return false;
     if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
     if (filters.scope === 'created_by_me' && incident.user_id !== user?.id) return false;
-    if (filters.scope !== 'followed' && (incident.status === 'CANCELED' || incident.status === 'INVALIDATED'))
+    if (
+      filters.scope !== 'followed' &&
+      (incident.status === 'CANCELED' || incident.status === 'INVALIDATED')
+    )
       return false;
     if (
       filters.scope !== 'followed' &&
@@ -114,11 +133,19 @@ export default function WorkshopDashboardPage() {
       incident.status === 'CLOSED'
     )
       return false;
-    if ((filters.scope === 'assigned_to_me' || filters.scope === 'created_by_me') && isResolved) return false;
+    if ((filters.scope === 'assigned_to_me' || filters.scope === 'created_by_me') && isResolved)
+      return false;
     if (filters.lineId !== 'all' && String(incident.line_id) !== filters.lineId) return false;
     if (filters.status !== 'all' && incident.status !== filters.status) return false;
-    if (filters.status === 'CLOSED' && !isWithinLastDays(incident.updated_at ?? incident.created_at, 7)) return false;
-    if (filters.aging === 'over_7d' && (incident.status === 'CLOSED' || isWithinLastDays(incident.created_at, 7)))
+    if (
+      filters.status === 'CLOSED' &&
+      !isWithinLastDays(incident.updated_at ?? incident.created_at, 7)
+    )
+      return false;
+    if (
+      filters.aging === 'over_7d' &&
+      (incident.status === 'CLOSED' || isWithinLastDays(incident.created_at, 7))
+    )
       return false;
     if (filters.priority === 'urgent' && !incident.is_priority) return false;
     if (filters.priority === 'normal' && incident.is_priority) return false;
@@ -182,59 +209,31 @@ export default function WorkshopDashboardPage() {
     modal.setDeleteCommentConfirm(null);
   }
 
-  if (selectedIncident) {
-    return (
-      <>
-        <WorkshopNavBar />
-        <main id="main-content" className="page-container workshop-page">
-          <IncidentDetailPanel
-            incident={selectedIncident}
-            lines={lines}
-            modal={modal}
-            userRole={user?.role}
-            userId={user?.id}
-            isMaintenance={isMaintenance}
-            isResponsable={isResponsable}
-            onBack={() => clearSelectedIncident()}
-            onToggleFollow={actions.handleToggleFollow}
-            onToggleUrgent={actions.handleToggleUrgent}
-            onConfirmTakeCharge={actions.handleConfirmTakeCharge}
-            onRequestDelete={actions.handleRequestDelete}
-            onSetPending={actions.handleSetPending}
-            onResumeIncident={actions.handleResumeIncident}
-            onCloseIncident={actions.handleCloseIncident}
-            onInvalidateIncident={actions.handleInvalidateIncident}
-            onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
-            onApplyEditRequest={actions.handleApplyEditRequest}
-            onRejectEditRequest={actions.handleRejectEditRequest}
-            onApproveDeleteRequest={actions.handleApproveDeleteRequest}
-            onRejectDeleteRequest={actions.handleRejectDeleteRequest}
-            onEditSuccess={(updated) => {
-              upsertIncident(updated);
-              setSelectedIncident(updated);
-              void refreshMetrics();
-            }}
-            onDeleteCommentConfirm={handleDeleteCommentConfirm}
-            patchIncident={async (id, payload) => {
-              const updated = await updateWorkshopIncident(id, payload);
-              setIncidents((prev) =>
-                sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-              );
-              setSelectedIncident(updated);
-              void refreshMetrics();
-              return updated;
-            }}
-          />
-        </main>
-      </>
-    );
-  }
+  // Un modal ouvert capte déjà Escape : le panneau ne doit pas se fermer en dessous.
+  const anyModalOpen =
+    modal.state.activeModal !== null ||
+    modal.state.reviewIncident !== null ||
+    modal.state.unfollowConfirmIncident !== null ||
+    modal.state.deleteResponsibleCommentIncident !== null;
+
+  useEffect(() => {
+    if (!selectedIncident || anyModalOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') clearSelectedIncident();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIncident, anyModalOpen]);
 
   return (
     <>
       <WorkshopNavBar />
-      <main id="main-content" className="page-container workshop-page">
-        <div className="page-header">
+      <main
+        id="main-content"
+        className={`page-container workshop-page${selectedIncident ? ' workshop-page--detail-open' : ''}`}
+      >
+        <div className="page-header workshop-dashboard-header">
           <h1>Tableau de bord atelier</h1>
           <div className="action-bar" style={{ marginTop: 0 }}>
             <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
@@ -245,118 +244,184 @@ export default function WorkshopDashboardPage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        <IncidentMetricsBar
-          metricsLoading={metricsLoading}
-          metrics={metrics}
-          filters={filters}
-          role={user?.role}
-          createdByMeCount={createdByMeCount}
-          onSetFilters={setFilters}
-        />
+        <div className="workshop-toolbar">
+          <IncidentMetricsBar
+            metricsLoading={metricsLoading}
+            metrics={metrics}
+            filters={filters}
+            role={user?.role}
+            createdByMeCount={createdByMeCount}
+            onSetFilters={setFilters}
+          />
 
-        <div className="workshop-search-bar">
-          <div className="filter-group workshop-search-filter">
-            <label className="filter-label" htmlFor="dashboard-search">Recherche</label>
-            <input
-              id="dashboard-search"
-              className="form-input"
-              value={filters.query}
-              onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
-              placeholder="Ligne, machine, robot, produit..."
-            />
+          <div className="workshop-search-bar">
+            <div className="filter-group workshop-search-filter">
+              <label className="filter-label" htmlFor="dashboard-search">
+                Recherche
+              </label>
+              <input
+                id="dashboard-search"
+                className="form-input"
+                value={filters.query}
+                onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
+                placeholder="Ligne, machine, robot, produit..."
+              />
+            </div>
+            <div className="filter-group workshop-sort-filter">
+              <span className="filter-label" aria-hidden="true">
+                Tri
+              </span>
+              <SelectField
+                value={sortOrder}
+                onChange={(value) => setSortOrder(value as 'default' | 'date_desc' | 'date_asc')}
+                ariaLabel="Ordre de tri"
+                options={[
+                  { value: 'default', label: 'Ordre de traitement' },
+                  { value: 'date_desc', label: 'Plus récent' },
+                  { value: 'date_asc', label: 'Plus ancien' },
+                ]}
+              />
+            </div>
+            <button
+              className="btn btn-secondary workshop-filter-button"
+              type="button"
+              onClick={() => modal.openModal('filters')}
+            >
+              Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </button>
           </div>
-          <div className="filter-group workshop-sort-filter">
-            <span className="filter-label" aria-hidden="true">Tri</span>
-            <SelectField
-              value={sortOrder}
-              onChange={(value) => setSortOrder(value as 'default' | 'date_desc' | 'date_asc')}
-              ariaLabel="Ordre de tri"
-              options={[
-                { value: 'default', label: 'Ordre de traitement' },
-                { value: 'date_desc', label: 'Plus récent' },
-                { value: 'date_asc', label: 'Plus ancien' },
-              ]}
-            />
-          </div>
-          <button
-            className="btn btn-secondary workshop-filter-button"
-            type="button"
-            onClick={() => modal.openModal('filters')}
-          >
-            Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </button>
+
+          <FilterSummary
+            count={filteredIncidents.length}
+            countLabel="incident(s) affiché(s)"
+            chips={filterChips}
+            onClear={clearAllFilters}
+          />
         </div>
 
-        <FilterSummary
-          count={filteredIncidents.length}
-          countLabel="incident(s) affiché(s)"
-          chips={filterChips}
-          onClear={clearAllFilters}
-        />
+        <div className={`workshop-split${selectedIncident ? ' workshop-split--open' : ''}`}>
+          <div className="workshop-split-list">
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+                <span
+                  className="spinner"
+                  aria-hidden="true"
+                  style={{ width: 24, height: 24, borderWidth: 3 }}
+                />
+              </div>
+            ) : sortedIncidents.length === 0 ? (
+              <div className="card">
+                <div className="empty-state incident-empty-state">
+                  {activeFilterCount > 0 ? (
+                    <>
+                      <p>Aucun incident ne correspond aux filtres.</p>
+                      <button className="btn btn-secondary" onClick={clearAllFilters}>
+                        Effacer les filtres
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Aucun incident à traiter. L'atelier est stable.</p>
+                      <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
+                        + Créer un incident
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="incident-list">
+                {sortedIncidents.map((incident) => (
+                  <IncidentCard
+                    key={incident.id}
+                    incident={incident}
+                    isSelected={selectedIncident?.id === incident.id}
+                    isDragging={draggedIncidentId === incident.id}
+                    isDropTarget={
+                      dragOverIncidentId === incident.id && draggedIncidentId !== incident.id
+                    }
+                    canReorder={
+                      sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)
+                    }
+                    isResponsable={isResponsable}
+                    isMaintenance={isMaintenance}
+                    onToggleFollow={actions.handleToggleFollow}
+                    onDragStart={(_e, id) => setDraggedIncidentId(id)}
+                    onDragOver={(_e, id, clientY) => {
+                      if (draggedIncidentId && draggedIncidentId !== id) {
+                        scheduleAutoScroll(clientY);
+                        setDropTarget(id);
+                      }
+                    }}
+                    onDragLeave={(id) => clearDropTarget(id)}
+                    onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
+                    onDragEnd={resetDragState}
+                    onClick={(inc) => {
+                      setSelectedIncident(inc);
+                      setIncidentUrlParam(inc.id);
+                      if (isResponsable && inc.cancel_request) {
+                        modal.openReview(inc, 'delete');
+                        return;
+                      }
+                      if (isResponsable && inc.edit_request) {
+                        modal.openReview(inc, 'edit');
+                      }
+                    }}
+                    onReviewEdit={(_e, inc) => modal.openReview(inc, 'edit')}
+                    onReviewDelete={(_e, inc) => modal.openReview(inc, 'delete')}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-            <span className="spinner" aria-hidden="true" style={{ width: 24, height: 24, borderWidth: 3 }} />
-          </div>
-        ) : sortedIncidents.length === 0 ? (
-          <div className="card">
-            <div className="empty-state incident-empty-state">
-              {activeFilterCount > 0 ? (
-                <>
-                  <p>Aucun incident ne correspond aux filtres.</p>
-                  <button className="btn btn-secondary" onClick={clearAllFilters}>
-                    Effacer les filtres
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p>Aucun incident à traiter. L'atelier est stable.</p>
-                  <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
-                    + Créer un incident
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="incident-list">
-            {sortedIncidents.map((incident) => (
-              <IncidentCard
-                key={incident.id}
-                incident={incident}
-                isDragging={draggedIncidentId === incident.id}
-                isDropTarget={dragOverIncidentId === incident.id && draggedIncidentId !== incident.id}
-                canReorder={sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)}
-                isResponsable={isResponsable}
+          {selectedIncident && (
+            <aside
+              className="workshop-split-detail"
+              aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
+            >
+              <IncidentDetailPanel
+                key={selectedIncident.id}
+                incident={selectedIncident}
+                lines={lines}
+                modal={modal}
+                userRole={user?.role}
+                userId={user?.id}
                 isMaintenance={isMaintenance}
+                isResponsable={isResponsable}
+                onBack={() => clearSelectedIncident()}
                 onToggleFollow={actions.handleToggleFollow}
-                onDragStart={(_e, id) => setDraggedIncidentId(id)}
-                onDragOver={(_e, id, clientY) => {
-                  if (draggedIncidentId && draggedIncidentId !== id) {
-                    scheduleAutoScroll(clientY);
-                    setDropTarget(id);
-                  }
+                onToggleUrgent={actions.handleToggleUrgent}
+                onConfirmTakeCharge={actions.handleConfirmTakeCharge}
+                onRequestDelete={actions.handleRequestDelete}
+                onSetPending={actions.handleSetPending}
+                onResumeIncident={actions.handleResumeIncident}
+                onCloseIncident={actions.handleCloseIncident}
+                onInvalidateIncident={actions.handleInvalidateIncident}
+                onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
+                onApplyEditRequest={actions.handleApplyEditRequest}
+                onRejectEditRequest={actions.handleRejectEditRequest}
+                onApproveDeleteRequest={actions.handleApproveDeleteRequest}
+                onRejectDeleteRequest={actions.handleRejectDeleteRequest}
+                onEditSuccess={(updated) => {
+                  upsertIncident(updated);
+                  setSelectedIncident(updated);
+                  void refreshMetrics();
                 }}
-                onDragLeave={(id) => clearDropTarget(id)}
-                onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
-                onDragEnd={resetDragState}
-                onClick={(inc) => {
-                  setSelectedIncident(inc);
-                  setIncidentUrlParam(inc.id);
-                  if (isResponsable && inc.cancel_request) {
-                    modal.openReview(inc, 'delete');
-                    return;
-                  }
-                  if (isResponsable && inc.edit_request) {
-                    modal.openReview(inc, 'edit');
-                  }
+                onDeleteCommentConfirm={handleDeleteCommentConfirm}
+                patchIncident={async (id, payload) => {
+                  const updated = await updateWorkshopIncident(id, payload);
+                  setIncidents((prev) =>
+                    sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
+                  );
+                  setSelectedIncident(updated);
+                  void refreshMetrics();
+                  return updated;
                 }}
-                onReviewEdit={(_e, inc) => modal.openReview(inc, 'edit')}
-                onReviewDelete={(_e, inc) => modal.openReview(inc, 'delete')}
               />
-            ))}
-          </div>
-        )}
+            </aside>
+          )}
+        </div>
 
         {modal.state.activeModal === 'create' && (
           <CreateIncidentModal
@@ -381,7 +446,9 @@ export default function WorkshopDashboardPage() {
           />
         )}
 
-        {modal.state.reviewIncident && modal.state.reviewType && (
+        {/* Ces trois modals sont aussi rendus par IncidentDetailPanel : quand le
+            panneau est ouvert, c'est lui qui les porte (sinon double rendu). */}
+        {!selectedIncident && modal.state.reviewIncident && modal.state.reviewType && (
           <ReviewIncidentRequestModal
             incident={modal.state.reviewIncident}
             lines={lines}
@@ -393,9 +460,15 @@ export default function WorkshopDashboardPage() {
             onRejectEdit={actions.handleRejectEditRequest}
             onApproveDelete={actions.handleApproveDeleteRequest}
             onRejectDelete={actions.handleRejectDeleteRequest}
-            allowDeleteApproval={canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)}
+            allowDeleteApproval={canPerform(
+              user?.role,
+              'approveCancel',
+              modal.state.reviewIncident
+            )}
             allowDeleteReject={canPerform(user?.role, 'rejectCancel', modal.state.reviewIncident)}
-            deleteApprovalDisabled={!canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)}
+            deleteApprovalDisabled={
+              !canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)
+            }
             deleteWarning={
               canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)
                 ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
@@ -412,7 +485,7 @@ export default function WorkshopDashboardPage() {
           />
         )}
 
-        {modal.state.unfollowConfirmIncident && (
+        {!selectedIncident && modal.state.unfollowConfirmIncident && (
           <UnfollowIncidentConfirmModal
             incident={modal.state.unfollowConfirmIncident}
             onClose={() => modal.setUnfollowConfirm(null)}
@@ -420,7 +493,7 @@ export default function WorkshopDashboardPage() {
           />
         )}
 
-        {modal.state.deleteResponsibleCommentIncident && (
+        {!selectedIncident && modal.state.deleteResponsibleCommentIncident && (
           <DeleteResponsibleCommentConfirmModal
             incident={modal.state.deleteResponsibleCommentIncident}
             onClose={() => modal.setDeleteCommentConfirm(null)}
