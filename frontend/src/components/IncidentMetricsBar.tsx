@@ -1,6 +1,5 @@
 import { WorkshopIncidentMetrics } from '../types';
 import type { Dispatch, SetStateAction } from 'react';
-import { useRef, useState, useLayoutEffect } from 'react';
 import type { DashboardFilters as Filters } from '../hooks/useDashboardFilters';
 
 interface IncidentMetricsBarProps {
@@ -126,56 +125,6 @@ const ROLE_METRIC_CONFIGS: MetricConfig[] = [
   },
 ];
 
-// Lit le nombre de colonnes réellement rendues par le navigateur pour cette
-// grille (via le CSS repeat() actif au breakpoint courant), et calcule
-// combien de "spans" ajouter aux dernières tuiles pour que la dernière ligne
-// soit toujours pleine — quel que soit le nombre total de tuiles ou la
-// largeur d'écran. Approche mesurée plutôt que des règles CSS par cas
-// (fragile : chaque total × chaque breakpoint est une combinaison à couvrir
-// à la main, et il est facile d'en oublier une, comme on vient de le vérifier).
-function useLastRowSpans(tileCount: number): {
-  containerRef: React.RefObject<HTMLDivElement>;
-  spans: number[];
-} {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [spans, setSpans] = useState<number[]>([]);
-
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el || tileCount === 0) {
-      setSpans([]);
-      return;
-    }
-
-    function recompute() {
-      if (!el) return;
-      const columnCount = getComputedStyle(el).gridTemplateColumns.split(' ').length || 1;
-      const remainder = tileCount % columnCount;
-      if (remainder === 0 || columnCount === 1) {
-        setSpans([]);
-        return;
-      }
-      // La dernière ligne a `remainder` tuiles à répartir sur `columnCount`
-      // colonnes : certaines tuiles reçoivent un span supplémentaire pour
-      // combler exactement l'espace (ex: 3 tuiles sur 4 colonnes -> spans
-      // [2,1,1] ; 2 tuiles sur 3 colonnes -> spans [2,1]).
-      const extra = columnCount - remainder;
-      const next: number[] = Array(remainder).fill(1);
-      for (let i = 0; i < extra; i += 1) {
-        next[i % remainder] += 1;
-      }
-      setSpans(next);
-    }
-
-    recompute();
-    const observer = new ResizeObserver(recompute);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [tileCount]);
-
-  return { containerRef, spans };
-}
-
 export default function IncidentMetricsBar({
   metricsLoading,
   metrics,
@@ -188,26 +137,22 @@ export default function IncidentMetricsBar({
   const extras: ExtraCounts = { createdByMe: createdByMeCount, requests: requestsCount };
   const roleMetrics = ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? ''));
   const showClosedToday = !metricsLoading && !!metrics && (metrics.closed_today ?? 0) > 0;
-  // Ordre de rendu unique : les configs fixes, puis "Clôturés aujourd'hui" si
-  // présent, puis les tuiles de rôle — dans cet ordre exact, pour que le
-  // calcul des spans (basé sur cet ordre) tombe juste.
   const tileCount =
     metricsLoading || !metrics
       ? 0
       : METRIC_CONFIGS.length + (showClosedToday ? 1 : 0) + roleMetrics.length;
-  const { containerRef, spans: lastRowSpans } = useLastRowSpans(tileCount);
-  const spanStartIndex = tileCount - lastRowSpans.length;
-  let renderIndex = -1;
-
-  function nextSpanStyle(): React.CSSProperties | undefined {
-    renderIndex += 1;
-    if (renderIndex < spanStartIndex) return undefined;
-    const span = lastRowSpans[renderIndex - spanStartIndex];
-    return span > 1 ? { gridColumn: `span ${span}` } : undefined;
-  }
 
   return (
-    <div className="workshop-metrics" ref={containerRef}>
+    <div
+      className="workshop-metrics"
+      // Une seule rangée de N colonnes égales : aucun retour à la ligne
+      // possible sur desktop, donc aucun orphelin, et toutes les tuiles ont
+      // strictement la même largeur (voir workshop.css). data-odd-count sert
+      // au palier 2 colonnes mobile : la dernière tuile d'un compte impair
+      // prend la rangée entière (pleine largeur = intentionnel, pas cassé).
+      style={{ '--metrics-count': tileCount || 6 } as React.CSSProperties}
+      data-odd-count={tileCount % 2 === 1 || undefined}
+    >
       {!metricsLoading && metrics && (
         <div className="sr-only" aria-live="polite" aria-atomic="true">
           {`${metrics.priority} urgent${metrics.priority !== 1 ? 's' : ''}, ${metrics.not_taken} non pris`}
@@ -229,7 +174,6 @@ export default function IncidentMetricsBar({
               <button
                 key={cfg.key}
                 className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
-                style={nextSpanStyle()}
                 onClick={() =>
                   onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
                 }
@@ -241,7 +185,7 @@ export default function IncidentMetricsBar({
             );
           })}
           {showClosedToday && (
-            <div className="workshop-metric" style={nextSpanStyle()}>
+            <div className="workshop-metric">
               <span>Clôturés aujourd'hui</span>
               <strong>{metrics.closed_today}</strong>
             </div>
@@ -256,7 +200,6 @@ export default function IncidentMetricsBar({
               <button
                 key={cfg.key}
                 className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
-                style={nextSpanStyle()}
                 onClick={() =>
                   onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
                 }

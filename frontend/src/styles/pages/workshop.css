@@ -90,32 +90,34 @@
 }
 
 
-/* Grille à colonnes fixes par palier d'écran (pas auto-fit : auto-fit décide
-   son nombre de colonnes sans connaître le nombre de tuiles, ce qui laisse
-   un reste imprévisible). Le span de la dernière ligne, lui, est calculé et
-   injecté en style inline par IncidentMetricsBar (useLastRowSpans) : le
-   composant mesure le nombre de colonnes réellement actif via
-   getComputedStyle + ResizeObserver et répartit les tuiles restantes pour
-   qu'aucune ligne ne soit jamais incomplète, à n'importe quel total de
-   tuiles ou largeur d'écran — pas de règle CSS à maintenir par cas. */
+/* Une seule rangée de N colonnes strictement égales (--metrics-count posé
+   par IncidentMetricsBar = nombre réel de tuiles du rôle). Pas de retour à
+   la ligne possible = pas d'orphelin possible, et toutes les tuiles ont la
+   même largeur — elles se compressent équitablement quand il y en a plus.
+   En dessous de 900px, 2 colonnes ; un compte impair met la dernière tuile
+   en pleine largeur (une rangée complète, pas une tuile isolée). */
 .workshop-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--metrics-count, 6), minmax(0, 1fr));
   gap: 10px;
   margin-bottom: var(--space-4);
   min-width: 0;
 }
 
 @media (max-width: 900px) {
-  .workshop-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
+  .workshop-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
-@media (max-width: 620px) {
-  .workshop-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workshop-metrics[data-odd-count] > .workshop-metric:last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 420px) {
-  .workshop-metrics { grid-template-columns: 1fr; }
+  .workshop-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 .workshop-metric {
