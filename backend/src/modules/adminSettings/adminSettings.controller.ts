@@ -58,7 +58,7 @@ export async function patchNotifPrefs(req: Request, res: Response): Promise<void
         sendError(res, 400, 'VALIDATION_ERROR', `${key} doit être un booléen.`);
         return;
       }
-      patch[key] = body[key] as boolean;
+      patch[key] = body[key];
     }
   }
 
@@ -69,7 +69,7 @@ export async function patchNotifPrefs(req: Request, res: Response): Promise<void
 
   try {
     await updateAdminNotifPrefs(req.admin.adminId, patch);
-    await createAdminSystemAuditEvent(req.admin.adminId, 'ADMIN_NOTIF_UPDATED', patch as Record<string, unknown>);
+    await createAdminSystemAuditEvent(req.admin.adminId, 'ADMIN_NOTIF_UPDATED', patch);
     const updated = await getAdminNotifPrefs(req.admin.adminId);
     res.json(updated);
   } catch (err) {
@@ -239,7 +239,7 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
     }
     if (Object.keys(patch).length > 0) {
       await updateAppSettings(req.admin.adminId, patch);
-      await createAdminSystemAuditEvent(req.admin.adminId, 'APP_SETTINGS_CHANGED', patch as Record<string, unknown>);
+      await createAdminSystemAuditEvent(req.admin.adminId, 'APP_SETTINGS_CHANGED', patch);
     }
     if (revokeAdmin) {
       await incrementAdminSessionVersion(req.admin.adminId);
@@ -260,4 +260,3 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
     handleControllerError(res, 'patchAppSettings', err);
   }
 }
-

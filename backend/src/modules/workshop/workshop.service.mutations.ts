@@ -205,7 +205,7 @@ export async function invalidateIncidentService(
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Seul le responsable peut invalider un incident clôturé.');
-  void notifyTechnicianIncidentInvalidated(result.id, actorUserId, invalidationReason!.trim());
+  void notifyTechnicianIncidentInvalidated(result.id, actorUserId, invalidationReason.trim());
   return { ok: true, data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId) };
 }
 
@@ -402,7 +402,7 @@ export async function cancelIncidentService(
       previousStatus: incident.status,
     }, client);
     await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
-    return { kind: 'ok' as const, mode: action, takenByUserId: incident.taken_by_user_id as number | null };
+    return { kind: 'ok' as const, mode: action, takenByUserId: incident.taken_by_user_id };
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');

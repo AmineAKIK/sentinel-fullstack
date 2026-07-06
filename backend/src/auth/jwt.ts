@@ -12,8 +12,7 @@ export function signAuthToken(payload: object, durationHours: number | 'unlimite
   if (durationHours === 'unlimited') {
     return jwt.sign(payload, secret);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return jwt.sign(payload, secret, { expiresIn: durationHours * 3600 } as any);
+  return jwt.sign(payload, secret, { expiresIn: durationHours * 3600 });
 }
 
 export function verifyAuthToken<TPayload>(token: string): TPayload | null {
