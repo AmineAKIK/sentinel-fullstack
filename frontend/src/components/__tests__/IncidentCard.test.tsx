@@ -108,15 +108,24 @@ describe('IncidentCard – rendu', () => {
     expect(screen.getByText('Sécuriser la zone avant intervention.')).toBeDefined();
   });
 
-  it('conserve le produit en cours dans le premier niveau de synthèse', () => {
+  it('conserve le produit en cours dans la ligne méta de la carte', () => {
     render(
       <IncidentCard
         incident={mockIncident({ current_product: 'PRODUIT X45' })}
         {...defaultProps}
       />
     );
-    expect(screen.getByText('Produit en cours')).toBeDefined();
     expect(screen.getByText('PRODUIT X45')).toBeDefined();
+  });
+
+  it('signale un produit non renseigné dans la ligne méta', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ current_product: '' })}
+        {...defaultProps}
+      />
+    );
+    expect(screen.getByText('Produit non renseigné')).toBeDefined();
   });
 
   it('affiche le bouton "Correction demandée" si responsable et edit_request présent', () => {

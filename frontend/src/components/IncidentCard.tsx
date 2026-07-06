@@ -50,7 +50,6 @@ export default function IncidentCard({
     <div
       role="button"
       className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
-      key={incident.id}
       draggable={canReorder}
       onDragStart={(event) => {
         if (!canReorder) return;
@@ -95,11 +94,17 @@ export default function IncidentCard({
           </button>
         </div>
       )}
+      {canReorder && (
+        <span className="incident-drag-grip" title="Glisser pour changer l'ordre de traitement" aria-hidden="true">
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+            <circle cx="2.5" cy="2.5" r="1.5" /><circle cx="7.5" cy="2.5" r="1.5" />
+            <circle cx="2.5" cy="8" r="1.5" /><circle cx="7.5" cy="8" r="1.5" />
+            <circle cx="2.5" cy="13.5" r="1.5" /><circle cx="7.5" cy="13.5" r="1.5" />
+          </svg>
+        </span>
+      )}
       <div className="incident-card-main">
-        <div>
-          <span className="detail-field-label">Incident</span>
-          <h2>Ligne {incident.line_number} · {incident.machine_id}</h2>
-        </div>
+        <h2>Ligne {incident.line_number} · {incident.machine_id}</h2>
         <div className="incident-card-status">
           <span className="badge-role">{STATE_LABELS[incident.state] || incident.state}</span>
           {isActiveUrgent && <span className="badge-status priority">Urgent</span>}
@@ -107,74 +112,87 @@ export default function IncidentCard({
           {incident.status === 'CANCELED' && <span className="badge-status neutral">Annulé</span>}
           {incident.status === 'INVALIDATED' && <span className="badge-status neutral">Invalidé</span>}
           {incident.is_followed && <span className="badge-status followed">Suivi</span>}
-          {incident.is_taken ? (
-            <span className="badge-status active">Pris en charge</span>
-          ) : (
-            <span className="badge-status inactive">Non pris</span>
+          {/* Le statut de prise en charge n'est badgé que pour l'opérateur :
+              technicien et responsable le lisent dans la ligne méta (un signal,
+              un canal — pas de redondance). */}
+          {!isMaintenance && !isResponsable && (
+            incident.is_taken ? (
+              <span className="badge-status active">Pris en charge</span>
+            ) : (
+              <span className="badge-status inactive">Non pris</span>
+            )
           )}
         </div>
       </div>
-      <div className="incident-tags">
-        {isResponsable && !isResolvedFollowed && (
-          <button
-            type="button"
-            className={`request-badge ${incident.is_followed ? 'request-badge-followed' : ''}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleFollow?.(incident);
-            }}
-          >
-            {incident.is_followed ? 'Retirer du suivi' : 'Suivre'}
-          </button>
+      {isResponsable && (!isResolvedFollowed || Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
+        <div className="incident-tags">
+          {!isResolvedFollowed && (
+            <button
+              type="button"
+              className={`request-badge ${incident.is_followed ? 'request-badge-followed' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleFollow?.(incident);
+              }}
+            >
+              {incident.is_followed ? 'Retirer du suivi' : 'Suivre'}
+            </button>
+          )}
+          {incident.edit_request && (
+            <button
+              type="button"
+              className="request-badge request-badge-edit"
+              onClick={(event) => {
+                event.stopPropagation();
+                onReviewEdit(event, incident);
+              }}
+            >
+              Correction demandée
+            </button>
+          )}
+          {incident.cancel_request && (
+            <button
+              type="button"
+              className="request-badge request-badge-delete"
+              onClick={(event) => {
+                event.stopPropagation();
+                onReviewDelete(event, incident);
+              }}
+            >
+              Annulation demandée
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="incident-card-meta">
+        {currentProduct ? (
+          <span className="incident-meta-item">Produit <strong>{currentProduct}</strong></span>
+        ) : (
+          <span className="incident-meta-item incident-meta-missing">Produit non renseigné</span>
         )}
-        {isResponsable && incident.edit_request && (
-          <button
-            type="button"
-            className="request-badge request-badge-edit"
-            onClick={(event) => {
-              event.stopPropagation();
-              onReviewEdit(event, incident);
-            }}
-          >
-            Correction demandée
-          </button>
-        )}
-        {isResponsable && incident.cancel_request && (
-          <button
-            type="button"
-            className="request-badge request-badge-delete"
-            onClick={(event) => {
-              event.stopPropagation();
-              onReviewDelete(event, incident);
-            }}
-          >
-            Annulation demandée
-          </button>
+        <span className="incident-meta-sep" aria-hidden="true">·</span>
+        <span className="incident-meta-item">{incident.robot_label} · Tête {incident.head_number}</span>
+        <span className="incident-meta-sep" aria-hidden="true">·</span>
+        <span className="incident-meta-item" title={formatDateTime(incident.created_at)}>
+          Depuis {formatElapsed(incident.created_at)}
+        </span>
+        {(isMaintenance || isResponsable) && (
+          <>
+            <span className="incident-meta-sep" aria-hidden="true">·</span>
+            {incident.taken_by_first_name ? (
+              <span className="incident-meta-item">
+                Pris par <strong>{`${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()}</strong>
+                {incident.taken_by_role ? ` (${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role})` : ''}
+              </span>
+            ) : (
+              <span className="incident-meta-item">Non pris</span>
+            )}
+          </>
         )}
       </div>
-
-      <div className="incident-card-summary">
-        <div className={`incident-summary-primary incident-summary-product${currentProduct ? '' : ' is-missing'}`}>
-          <span className="detail-field-label">Produit en cours</span>
-          <strong>{currentProduct || 'Non renseigné'}</strong>
-          <p>Créé par {`${incident.first_name} ${incident.last_name}`.trim()} · {ROLE_LABELS[incident.role] || incident.role}</p>
-        </div>
-        <div className="incident-summary-primary">
-          <span className="detail-field-label">Équipement</span>
-          <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
-          <p title={formatDateTime(incident.created_at)}>Depuis {formatElapsed(incident.created_at)}</p>
-        </div>
-        {(isMaintenance || isResponsable) && (
-          <div className="incident-summary-primary">
-            <span className="detail-field-label">Traitement</span>
-            <strong>
-              {incident.taken_by_first_name
-                ? `${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()
-                : 'À prendre'}
-            </strong>
-            <p>{incident.taken_by_role ? ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role : '-'}</p>
-          </div>
-        )}
+      <div className="incident-card-footer">
+        Créé par {`${incident.first_name} ${incident.last_name}`.trim()} · {ROLE_LABELS[incident.role] || incident.role}
       </div>
 
       {incident.responsible_comment && (

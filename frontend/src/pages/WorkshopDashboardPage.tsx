@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
 import DashboardFilters from '../components/DashboardFilters';
@@ -10,6 +10,7 @@ import ReviewIncidentRequestModal from '../components/ReviewIncidentRequestModal
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import FilterSummary from '../components/FilterSummary';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import SelectField from '../components/ui/SelectField';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import { updateWorkshopIncident } from '../api/workshop';
 import { useAppAuth } from '../routes/AppAuthContext';
@@ -33,7 +34,6 @@ export default function WorkshopDashboardPage() {
   usePageTitle('Tableau de bord atelier');
   const { session } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
   const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
@@ -237,24 +237,11 @@ export default function WorkshopDashboardPage() {
         <div className="page-header">
           <h1>Tableau de bord atelier</h1>
           <div className="action-bar" style={{ marginTop: 0 }}>
-            {user && (
-              <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
-                + Créer un incident
-              </button>
-            )}
-            {!user && (
-              <button className="btn btn-secondary" onClick={() => void navigate('/login')}>
-                Se connecter
-              </button>
-            )}
+            <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
+              + Créer un incident
+            </button>
           </div>
         </div>
-
-        {!user && (
-          <div className="notice" style={{ marginBottom: 20 }}>
-            Lecture seule : connectez-vous pour créer ou agir sur un incident.
-          </div>
-        )}
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
@@ -278,28 +265,18 @@ export default function WorkshopDashboardPage() {
               placeholder="Ligne, machine, robot, produit..."
             />
           </div>
-          <div className="sort-toggle-group">
-            <button
-              type="button"
-              className={`sort-toggle-btn${sortOrder === 'default' ? ' active' : ''}`}
-              onClick={() => setSortOrder('default')}
-            >
-              Par défaut
-            </button>
-            <button
-              type="button"
-              className={`sort-toggle-btn${sortOrder === 'date_desc' ? ' active' : ''}`}
-              onClick={() => setSortOrder('date_desc')}
-            >
-              Plus récent
-            </button>
-            <button
-              type="button"
-              className={`sort-toggle-btn${sortOrder === 'date_asc' ? ' active' : ''}`}
-              onClick={() => setSortOrder('date_asc')}
-            >
-              Plus ancien
-            </button>
+          <div className="filter-group workshop-sort-filter">
+            <span className="filter-label" aria-hidden="true">Tri</span>
+            <SelectField
+              value={sortOrder}
+              onChange={(value) => setSortOrder(value as 'default' | 'date_desc' | 'date_asc')}
+              ariaLabel="Ordre de tri"
+              options={[
+                { value: 'default', label: 'Ordre de traitement' },
+                { value: 'date_desc', label: 'Plus récent' },
+                { value: 'date_asc', label: 'Plus ancien' },
+              ]}
+            />
           </div>
           <button
             className="btn btn-secondary workshop-filter-button"
@@ -317,20 +294,28 @@ export default function WorkshopDashboardPage() {
           onClear={clearAllFilters}
         />
 
-        {isResponsable && sortedIncidents.length > 1 && sortOrder === 'default' && (
-          <div className="reorder-help">
-            Pour changer l'ordre de traitement, sélectionnez un incident puis glissez-le à la position voulue.
-          </div>
-        )}
-
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
             <span className="spinner" aria-hidden="true" style={{ width: 24, height: 24, borderWidth: 3 }} />
           </div>
         ) : sortedIncidents.length === 0 ? (
           <div className="card">
-            <div className="empty-state">
-              {activeFilterCount > 0 ? 'Aucun incident ne correspond aux filtres.' : 'Aucun incident à traiter.'}
+            <div className="empty-state incident-empty-state">
+              {activeFilterCount > 0 ? (
+                <>
+                  <p>Aucun incident ne correspond aux filtres.</p>
+                  <button className="btn btn-secondary" onClick={clearAllFilters}>
+                    Effacer les filtres
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p>Aucun incident à traiter. L'atelier est stable.</p>
+                  <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
+                    + Créer un incident
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : (

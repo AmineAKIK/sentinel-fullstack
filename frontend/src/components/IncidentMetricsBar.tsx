@@ -20,6 +20,9 @@ interface MetricConfig {
   isActive: (f: Filters) => boolean;
   getFilter: (f: Filters) => Partial<Filters>;
   roles?: string[];
+  // Niveau d'attention (doctrine §5.1) : la tuile s'allume quand sa valeur > 0,
+  // avec la même grammaire de couleurs que le liseré des cartes incident.
+  tone?: 'watch' | 'act' | 'critical';
 }
 
 const METRIC_CONFIGS: MetricConfig[] = [
@@ -50,6 +53,7 @@ const METRIC_CONFIGS: MetricConfig[] = [
     getValue: (m) => m.open_over_7d,
     isActive: (f) => f.aging === 'over_7d',
     getFilter: () => ({ ...RESET, aging: 'over_7d' }),
+    tone: 'watch',
   },
   {
     key: 'priority',
@@ -57,6 +61,7 @@ const METRIC_CONFIGS: MetricConfig[] = [
     getValue: (m) => m.priority,
     isActive: (f) => f.priority === 'urgent',
     getFilter: (f) => ({ ...RESET, priority: f.priority === 'urgent' ? 'all' : 'urgent' }),
+    tone: 'critical',
   },
   {
     key: 'not_taken',
@@ -64,6 +69,7 @@ const METRIC_CONFIGS: MetricConfig[] = [
     getValue: (m) => m.not_taken,
     isActive: (f) => f.taken === 'not_taken',
     getFilter: (f) => ({ ...RESET, taken: f.taken === 'not_taken' ? 'all' : 'not_taken' }),
+    tone: 'act',
   },
 ];
 
@@ -115,17 +121,22 @@ export default function IncidentMetricsBar({
         </div>
       ) : metrics ? (
         <>
-          {METRIC_CONFIGS.map((cfg) => (
-            <button
-              key={cfg.key}
-              className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}`}
-              onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
-              type="button"
-            >
-              <span>{cfg.label}</span>
-              <strong>{cfg.getValue(metrics, createdByMeCount)}</strong>
-            </button>
-          ))}
+          {METRIC_CONFIGS.map((cfg) => {
+            const value = cfg.getValue(metrics, createdByMeCount);
+            const toneClass =
+              cfg.tone && typeof value === 'number' && value > 0 ? ` workshop-metric--${cfg.tone}` : '';
+            return (
+              <button
+                key={cfg.key}
+                className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
+                onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
+                type="button"
+              >
+                <span>{cfg.label}</span>
+                <strong>{value}</strong>
+              </button>
+            );
+          })}
           {(metrics.closed_today ?? 0) > 0 && (
             <div className="workshop-metric">
               <span>Clôturés aujourd'hui</span>
