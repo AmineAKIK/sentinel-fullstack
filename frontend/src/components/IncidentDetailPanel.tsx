@@ -480,86 +480,92 @@ export default function IncidentDetailPanel({
               )}
             </section>
           )}
+
+          {detailHasTreatmentActions && (
+            <section
+              className="incident-detail-section"
+              aria-labelledby={`incident-treatment-actions-${incident.id}`}
+            >
+              <h3
+                id={`incident-treatment-actions-${incident.id}`}
+                className="incident-section-title"
+              >
+                Actions de traitement
+              </h3>
+              <div className="action-bar">
+                {canResume && (
+                  <button className="btn btn-outline" onClick={() => modal.openModal('resume')}>
+                    Reprendre
+                  </button>
+                )}
+                {canSetPending && (
+                  <button className="btn btn-outline" onClick={() => modal.openModal('pending')}>
+                    Suspendre
+                  </button>
+                )}
+                {canClose && (
+                  <button className="btn btn-primary" onClick={() => modal.openModal('close')}>
+                    Clôturer
+                  </button>
+                )}
+                {canSetPriority && (
+                  <button
+                    className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-warning'}
+                    onClick={() => void onToggleUrgent(incident)}
+                  >
+                    {incident.is_priority ? "Retirer l'urgence" : 'Déclarer urgent'}
+                  </button>
+                )}
+              </div>
+              {canEditResponsibleComment && (
+                <div className="incident-responsible-editor">
+                  <div className="form-group">
+                    <label
+                      className="form-label"
+                      htmlFor={`responsible-comment-detail-${incident.id}`}
+                    >
+                      Consigne responsable
+                    </label>
+                    <textarea
+                      id={`responsible-comment-detail-${incident.id}`}
+                      className="form-input"
+                      rows={3}
+                      value={responsibleDraft}
+                      onChange={(e) =>
+                        setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))
+                      }
+                      maxLength={FIELD_LIMITS.COMMENT}
+                      placeholder="Consigne courte pour orienter le traitement"
+                    />
+                    <CharCounter current={responsibleDraft.length} max={FIELD_LIMITS.COMMENT} />
+                  </div>
+                  <div className="action-bar">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() =>
+                        void patchIncident(incident.id, {
+                          responsibleComment: responsibleDraft.trim(),
+                        })
+                      }
+                      disabled={!responsibleDraft.trim()}
+                    >
+                      {incident.responsible_comment ? 'Mettre à jour' : 'Ajouter'}
+                    </button>
+                    {incident.responsible_comment && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => modal.setDeleteCommentConfirm(incident)}
+                      >
+                        Retirer la consigne
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </div>
-
-      {detailHasTreatmentActions && (
-        <div className="card incident-treatment-card">
-          <div className="card-body">
-            <h3 className="incident-section-title">Actions de traitement</h3>
-            <div className="action-bar">
-              {canResume && (
-                <button className="btn btn-outline" onClick={() => modal.openModal('resume')}>
-                  Reprendre
-                </button>
-              )}
-              {canSetPending && (
-                <button className="btn btn-outline" onClick={() => modal.openModal('pending')}>
-                  Suspendre
-                </button>
-              )}
-              {canClose && (
-                <button className="btn btn-primary" onClick={() => modal.openModal('close')}>
-                  Clôturer
-                </button>
-              )}
-              {canSetPriority && (
-                <button
-                  className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-danger'}
-                  onClick={() => void onToggleUrgent(incident)}
-                >
-                  {incident.is_priority ? "Retirer l'urgence" : 'Déclarer urgent'}
-                </button>
-              )}
-            </div>
-            {canEditResponsibleComment && (
-              <div className="incident-responsible-editor">
-                <div className="form-group">
-                  <label
-                    className="form-label"
-                    htmlFor={`responsible-comment-detail-${incident.id}`}
-                  >
-                    Consigne responsable
-                  </label>
-                  <textarea
-                    id={`responsible-comment-detail-${incident.id}`}
-                    className="form-input"
-                    rows={3}
-                    value={responsibleDraft}
-                    onChange={(e) =>
-                      setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))
-                    }
-                    maxLength={FIELD_LIMITS.COMMENT}
-                    placeholder="Consigne courte pour orienter le traitement"
-                  />
-                  <CharCounter current={responsibleDraft.length} max={FIELD_LIMITS.COMMENT} />
-                </div>
-                <div className="action-bar">
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() =>
-                      void patchIncident(incident.id, {
-                        responsibleComment: responsibleDraft.trim(),
-                      })
-                    }
-                    disabled={!responsibleDraft.trim()}
-                  >
-                    {incident.responsible_comment ? 'Mettre à jour' : 'Ajouter'}
-                  </button>
-                  {incident.responsible_comment && (
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => modal.setDeleteCommentConfirm(incident)}
-                    >
-                      Retirer la consigne
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Modales du panneau détail */}
       {modal.state.activeModal === 'edit' && (

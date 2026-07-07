@@ -269,6 +269,20 @@ a { color: var(--color-primary); text-decoration: none; }
   background-color: var(--color-danger-hover);
 }
 
+/* Signal d'attention forte mais réversible sans conséquence destructrice
+   (ex. déclarer un incident urgent) : ne doit pas emprunter le rouge de
+   btn-danger, réservé aux actions à conséquence grave (annuler, invalider). */
+.btn-warning {
+  background-color: var(--color-warning);
+  color: var(--color-primary-text);
+  border-color: var(--color-warning);
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: var(--color-warning);
+  opacity: 0.9;
+}
+
 .btn-ghost {
   background-color: transparent;
   color: var(--color-text-secondary);
