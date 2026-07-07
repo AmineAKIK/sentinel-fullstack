@@ -24,6 +24,7 @@ interface MetricConfig {
   key: string;
   label: string;
   getValue: (m: WorkshopIncidentMetrics, extras: ExtraCounts) => React.ReactNode;
+  getBadgeValue?: (m: WorkshopIncidentMetrics, extras: ExtraCounts) => number;
   isActive: (f: Filters) => boolean;
   getFilter: (f: Filters) => Partial<Filters>;
   roles?: string[];
@@ -32,7 +33,7 @@ interface MetricConfig {
   tone?: 'watch' | 'act' | 'critical';
 }
 
-const METRIC_CONFIGS: MetricConfig[] = [
+const BASE_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: 'total',
     label: 'Total',
@@ -110,6 +111,7 @@ const ROLE_METRIC_CONFIGS: MetricConfig[] = [
     key: 'requests',
     label: 'À arbitrer',
     getValue: (_m, extras) => extras.requests,
+    getBadgeValue: (m) => m.arbitration_unread ?? 0,
     isActive: (f) => f.scope === 'requests',
     getFilter: (f) => ({ ...RESET, scope: f.scope === 'requests' ? 'all' : 'requests' }),
     roles: ['RESPONSABLE'],
@@ -125,6 +127,26 @@ const ROLE_METRIC_CONFIGS: MetricConfig[] = [
   },
 ];
 
+const METRIC_CONFIGS = [...BASE_METRIC_CONFIGS, ...ROLE_METRIC_CONFIGS];
+
+const DEFAULT_METRIC_ORDER = ['priority', 'not_taken', 'pending', 'over_7d', 'open', 'total'];
+
+const ROLE_METRIC_ORDER: Record<string, string[]> = {
+  OPERATOR: ['created_by_me', 'pending', 'not_taken', 'priority', 'over_7d', 'open', 'total'],
+  MAINTENANCE: ['priority', 'not_taken', 'assigned_to_me', 'pending', 'over_7d', 'open', 'total'],
+  RESPONSABLE: ['requests', 'priority', 'not_taken', 'over_7d', 'pending', 'followed', 'open', 'total'],
+};
+
+function getOrderedMetricConfigs(role?: string): MetricConfig[] {
+  const order = ROLE_METRIC_ORDER[role ?? ''] ?? DEFAULT_METRIC_ORDER;
+  return order.flatMap((key) => {
+    const config = METRIC_CONFIGS.find((cfg) => cfg.key === key);
+    if (!config) return [];
+    if (config.roles && !config.roles.includes(role ?? '')) return [];
+    return [config];
+  });
+}
+
 export default function IncidentMetricsBar({
   metricsLoading,
   metrics,
@@ -135,12 +157,60 @@ export default function IncidentMetricsBar({
   onSetFilters,
 }: IncidentMetricsBarProps) {
   const extras: ExtraCounts = { createdByMe: createdByMeCount, requests: requestsCount };
-  const roleMetrics = ROLE_METRIC_CONFIGS.filter((cfg) => cfg.roles?.includes(role ?? ''));
+  const orderedMetrics = getOrderedMetricConfigs(role);
   const showClosedToday = !metricsLoading && !!metrics && (metrics.closed_today ?? 0) > 0;
   const tileCount =
     metricsLoading || !metrics
       ? 0
-      : METRIC_CONFIGS.length + (showClosedToday ? 1 : 0) + roleMetrics.length;
+      : orderedMetrics.length + (showClosedToday ? 1 : 0);
+
+  function renderClosedTodayTile(metricData: WorkshopIncidentMetrics) {
+    return (
+      <div className="workshop-metric" key="closed_today">
+        <span className="workshop-metric-label">Clôturés aujourd'hui</span>
+        <strong>{metricData.closed_today}</strong>
+      </div>
+    );
+  }
+
+  function renderMetricTile(cfg: MetricConfig, metricData: WorkshopIncidentMetrics) {
+    const value = cfg.getValue(metricData, extras);
+    const badgeValue = cfg.getBadgeValue?.(metricData, extras) ?? 0;
+    const hasNotificationBadge = badgeValue > 0;
+    const badgeLabel = badgeValue > 99 ? '99+' : String(badgeValue);
+    const toneClass =
+      cfg.tone && typeof value === 'number' && value > 0
+        ? ` workshop-metric--${cfg.tone}`
+        : '';
+    const notificationClass = hasNotificationBadge ? ' workshop-metric--has-notif' : '';
+
+    return (
+      <button
+        key={cfg.key}
+        className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}${notificationClass}`}
+        aria-label={
+          hasNotificationBadge
+            ? `${cfg.label}, ${badgeValue} nouveau${badgeValue > 1 ? 'x' : ''} cas non consulté${badgeValue > 1 ? 's' : ''}`
+            : undefined
+        }
+        onClick={() =>
+          onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
+        }
+        type="button"
+      >
+        <span className="workshop-metric-label">{cfg.label}</span>
+        <strong>{value}</strong>
+        {hasNotificationBadge && (
+          <span className="workshop-metric-notif" aria-hidden="true">
+            {badgeLabel}
+          </span>
+        )}
+        {cfg.key === 'followed' && (metricData.followed_resolved ?? 0) > 0 && (
+          <small>{metricData.followed_resolved} clôturé(s)</small>
+        )}
+      </button>
+    );
+  }
 
   return (
     <div
@@ -164,59 +234,18 @@ export default function IncidentMetricsBar({
         </div>
       ) : metrics ? (
         <>
-          {METRIC_CONFIGS.map((cfg) => {
-            const value = cfg.getValue(metrics, extras);
-            const toneClass =
-              cfg.tone && typeof value === 'number' && value > 0
-                ? ` workshop-metric--${cfg.tone}`
-                : '';
-            return (
-              <button
-                key={cfg.key}
-                className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
-                onClick={() =>
-                  onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
-                }
-                type="button"
-              >
-                <span>{cfg.label}</span>
-                <strong>{value}</strong>
-              </button>
-            );
-          })}
-          {showClosedToday && (
-            <div className="workshop-metric">
-              <span>Clôturés aujourd'hui</span>
-              <strong>{metrics.closed_today}</strong>
-            </div>
-          )}
-          {roleMetrics.map((cfg) => {
-            const value = cfg.getValue(metrics, extras);
-            const toneClass =
-              cfg.tone && typeof value === 'number' && value > 0
-                ? ` workshop-metric--${cfg.tone}`
-                : '';
-            return (
-              <button
-                key={cfg.key}
-                className={`workshop-metric ${cfg.isActive(filters) ? 'active' : ''}${toneClass}`}
-                onClick={() =>
-                  onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
-                }
-                type="button"
-              >
-                <span>{cfg.label}</span>
-                <strong>{value}</strong>
-                {cfg.key === 'followed' && (metrics.followed_resolved ?? 0) > 0 && (
-                  <small>{metrics.followed_resolved} clôturé(s)</small>
-                )}
-              </button>
-            );
+          {orderedMetrics.flatMap((cfg) => {
+            const items = [];
+            if (cfg.key === 'total' && showClosedToday) {
+              items.push(renderClosedTodayTile(metrics));
+            }
+            items.push(renderMetricTile(cfg, metrics));
+            return items;
           })}
         </>
       ) : (
         <div className="workshop-metric">
-          <span>KPI indisponibles</span>
+          <span className="workshop-metric-label">KPI indisponibles</span>
           <strong>-</strong>
         </div>
       )}

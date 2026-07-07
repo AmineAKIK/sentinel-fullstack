@@ -21,12 +21,14 @@ import {
   listIncidentsService,
   listKnowledgeIncidentsService,
   listWorkshopLinesService,
+  consultArbitrationRequestService,
   reorderIncidentsService,
   unfollowIncidentService,
   updateIncidentService,
 } from './workshop.service';
 import {
   createIncidentSchema,
+  arbitrationConsultationSchema,
   incidentWorkspaceQuerySchema,
   reorderIncidentsSchema,
   updateIncidentSchema,
@@ -132,9 +134,34 @@ export async function listIncidentEvents(req: Request, res: Response): Promise<v
 
 export async function getIncidentMetrics(req: Request, res: Response): Promise<void> {
   try {
-    res.json(await getIncidentMetricsService(req.workshopUser!.userId));
+    res.json(await getIncidentMetricsService(req.workshopUser!.userId, req.workshopUser!.role));
   } catch (err) {
     handleControllerError(res, 'getIncidentMetrics', err);
+  }
+}
+
+export async function consultArbitrationRequest(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
+
+    const parsed = arbitrationConsultationSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
+      return;
+    }
+
+    const { userId, role } = req.workshopUser!;
+    const result = await consultArbitrationRequestService(
+      id.data,
+      userId,
+      role,
+      parsed.data.requestType
+    );
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
+  } catch (err) {
+    handleControllerError(res, 'consultArbitrationRequest', err);
   }
 }
 

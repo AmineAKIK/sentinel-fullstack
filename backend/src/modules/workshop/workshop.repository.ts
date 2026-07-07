@@ -44,6 +44,64 @@ const INCIDENT_FOLLOWER_COLS = `(wif.id IS NOT NULL) AS is_followed,
 const INCIDENT_USER_JOINS = `JOIN sentinel_users su ON su.id = wi.user_id
      LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id`;
 
+const INCIDENT_ARBITRATION_COLS = `jsonb_strip_nulls(jsonb_build_object(
+            'edit',
+              CASE
+                WHEN wi.edit_request IS NOT NULL AND edit_arbitration.request_event_id IS NOT NULL
+                THEN jsonb_build_object(
+                  'requestEventId', edit_arbitration.request_event_id,
+                  'requestedAt', edit_arbitration.requested_at,
+                  'state', CASE
+                    WHEN edit_arbitration.consulted_at IS NULL THEN 'ACTIVE'
+                    ELSE 'WAITING'
+                  END,
+                  'consultedAt', edit_arbitration.consulted_at,
+                  'consultedByUserId', edit_arbitration.consulted_by_user_id
+                )
+              END,
+            'cancel',
+              CASE
+                WHEN wi.cancel_request = TRUE AND cancel_arbitration.request_event_id IS NOT NULL
+                THEN jsonb_build_object(
+                  'requestEventId', cancel_arbitration.request_event_id,
+                  'requestedAt', cancel_arbitration.requested_at,
+                  'state', CASE
+                    WHEN cancel_arbitration.consulted_at IS NULL THEN 'ACTIVE'
+                    ELSE 'WAITING'
+                  END,
+                  'consultedAt', cancel_arbitration.consulted_at,
+                  'consultedByUserId', cancel_arbitration.consulted_by_user_id
+                )
+              END
+          )) AS arbitration`;
+
+const INCIDENT_ARBITRATION_JOINS = `LEFT JOIN LATERAL (
+       SELECT we.id AS request_event_id,
+              we.created_at AS requested_at,
+              wac.consulted_at,
+              wac.consulted_by_user_id
+       FROM workshop_incident_events we
+       LEFT JOIN workshop_arbitration_consultations wac
+         ON wac.request_event_id = we.id
+       WHERE we.incident_id = wi.id
+         AND we.event_type = 'EDIT_REQUESTED'
+       ORDER BY we.id DESC
+       LIMIT 1
+     ) edit_arbitration ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT we.id AS request_event_id,
+              we.created_at AS requested_at,
+              wac.consulted_at,
+              wac.consulted_by_user_id
+       FROM workshop_incident_events we
+       LEFT JOIN workshop_arbitration_consultations wac
+         ON wac.request_event_id = we.id
+       WHERE we.incident_id = wi.id
+         AND we.event_type = 'CANCEL_REQUESTED'
+       ORDER BY we.id DESC
+       LIMIT 1
+     ) cancel_arbitration ON TRUE`;
+
 // ─── SQL time interval constants ──────────────────────────────────────────────
 
 const INCIDENT_CRITICAL_AGE = `'7 days'`;
@@ -110,6 +168,7 @@ export interface WorkshopIncidentRow extends CurrentIncident {
   updated_at: Date;
   is_followed?: boolean;
   followed_at?: Date | null;
+  arbitration?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
@@ -117,6 +176,8 @@ export interface IncidentSelection {
   lineNumber: string;
   machineBrand: string;
 }
+
+export type ArbitrationRequestType = 'EDIT' | 'CANCEL' | 'ALL';
 
 export interface WorkshopIncidentMetricsResult {
   global?: {
@@ -133,6 +194,7 @@ export interface WorkshopIncidentMetricsResult {
     assigned_to_me: number;
     followed: number;
     followed_resolved: number;
+    arbitration_unread: number;
   };
   total: number;
   open: number;
@@ -143,6 +205,7 @@ export interface WorkshopIncidentMetricsResult {
   assigned_to_me: number;
   followed: number;
   followed_resolved: number;
+  arbitration_unread: number;
   open_over_7d: number;
   closed_today: number;
 }
@@ -315,9 +378,11 @@ export async function listIncidents(userId: number, role: string) {
   const { rows } = await pool.query(
     `SELECT ${INCIDENT_BASE_COLS},
             ${INCIDENT_ACTOR_COLS},
-            ${INCIDENT_FOLLOWER_COLS}
+            ${INCIDENT_FOLLOWER_COLS},
+            ${INCIDENT_ARBITRATION_COLS}
      FROM workshop_incidents wi
      ${INCIDENT_USER_JOINS}
+     ${INCIDENT_ARBITRATION_JOINS}
      LEFT JOIN workshop_incident_followers wif
        ON wif.incident_id = wi.id
       AND wif.user_id = $1
@@ -344,9 +409,11 @@ export async function listIncidentWorkspaceRows(query: QueryParams, mode: Incide
 
   const { rows } = await pool.query(
     `SELECT ${INCIDENT_BASE_COLS},
-            ${INCIDENT_ACTOR_COLS}
+            ${INCIDENT_ACTOR_COLS},
+            ${INCIDENT_ARBITRATION_COLS}
      FROM workshop_incidents wi
      ${INCIDENT_USER_JOINS}
+     ${INCIDENT_ARBITRATION_JOINS}
      ${whereClause}
      ORDER BY ${orderBy}
      LIMIT $${params.length + 1}`,
@@ -368,9 +435,11 @@ export async function fetchIncidentWithUsers(incidentId: number, actorUserId?: n
 
   const { rows } = await pool.query(
     `SELECT ${INCIDENT_BASE_COLS},
-            ${INCIDENT_ACTOR_COLS}${followerCols}
+            ${INCIDENT_ACTOR_COLS},
+            ${INCIDENT_ARBITRATION_COLS}${followerCols}
      FROM workshop_incidents wi
      ${INCIDENT_USER_JOINS}
+     ${INCIDENT_ARBITRATION_JOINS}
      ${followerJoin}
      WHERE wi.id = $1`,
     withFollowers ? [incidentId, actorUserId] : [incidentId]
@@ -730,7 +799,7 @@ export async function listIncidentEvents(incidentId: number) {
   return rows;
 }
 
-export async function getIncidentMetrics(userId: number): Promise<WorkshopIncidentMetricsResult> {
+export async function getIncidentMetrics(userId: number, role: string): Promise<WorkshopIncidentMetricsResult> {
   const { rows } = await pool.query(
     `SELECT
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
@@ -757,6 +826,10 @@ export async function getIncidentMetrics(userId: number): Promise<WorkshopIncide
     [userId]
   );
 
+  const unconsultedArbitration = role === 'RESPONSABLE'
+    ? await countUnconsultedArbitrationIncidents()
+    : 0;
+
   const metrics = rows[0];
   const followMetrics = followed.rows[0];
   return {
@@ -774,6 +847,7 @@ export async function getIncidentMetrics(userId: number): Promise<WorkshopIncide
       assigned_to_me: metrics.assigned_to_me_count,
       followed: followMetrics.followed_count,
       followed_resolved: followMetrics.followed_resolved_count,
+      arbitration_unread: unconsultedArbitration,
     },
     total: metrics.total,
     open: metrics.open_count,
@@ -784,9 +858,100 @@ export async function getIncidentMetrics(userId: number): Promise<WorkshopIncide
     assigned_to_me: metrics.assigned_to_me_count,
     followed: followMetrics.followed_count,
     followed_resolved: followMetrics.followed_resolved_count,
+    arbitration_unread: unconsultedArbitration,
     open_over_7d: metrics.open_over_7d,
     closed_today: metrics.closed_today,
   };
+}
+
+export async function countUnconsultedArbitrationIncidents(): Promise<number> {
+  const { rows } = await pool.query<{ unread_count: number }>(
+    `WITH active_requests AS (
+       SELECT wi.id AS incident_id, edit_request.request_event_id
+       FROM workshop_incidents wi
+       JOIN LATERAL (
+         SELECT we.id AS request_event_id
+         FROM workshop_incident_events we
+         WHERE we.incident_id = wi.id
+           AND we.event_type = 'EDIT_REQUESTED'
+         ORDER BY we.id DESC
+         LIMIT 1
+       ) edit_request ON TRUE
+       WHERE wi.status IN ('OPEN', 'PENDING')
+         AND wi.edit_request IS NOT NULL
+       UNION ALL
+       SELECT wi.id AS incident_id, cancel_request.request_event_id
+       FROM workshop_incidents wi
+       JOIN LATERAL (
+         SELECT we.id AS request_event_id
+         FROM workshop_incident_events we
+         WHERE we.incident_id = wi.id
+           AND we.event_type = 'CANCEL_REQUESTED'
+         ORDER BY we.id DESC
+         LIMIT 1
+       ) cancel_request ON TRUE
+       WHERE wi.status IN ('OPEN', 'PENDING')
+         AND wi.cancel_request = TRUE
+     )
+     SELECT COUNT(*)::int AS unread_count
+     FROM (
+       SELECT DISTINCT ar.incident_id
+       FROM active_requests ar
+       LEFT JOIN workshop_arbitration_consultations wac
+         ON wac.request_event_id = ar.request_event_id
+       WHERE wac.request_event_id IS NULL
+     ) unconsulted`
+  );
+
+  return rows[0]?.unread_count ?? 0;
+}
+
+export async function consultArbitrationRequest(
+  incidentId: number,
+  userId: number,
+  requestType: ArbitrationRequestType
+): Promise<number> {
+  const { rowCount } = await pool.query(
+    `WITH active_requests AS (
+       SELECT wi.id AS incident_id, 'EDIT'::text AS request_type, edit_request.request_event_id
+       FROM workshop_incidents wi
+       JOIN LATERAL (
+         SELECT we.id AS request_event_id
+         FROM workshop_incident_events we
+         WHERE we.incident_id = wi.id
+           AND we.event_type = 'EDIT_REQUESTED'
+         ORDER BY we.id DESC
+         LIMIT 1
+       ) edit_request ON TRUE
+       WHERE wi.id = $1
+         AND wi.status IN ('OPEN', 'PENDING')
+         AND wi.edit_request IS NOT NULL
+         AND $3 IN ('EDIT', 'ALL')
+       UNION ALL
+       SELECT wi.id AS incident_id, 'CANCEL'::text AS request_type, cancel_request.request_event_id
+       FROM workshop_incidents wi
+       JOIN LATERAL (
+         SELECT we.id AS request_event_id
+         FROM workshop_incident_events we
+         WHERE we.incident_id = wi.id
+           AND we.event_type = 'CANCEL_REQUESTED'
+         ORDER BY we.id DESC
+         LIMIT 1
+       ) cancel_request ON TRUE
+       WHERE wi.id = $1
+         AND wi.status IN ('OPEN', 'PENDING')
+         AND wi.cancel_request = TRUE
+         AND $3 IN ('CANCEL', 'ALL')
+     )
+     INSERT INTO workshop_arbitration_consultations
+       (request_event_id, incident_id, request_type, consulted_by_user_id)
+     SELECT request_event_id, incident_id, request_type, $2
+     FROM active_requests
+     ON CONFLICT (request_event_id) DO NOTHING`,
+    [incidentId, userId, requestType]
+  );
+
+  return rowCount ?? 0;
 }
 
 export async function incidentExists(incidentId: number): Promise<boolean> {

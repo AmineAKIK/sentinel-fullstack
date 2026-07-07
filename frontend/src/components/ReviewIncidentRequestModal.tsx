@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import Modal from './Modal';
 import { ProductionLine, WorkshopIncident } from '../types';
-import { STATE_LABELS } from '../utils/labels';
+import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
 import { computeIncidentDiff } from '../utils/incidentDiff';
+import { formatDateTime } from '../utils/date';
 
 interface ReviewIncidentRequestModalProps {
   incident: WorkshopIncident;
@@ -19,6 +20,8 @@ interface ReviewIncidentRequestModalProps {
   editDisabled?: boolean;
   editWarning?: string;
   onClose: () => void;
+  onConsult?: () => void;
+  onReport?: () => void;
   onApplyEdit?: () => void;
   onRejectEdit?: () => void;
   onApproveDelete?: () => void;
@@ -40,6 +43,8 @@ export default function ReviewIncidentRequestModal({
   editDisabled = false,
   editWarning,
   onClose,
+  onConsult,
+  onReport,
   onApplyEdit,
   onRejectEdit,
   onApproveDelete,
@@ -54,9 +59,36 @@ export default function ReviewIncidentRequestModal({
     () => (requested ? computeIncidentDiff(incident, requested, lines) : []),
     [incident, lines, requested]
   );
+  const creatorName = `${incident.first_name} ${incident.last_name}`.trim();
+  const takenByName = incident.taken_by_first_name
+    ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
+    : '';
+  const currentProduct = incident.current_product?.trim();
+  const editState = incident.arbitration?.edit?.state;
+  const cancelState = incident.arbitration?.cancel?.state;
+  const activeRequestCount =
+    Number(Boolean(incident.edit_request)) + Number(Boolean(incident.cancel_request));
+  const hasActiveArbitration =
+    (Boolean(incident.edit_request) && editState !== 'WAITING') ||
+    (Boolean(incident.cancel_request) && cancelState !== 'WAITING');
+  const requestDate =
+    type === 'edit'
+      ? incident.arbitration?.edit?.requestedAt
+      : incident.arbitration?.cancel?.requestedAt;
+  const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
+  const report = onReport ?? onClose;
 
   const footer = type === 'edit' ? (
     <>
+      <button className="btn btn-secondary" onClick={report} disabled={loading}>
+        Reporter
+      </button>
+      {onConsult && hasActiveArbitration && (
+        <button className="btn btn-outline" onClick={onConsult} disabled={loading}>
+          Consulter le dossier
+        </button>
+      )}
+      <span className="arbitration-modal-footer-spacer" aria-hidden="true" />
       {allowEditReject && (
         <button className="btn btn-secondary" onClick={onRejectEdit} disabled={loading || editDisabled}>
           Refuser
@@ -70,6 +102,15 @@ export default function ReviewIncidentRequestModal({
     </>
   ) : (
     <>
+      <button className="btn btn-secondary" onClick={report} disabled={loading}>
+        Reporter
+      </button>
+      {onConsult && hasActiveArbitration && (
+        <button className="btn btn-outline" onClick={onConsult} disabled={loading}>
+          Consulter le dossier
+        </button>
+      )}
+      <span className="arbitration-modal-footer-spacer" aria-hidden="true" />
       {allowDeleteReject && (
         <button className="btn btn-secondary" onClick={onRejectDelete} disabled={loading}>
           Refuser
@@ -90,13 +131,27 @@ export default function ReviewIncidentRequestModal({
   return (
     <Modal
       title={type === 'edit' ? 'Demande de modification' : 'Demande d’annulation'}
-      onClose={loading ? undefined : onClose}
+      onClose={loading ? undefined : report}
       closeOnOverlay={false}
       isLoading={loading}
       variant={type === 'delete' ? 'danger' : 'default'}
       size="lg"
       footer={footer}
     >
+      <div className="arbitration-modal-brief">
+        <div>
+          <span className="detail-field-label">Décision attendue</span>
+          <strong>
+            {type === 'edit' ? 'Correction opérateur' : 'Annulation opérateur'}
+          </strong>
+        </div>
+        {activeRequestCount > 1 && (
+          <div className="notice arbitration-modal-secondary-notice">
+            Deux demandes sont actives sur cet incident. Vérifier les deux avant décision finale.
+          </div>
+        )}
+      </div>
+
       <div className="detail-grid">
         <div className="detail-field">
           <span className="detail-field-label">Incident</span>
@@ -105,15 +160,79 @@ export default function ReviewIncidentRequestModal({
           </span>
         </div>
         <div className="detail-field">
-          <span className="detail-field-label">Utilisateur</span>
+          <span className="detail-field-label">Demandeur</span>
           <span className="detail-field-value">
-            {incident.first_name} {incident.last_name}
+            {creatorName || 'Non renseigné'}
+          </span>
+        </div>
+        <div className="detail-field">
+          <span className="detail-field-label">Rôle demandeur</span>
+          <span className="detail-field-value">{ROLE_LABELS[incident.role] ?? incident.role}</span>
+        </div>
+        <div className="detail-field">
+          <span className="detail-field-label">Date de demande</span>
+          <span className="detail-field-value">
+            {requestDate ? formatDateTime(requestDate) : 'Non tracée'}
           </span>
         </div>
         <div className="detail-field">
           <span className="detail-field-label">État</span>
           <span className="detail-field-value">{STATE_LABELS[incident.state]}</span>
         </div>
+        <div className="detail-field">
+          <span className="detail-field-label">Produit</span>
+          <span className="detail-field-value">
+            {currentProduct || <span className="detail-value-muted">Non renseigné</span>}
+          </span>
+        </div>
+        <div className="detail-field">
+          <span className="detail-field-label">Robot</span>
+          <span className="detail-field-value">
+            {incident.robot_label} · Tête {incident.head_number}
+          </span>
+        </div>
+        <div className="detail-field">
+          <span className="detail-field-label">Prise en charge</span>
+          <span className="detail-field-value">
+            {takenByName
+              ? `${takenByName}${
+                  incident.taken_by_role
+                    ? ` · ${ROLE_LABELS[incident.taken_by_role] ?? incident.taken_by_role}`
+                    : ''
+                }`
+              : 'Non pris'}
+          </span>
+        </div>
+      </div>
+
+      <div className="arbitration-modal-state-row" aria-label="État des demandes d'arbitrage">
+        {incident.edit_request && (
+          <span
+            className={`incident-detail-request incident-detail-request--edit${
+              editState === 'WAITING' ? ' is-waiting' : ''
+            }`}
+          >
+            Correction {editState === 'WAITING' ? 'en attente' : 'active'}
+          </span>
+        )}
+        {incident.cancel_request && (
+          <span
+            className={`incident-detail-request incident-detail-request--delete${
+              cancelState === 'WAITING' ? ' is-waiting' : ''
+            }`}
+          >
+            Annulation {cancelState === 'WAITING' ? 'en attente' : 'active'}
+          </span>
+        )}
+      </div>
+
+      <div className="machine-context-actions">
+        <a className="btn btn-outline btn-sm" href={`/workshop/knowledge?${machineContextQuery}`}>
+          Solutions déjà appliquées
+        </a>
+        <a className="btn btn-outline btn-sm" href={`/workshop/history?${machineContextQuery}`}>
+          Historique de la machine
+        </a>
       </div>
 
       {type === 'delete' && (
@@ -139,6 +258,13 @@ export default function ReviewIncidentRequestModal({
       {type === 'edit' && (
         <div className="table-wrapper">
           <table className="change-table">
+            <thead>
+              <tr>
+                <th>Champ</th>
+                <th>Actuel</th>
+                <th>Demandé</th>
+              </tr>
+            </thead>
             <tbody>
               {changeRows.length === 0 ? (
                 <tr>
@@ -155,6 +281,35 @@ export default function ReviewIncidentRequestModal({
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {(incident.comment || incident.diagnostic || incident.intervention_note || incident.responsible_comment) && (
+        <div className="arbitration-modal-context">
+          {incident.comment && (
+            <div className="incident-detail-note">
+              <span className="detail-field-label">Signalement</span>
+              <p>{incident.comment}</p>
+            </div>
+          )}
+          {incident.diagnostic && (
+            <div className="incident-detail-note">
+              <span className="detail-field-label">Diagnostic</span>
+              <p>{incident.diagnostic}</p>
+            </div>
+          )}
+          {incident.intervention_note && (
+            <div className="incident-detail-note">
+              <span className="detail-field-label">Intervention</span>
+              <p>{incident.intervention_note}</p>
+            </div>
+          )}
+          {incident.responsible_comment && (
+            <div className="incident-detail-note">
+              <span className="detail-field-label">Consigne responsable</span>
+              <p>{incident.responsible_comment}</p>
+            </div>
+          )}
         </div>
       )}
 

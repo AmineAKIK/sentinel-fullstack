@@ -78,6 +78,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     try {
       const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, { applyEditRequest: true });
       upsertIncident(updated);
+      void refreshMetrics();
       modal.closeReview();
     } catch (_err) {
       modal.setReviewError("Impossible d'appliquer la modification.");
@@ -97,6 +98,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     try {
       const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, { rejectEditRequest: true });
       upsertIncident(updated);
+      void refreshMetrics();
       modal.closeReview();
     } catch (_err) {
       modal.setReviewError('Impossible de refuser la modification.');
@@ -138,6 +140,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     try {
       const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, { rejectDeleteRequest: true });
       upsertIncident(updated);
+      void refreshMetrics();
       modal.closeReview();
     } catch (_err) {
       modal.setReviewError("Impossible de refuser l'annulation.");

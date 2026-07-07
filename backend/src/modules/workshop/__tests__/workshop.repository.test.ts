@@ -6,7 +6,11 @@ jest.mock('../../../db/pool', () => ({
 }));
 
 import pool from '../../../db/pool';
-import { getBoardData } from '../workshop.repository';
+import {
+  consultArbitrationRequest,
+  countUnconsultedArbitrationIncidents,
+  getBoardData,
+} from '../workshop.repository';
 
 const mockedPool = jest.mocked(pool);
 
@@ -40,5 +44,35 @@ describe('getBoardData', () => {
 
     expect(incidentQuery).toContain('responsible_comment');
     expect(boardData.incidents[0]?.responsible_comment).toBe('Sécuriser la zone avant intervention.');
+  });
+});
+
+describe('arbitration consultation tracking', () => {
+  beforeEach(() => {
+    mockedPool.query.mockReset();
+  });
+
+  it("compte les incidents d'arbitrage avec au moins une demande active non consultée", async () => {
+    mockedPool.query.mockResolvedValueOnce(result([{ unread_count: 3 }]));
+
+    const count = await countUnconsultedArbitrationIncidents();
+    const sql = String(mockedPool.query.mock.calls[0]?.[0]);
+
+    expect(count).toBe(3);
+    expect(sql).toContain("we.event_type = 'EDIT_REQUESTED'");
+    expect(sql).toContain("we.event_type = 'CANCEL_REQUESTED'");
+    expect(sql).toContain('workshop_arbitration_consultations');
+  });
+
+  it('insère les consultations actives de manière idempotente', async () => {
+    mockedPool.query.mockResolvedValueOnce({ rows: [], rowCount: 2 } as never);
+
+    const consulted = await consultArbitrationRequest(12, 7, 'ALL');
+    const sql = String(mockedPool.query.mock.calls[0]?.[0]);
+
+    expect(consulted).toBe(2);
+    expect(sql).toContain('INSERT INTO workshop_arbitration_consultations');
+    expect(sql).toContain('ON CONFLICT (request_event_id) DO NOTHING');
+    expect(mockedPool.query.mock.calls[0]?.[1]).toEqual([12, 7, 'ALL']);
   });
 });

@@ -1,5 +1,7 @@
-import { badRequest, notFound, ServiceResult } from '../../utils/serviceResult';
+import { badRequest, forbidden, notFound, ok, ServiceResult } from '../../utils/serviceResult';
 import * as workshopRepository from './workshop.repository';
+import type { ArbitrationRequestType } from './workshop.repository';
+import { logIncidentEvent } from './workshop.events';
 import { UpdateIncidentInput } from './workshop.validation';
 
 export {
@@ -106,8 +108,35 @@ export async function listIncidentEventsService(id: number) {
   return workshopRepository.listIncidentEvents(id);
 }
 
-export async function getIncidentMetricsService(userId: number) {
-  return workshopRepository.getIncidentMetrics(userId);
+export async function getIncidentMetricsService(userId: number, role: string) {
+  return workshopRepository.getIncidentMetrics(userId, role);
+}
+
+export async function consultArbitrationRequestService(
+  incidentId: number,
+  actorUserId: number,
+  actorRole: string,
+  requestType: ArbitrationRequestType
+): Promise<ServiceResult<{ consulted: number; incident: unknown }>> {
+  if (actorRole !== 'RESPONSABLE') {
+    return forbidden("Seul le responsable peut consulter un dossier d'arbitrage.");
+  }
+
+  const consulted = await workshopRepository.consultArbitrationRequest(
+    incidentId,
+    actorUserId,
+    requestType
+  );
+  if (consulted > 0) {
+    await logIncidentEvent(incidentId, actorUserId, 'ARBITRATION_CONSULTED', {
+      requestType,
+      consulted,
+    });
+  }
+
+  const incident = await workshopRepository.fetchIncidentWithUsersForActor(incidentId, actorUserId);
+  if (!incident) return notFound('Incident introuvable.');
+  return ok({ consulted, incident });
 }
 
 export async function getWorkshopAnalyticsService(query: Record<string, unknown>) {

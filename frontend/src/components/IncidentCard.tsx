@@ -52,6 +52,8 @@ export default function IncidentCard({
   const isResolvedFollowed = incident.is_followed && isResolved;
   const isActiveUrgent = incident.is_priority && !isResolved;
   const currentProduct = incident.current_product?.trim();
+  const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
+  const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
   // Niveau d'attention unifié (F1/F2) : le liseré gauche encode ce niveau, de
   // sorte que l'urgent émerge par contraste avec les autres, sans agression (P1).
   const attentionLevel = isResolvedFollowed ? 'calm' : incidentAttentionLevel(incident);
@@ -175,7 +177,7 @@ export default function IncidentCard({
                 onReviewEdit(event, incident);
               }}
             >
-              Correction demandée
+              {editArbitrationWaiting ? 'Correction en attente' : 'Correction demandée'}
             </button>
           )}
           {incident.cancel_request && (
@@ -187,7 +189,7 @@ export default function IncidentCard({
                 onReviewDelete(event, incident);
               }}
             >
-              Annulation demandée
+              {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation demandée'}
             </button>
           )}
         </div>

@@ -110,6 +110,18 @@ export async function unfollowWorkshopIncident(id: number): Promise<WorkshopInci
   return api.delete<WorkshopIncident>(`/api/workshop/incidents/${id}/follow`);
 }
 
+export type ArbitrationConsultationRequestType = 'EDIT' | 'CANCEL' | 'ALL';
+
+export async function consultWorkshopArbitration(
+  id: number,
+  requestType: ArbitrationConsultationRequestType = 'ALL'
+): Promise<{ consulted: number; incident: WorkshopIncident }> {
+  return api.post<{ consulted: number; incident: WorkshopIncident }>(
+    `/api/workshop/incidents/${id}/arbitration-consultation`,
+    { requestType }
+  );
+}
+
 export async function cancelWorkshopIncident(id: number): Promise<void> {
   return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {});
 }

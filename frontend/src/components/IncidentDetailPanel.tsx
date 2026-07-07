@@ -59,6 +59,8 @@ interface IncidentDetailPanelProps {
   onRejectEditRequest: () => Promise<void>;
   onApproveDeleteRequest: () => Promise<void>;
   onRejectDeleteRequest: () => Promise<void>;
+  onConsultArbitration: () => void;
+  onReportArbitration: () => void;
   onEditSuccess: (updated: WorkshopIncident) => void;
   onDeleteCommentConfirm: (incident: WorkshopIncident) => Promise<void>;
   patchIncident: (id: number, payload: Record<string, unknown>) => Promise<WorkshopIncident>;
@@ -87,6 +89,8 @@ export default function IncidentDetailPanel({
   onRejectEditRequest,
   onApproveDeleteRequest,
   onRejectDeleteRequest,
+  onConsultArbitration,
+  onReportArbitration,
   onEditSuccess,
   onDeleteCommentConfirm,
   patchIncident,
@@ -119,6 +123,15 @@ export default function IncidentDetailPanel({
   const canEditResponsibleComment = canPerform(userRole, 'responsibleComment', incident);
   const canInvalidateClosed = canPerform(userRole, 'invalidateClosed', incident);
   const isResolved = isIncidentResolved(incident);
+  const canReviewEditRequest =
+    isResponsable &&
+    incident.edit_request != null &&
+    (canPerform(userRole, 'approveEdit', incident) || canPerform(userRole, 'rejectEdit', incident));
+  const canReviewCancelRequest =
+    isResponsable &&
+    incident.cancel_request === true &&
+    (canPerform(userRole, 'approveCancel', incident) ||
+      canPerform(userRole, 'rejectCancel', incident));
   const creatorName = `${incident.first_name} ${incident.last_name}`.trim();
   const currentProduct = incident.current_product?.trim();
   const takenByName = incident.taken_by_first_name
@@ -126,6 +139,8 @@ export default function IncidentDetailPanel({
     : '';
   const hasPrimaryActions =
     isResponsable ||
+    canReviewEditRequest ||
+    canReviewCancelRequest ||
     canRequestEdit ||
     canDirectEdit ||
     canResponsableEdit ||
@@ -141,6 +156,8 @@ export default function IncidentDetailPanel({
     Boolean(incident.cancel_request);
   const detailHasTreatmentActions =
     canSetPending || canResume || canClose || canSetPriority || canEditResponsibleComment;
+  const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
+  const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
 
   return (
     <>
@@ -237,6 +254,25 @@ export default function IncidentDetailPanel({
       {hasDetailActions && (
         <div className="incident-detail-header">
           <div className="incident-detail-actions">
+            {(canReviewEditRequest || canReviewCancelRequest) && (
+              <div className="incident-action-group" aria-label="Actions d'arbitrage">
+                {canReviewEditRequest && (
+                  <button className="btn btn-outline" onClick={() => modal.openReview(incident, 'edit')}>
+                    {editArbitrationWaiting ? 'Reprendre la correction' : 'Arbitrer la correction'}
+                  </button>
+                )}
+                {canReviewCancelRequest && (
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => modal.openReview(incident, 'delete')}
+                  >
+                    {cancelArbitrationWaiting
+                      ? "Reprendre l'annulation"
+                      : "Arbitrer l'annulation"}
+                  </button>
+                )}
+              </div>
+            )}
             {hasPrimaryActions && (
               <div className="incident-action-group" aria-label="Actions principales">
                 {isResponsable && (
@@ -421,13 +457,25 @@ export default function IncidentDetailPanel({
                 </div>
               )}
               {incident.edit_request && (
-                <div className="incident-detail-request incident-detail-request--edit">
-                  Correction opérateur en attente d'arbitrage.
+                <div
+                  className={`incident-detail-request incident-detail-request--edit${
+                    editArbitrationWaiting ? ' is-waiting' : ''
+                  }`}
+                >
+                  {editArbitrationWaiting
+                    ? 'Correction opérateur en consultation.'
+                    : "Correction opérateur en attente d'arbitrage."}
                 </div>
               )}
               {incident.cancel_request && (
-                <div className="incident-detail-request incident-detail-request--delete">
-                  Annulation opérateur en attente d'arbitrage.
+                <div
+                  className={`incident-detail-request incident-detail-request--delete${
+                    cancelArbitrationWaiting ? ' is-waiting' : ''
+                  }`}
+                >
+                  {cancelArbitrationWaiting
+                    ? 'Annulation opérateur en consultation.'
+                    : "Annulation opérateur en attente d'arbitrage."}
                 </div>
               )}
             </section>
@@ -604,6 +652,8 @@ export default function IncidentDetailPanel({
           loading={modal.state.reviewLoading}
           error={modal.state.reviewError}
           onClose={modal.closeReview}
+          onConsult={onConsultArbitration}
+          onReport={onReportArbitration}
           onApplyEdit={onApplyEditRequest}
           onRejectEdit={onRejectEditRequest}
           onApproveDelete={onApproveDeleteRequest}

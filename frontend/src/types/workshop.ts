@@ -40,10 +40,22 @@ export interface WorkshopIncident {
   updated_at: string;
   is_followed?: boolean;
   followed_at?: string | null;
+  arbitration?: {
+    edit?: WorkshopArbitrationRequestState;
+    cancel?: WorkshopArbitrationRequestState;
+  } | null;
   first_name: string;
   last_name: string;
   badge_number: string | null;
   role: Role;
+}
+
+export interface WorkshopArbitrationRequestState {
+  requestEventId: number;
+  requestedAt: string;
+  state: 'ACTIVE' | 'WAITING';
+  consultedAt?: string | null;
+  consultedByUserId?: number | null;
 }
 
 export interface WorkshopIncidentEvent {
@@ -80,6 +92,7 @@ export interface WorkshopIncidentMetrics {
   assigned_to_me?: number;
   followed?: number;
   followed_resolved?: number;
+  arbitration_unread?: number;
 }
 
 export interface WorkshopBoardLine {

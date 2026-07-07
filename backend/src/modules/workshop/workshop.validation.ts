@@ -60,6 +60,11 @@ export const reorderIncidentsSchema = z.object({
   orderedIncidentIds: z.array(z.coerce.number().int().positive()).min(1).max(500),
 });
 
+export const arbitrationConsultationSchema = z.object({
+  requestType: z.enum(['EDIT', 'CANCEL', 'ALL']).default('ALL'),
+});
+
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type UpdateIncidentInput = z.infer<typeof updateIncidentSchema>;
 export type ReorderIncidentsInput = z.infer<typeof reorderIncidentsSchema>;
+export type ArbitrationConsultationInput = z.infer<typeof arbitrationConsultationSchema>;

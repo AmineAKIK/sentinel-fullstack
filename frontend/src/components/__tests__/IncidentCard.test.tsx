@@ -131,6 +131,26 @@ describe('IncidentCard – rendu', () => {
     expect(screen.getByText('Correction demandée')).toBeDefined();
   });
 
+  it('signale une correction déjà prise en consultation', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({
+          edit_request: { state: 'ARRET' },
+          arbitration: {
+            edit: {
+              requestEventId: 11,
+              requestedAt: new Date().toISOString(),
+              state: 'WAITING',
+            },
+          },
+        })}
+        {...defaultProps}
+        isResponsable
+      />
+    );
+    expect(screen.getByText('Correction en attente')).toBeDefined();
+  });
+
   it("n'affiche pas le bouton correction si non responsable", () => {
     render(
       <IncidentCard

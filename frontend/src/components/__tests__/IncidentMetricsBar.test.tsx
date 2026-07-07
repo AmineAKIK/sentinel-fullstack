@@ -14,6 +14,7 @@ function mockMetrics(overrides: Partial<WorkshopIncidentMetrics> = {}): Workshop
     not_taken: 6,
     open_over_7d: 1,
     closed_today: 0,
+    arbitration_unread: 0,
     ...overrides,
   };
 }
@@ -27,6 +28,10 @@ const defaultFilters = {
   scope: 'all',
   query: '',
 };
+
+function metricLabels(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('.workshop-metric-label')).map((node) => node.textContent ?? '');
+}
 
 describe('IncidentMetricsBar – rendu', () => {
   it('affiche un spinner quand metricsLoading est vrai', () => {
@@ -50,6 +55,133 @@ describe('IncidentMetricsBar – rendu', () => {
       <IncidentMetricsBar metricsLoading={false} metrics={null} filters={defaultFilters} onSetFilters={vi.fn()} />
     );
     expect(screen.getByText('KPI indisponibles')).toBeDefined();
+  });
+});
+
+describe('IncidentMetricsBar – ordre métier', () => {
+  it('place les tuiles opérateur dans l’ordre de suivi déclarant', () => {
+    const { container } = render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={defaultFilters}
+        role="OPERATOR"
+        createdByMeCount={4}
+        onSetFilters={vi.fn()}
+      />
+    );
+
+    expect(metricLabels(container)).toEqual([
+      'Créés par moi',
+      'En attente',
+      'Non pris',
+      'Urgents',
+      'Ouverts > 7j',
+      'Ouverts',
+      'Total',
+    ]);
+  });
+
+  it('place les tuiles maintenance dans l’ordre d’intervention', () => {
+    const { container } = render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics({ assigned_to_me: 2 })}
+        filters={defaultFilters}
+        role="MAINTENANCE"
+        onSetFilters={vi.fn()}
+      />
+    );
+
+    expect(metricLabels(container)).toEqual([
+      'Urgents',
+      'Non pris',
+      'Pris par moi',
+      'En attente',
+      'Ouverts > 7j',
+      'Ouverts',
+      'Total',
+    ]);
+  });
+
+  it('place les tuiles responsable dans l’ordre de décision et pilotage', () => {
+    const { container } = render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics({ followed: 6, followed_resolved: 2 })}
+        filters={defaultFilters}
+        role="RESPONSABLE"
+        requestsCount={3}
+        onSetFilters={vi.fn()}
+      />
+    );
+
+    expect(metricLabels(container)).toEqual([
+      'À arbitrer',
+      'Urgents',
+      'Non pris',
+      'Ouverts > 7j',
+      'En attente',
+      'Suivis',
+      'Ouverts',
+      'Total',
+    ]);
+  });
+
+  it('affiche une pastille de nouveaux arbitrages sur la tuile responsable', () => {
+    render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics({ arbitration_unread: 2 })}
+        filters={defaultFilters}
+        role="RESPONSABLE"
+        requestsCount={5}
+        onSetFilters={vi.fn()}
+      />
+    );
+
+    const arbitrationTile = screen.getByRole('button', { name: /À arbitrer, 2 nouveaux cas non consultés/i });
+    expect(arbitrationTile).toBeDefined();
+    expect(arbitrationTile.textContent).toContain('5');
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0);
+  });
+
+  it('plafonne la pastille d’arbitrage à 99+', () => {
+    render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics({ arbitration_unread: 120 })}
+        filters={defaultFilters}
+        role="RESPONSABLE"
+        requestsCount={120}
+        onSetFilters={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('99+')).toBeDefined();
+  });
+
+  it("place les clôtures du jour juste avant Total lorsqu'elles sont affichées", () => {
+    const { container } = render(
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics({ closed_today: 2 })}
+        filters={defaultFilters}
+        role="MAINTENANCE"
+        onSetFilters={vi.fn()}
+      />
+    );
+
+    expect(metricLabels(container)).toEqual([
+      'Urgents',
+      'Non pris',
+      'Pris par moi',
+      'En attente',
+      'Ouverts > 7j',
+      'Ouverts',
+      "Clôturés aujourd'hui",
+      'Total',
+    ]);
   });
 });
 

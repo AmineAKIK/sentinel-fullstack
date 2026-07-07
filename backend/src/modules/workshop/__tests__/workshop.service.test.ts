@@ -2,6 +2,7 @@ import { IncidentStatus } from '../../../domain/constants';
 import {
   createIncidentService,
   cancelIncidentService,
+  consultArbitrationRequestService,
   followIncidentService,
   reorderIncidentsService,
   unfollowIncidentService,
@@ -31,6 +32,7 @@ jest.mock('../workshop.repository', () => ({
   listHistoryEvents: jest.fn(),
   listIncidentEvents: jest.fn(),
   getIncidentMetrics: jest.fn(),
+  consultArbitrationRequest: jest.fn(),
   getWorkshopAnalytics: jest.fn(),
   fetchIncidentWithUsersForActor: jest.fn(),
   incidentExists: jest.fn(),
@@ -644,13 +646,41 @@ describe('getIncidentMetricsService', () => {
       assigned_to_me: 1,
       followed: 2,
       followed_resolved: 1,
+      arbitration_unread: 0,
       open_over_7d: 0,
       closed_today: 0,
     };
     jest.mocked(repo.getIncidentMetrics).mockResolvedValue(metrics);
-    const result = await getIncidentMetricsService(7);
+    const result = await getIncidentMetricsService(7, 'RESPONSABLE');
     expect(result).toEqual(metrics);
-    expect(repo.getIncidentMetrics).toHaveBeenCalledWith(7);
+    expect(repo.getIncidentMetrics).toHaveBeenCalledWith(7, 'RESPONSABLE');
+  });
+});
+
+describe('consultArbitrationRequestService', () => {
+  it('refuse les rôles non responsables', async () => {
+    const result = await consultArbitrationRequestService(1, 7, 'MAINTENANCE', 'ALL');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('FORBIDDEN');
+    expect(repo.consultArbitrationRequest).not.toHaveBeenCalled();
+  });
+
+  it("passe le dossier d'arbitrage en consultation pour un responsable", async () => {
+    const incident = mockIncident({ edit_request: { state: 'DEGRADEE' } });
+    jest.mocked(repo.consultArbitrationRequest).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsersForActor).mockResolvedValue(incident);
+
+    const result = await consultArbitrationRequestService(1, 7, 'RESPONSABLE', 'ALL');
+
+    expect(result).toEqual({ ok: true, data: { consulted: 1, incident } });
+    expect(repo.consultArbitrationRequest).toHaveBeenCalledWith(1, 7, 'ALL');
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(
+      1,
+      7,
+      'ARBITRATION_CONSULTED',
+      { requestType: 'ALL', consulted: 1 }
+    );
   });
 });
 

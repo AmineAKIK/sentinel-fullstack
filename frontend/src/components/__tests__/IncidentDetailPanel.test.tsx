@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import IncidentDetailPanel from '../IncidentDetailPanel';
 import { ModalStateApi } from '../../hooks/useModalState';
@@ -108,6 +108,8 @@ function renderPanel({
         onRejectEditRequest={vi.fn(resolvedVoid)}
         onApproveDeleteRequest={vi.fn(resolvedVoid)}
         onRejectDeleteRequest={vi.fn(resolvedVoid)}
+        onConsultArbitration={vi.fn()}
+        onReportArbitration={vi.fn()}
         onEditSuccess={vi.fn()}
         onDeleteCommentConfirm={vi.fn(resolvedVoid)}
         patchIncident={vi.fn(() => Promise.resolve(incident))}
@@ -157,5 +159,24 @@ describe('IncidentDetailPanel', () => {
 
     expect(screen.getByRole('button', { name: "Demander l'annulation" })).toBeDefined();
     expect(screen.queryByRole('button', { name: /^Annuler$/ })).toBeNull();
+  });
+
+  it("permet de reprendre l'arbitrage depuis le détail après consultation du cas", () => {
+    const incident = mockIncident({
+      edit_request: { state: 'DEGRADEE' },
+      arbitration: {
+        edit: {
+          requestEventId: 42,
+          requestedAt: '2026-06-28T11:00:00.000Z',
+          state: 'WAITING',
+          consultedAt: '2026-06-28T11:05:00.000Z',
+        },
+      },
+    });
+    const { modal } = renderPanel({ incident });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reprendre la correction' }));
+
+    expect(modal.openReview).toHaveBeenCalledWith(incident, 'edit');
   });
 });

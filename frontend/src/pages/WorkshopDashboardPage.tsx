@@ -12,7 +12,7 @@ import FilterSummary from '../components/FilterSummary';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import SelectField from '../components/ui/SelectField';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
-import { updateWorkshopIncident } from '../api/workshop';
+import { consultWorkshopArbitration, updateWorkshopIncident } from '../api/workshop';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { WorkshopIncident } from '../types';
 import { canPerform } from '../utils/workshopPermissions';
@@ -33,12 +33,41 @@ function isWithinLastDays(iso: string, days: number): boolean {
   return createdAt >= limit;
 }
 
+type ReviewType = 'edit' | 'delete';
+
+function isArbitrationRequestActive(incident: WorkshopIncident, type: ReviewType): boolean {
+  if (type === 'edit') {
+    if (!incident.edit_request) return false;
+    return incident.arbitration?.edit?.state !== 'WAITING';
+  }
+  if (!incident.cancel_request) return false;
+  return incident.arbitration?.cancel?.state !== 'WAITING';
+}
+
+function getAutoReviewType(incident: WorkshopIncident): ReviewType | null {
+  if (isArbitrationRequestActive(incident, 'delete')) return 'delete';
+  if (isArbitrationRequestActive(incident, 'edit')) return 'edit';
+  return null;
+}
+
+function getActiveArbitrationKey(incident: WorkshopIncident): string | null {
+  const parts: string[] = [];
+  if (isArbitrationRequestActive(incident, 'edit')) {
+    parts.push(`edit:${incident.arbitration?.edit?.requestEventId ?? 'pending'}`);
+  }
+  if (isArbitrationRequestActive(incident, 'delete')) {
+    parts.push(`delete:${incident.arbitration?.cancel?.requestEventId ?? 'pending'}`);
+  }
+  return parts.length > 0 ? `${incident.id}:${parts.join('|')}` : null;
+}
+
 export default function WorkshopDashboardPage() {
   usePageTitle('Tableau de bord atelier');
   const { session } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
+  const [reportedArbitrationKey, setReportedArbitrationKey] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
   const [filters, setFilters] = useState<DashboardFiltersState>({
     lineId: searchParams.get('line') ?? 'all',
@@ -112,6 +141,10 @@ export default function WorkshopDashboardPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIncidentParam, incidents, loading]);
+
+  useEffect(() => {
+    setReportedArbitrationKey(null);
+  }, [selectedIncident?.id]);
 
   const filteredIncidents = incidents.filter((incident) => {
     const isResolved =
@@ -252,6 +285,59 @@ export default function WorkshopDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIncident, anyModalOpen]);
 
+  useEffect(() => {
+    if (
+      !isResponsable ||
+      !selectedIncident ||
+      modal.state.reviewIncident ||
+      modal.state.activeModal
+    ) {
+      return;
+    }
+    const reviewType = getAutoReviewType(selectedIncident);
+    const arbitrationKey = getActiveArbitrationKey(selectedIncident);
+    if (!reviewType || !arbitrationKey || arbitrationKey === reportedArbitrationKey) return;
+    modal.openReview(selectedIncident, reviewType);
+    // modal.openReview is intentionally omitted: useModalState returns stable behavior,
+    // but a fresh object each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isResponsable,
+    selectedIncident,
+    modal.state.reviewIncident,
+    modal.state.activeModal,
+    reportedArbitrationKey,
+  ]);
+
+  function openReviewFromIncident(incident: WorkshopIncident, reviewType: ReviewType) {
+    setSelectedIncident(incident);
+    setIncidentUrlParam(incident.id);
+    setReportedArbitrationKey(null);
+    modal.openReview(incident, reviewType);
+  }
+
+  function handleReportArbitration(incident: WorkshopIncident | null) {
+    if (incident) setReportedArbitrationKey(getActiveArbitrationKey(incident));
+    modal.closeReview();
+  }
+
+  async function handleConsultArbitration(incident: WorkshopIncident | null) {
+    if (!incident) return;
+    modal.setReviewLoading(true);
+    modal.setReviewError('');
+    try {
+      const result = await consultWorkshopArbitration(incident.id, 'ALL');
+      upsertIncident(result.incident);
+      if (selectedIncident?.id === incident.id) setSelectedIncident(result.incident);
+      await refreshMetrics();
+      modal.closeReview();
+    } catch {
+      modal.setReviewError("Impossible de passer le dossier d'arbitrage en consultation.");
+    } finally {
+      modal.setReviewLoading(false);
+    }
+  }
+
   return (
     <>
       <WorkshopNavBar />
@@ -380,16 +466,9 @@ export default function WorkshopDashboardPage() {
                   onClick={(inc) => {
                     setSelectedIncident(inc);
                     setIncidentUrlParam(inc.id);
-                    if (isResponsable && inc.cancel_request) {
-                      modal.openReview(inc, 'delete');
-                      return;
-                    }
-                    if (isResponsable && inc.edit_request) {
-                      modal.openReview(inc, 'edit');
-                    }
                   }}
-                  onReviewEdit={(_e, inc) => modal.openReview(inc, 'edit')}
-                  onReviewDelete={(_e, inc) => modal.openReview(inc, 'delete')}
+                  onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
+                  onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
                 />
               ))}
             </div>
@@ -433,6 +512,10 @@ export default function WorkshopDashboardPage() {
               onRejectEditRequest={actions.handleRejectEditRequest}
               onApproveDeleteRequest={actions.handleApproveDeleteRequest}
               onRejectDeleteRequest={actions.handleRejectDeleteRequest}
+              onConsultArbitration={() =>
+                void handleConsultArbitration(modal.state.reviewIncident)
+              }
+              onReportArbitration={() => handleReportArbitration(modal.state.reviewIncident)}
               onEditSuccess={(updated) => {
                 upsertIncident(updated);
                 setSelectedIncident(updated);
@@ -485,6 +568,8 @@ export default function WorkshopDashboardPage() {
             loading={modal.state.reviewLoading}
             error={modal.state.reviewError}
             onClose={modal.closeReview}
+            onConsult={() => void handleConsultArbitration(modal.state.reviewIncident)}
+            onReport={() => handleReportArbitration(modal.state.reviewIncident)}
             onApplyEdit={actions.handleApplyEditRequest}
             onRejectEdit={actions.handleRejectEditRequest}
             onApproveDelete={actions.handleApproveDeleteRequest}

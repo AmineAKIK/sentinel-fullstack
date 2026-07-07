@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { workshopAuthMiddleware } from '../../middlewares/workshopAuth';
 import {
   cancelIncident,
+  consultArbitrationRequest,
   createIncident,
   followIncident,
   getHistoryIncident,
@@ -37,6 +38,7 @@ router.post('/incidents', createIncident);
 router.post('/incidents/reorder', reorderIncidents);
 router.post('/incidents/:id/cancel', cancelIncident);
 router.post('/incidents/:id/follow', followIncident);
+router.post('/incidents/:id/arbitration-consultation', consultArbitrationRequest);
 router.patch('/incidents/:id', updateIncident);
 router.delete('/incidents/:id/follow', unfollowIncident);
 // Legacy compatibility: cancellation is a state transition, not a deletion.
