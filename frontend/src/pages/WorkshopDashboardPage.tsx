@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
 import DashboardFilters from '../components/DashboardFilters';
 import IncidentCard from '../components/IncidentCard';
+import { isLineDown } from '../components/IncidentBadges';
 import UnfollowIncidentConfirmModal from '../components/UnfollowIncidentConfirmModal';
 import DeleteResponsibleCommentConfirmModal from '../components/DeleteResponsibleCommentConfirmModal';
 import ReviewIncidentRequestModal from '../components/ReviewIncidentRequestModal';
@@ -16,7 +17,7 @@ import { consultWorkshopArbitration, updateWorkshopIncident } from '../api/works
 import { useAppAuth } from '../routes/AppAuthContext';
 import { WorkshopIncident } from '../types';
 import { canPerform } from '../utils/workshopPermissions';
-import { sortIncidents } from '../utils/incidentSort';
+import { sortIncidents, groupIncidentsByLine } from '../utils/incidentSort';
 import { usePageTitle } from '../hooks/usePageTitle';
 import {
   useDashboardFilters,
@@ -222,6 +223,12 @@ export default function WorkshopDashboardPage() {
           return sortOrder === 'date_desc' ? diff : -diff;
         });
 
+  // Regroupement sémantique par ligne : les groupes sont ordonnés 1-9/A-Z de
+  // façon fixe (indépendante du tri/filtre actif), le tri/filtre choisis par
+  // l'utilisateur ne s'appliquent qu'à l'intérieur de chaque groupe (l'ordre
+  // relatif de sortedIncidents est préservé lors du regroupement).
+  const lineGroups = groupIncidentsByLine(sortedIncidents);
+
   const actions = useIncidentActions({
     selectedIncident,
     clearSelectedIncident,
@@ -423,37 +430,37 @@ export default function WorkshopDashboardPage() {
               </div>
             </div>
           ) : (
-            <div className="incident-list">
-              {sortedIncidents.map((incident, index) => {
-                // Repère visuel de ligne : n'apparaît que quand deux cartes
-                // consécutives partagent la même ligne, pour donner un point
-                // de repère sans re-trier ni casser l'ordre de traitement
-                // (priorité + tri manuel du responsable).
-                const previous = sortedIncidents[index - 1];
-                const showLineMarker = previous?.line_number === incident.line_number;
-                return (
-                  <Fragment key={incident.id}>
-                    {showLineMarker && (
-                      <div className="incident-line-marker" aria-hidden="true">
-                        Autre cas · Ligne {incident.line_number}
-                      </div>
+            <div className="incident-line-groups">
+              {lineGroups.map((group) => (
+                <section key={group.lineId} className="incident-line-group">
+                  <h2 className="incident-line-group-header">
+                    Ligne {group.lineNumber}
+                    {isLineDown(group.incidents) && (
+                      <span className="incident-chip incident-chip--critical">
+                        Ligne à l'arrêt
+                      </span>
                     )}
-                    <IncidentCard
-                      incident={incident}
-                      isSelected={selectedIncident?.id === incident.id}
-                      isResponsable={isResponsable}
-                      isMaintenance={isMaintenance}
-                      onToggleFollow={actions.handleToggleFollow}
-                      onClick={(inc) => {
-                        setSelectedIncident(inc);
-                        setIncidentUrlParam(inc.id);
-                      }}
-                      onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
-                      onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
-                    />
-                  </Fragment>
-                );
-              })}
+                  </h2>
+                  <div className="incident-list">
+                    {group.incidents.map((incident) => (
+                      <IncidentCard
+                        key={incident.id}
+                        incident={incident}
+                        isSelected={selectedIncident?.id === incident.id}
+                        isResponsable={isResponsable}
+                        isMaintenance={isMaintenance}
+                        onToggleFollow={actions.handleToggleFollow}
+                        onClick={(inc) => {
+                          setSelectedIncident(inc);
+                          setIncidentUrlParam(inc.id);
+                        }}
+                        onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
+                        onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </div>

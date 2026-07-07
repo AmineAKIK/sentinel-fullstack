@@ -236,11 +236,20 @@ button.workshop-metric:hover,
   gap: var(--space-4);
 }
 
-/* Repère visuel discret quand deux cartes consécutives partagent la même
-   ligne (voir WorkshopDashboardPage) : donne un point de repère sans
-   re-trier ni casser l'ordre de traitement / le drag manuel du responsable. */
-.incident-line-marker {
-  margin: calc(var(--space-4) * -1 + 4px) 4px 0;
+/* Regroupement sémantique par ligne (voir WorkshopDashboardPage) : les
+   groupes sont ordonnés 1-9/A-Z, le tri/filtre actif ne s'applique qu'à
+   l'intérieur de chaque groupe. */
+.incident-line-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.incident-line-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
   padding-left: 2px;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
