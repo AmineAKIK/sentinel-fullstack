@@ -238,24 +238,53 @@ button.workshop-metric:hover,
 
 /* Regroupement sémantique par ligne (voir WorkshopDashboardPage) : les
    groupes sont ordonnés 1-9/A-Z, le tri/filtre actif ne s'applique qu'à
-   l'intérieur de chaque groupe. */
+   l'intérieur de chaque groupe.
+   La frontière de groupe doit se percevoir en vision périphérique, avant
+   toute lecture — sinon elle a le même poids visuel qu'un simple champ de
+   carte et l'œil ne peut pas la prioriser en scannant la liste. D'où un
+   espacement asymétrique (beaucoup d'air avant un groupe, peu après son
+   en-tête) et un trait de séparation net : deux signaux perçus sans effort
+   de focalisation, indépendants du badge "Ligne à l'arrêt" qui ne doit être
+   qu'un renfort et non l'unique porteur du repère. */
 .incident-line-groups {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-8);
 }
 
 .incident-line-group-header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-3);
-  padding-left: 2px;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 2px solid var(--color-border-strong);
+  color: var(--color-text);
+  font-size: var(--text-lg);
   font-weight: 600;
+}
+
+.incident-line-groups > .incident-line-group:first-child .incident-line-group-header {
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Même sémantique de couleur que .incident-chip--critical (grammaire des
+   niveaux d'attention, base.css §5.1), mais dimensionné pour flotter à côté
+   d'un titre --text-lg plutôt qu'à côté de texte de carte --text-base : un
+   badge taillé pour une carte paraîtrait petit et déconnecté ici, réduit à
+   un détail plutôt qu'un renfort du signal de frontière. */
+.incident-line-group-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background-color: var(--attention-critical-text);
+  color: var(--color-primary-text);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 /* ── Drawer de détail : panneau fixe en overlay (pattern "peek") ──

@@ -436,9 +436,7 @@ export default function WorkshopDashboardPage() {
                   <h2 className="incident-line-group-header">
                     Ligne {group.lineNumber}
                     {isLineDown(group.incidents) && (
-                      <span className="incident-chip incident-chip--critical">
-                        Ligne à l'arrêt
-                      </span>
+                      <span className="incident-line-group-flag">Ligne à l'arrêt</span>
                     )}
                   </h2>
                   <div className="incident-list">
