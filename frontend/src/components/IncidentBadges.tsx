@@ -9,10 +9,6 @@ export function isIncidentResolved(incident: WorkshopIncident): boolean {
   );
 }
 
-export function isLineDown(incidents: WorkshopIncident[]): boolean {
-  return incidents.some((incident) => incident.state === 'INDISPONIBLE' && !isIncidentResolved(incident));
-}
-
 export function IncidentStateChip({ incident }: { incident: WorkshopIncident }) {
   return (
     <span className="incident-chip incident-chip--state">

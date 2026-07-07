@@ -4,7 +4,6 @@ import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
 import DashboardFilters from '../components/DashboardFilters';
 import IncidentCard from '../components/IncidentCard';
-import { isLineDown } from '../components/IncidentBadges';
 import UnfollowIncidentConfirmModal from '../components/UnfollowIncidentConfirmModal';
 import DeleteResponsibleCommentConfirmModal from '../components/DeleteResponsibleCommentConfirmModal';
 import ReviewIncidentRequestModal from '../components/ReviewIncidentRequestModal';
@@ -433,12 +432,7 @@ export default function WorkshopDashboardPage() {
             <div className="incident-line-groups">
               {lineGroups.map((group) => (
                 <section key={group.lineId} className="incident-line-group">
-                  <h2 className="incident-line-group-header">
-                    Ligne {group.lineNumber}
-                    {isLineDown(group.incidents) && (
-                      <span className="incident-line-group-flag">Ligne à l'arrêt</span>
-                    )}
-                  </h2>
+                  <h2 className="incident-line-group-header">Ligne {group.lineNumber}</h2>
                   <div className="incident-list">
                     {group.incidents.map((incident) => (
                       <IncidentCard
