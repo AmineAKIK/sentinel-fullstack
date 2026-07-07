@@ -15,13 +15,11 @@ import {
   listIncidents,
   listKnowledgeIncidents,
   listWorkshopLines,
-  reorderIncidents,
   unfollowIncident,
   updateIncident,
 } from './workshop.controller';
 
 const router = Router();
-
 
 router.use(workshopAuthMiddleware);
 router.get('/lines', listWorkshopLines);
@@ -35,7 +33,6 @@ router.get('/incidents/:id/events', listIncidentEvents);
 router.get('/metrics', getIncidentMetrics);
 router.get('/analytics', getWorkshopAnalytics);
 router.post('/incidents', createIncident);
-router.post('/incidents/reorder', reorderIncidents);
 router.post('/incidents/:id/cancel', cancelIncident);
 router.post('/incidents/:id/follow', followIncident);
 router.post('/incidents/:id/arbitration-consultation', consultArbitrationRequest);

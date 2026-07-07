@@ -28,7 +28,6 @@ export async function listWorkshopIncidents(): Promise<WorkshopIncident[]> {
   return api.get<WorkshopIncident[]>('/api/workshop/incidents');
 }
 
-
 export type IncidentWorkspaceParams = {
   q?: string;
   status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
@@ -74,7 +73,6 @@ export async function createWorkshopIncident(
 export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   isTaken?: boolean;
   isPriority?: boolean;
-  displayOrder?: number;
   status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
   diagnostic?: string;
   interventionNote?: string;
@@ -96,10 +94,6 @@ export async function updateWorkshopIncident(
   payload: UpdateIncidentPayload
 ): Promise<WorkshopIncident> {
   return api.patch<WorkshopIncident>(`/api/workshop/incidents/${id}`, payload);
-}
-
-export async function reorderWorkshopIncidents(orderedIncidentIds: number[]): Promise<{ updated: number }> {
-  return api.post<{ updated: number }>('/api/workshop/incidents/reorder', { orderedIncidentIds });
 }
 
 export async function followWorkshopIncident(id: number): Promise<WorkshopIncident> {

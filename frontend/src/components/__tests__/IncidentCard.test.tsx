@@ -43,16 +43,8 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
 }
 
 const defaultProps = {
-  isDragging: false,
-  isDropTarget: false,
-  canReorder: false,
   isResponsable: false,
   isMaintenance: false,
-  onDragStart: vi.fn(),
-  onDragOver: vi.fn(),
-  onDragLeave: vi.fn(),
-  onDrop: vi.fn(),
-  onDragEnd: vi.fn(),
   onClick: vi.fn(),
   onReviewEdit: vi.fn(),
   onReviewDelete: vi.fn(),

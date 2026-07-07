@@ -28,13 +28,16 @@ export type WorkshopAction =
   | 'resume'
   | 'close'
   | 'setPriority'
-  | 'reorder'
   | 'responsibleComment'
   | 'invalidateClosed'
   | 'withdrawEdit';
 
 function isActiveIncident(incident: WorkshopIncident): boolean {
-  return incident.status !== 'CLOSED' && incident.status !== 'CANCELED' && incident.status !== 'INVALIDATED';
+  return (
+    incident.status !== 'CLOSED' &&
+    incident.status !== 'CANCELED' &&
+    incident.status !== 'INVALIDATED'
+  );
 }
 
 export function canPerform(
@@ -72,7 +75,11 @@ export function canPerform(
         incident.user_id === actorId
       );
     case 'directEdit':
-      return isActiveIncident(incident) && !incident.is_taken && (role === 'RESPONSABLE' || role === 'MAINTENANCE');
+      return (
+        isActiveIncident(incident) &&
+        !incident.is_taken &&
+        (role === 'RESPONSABLE' || role === 'MAINTENANCE')
+      );
     case 'responsableEdit':
       return role === 'RESPONSABLE' && isActiveIncident(incident);
     case 'editAfterTake':
@@ -87,14 +94,22 @@ export function canPerform(
       if (incident.status === 'PENDING') {
         return role === 'RESPONSABLE';
       }
-      return isActiveIncident(incident) && !incident.is_taken && (role === 'RESPONSABLE' || role === 'MAINTENANCE');
+      return (
+        isActiveIncident(incident) &&
+        !incident.is_taken &&
+        (role === 'RESPONSABLE' || role === 'MAINTENANCE')
+      );
     case 'approveEdit':
     case 'rejectEdit':
       return role === 'RESPONSABLE' && isActiveIncident(incident) && incident.edit_request != null;
     case 'approveCancel':
-      return role === 'RESPONSABLE' && isActiveIncident(incident) && incident.cancel_request === true;
+      return (
+        role === 'RESPONSABLE' && isActiveIncident(incident) && incident.cancel_request === true
+      );
     case 'rejectCancel':
-      return role === 'RESPONSABLE' && isActiveIncident(incident) && incident.cancel_request === true;
+      return (
+        role === 'RESPONSABLE' && isActiveIncident(incident) && incident.cancel_request === true
+      );
     case 'take':
       // Any MAINTENANCE member can take or retake an OPEN incident — team play,
       // every transfer is logged in the event history.
@@ -106,7 +121,6 @@ export function canPerform(
     case 'close':
       return role === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
     case 'setPriority':
-    case 'reorder':
     case 'responsibleComment':
       return role === 'RESPONSABLE' && isActiveIncident(incident);
     case 'invalidateClosed':

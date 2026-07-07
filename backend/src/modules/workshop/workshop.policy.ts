@@ -1,8 +1,4 @@
-import {
-  IncidentAction,
-  IncidentStatus,
-  isWorkshopRole,
-} from '../../domain/constants';
+import { IncidentAction, IncidentStatus, isWorkshopRole } from '../../domain/constants';
 
 /*
  * Permissions atelier — SOURCE DE VÉRITÉ en matière de sécurité (`canPerform`).
@@ -113,9 +109,7 @@ export function canPerform(
     case 'APPROVE_CANCEL':
     case 'REJECT_CANCEL':
       return (
-        workshopRole === 'RESPONSABLE' &&
-        isActiveIncident(incident) &&
-        hasCancelRequest(incident)
+        workshopRole === 'RESPONSABLE' && isActiveIncident(incident) && hasCancelRequest(incident)
       );
     case 'TAKE':
       // Any MAINTENANCE member can take or retake an OPEN incident at any time.
@@ -132,7 +126,6 @@ export function canPerform(
       // Intentional: allows a replacement technician to take over if needed.
       return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
     case 'SET_PRIORITY':
-    case 'REORDER':
     case 'RESPONSIBLE_COMMENT':
       return workshopRole === 'RESPONSABLE' && isActiveIncident(incident);
     case 'INVALIDATE_CLOSED':

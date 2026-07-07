@@ -1,7 +1,6 @@
 import {
   cancelWorkshopIncident,
   followWorkshopIncident,
-  reorderWorkshopIncidents,
   unfollowWorkshopIncident,
   updateWorkshopIncident,
 } from '../api/workshop';
@@ -17,9 +16,6 @@ interface IncidentActionsOptions {
   setIncidents: React.Dispatch<React.SetStateAction<WorkshopIncident[]>>;
   refreshMetrics: () => Promise<void>;
   modal: ModalStateApi;
-  filteredIncidents: WorkshopIncident[];
-  draggedIncidentId: number | null;
-  resetDragState: () => void;
   isMaintenance: boolean;
   userRole: string | undefined;
 }
@@ -36,9 +32,6 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     setIncidents,
     refreshMetrics,
     modal,
-    filteredIncidents,
-    draggedIncidentId,
-    resetDragState,
     isMaintenance,
   } = opts;
 
@@ -76,7 +69,9 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, { applyEditRequest: true });
+      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
+        applyEditRequest: true,
+      });
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
@@ -96,7 +91,9 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, { rejectEditRequest: true });
+      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
+        rejectEditRequest: true,
+      });
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
@@ -138,7 +135,9 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, { rejectDeleteRequest: true });
+      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
+        rejectDeleteRequest: true,
+      });
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
@@ -169,19 +168,26 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
 
   async function handleInvalidateIncident(reason: string) {
     if (!selectedIncident) return;
-    await patchIncident(selectedIncident.id, { status: 'INVALIDATED', invalidationReason: reason.trim() });
+    await patchIncident(selectedIncident.id, {
+      status: 'INVALIDATED',
+      invalidationReason: reason.trim(),
+    });
     modal.closeModal();
   }
 
   async function handleToggleUrgent(incident: WorkshopIncident) {
-    const updated = await updateWorkshopIncident(incident.id, { isPriority: !incident.is_priority });
+    const updated = await updateWorkshopIncident(incident.id, {
+      isPriority: !incident.is_priority,
+    });
     upsertIncident(updated);
   }
 
   async function handleToggleFollow(incident: WorkshopIncident) {
     if (
       incident.is_followed &&
-      (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED') &&
+      (incident.status === 'CLOSED' ||
+        incident.status === 'CANCELED' ||
+        incident.status === 'INVALIDATED') &&
       modal.state.unfollowConfirmIncident?.id !== incident.id
     ) {
       modal.setUnfollowConfirm(incident);
@@ -205,7 +211,12 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
           sortIncidents(
             prev.map((item) =>
               item.id === id
-                ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
+                ? {
+                    ...item,
+                    status: 'CANCELED',
+                    cancel_request: false,
+                    cancel_request_reason: null,
+                  }
                 : item
             )
           )
@@ -222,7 +233,12 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
           sortIncidents(
             prev.map((item) =>
               item.id === id
-                ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
+                ? {
+                    ...item,
+                    status: 'CANCELED',
+                    cancel_request: false,
+                    cancel_request_reason: null,
+                  }
                 : item
             )
           )
@@ -234,36 +250,6 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     } catch (err) {
       modal.setReviewError(actionErrorMessage(err, "Impossible d'annuler l'incident."));
     }
-  }
-
-  async function persistManualOrder(ordered: WorkshopIncident[]) {
-    const baseOrder = ordered.length + 1;
-    const reorderedIds = new Set(ordered.map((item) => item.id));
-    const nextOrderById = new Map<number, number>();
-    ordered.forEach((item, i) => nextOrderById.set(item.id, baseOrder - i));
-
-    setIncidents((prev) =>
-      sortIncidents(
-        prev.map((item) =>
-          reorderedIds.has(item.id)
-            ? { ...item, display_order: nextOrderById.get(item.id) ?? item.display_order }
-            : item
-        )
-      )
-    );
-    await reorderWorkshopIncidents(ordered.map((item) => item.id));
-  }
-
-  async function reorderDraggedIncident(targetId: number) {
-    if (!draggedIncidentId || draggedIncidentId === targetId) return;
-    const fromIndex = filteredIncidents.findIndex((item) => item.id === draggedIncidentId);
-    const toIndex = filteredIncidents.findIndex((item) => item.id === targetId);
-    if (fromIndex === -1 || toIndex === -1) return;
-    const nextOrdered = [...filteredIncidents];
-    const [moved] = nextOrdered.splice(fromIndex, 1);
-    nextOrdered.splice(toIndex, 0, moved);
-    await persistManualOrder(nextOrdered);
-    resetDragState();
   }
 
   return {
@@ -281,6 +267,5 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     handleToggleUrgent,
     handleToggleFollow,
     handleMaintenanceDeleteConfirm,
-    reorderDraggedIncident,
   };
 }

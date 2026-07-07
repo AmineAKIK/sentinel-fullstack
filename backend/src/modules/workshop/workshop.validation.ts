@@ -8,16 +8,22 @@ export const createIncidentSchema = z.object({
   lineId: z.coerce.number().int().positive(),
   machineId: z.string().trim().min(1).max(FIELD_LIMITS.MACHINE_ID),
   robotLabel: z.string().trim().min(1).max(FIELD_LIMITS.ROBOT),
-  headNumber: z.coerce.number().int().min(1, 'La tête doit correspondre au référentiel de la machine.'),
+  headNumber: z.coerce
+    .number()
+    .int()
+    .min(1, 'La tête doit correspondre au référentiel de la machine.'),
   state: IncidentStateEnum,
   comment: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
-  currentProduct: z.string().trim().min(1, 'Le produit en cours est obligatoire.').max(FIELD_LIMITS.PRODUCT),
+  currentProduct: z
+    .string()
+    .trim()
+    .min(1, 'Le produit en cours est obligatoire.')
+    .max(FIELD_LIMITS.PRODUCT),
 });
 
 export const updateIncidentSchema = createIncidentSchema.partial().extend({
   isTaken: z.boolean().optional(),
   isPriority: z.boolean().optional(),
-  displayOrder: z.coerce.number().int().optional(),
   status: IncidentStatusEnum.optional(),
   diagnostic: z.string().trim().max(FIELD_LIMITS.NOTE).optional(),
   interventionNote: z.string().trim().max(FIELD_LIMITS.NOTE).optional(),
@@ -47,7 +53,9 @@ export const incidentWorkspaceQuerySchema = z.object({
 const isoDateTimeSchema = z
   .string()
   .trim()
-  .refine((v) => !Number.isNaN(Date.parse(v)), { message: 'Date invalide (format ISO 8601 attendu).' });
+  .refine((v) => !Number.isNaN(Date.parse(v)), {
+    message: 'Date invalide (format ISO 8601 attendu).',
+  });
 
 export const workshopAnalyticsQuerySchema = z.object({
   start: isoDateTimeSchema.optional(),
@@ -56,15 +64,10 @@ export const workshopAnalyticsQuerySchema = z.object({
   machineId: z.string().trim().max(120).optional(),
 });
 
-export const reorderIncidentsSchema = z.object({
-  orderedIncidentIds: z.array(z.coerce.number().int().positive()).min(1).max(500),
-});
-
 export const arbitrationConsultationSchema = z.object({
   requestType: z.enum(['EDIT', 'CANCEL', 'ALL']).default('ALL'),
 });
 
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type UpdateIncidentInput = z.infer<typeof updateIncidentSchema>;
-export type ReorderIncidentsInput = z.infer<typeof reorderIncidentsSchema>;
 export type ArbitrationConsultationInput = z.infer<typeof arbitrationConsultationSchema>;

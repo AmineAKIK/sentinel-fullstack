@@ -14,16 +14,8 @@ import {
 interface IncidentCardProps {
   incident: WorkshopIncident;
   isSelected?: boolean;
-  isDragging: boolean;
-  isDropTarget: boolean;
-  canReorder: boolean;
   isResponsable: boolean;
   isMaintenance: boolean;
-  onDragStart: (event: React.DragEvent<HTMLElement>, incidentId: number) => void;
-  onDragOver: (event: React.DragEvent<HTMLElement>, incidentId: number, clientY: number) => void;
-  onDragLeave: (incidentId: number) => void;
-  onDrop: (event: React.DragEvent<HTMLElement>, incidentId: number) => void;
-  onDragEnd: () => void;
   onClick: (incident: WorkshopIncident) => void;
   onToggleFollow?: (incident: WorkshopIncident) => void;
   onReviewEdit: (event: React.MouseEvent, incident: WorkshopIncident) => void;
@@ -33,16 +25,8 @@ interface IncidentCardProps {
 export default function IncidentCard({
   incident,
   isSelected = false,
-  isDragging,
-  isDropTarget,
-  canReorder,
   isResponsable,
   isMaintenance,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
   onClick,
   onToggleFollow,
   onReviewEdit,
@@ -61,25 +45,8 @@ export default function IncidentCard({
   return (
     <div
       role="button"
-      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isSelected ? ' is-selected' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isSelected ? ' is-selected' : ''}`}
       aria-current={isSelected || undefined}
-      draggable={canReorder}
-      onDragStart={(event) => {
-        if (!canReorder) return;
-        onDragStart(event, incident.id);
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', String(incident.id));
-      }}
-      onDragOver={(event) => {
-        event.preventDefault();
-        onDragOver(event, incident.id, event.clientY);
-      }}
-      onDragLeave={() => onDragLeave(incident.id)}
-      onDrop={(event) => {
-        event.preventDefault();
-        onDrop(event, incident.id);
-      }}
-      onDragEnd={onDragEnd}
       onClick={() => onClick(incident)}
       tabIndex={0}
       aria-label={`Ouvrir incident${isActiveUrgent ? ' urgent' : ''} ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
@@ -106,22 +73,6 @@ export default function IncidentCard({
             Retirer du suivi
           </button>
         </div>
-      )}
-      {canReorder && (
-        <span
-          className="incident-drag-grip"
-          title="Glisser pour changer l'ordre de traitement"
-          aria-hidden="true"
-        >
-          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-            <circle cx="2.5" cy="2.5" r="1.5" />
-            <circle cx="7.5" cy="2.5" r="1.5" />
-            <circle cx="2.5" cy="8" r="1.5" />
-            <circle cx="7.5" cy="8" r="1.5" />
-            <circle cx="2.5" cy="13.5" r="1.5" />
-            <circle cx="7.5" cy="13.5" r="1.5" />
-          </svg>
-        </span>
       )}
       <div className="incident-card-main">
         <h2>

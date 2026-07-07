@@ -22,7 +22,6 @@ import {
   listKnowledgeIncidentsService,
   listWorkshopLinesService,
   consultArbitrationRequestService,
-  reorderIncidentsService,
   unfollowIncidentService,
   updateIncidentService,
 } from './workshop.service';
@@ -30,7 +29,6 @@ import {
   createIncidentSchema,
   arbitrationConsultationSchema,
   incidentWorkspaceQuerySchema,
-  reorderIncidentsSchema,
   updateIncidentSchema,
   workshopAnalyticsQuerySchema,
 } from './workshop.validation';
@@ -185,7 +183,11 @@ export async function createIncident(req: Request, res: Response): Promise<void>
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
-    const result = await createIncidentService(parsed.data, req.workshopUser!.userId, req.workshopUser!.role);
+    const result = await createIncidentService(
+      parsed.data,
+      req.workshopUser!.userId,
+      req.workshopUser!.role
+    );
     if (sendServiceError(res, result)) return;
     res.status(201).json(result.data);
   } catch (err) {
@@ -217,7 +219,11 @@ export async function cancelIncident(req: Request, res: Response): Promise<void>
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
-    const result = await cancelIncidentService(id.data, req.workshopUser!.userId, req.workshopUser!.role);
+    const result = await cancelIncidentService(
+      id.data,
+      req.workshopUser!.userId,
+      req.workshopUser!.role
+    );
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {
@@ -229,7 +235,11 @@ export async function followIncident(req: Request, res: Response): Promise<void>
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
-    const result = await followIncidentService(id.data, req.workshopUser!.userId, req.workshopUser!.role);
+    const result = await followIncidentService(
+      id.data,
+      req.workshopUser!.userId,
+      req.workshopUser!.role
+    );
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {
@@ -241,25 +251,14 @@ export async function unfollowIncident(req: Request, res: Response): Promise<voi
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
-    const result = await unfollowIncidentService(id.data, req.workshopUser!.userId, req.workshopUser!.role);
+    const result = await unfollowIncidentService(
+      id.data,
+      req.workshopUser!.userId,
+      req.workshopUser!.role
+    );
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'unfollowIncident', err);
-  }
-}
-
-export async function reorderIncidents(req: Request, res: Response): Promise<void> {
-  try {
-    const parsed = reorderIncidentsSchema.safeParse(req.body);
-    if (!parsed.success) {
-      sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
-      return;
-    }
-    const result = await reorderIncidentsService(parsed.data, req.workshopUser!.userId, req.workshopUser!.role);
-    if (sendServiceError(res, result)) return;
-    res.json(result.data);
-  } catch (err) {
-    handleControllerError(res, 'reorderIncidents', err);
   }
 }

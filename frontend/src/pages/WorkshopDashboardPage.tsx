@@ -22,7 +22,6 @@ import {
   useDashboardFilters,
   DashboardFilters as DashboardFiltersState,
 } from '../hooks/useDashboardFilters';
-import { useDragDrop } from '../hooks/useDragDrop';
 import { useIncidentsData } from '../hooks/useIncidentsData';
 import { useModalState } from '../hooks/useModalState';
 import { useIncidentActions } from '../hooks/useIncidentActions';
@@ -96,16 +95,6 @@ export default function WorkshopDashboardPage() {
     setFilters,
     lines,
   });
-  const {
-    draggedIncidentId,
-    dragOverIncidentId,
-    setDraggedIncidentId,
-    scheduleAutoScroll,
-    setDropTarget,
-    clearDropTarget,
-    resetDragState,
-  } = useDragDrop();
-
   const isOperator = user?.role === 'OPERATOR';
   const isMaintenance = user?.role === 'MAINTENANCE';
   const isResponsable = user?.role === 'RESPONSABLE';
@@ -240,9 +229,6 @@ export default function WorkshopDashboardPage() {
     setIncidents,
     refreshMetrics,
     modal,
-    filteredIncidents,
-    draggedIncidentId,
-    resetDragState,
     isMaintenance,
     userRole: user?.role,
   });
@@ -455,26 +441,9 @@ export default function WorkshopDashboardPage() {
                     <IncidentCard
                       incident={incident}
                       isSelected={selectedIncident?.id === incident.id}
-                      isDragging={draggedIncidentId === incident.id}
-                      isDropTarget={
-                        dragOverIncidentId === incident.id && draggedIncidentId !== incident.id
-                      }
-                      canReorder={
-                        sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)
-                      }
                       isResponsable={isResponsable}
                       isMaintenance={isMaintenance}
                       onToggleFollow={actions.handleToggleFollow}
-                      onDragStart={(_e, id) => setDraggedIncidentId(id)}
-                      onDragOver={(_e, id, clientY) => {
-                        if (draggedIncidentId && draggedIncidentId !== id) {
-                          scheduleAutoScroll(clientY);
-                          setDropTarget(id);
-                        }
-                      }}
-                      onDragLeave={(id) => clearDropTarget(id)}
-                      onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
-                      onDragEnd={resetDragState}
                       onClick={(inc) => {
                         setSelectedIncident(inc);
                         setIncidentUrlParam(inc.id);

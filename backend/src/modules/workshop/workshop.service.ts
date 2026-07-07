@@ -22,13 +22,11 @@ export {
   invalidateIncidentService,
   setPriorityIncidentService,
   setResponsibleCommentService,
-  setDisplayOrderIncidentService,
   requestCancelIncidentService,
   rejectCancelIncidentService,
   cancelIncidentService,
   followIncidentService,
   unfollowIncidentService,
-  reorderIncidentsService,
 } from './workshop.service.mutations';
 
 import {
@@ -54,7 +52,6 @@ import {
   invalidateIncidentService,
   setPriorityIncidentService,
   setResponsibleCommentService,
-  setDisplayOrderIncidentService,
   requestCancelIncidentService,
   rejectCancelIncidentService,
 } from './workshop.service.mutations';
@@ -173,7 +170,10 @@ export async function updateIncidentService(
     if (!hasOnlyKeys(keys, ['status', 'interventionNote'])) return unexpectedFieldsError();
     return closeIncidentService(id, updates.interventionNote, actorUserId, actorRole);
   }
-  if (updates.status === 'INVALIDATED' || (updates.status === 'CANCELED' && updates.invalidationReason !== undefined)) {
+  if (
+    updates.status === 'INVALIDATED' ||
+    (updates.status === 'CANCELED' && updates.invalidationReason !== undefined)
+  ) {
     if (!hasOnlyKeys(keys, ['status', 'invalidationReason'])) return unexpectedFieldsError();
     return invalidateIncidentService(id, updates.invalidationReason, actorUserId, actorRole);
   }
@@ -187,10 +187,6 @@ export async function updateIncidentService(
     if (!hasOnlyKeys(keys, ['responsibleComment'])) return unexpectedFieldsError();
     return setResponsibleCommentService(id, updates.responsibleComment, actorUserId, actorRole);
   }
-  if (updates.displayOrder !== undefined) {
-    if (!hasOnlyKeys(keys, ['displayOrder'])) return unexpectedFieldsError();
-    return setDisplayOrderIncidentService(id, updates.displayOrder, actorUserId, actorRole);
-  }
   if (updates.requestOnly === true) {
     if (!hasOnlyKeys(keys, ['requestOnly', ...EDIT_FIELD_KEYS])) return unexpectedFieldsError();
     if (!hasEditFields(keys)) return badRequest('Aucune modification demandée.');
@@ -200,7 +196,14 @@ export async function updateIncidentService(
   if (updates.requestOnly !== undefined) return unexpectedFieldsError();
 
   if (updates.cancelRequest === true || updates.deleteRequest === true) {
-    if (!hasOnlyKeys(keys, ['cancelRequest', 'cancelRequestReason', 'deleteRequest', 'deleteRequestReason'])) {
+    if (
+      !hasOnlyKeys(keys, [
+        'cancelRequest',
+        'cancelRequestReason',
+        'deleteRequest',
+        'deleteRequestReason',
+      ])
+    ) {
       return unexpectedFieldsError();
     }
     const reason = updates.cancelRequestReason ?? updates.deleteRequestReason ?? '';

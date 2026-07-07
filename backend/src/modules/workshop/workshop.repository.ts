@@ -18,9 +18,10 @@ const activeIncidentStatusSql = statusInSql('status', ACTIVE_INCIDENT_STATUSES);
 const openStatusSql = statusEqualsSql('status', 'OPEN');
 const pendingStatusSql = statusEqualsSql('status', 'PENDING');
 const _closedStatusSql = statusEqualsSql('status', 'CLOSED');
-const _nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql('wi.status', INCIDENT_STATUSES.filter(
-  (status) => status !== 'CANCELED' && status !== 'INVALIDATED'
-));
+const _nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql(
+  'wi.status',
+  INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED')
+);
 
 // ─── SQL column constants ─────────────────────────────────────────────────────
 
@@ -284,7 +285,11 @@ function buildIncidentWorkspaceFilters(
   };
 }
 
-function buildHistoryEventFilters(query: QueryParams): { whereClause: string; params: Array<string | number>; limit: number } {
+function buildHistoryEventFilters(query: QueryParams): {
+  whereClause: string;
+  params: Array<string | number>;
+  limit: number;
+} {
   const { q, eventType, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
@@ -403,9 +408,10 @@ export async function listIncidents(userId: number, role: string) {
 
 export async function listIncidentWorkspaceRows(query: QueryParams, mode: IncidentListMode) {
   const { whereClause, params, limit } = buildIncidentWorkspaceFilters(query, mode);
-  const orderBy = mode === 'knowledge'
-    ? 'wi.updated_at DESC, wi.created_at DESC'
-    : 'wi.created_at DESC, wi.updated_at DESC';
+  const orderBy =
+    mode === 'knowledge'
+      ? 'wi.updated_at DESC, wi.created_at DESC'
+      : 'wi.created_at DESC, wi.updated_at DESC';
 
   const { rows } = await pool.query(
     `SELECT ${INCIDENT_BASE_COLS},
@@ -463,13 +469,16 @@ export async function getActiveWorkshopLine(lineId: number): Promise<ActiveWorks
   return rows[0] ?? null;
 }
 
-export async function createIncidentData(input: {
-  actorUserId: number;
-  data: CreateIncidentInput;
-  line: ActiveWorkshopLine;
-  machine: StoredMachine;
-  robotLabel: string;
-}, client?: PoolClient): Promise<number> {
+export async function createIncidentData(
+  input: {
+    actorUserId: number;
+    data: CreateIncidentInput;
+    line: ActiveWorkshopLine;
+    machine: StoredMachine;
+    robotLabel: string;
+  },
+  client?: PoolClient
+): Promise<number> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `INSERT INTO workshop_incidents (
@@ -517,7 +526,10 @@ export async function getIncidentCancelSnapshot(
   return rows[0] ?? null;
 }
 
-export async function cancelIncidentData(incidentId: number, client?: PoolClient): Promise<boolean> {
+export async function cancelIncidentData(
+  incidentId: number,
+  client?: PoolClient
+): Promise<boolean> {
   const db = client ?? pool;
   const result = await db.query(
     `UPDATE workshop_incidents
@@ -535,13 +547,22 @@ export async function cancelIncidentData(incidentId: number, client?: PoolClient
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function getIncidentById(incidentId: number, client?: PoolClient): Promise<WorkshopIncidentRow | null> {
+export async function getIncidentById(
+  incidentId: number,
+  client?: PoolClient
+): Promise<WorkshopIncidentRow | null> {
   const db = client ?? pool;
-  const { rows } = await db.query('SELECT * FROM workshop_incidents WHERE id = $1 FOR UPDATE', [incidentId]);
+  const { rows } = await db.query('SELECT * FROM workshop_incidents WHERE id = $1 FOR UPDATE', [
+    incidentId,
+  ]);
   return rows[0] ?? null;
 }
 
-export async function requestCancelIncident(incidentId: number, reason: string, client?: PoolClient): Promise<number | null> {
+export async function requestCancelIncident(
+  incidentId: number,
+  reason: string,
+  client?: PoolClient
+): Promise<number | null> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
@@ -558,7 +579,11 @@ export async function requestCancelIncident(incidentId: number, reason: string, 
   return rows[0]?.id ?? null;
 }
 
-export async function requestEditIncident(incidentId: number, editPayload: Record<string, unknown>, client?: PoolClient): Promise<number | null> {
+export async function requestEditIncident(
+  incidentId: number,
+  editPayload: Record<string, unknown>,
+  client?: PoolClient
+): Promise<number | null> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
@@ -571,7 +596,10 @@ export async function requestEditIncident(incidentId: number, editPayload: Recor
   return rows[0]?.id ?? null;
 }
 
-export async function rejectEditIncident(incidentId: number, client?: PoolClient): Promise<number | null> {
+export async function rejectEditIncident(
+  incidentId: number,
+  client?: PoolClient
+): Promise<number | null> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
@@ -584,7 +612,10 @@ export async function rejectEditIncident(incidentId: number, client?: PoolClient
   return rows[0]?.id ?? null;
 }
 
-export async function rejectCancelIncident(incidentId: number, client?: PoolClient): Promise<number | null> {
+export async function rejectCancelIncident(
+  incidentId: number,
+  client?: PoolClient
+): Promise<number | null> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
@@ -601,12 +632,15 @@ export async function rejectCancelIncident(incidentId: number, client?: PoolClie
   return rows[0]?.id ?? null;
 }
 
-export async function applyEditRequestIncident(input: {
-  incidentId: number;
-  current: WorkshopIncidentRow;
-  requested: Record<string, unknown>;
-  selection: IncidentSelection;
-}, client?: PoolClient): Promise<number> {
+export async function applyEditRequestIncident(
+  input: {
+    incidentId: number;
+    current: WorkshopIncidentRow;
+    requested: Record<string, unknown>;
+    selection: IncidentSelection;
+  },
+  client?: PoolClient
+): Promise<number> {
   const db = client ?? pool;
   const requested = input.requested;
   const { rows } = await db.query<{ id: number }>(
@@ -633,7 +667,10 @@ export async function applyEditRequestIncident(input: {
   return rows[0]?.id ?? null;
 }
 
-export async function invalidateIncident(incidentId: number, client?: PoolClient): Promise<number | null> {
+export async function invalidateIncident(
+  incidentId: number,
+  client?: PoolClient
+): Promise<number | null> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
@@ -652,18 +689,21 @@ export async function invalidateIncident(incidentId: number, client?: PoolClient
   return rows[0]?.id ?? null;
 }
 
-export async function updateIncidentData(input: {
-  incidentId: number;
-  current: WorkshopIncidentRow;
-  updates: UpdateIncidentInput;
-  role: string;
-  actorUserId: number;
-  selection: IncidentSelection;
-  lineId: number;
-  machineId: string;
-  robotLabel: string;
-  headNumber: number;
-}, client?: PoolClient): Promise<number | null> {
+export async function updateIncidentData(
+  input: {
+    incidentId: number;
+    current: WorkshopIncidentRow;
+    updates: UpdateIncidentInput;
+    role: string;
+    actorUserId: number;
+    selection: IncidentSelection;
+    lineId: number;
+    machineId: string;
+    robotLabel: string;
+    headNumber: number;
+  },
+  client?: PoolClient
+): Promise<number | null> {
   const db = client ?? pool;
   const { current, updates } = input;
   const tookOwnership = updates.isTaken === true && !current.is_taken;
@@ -695,13 +735,15 @@ export async function updateIncidentData(input: {
       updates.diagnostic ?? current.diagnostic,
       updates.interventionNote ?? current.intervention_note,
       input.role === 'RESPONSABLE'
-        ? (updates.responsibleComment !== undefined
-            ? (updates.responsibleComment.trim() === '' ? null : updates.responsibleComment)
-            : current.responsible_comment)
+        ? updates.responsibleComment !== undefined
+          ? updates.responsibleComment.trim() === ''
+            ? null
+            : updates.responsibleComment
+          : current.responsible_comment
         : current.responsible_comment,
       nextTakenByUserId,
       nextTakenAt,
-      updates.displayOrder ?? current.display_order,
+      current.display_order,
       input.incidentId,
     ]
   );
@@ -719,45 +761,6 @@ export async function updateIncidentData(input: {
   }
 
   return rows[0]?.id ?? null;
-}
-
-export async function reorderIncidentsData(
-  orderedIncidentIds: number[],
-  client?: PoolClient
-): Promise<number> {
-  const db = client ?? pool;
-  if (orderedIncidentIds.length === 0) return 0;
-  const baseOrder = orderedIncidentIds.length;
-  const { rowCount } = await db.query(
-    `WITH next_order AS (
-       SELECT incident_id, ($1::int - ordinal)::int AS display_order
-       FROM unnest($2::int[]) WITH ORDINALITY AS ordered(incident_id, ordinal)
-     )
-     UPDATE workshop_incidents wi
-     SET display_order = next_order.display_order, updated_at = NOW()
-     FROM next_order
-     WHERE wi.id = next_order.incident_id
-       AND wi.status IN ('OPEN', 'PENDING')`,
-    [baseOrder + 1, orderedIncidentIds]
-  );
-  return rowCount ?? 0;
-}
-
-export async function listReorderableIncidentIds(
-  incidentIds: number[],
-  client?: PoolClient
-): Promise<number[]> {
-  if (incidentIds.length === 0) return [];
-  const db = client ?? pool;
-  const { rows } = await db.query<{ id: number }>(
-    `SELECT id
-     FROM workshop_incidents
-     WHERE id = ANY($1::int[])
-       AND status IN ('OPEN', 'PENDING')
-     FOR UPDATE`,
-    [incidentIds]
-  );
-  return rows.map((row) => row.id);
 }
 
 export async function listHistoryEvents(query: QueryParams) {
@@ -799,7 +802,10 @@ export async function listIncidentEvents(incidentId: number) {
   return rows;
 }
 
-export async function getIncidentMetrics(userId: number, role: string): Promise<WorkshopIncidentMetricsResult> {
+export async function getIncidentMetrics(
+  userId: number,
+  role: string
+): Promise<WorkshopIncidentMetricsResult> {
   const { rows } = await pool.query(
     `SELECT
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
@@ -826,9 +832,8 @@ export async function getIncidentMetrics(userId: number, role: string): Promise<
     [userId]
   );
 
-  const unconsultedArbitration = role === 'RESPONSABLE'
-    ? await countUnconsultedArbitrationIncidents()
-    : 0;
+  const unconsultedArbitration =
+    role === 'RESPONSABLE' ? await countUnconsultedArbitrationIncidents() : 0;
 
   const metrics = rows[0];
   const followMetrics = followed.rows[0];
@@ -955,11 +960,15 @@ export async function consultArbitrationRequest(
 }
 
 export async function incidentExists(incidentId: number): Promise<boolean> {
-  const { rowCount } = await pool.query('SELECT 1 FROM workshop_incidents WHERE id = $1', [incidentId]);
+  const { rowCount } = await pool.query('SELECT 1 FROM workshop_incidents WHERE id = $1', [
+    incidentId,
+  ]);
   return (rowCount ?? 0) > 0;
 }
 
-export async function getIncidentStatus(incidentId: number): Promise<{ status: IncidentStatus } | null> {
+export async function getIncidentStatus(
+  incidentId: number
+): Promise<{ status: IncidentStatus } | null> {
   const { rows } = await pool.query<{ status: IncidentStatus }>(
     'SELECT status FROM workshop_incidents WHERE id = $1',
     [incidentId]
@@ -967,7 +976,11 @@ export async function getIncidentStatus(incidentId: number): Promise<{ status: I
   return rows[0] ?? null;
 }
 
-export async function followIncidentData(incidentId: number, userId: number, client?: PoolClient): Promise<void> {
+export async function followIncidentData(
+  incidentId: number,
+  userId: number,
+  client?: PoolClient
+): Promise<void> {
   const db = client ?? pool;
   await db.query(
     `INSERT INTO workshop_incident_followers (incident_id, user_id)
@@ -977,7 +990,11 @@ export async function followIncidentData(incidentId: number, userId: number, cli
   );
 }
 
-export async function unfollowIncidentData(incidentId: number, userId: number, client?: PoolClient): Promise<void> {
+export async function unfollowIncidentData(
+  incidentId: number,
+  userId: number,
+  client?: PoolClient
+): Promise<void> {
   const db = client ?? pool;
   await db.query(
     `UPDATE workshop_incident_followers
