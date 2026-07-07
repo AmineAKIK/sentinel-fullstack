@@ -22,7 +22,6 @@ import { canPerform } from '../utils/workshopPermissions';
 import { ModalStateApi } from '../hooks/useModalState';
 import { sortIncidents } from '../utils/incidentSort';
 import {
-  IncidentFollowedChip,
   IncidentPriorityChip,
   IncidentStateChip,
   IncidentStatusChip,
@@ -379,12 +378,6 @@ export default function IncidentDetailPanel({
     Boolean(incident.responsible_comment) || canEditResponsibleComment;
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
-  const headerSubtitle = [
-    incident.machine_brand,
-    incident.robot_label,
-    `Tête ${incident.head_number}`,
-    currentProduct ? `Produit ${currentProduct}` : 'Produit non renseigné',
-  ].join(' · ');
 
   return (
     <>
@@ -392,16 +385,8 @@ export default function IncidentDetailPanel({
         <div className="incident-detail-heading">
           <span className="incident-detail-eyebrow">Dossier incident</span>
           <h2 className="incident-detail-title">
-            Incident {incident.line_number} · {incident.machine_id}
+            Ligne {incident.line_number} · {incident.machine_id}
           </h2>
-          <p className="incident-detail-subtitle">{headerSubtitle}</p>
-          <div className="incident-detail-badges" aria-label="Statuts de l'incident">
-            <IncidentStateChip incident={incident} />
-            <IncidentPriorityChip incident={incident} />
-            <IncidentStatusChip incident={incident} showOpen />
-            {incident.is_followed && <IncidentFollowedChip />}
-            {!isResolved && <IncidentTakenChip incident={incident} />}
-          </div>
         </div>
         <div className="incident-detail-toolbar">
           {navigation && navigation.total > 1 && (
@@ -551,10 +536,7 @@ export default function IncidentDetailPanel({
 
         <DrawerSection title="Dossier">
           <div className="incident-detail-property-grid">
-            <DetailField label="Ligne">{incident.line_number}</DetailField>
-            <DetailField label="Machine">
-              {incident.machine_id} · {incident.machine_brand}
-            </DetailField>
+            <DetailField label="Marque machine">{incident.machine_brand}</DetailField>
             <DetailField label="Robot">{incident.robot_label}</DetailField>
             <DetailField label="Tête">{incident.head_number}</DetailField>
             <DetailField label="Produit en cours">

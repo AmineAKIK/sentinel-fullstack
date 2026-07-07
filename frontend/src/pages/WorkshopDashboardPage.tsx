@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
@@ -65,7 +65,9 @@ export default function WorkshopDashboardPage() {
   const { session } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const [searchParams, setSearchParams] = useSearchParams();
+  const workbenchRef = useRef<HTMLDivElement | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
+  const [detailOffsetTop, setDetailOffsetTop] = useState(0);
   const [reportedArbitrationKey, setReportedArbitrationKey] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
   const [filters, setFilters] = useState<DashboardFiltersState>({
@@ -221,6 +223,7 @@ export default function WorkshopDashboardPage() {
           const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           return sortOrder === 'date_desc' ? diff : -diff;
         });
+  const sortedIncidentPositionKey = sortedIncidents.map((incident) => incident.id).join('|');
 
   // Regroupement sémantique par ligne : les groupes sont ordonnés 1-9/A-Z de
   // façon fixe (indépendante du tri/filtre actif), le tri/filtre choisis par
@@ -250,6 +253,8 @@ export default function WorkshopDashboardPage() {
   const selectedIndex = selectedIncident
     ? sortedIncidents.findIndex((inc) => inc.id === selectedIncident.id)
     : -1;
+  const selectedIncidentId = selectedIncident?.id ?? null;
+  const selectedIncidentUpdatedAt = selectedIncident?.updated_at ?? null;
 
   function navigateToIncident(offset: number) {
     if (selectedIndex === -1) return;
@@ -338,6 +343,51 @@ export default function WorkshopDashboardPage() {
   ]
     .filter(Boolean)
     .join(' ');
+  const detailDrawerStyle = {
+    '--incident-detail-offset-top': `${detailOffsetTop}px`,
+  } as CSSProperties;
+
+  useLayoutEffect(() => {
+    if (selectedIncidentId === null) {
+      setDetailOffsetTop(0);
+      return;
+    }
+
+    function updateDetailOffset() {
+      const workbenchElement = workbenchRef.current;
+      if (!workbenchElement) return;
+
+      const selectedCard = workbenchElement.querySelector<HTMLElement>(
+        `[data-incident-card-id="${selectedIncidentId}"]`
+      );
+      if (!selectedCard) {
+        setDetailOffsetTop(0);
+        return;
+      }
+
+      const workbenchTop = workbenchElement.getBoundingClientRect().top;
+      const cardTop = selectedCard.getBoundingClientRect().top;
+      const nextOffset = Math.max(0, Math.round(cardTop - workbenchTop));
+      setDetailOffsetTop((currentOffset) =>
+        currentOffset === nextOffset ? currentOffset : nextOffset
+      );
+    }
+
+    updateDetailOffset();
+    const frameId = window.requestAnimationFrame(updateDetailOffset);
+    window.addEventListener('resize', updateDetailOffset);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', updateDetailOffset);
+    };
+  }, [
+    selectedIncidentId,
+    selectedIncidentUpdatedAt,
+    sortedIncidentPositionKey,
+    loading,
+    sortOrder,
+  ]);
 
   return (
     <>
@@ -408,7 +458,7 @@ export default function WorkshopDashboardPage() {
           onClear={clearAllFilters}
         />
 
-        <div className={workbenchClassName}>
+        <div ref={workbenchRef} className={workbenchClassName}>
           <section className="workshop-results-list-pane" aria-label="Liste des incidents atelier">
             {loading ? (
               <div className="workshop-results-loading">
@@ -470,6 +520,7 @@ export default function WorkshopDashboardPage() {
           {selectedIncident && (
             <aside
               className="incident-detail-drawer"
+              style={detailDrawerStyle}
               aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
             >
               <IncidentDetailPanel

@@ -133,10 +133,10 @@ describe('IncidentDetailPanel', () => {
     expect(screen.getByRole('heading', { name: 'Dossier' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Narratif atelier' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Contexte machine' })).toBeDefined();
-    expect(screen.getAllByText('Urgent').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Ouvert').length).toBeGreaterThan(0);
-    expect(screen.getByText('Suivi')).toBeDefined();
-    expect(screen.getAllByText('Non pris').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Urgent')).toHaveLength(1);
+    expect(screen.getAllByText('Ouvert')).toHaveLength(1);
+    expect(screen.queryByText('Suivi')).toBeNull();
+    expect(screen.getAllByText('Non pris')).toHaveLength(1);
     expect(screen.getByText('Correction opérateur')).toBeDefined();
     expect(screen.getByText('Annulation opérateur')).toBeDefined();
     expect(screen.queryByRole('heading', { name: 'Notes' })).toBeNull();

@@ -45,6 +45,7 @@ export default function IncidentCard({
   return (
     <div
       role="button"
+      data-incident-card-id={incident.id}
       className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isSelected ? ' is-selected' : ''}`}
       aria-current={isSelected || undefined}
       onClick={() => onClick(incident)}
