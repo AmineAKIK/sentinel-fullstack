@@ -123,6 +123,8 @@ describe('ReviewIncidentRequestModal', () => {
     expect(screen.getByText('Dégradée')).toBeDefined();
     expect(screen.getAllByText('Demandé').length).toBeGreaterThan(0);
     expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText('Solutions déjà appliquées')).toBeNull();
+    expect(screen.queryByText('Historique de la machine')).toBeNull();
     expect(screen.getByRole('button', { name: 'Appliquer la correction' })).toBeDefined();
   });
 

@@ -123,7 +123,6 @@ export default function ReviewIncidentRequestModal({
       : incident.arbitration?.cancel?.requestedAt;
   const requestAge = requestDate ? formatElapsed(requestDate) : null;
   const requestDateLabel = requestDate ? formatDateTime(requestDate) : 'Non tracée';
-  const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
   const report = onReport ?? onClose;
   const isDelete = type === 'delete';
   const decisionTitle = isDelete ? 'Annulation opérateur' : 'Correction opérateur';
@@ -299,18 +298,6 @@ export default function ReviewIncidentRequestModal({
                 Annulation · {requestStateLabel(cancelState)}
               </span>
             )}
-          </div>
-
-          <div className="machine-context-actions">
-            <a
-              className="incident-context-link"
-              href={`/workshop/knowledge?${machineContextQuery}`}
-            >
-              Solutions déjà appliquées
-            </a>
-            <a className="incident-context-link" href={`/workshop/history?${machineContextQuery}`}>
-              Historique de la machine
-            </a>
           </div>
         </section>
 

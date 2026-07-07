@@ -330,6 +330,15 @@ export default function WorkshopDashboardPage() {
     }
   }
 
+  const workbenchClassName = [
+    'workshop-results-workbench',
+    selectedIncident ? 'is-detail-open' : '',
+    loading ? 'is-loading' : '',
+    !loading && sortedIncidents.length === 0 ? 'is-empty' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <>
       <WorkshopNavBar />
@@ -399,121 +408,125 @@ export default function WorkshopDashboardPage() {
           onClear={clearAllFilters}
         />
 
-        <div>
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-              <span
-                className="spinner"
-                aria-hidden="true"
-                style={{ width: 24, height: 24, borderWidth: 3 }}
-              />
-            </div>
-          ) : sortedIncidents.length === 0 ? (
-            <div className="card">
-              <div className="empty-state incident-empty-state">
-                {activeFilterCount > 0 ? (
-                  <>
-                    <p>Aucun incident ne correspond aux filtres.</p>
-                    <button className="btn btn-secondary" onClick={clearAllFilters}>
-                      Effacer les filtres
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p>Aucun incident à traiter. L'atelier est stable.</p>
-                    <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
-                      + Créer un incident
-                    </button>
-                  </>
-                )}
+        <div className={workbenchClassName}>
+          <section className="workshop-results-list-pane" aria-label="Liste des incidents atelier">
+            {loading ? (
+              <div className="workshop-results-loading">
+                <span
+                  className="spinner"
+                  aria-hidden="true"
+                  style={{ width: 24, height: 24, borderWidth: 3 }}
+                />
               </div>
-            </div>
-          ) : (
-            <div className="incident-line-groups">
-              {lineGroups.map((group) => (
-                <section key={group.lineId} className="incident-line-group">
-                  <h2 className="incident-line-group-header">Ligne {group.lineNumber}</h2>
-                  <div className="incident-list">
-                    {group.incidents.map((incident) => (
-                      <IncidentCard
-                        key={incident.id}
-                        incident={incident}
-                        isSelected={selectedIncident?.id === incident.id}
-                        isResponsable={isResponsable}
-                        isMaintenance={isMaintenance}
-                        onToggleFollow={actions.handleToggleFollow}
-                        onClick={(inc) => {
-                          setSelectedIncident(inc);
-                          setIncidentUrlParam(inc.id);
-                        }}
-                        onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
-                        onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
+            ) : sortedIncidents.length === 0 ? (
+              <div className="card">
+                <div className="empty-state incident-empty-state">
+                  {activeFilterCount > 0 ? (
+                    <>
+                      <p>Aucun incident ne correspond aux filtres.</p>
+                      <button className="btn btn-secondary" onClick={clearAllFilters}>
+                        Effacer les filtres
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Aucun incident à traiter. L'atelier est stable.</p>
+                      <button className="btn btn-primary" onClick={() => modal.openModal('create')}>
+                        + Créer un incident
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="incident-line-groups">
+                {lineGroups.map((group) => (
+                  <section key={group.lineId} className="incident-line-group">
+                    <h2 className="incident-line-group-header">Ligne {group.lineNumber}</h2>
+                    <div className="incident-list">
+                      {group.incidents.map((incident) => (
+                        <IncidentCard
+                          key={incident.id}
+                          incident={incident}
+                          isSelected={selectedIncident?.id === incident.id}
+                          isResponsable={isResponsable}
+                          isMaintenance={isMaintenance}
+                          onToggleFollow={actions.handleToggleFollow}
+                          onClick={(inc) => {
+                            setSelectedIncident(inc);
+                            setIncidentUrlParam(inc.id);
+                          }}
+                          onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
+                          onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {selectedIncident && (
+            <aside
+              className="incident-detail-drawer"
+              aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
+            >
+              <IncidentDetailPanel
+                incident={selectedIncident}
+                lines={lines}
+                modal={modal}
+                userRole={user?.role}
+                userId={user?.id}
+                isMaintenance={isMaintenance}
+                isResponsable={isResponsable}
+                navigation={
+                  selectedIndex >= 0
+                    ? {
+                        index: selectedIndex,
+                        total: sortedIncidents.length,
+                        onPrev: () => navigateToIncident(-1),
+                        onNext: () => navigateToIncident(1),
+                      }
+                    : undefined
+                }
+                onBack={() => clearSelectedIncident()}
+                onToggleFollow={actions.handleToggleFollow}
+                onToggleUrgent={actions.handleToggleUrgent}
+                onConfirmTakeCharge={actions.handleConfirmTakeCharge}
+                onRequestDelete={actions.handleRequestDelete}
+                onSetPending={actions.handleSetPending}
+                onResumeIncident={actions.handleResumeIncident}
+                onCloseIncident={actions.handleCloseIncident}
+                onInvalidateIncident={actions.handleInvalidateIncident}
+                onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
+                onApplyEditRequest={actions.handleApplyEditRequest}
+                onRejectEditRequest={actions.handleRejectEditRequest}
+                onApproveDeleteRequest={actions.handleApproveDeleteRequest}
+                onRejectDeleteRequest={actions.handleRejectDeleteRequest}
+                onConsultArbitration={() =>
+                  void handleConsultArbitration(modal.state.reviewIncident)
+                }
+                onReportArbitration={() => handleReportArbitration(modal.state.reviewIncident)}
+                onEditSuccess={(updated) => {
+                  upsertIncident(updated);
+                  setSelectedIncident(updated);
+                  void refreshMetrics();
+                }}
+                onDeleteCommentConfirm={handleDeleteCommentConfirm}
+                patchIncident={async (id, payload) => {
+                  const updated = await updateWorkshopIncident(id, payload);
+                  setIncidents((prev) =>
+                    sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
+                  );
+                  setSelectedIncident(updated);
+                  void refreshMetrics();
+                  return updated;
+                }}
+              />
+            </aside>
           )}
         </div>
-
-        {selectedIncident && (
-          <aside
-            className="incident-detail-drawer"
-            aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
-          >
-            <IncidentDetailPanel
-              incident={selectedIncident}
-              lines={lines}
-              modal={modal}
-              userRole={user?.role}
-              userId={user?.id}
-              isMaintenance={isMaintenance}
-              isResponsable={isResponsable}
-              navigation={
-                selectedIndex >= 0
-                  ? {
-                      index: selectedIndex,
-                      total: sortedIncidents.length,
-                      onPrev: () => navigateToIncident(-1),
-                      onNext: () => navigateToIncident(1),
-                    }
-                  : undefined
-              }
-              onBack={() => clearSelectedIncident()}
-              onToggleFollow={actions.handleToggleFollow}
-              onToggleUrgent={actions.handleToggleUrgent}
-              onConfirmTakeCharge={actions.handleConfirmTakeCharge}
-              onRequestDelete={actions.handleRequestDelete}
-              onSetPending={actions.handleSetPending}
-              onResumeIncident={actions.handleResumeIncident}
-              onCloseIncident={actions.handleCloseIncident}
-              onInvalidateIncident={actions.handleInvalidateIncident}
-              onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
-              onApplyEditRequest={actions.handleApplyEditRequest}
-              onRejectEditRequest={actions.handleRejectEditRequest}
-              onApproveDeleteRequest={actions.handleApproveDeleteRequest}
-              onRejectDeleteRequest={actions.handleRejectDeleteRequest}
-              onConsultArbitration={() => void handleConsultArbitration(modal.state.reviewIncident)}
-              onReportArbitration={() => handleReportArbitration(modal.state.reviewIncident)}
-              onEditSuccess={(updated) => {
-                upsertIncident(updated);
-                setSelectedIncident(updated);
-                void refreshMetrics();
-              }}
-              onDeleteCommentConfirm={handleDeleteCommentConfirm}
-              patchIncident={async (id, payload) => {
-                const updated = await updateWorkshopIncident(id, payload);
-                setIncidents((prev) =>
-                  sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-                );
-                setSelectedIncident(updated);
-                void refreshMetrics();
-                return updated;
-              }}
-            />
-          </aside>
-        )}
 
         {modal.state.activeModal === 'create' && (
           <CreateIncidentModal
