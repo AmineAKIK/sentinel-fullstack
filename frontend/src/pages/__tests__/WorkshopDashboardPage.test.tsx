@@ -183,4 +183,38 @@ describe('WorkshopDashboardPage', () => {
     });
     expect(container.querySelector('.incident-detail-drawer')).toBeNull();
   });
+
+  it("pose le dossier sélectionné avant d'ouvrir l'arbitrage automatique", async () => {
+    mockDashboardData([
+      mockIncident({
+        id: 4,
+        line_id: 4,
+        line_number: '119',
+        machine_id: 'MCH-4119',
+        robot_label: 'Droite 8',
+        head_number: 1,
+        cancel_request: true,
+        cancel_request_reason: 'doublon',
+        arbitration: {
+          cancel: {
+            requestEventId: 7,
+            requestedAt: '2026-06-28T11:00:00.000Z',
+            state: 'ACTIVE',
+          },
+        },
+      }),
+    ]);
+
+    const { container } = renderDashboard('/workshop/dashboard?incident=4');
+
+    await waitFor(() => {
+      expect(container.querySelector('.workshop-results-workbench.is-detail-open')).not.toBeNull();
+    });
+
+    expect(screen.queryByRole('dialog', { name: 'Arbitrage annulation' })).toBeNull();
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Arbitrage annulation' })).toBeDefined();
+    });
+  });
 });

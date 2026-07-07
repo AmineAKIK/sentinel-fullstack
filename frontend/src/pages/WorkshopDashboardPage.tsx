@@ -33,6 +33,10 @@ function isWithinLastDays(iso: string, days: number): boolean {
 }
 
 type ReviewType = 'edit' | 'delete';
+type PendingReviewRequest = {
+  incidentId: number;
+  type: ReviewType;
+};
 
 function isArbitrationRequestActive(incident: WorkshopIncident, type: ReviewType): boolean {
   if (type === 'edit') {
@@ -60,14 +64,40 @@ function getActiveArbitrationKey(incident: WorkshopIncident): string | null {
   return parts.length > 0 ? `${incident.id}:${parts.join('|')}` : null;
 }
 
+function getFocusViewport() {
+  const nav = document.querySelector<HTMLElement>('.nav-bar');
+  const navBottom = nav?.getBoundingClientRect().bottom ?? 0;
+  const top = Math.max(72, Math.round(navBottom + 16));
+  const bottom = Math.min(window.innerHeight - 16, Math.max(top + 180, window.innerHeight - 24));
+  const height = Math.max(180, bottom - top);
+  return {
+    top,
+    bottom,
+    height,
+    center: top + height / 2,
+  };
+}
+
+function prefersReducedMotion(): boolean {
+  return Boolean(
+    typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
 export default function WorkshopDashboardPage() {
   usePageTitle('Tableau de bord atelier');
   const { session } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const [searchParams, setSearchParams] = useSearchParams();
   const workbenchRef = useRef<HTMLDivElement | null>(null);
+  const detailDrawerRef = useRef<HTMLElement | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
   const [detailOffsetTop, setDetailOffsetTop] = useState(0);
+  const [focusedIncidentId, setFocusedIncidentId] = useState<number | null>(null);
+  const [pendingReviewRequest, setPendingReviewRequest] = useState<PendingReviewRequest | null>(
+    null
+  );
   const [reportedArbitrationKey, setReportedArbitrationKey] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
   const [filters, setFilters] = useState<DashboardFiltersState>({
@@ -114,6 +144,8 @@ export default function WorkshopDashboardPage() {
 
   function clearSelectedIncident(replace = true) {
     setSelectedIncident(null);
+    setFocusedIncidentId(null);
+    setPendingReviewRequest(null);
     setIncidentUrlParam(null, replace);
   }
 
@@ -261,6 +293,8 @@ export default function WorkshopDashboardPage() {
     const next = sortedIncidents[selectedIndex + offset];
     if (!next) return;
     setSelectedIncident(next);
+    setFocusedIncidentId(null);
+    setPendingReviewRequest(null);
     // replace : feuilleter les incidents ne doit pas empiler l'historique.
     setIncidentUrlParam(next.id, true);
   }
@@ -291,6 +325,7 @@ export default function WorkshopDashboardPage() {
     ) {
       return;
     }
+    if (focusedIncidentId !== selectedIncident.id || pendingReviewRequest) return;
     const reviewType = getAutoReviewType(selectedIncident);
     const arbitrationKey = getActiveArbitrationKey(selectedIncident);
     if (!reviewType || !arbitrationKey || arbitrationKey === reportedArbitrationKey) return;
@@ -304,17 +339,46 @@ export default function WorkshopDashboardPage() {
     modal.state.reviewIncident,
     modal.state.activeModal,
     reportedArbitrationKey,
+    focusedIncidentId,
+    pendingReviewRequest,
+  ]);
+
+  useEffect(() => {
+    if (
+      !selectedIncident ||
+      !pendingReviewRequest ||
+      pendingReviewRequest.incidentId !== selectedIncident.id ||
+      focusedIncidentId !== selectedIncident.id ||
+      modal.state.reviewIncident ||
+      modal.state.activeModal
+    ) {
+      return;
+    }
+
+    modal.openReview(selectedIncident, pendingReviewRequest.type);
+    setPendingReviewRequest(null);
+    // modal.openReview is intentionally omitted: useModalState returns stable behavior,
+    // but a fresh object each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedIncident,
+    pendingReviewRequest,
+    focusedIncidentId,
+    modal.state.reviewIncident,
+    modal.state.activeModal,
   ]);
 
   function openReviewFromIncident(incident: WorkshopIncident, reviewType: ReviewType) {
     setSelectedIncident(incident);
+    setFocusedIncidentId(null);
+    setPendingReviewRequest({ incidentId: incident.id, type: reviewType });
     setIncidentUrlParam(incident.id);
     setReportedArbitrationKey(null);
-    modal.openReview(incident, reviewType);
   }
 
   function handleReportArbitration(incident: WorkshopIncident | null) {
     if (incident) setReportedArbitrationKey(getActiveArbitrationKey(incident));
+    setPendingReviewRequest(null);
     modal.closeReview();
   }
 
@@ -366,8 +430,15 @@ export default function WorkshopDashboardPage() {
       }
 
       const workbenchTop = workbenchElement.getBoundingClientRect().top;
-      const cardTop = selectedCard.getBoundingClientRect().top;
-      const nextOffset = Math.max(0, Math.round(cardTop - workbenchTop));
+      const cardRect = selectedCard.getBoundingClientRect();
+      const drawerRect = detailDrawerRef.current?.getBoundingClientRect();
+      const focusViewport = getFocusViewport();
+      const visualDrawerHeight = Math.min(
+        drawerRect?.height ?? cardRect.height,
+        Math.max(320, focusViewport.height)
+      );
+      const cardCenter = cardRect.top - workbenchTop + cardRect.height / 2;
+      const nextOffset = Math.max(0, Math.round(cardCenter - visualDrawerHeight / 2));
       setDetailOffsetTop((currentOffset) =>
         currentOffset === nextOffset ? currentOffset : nextOffset
       );
@@ -388,6 +459,55 @@ export default function WorkshopDashboardPage() {
     loading,
     sortOrder,
   ]);
+
+  useLayoutEffect(() => {
+    if (selectedIncidentId === null || loading) {
+      setFocusedIncidentId(null);
+      return;
+    }
+
+    setFocusedIncidentId(null);
+
+    function focusSelectedIncident() {
+      const workbenchElement = workbenchRef.current;
+      if (!workbenchElement) return false;
+
+      const selectedCard = workbenchElement.querySelector<HTMLElement>(
+        `[data-incident-card-id="${selectedIncidentId}"]`
+      );
+      if (!selectedCard) return false;
+
+      const cardRect = selectedCard.getBoundingClientRect();
+      if (cardRect.width === 0 && cardRect.height === 0) return true;
+
+      const focusViewport = getFocusViewport();
+      const cardCenter = cardRect.top + cardRect.height / 2;
+      const delta = cardCenter - focusViewport.center;
+      if (Math.abs(delta) > 8) {
+        window.scrollBy({
+          top: delta,
+          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+      }
+      return true;
+    }
+
+    let settleTimer: number | undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      const didResolveFocus = focusSelectedIncident();
+      settleTimer = window.setTimeout(
+        () => {
+          if (didResolveFocus) setFocusedIncidentId(selectedIncidentId);
+        },
+        prefersReducedMotion() ? 0 : 220
+      );
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      if (settleTimer !== undefined) window.clearTimeout(settleTimer);
+    };
+  }, [selectedIncidentId, loading, sortedIncidentPositionKey]);
 
   return (
     <>
@@ -504,6 +624,8 @@ export default function WorkshopDashboardPage() {
                           onToggleFollow={actions.handleToggleFollow}
                           onClick={(inc) => {
                             setSelectedIncident(inc);
+                            setFocusedIncidentId(null);
+                            setPendingReviewRequest(null);
                             setIncidentUrlParam(inc.id);
                           }}
                           onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
@@ -519,6 +641,7 @@ export default function WorkshopDashboardPage() {
 
           {selectedIncident && (
             <aside
+              ref={detailDrawerRef}
               className="incident-detail-drawer"
               style={detailDrawerStyle}
               aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
