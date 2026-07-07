@@ -125,6 +125,7 @@ describe('ReviewIncidentRequestModal', () => {
 
     expect(screen.getByText('Arbitrage correction')).toBeDefined();
     expect(screen.getByText('Correction demandée')).toBeDefined();
+    expect(screen.queryByText(/consultée pour arbitrage/i)).toBeNull();
     expect(screen.getAllByText('État').length).toBeGreaterThan(1);
     expect(screen.getByText('Dégradée')).toBeDefined();
     expect(screen.getAllByText('Demandé').length).toBeGreaterThan(0);

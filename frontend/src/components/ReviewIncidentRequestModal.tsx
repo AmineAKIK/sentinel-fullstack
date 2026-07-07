@@ -34,12 +34,6 @@ function requestStateLabel(state: ArbitrationRequestState): string {
   return state === 'WAITING' ? 'Consultée' : 'À arbitrer';
 }
 
-function requestStateHint(state: ArbitrationRequestState): string {
-  return state === 'WAITING'
-    ? 'Le dossier a été consulté pour arbitrage, la décision reste ouverte.'
-    : 'La demande n’a pas encore été consultée pour arbitrage.';
-}
-
 function isRequestWaiting(state: ArbitrationRequestState): boolean {
   return state === 'WAITING';
 }
@@ -116,7 +110,6 @@ export default function ReviewIncidentRequestModal({
       : 'Consulter le dossier';
   const currentRequestState = type === 'edit' ? editState : cancelState;
   const currentRequestLabel = requestStateLabel(currentRequestState);
-  const currentRequestHint = requestStateHint(currentRequestState);
   const requestDate =
     type === 'edit'
       ? incident.arbitration?.edit?.requestedAt
@@ -240,7 +233,6 @@ export default function ReviewIncidentRequestModal({
                 {currentRequestLabel}
               </span>
             </div>
-            <p className="arbitration-decision-hint">{currentRequestHint}</p>
             <div className="arbitration-decision-meta">
               <DecisionField label="Demandeur" emphasis>
                 {creatorName || 'Non renseigné'}
