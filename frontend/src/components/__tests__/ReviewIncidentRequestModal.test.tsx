@@ -99,7 +99,100 @@ describe('ReviewIncidentRequestModal', () => {
       />
     );
 
-    expect(screen.getByText('Correction en attente')).toBeDefined();
+    expect(screen.getByText(/Correction · Consultée/)).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Consulter le dossier' })).toBeNull();
+  });
+
+  it('présente une correction comme une décision lisible sans table brute', () => {
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onReport={vi.fn()}
+        onConsult={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Arbitrage correction')).toBeDefined();
+    expect(screen.getByText('Correction demandée')).toBeDefined();
+    expect(screen.getAllByText('État').length).toBeGreaterThan(1);
+    expect(screen.getByText('Dégradée')).toBeDefined();
+    expect(screen.getAllByText('Demandé').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Appliquer la correction' })).toBeDefined();
+  });
+
+  it('présente une demande d’annulation avec le motif et une action destructive explicite', () => {
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident({
+          edit_request: null,
+          cancel_request: true,
+          cancel_request_reason: 'doublon',
+          arbitration: {
+            cancel: {
+              requestEventId: 43,
+              requestedAt: '2026-06-28T11:10:00.000Z',
+              state: 'ACTIVE',
+            },
+          },
+        })}
+        lines={[]}
+        type="delete"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onReport={vi.fn()}
+        onConsult={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Arbitrage annulation')).toBeDefined();
+    expect(screen.getByText('Annulation opérateur')).toBeDefined();
+    expect(screen.getByText('Motif opérateur')).toBeDefined();
+    expect(screen.getByText('doublon')).toBeDefined();
+    expect(screen.getByRole('button', { name: "Annuler l'incident" })).toBeDefined();
+  });
+
+  it('adapte la consultation quand deux demandes sont ouvertes sur le même incident', () => {
+    const onConsult = vi.fn();
+
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident({
+          cancel_request: true,
+          cancel_request_reason: 'doublon',
+          arbitration: {
+            edit: {
+              requestEventId: 42,
+              requestedAt: '2026-06-28T11:00:00.000Z',
+              state: 'ACTIVE',
+            },
+            cancel: {
+              requestEventId: 43,
+              requestedAt: '2026-06-28T11:10:00.000Z',
+              state: 'ACTIVE',
+            },
+          },
+        })}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onReport={vi.fn()}
+        onConsult={onConsult}
+      />
+    );
+
+    expect(screen.getByText(/Deux demandes sont ouvertes/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Consulter le dossier' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Consulter les demandes' }));
+    expect(onConsult).toHaveBeenCalledTimes(1);
   });
 });
