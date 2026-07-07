@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CreateIncidentModal from './CreateIncidentModal';
 import DeleteRequestModal from './DeleteRequestModal';
@@ -15,7 +15,7 @@ import DetailField from './ui/DetailField';
 import CharCounter from './ui/CharCounter';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { Role } from '../types/common';
-import { formatDateTime } from '../utils/date';
+import { formatDateTime, formatElapsed } from '../utils/date';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
 import { ROLE_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
@@ -66,6 +66,240 @@ interface IncidentDetailPanelProps {
   patchIncident: (id: number, payload: Record<string, unknown>) => Promise<WorkshopIncident>;
 }
 
+type DrawerSectionProps = {
+  title: string;
+  eyebrow?: string;
+  tone?: 'default' | 'attention' | 'danger';
+  className?: string;
+  children: ReactNode;
+};
+
+function DrawerSection({
+  title,
+  eyebrow,
+  tone = 'default',
+  className = '',
+  children,
+}: DrawerSectionProps) {
+  return (
+    <section
+      className={`incident-dossier-section incident-dossier-section--${tone}${className ? ` ${className}` : ''}`}
+    >
+      <div className="incident-dossier-section-heading">
+        {eyebrow && <span className="detail-field-label">{eyebrow}</span>}
+        <h3 className="incident-section-title">{title}</h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SummaryItem({
+  label,
+  children,
+  muted,
+}: {
+  label: string;
+  children: ReactNode;
+  muted?: boolean;
+}) {
+  return (
+    <div className={`incident-summary-item${muted ? ' is-muted' : ''}`}>
+      <span className="detail-field-label">{label}</span>
+      <strong>{children}</strong>
+    </div>
+  );
+}
+
+function NarrativeItem({
+  label,
+  value,
+  primary = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  primary?: boolean;
+}) {
+  if (!value) return null;
+
+  return (
+    <div className={`incident-narrative-item${primary ? ' incident-narrative-item--primary' : ''}`}>
+      <span className="detail-field-label">{label}</span>
+      <p>{value}</p>
+    </div>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2" />
+    </svg>
+  );
+}
+
+type ReviewType = 'edit' | 'delete';
+
+function IncidentDecisionBlock({
+  incident,
+  canReviewEditRequest,
+  canReviewCancelRequest,
+  editArbitrationWaiting,
+  cancelArbitrationWaiting,
+  onReview,
+}: {
+  incident: WorkshopIncident;
+  canReviewEditRequest: boolean;
+  canReviewCancelRequest: boolean;
+  editArbitrationWaiting: boolean;
+  cancelArbitrationWaiting: boolean;
+  onReview: (type: ReviewType) => void;
+}) {
+  const hasEditRequest = Boolean(incident.edit_request);
+  const hasCancelRequest = Boolean(incident.cancel_request);
+  if (!hasEditRequest && !hasCancelRequest) return null;
+
+  const actionable = canReviewEditRequest || canReviewCancelRequest;
+  const activeRequestCount = Number(hasEditRequest) + Number(hasCancelRequest);
+
+  return (
+    <DrawerSection
+      title={actionable ? 'Décision requise' : 'Demande en cours'}
+      eyebrow="Arbitrage"
+      tone={actionable ? 'attention' : 'default'}
+      className="incident-decision-section"
+    >
+      {activeRequestCount > 1 && (
+        <div className="notice incident-decision-notice">
+          Deux demandes sont actives sur cet incident.
+        </div>
+      )}
+      <div className="incident-decision-list">
+        {hasEditRequest && (
+          <div
+            className={`incident-decision-item incident-decision-item--edit${
+              editArbitrationWaiting ? ' is-waiting' : ''
+            }`}
+          >
+            <div>
+              <span className="incident-decision-state">
+                {editArbitrationWaiting ? 'En consultation' : 'Active'}
+              </span>
+              <strong>Correction opérateur</strong>
+              <p>
+                {editArbitrationWaiting
+                  ? 'Consultée, décision encore ouverte.'
+                  : 'Nouveau cas à arbitrer.'}
+              </p>
+            </div>
+            {canReviewEditRequest && (
+              <button
+                type="button"
+                className={editArbitrationWaiting ? 'btn btn-outline' : 'btn btn-primary'}
+                onClick={() => onReview('edit')}
+              >
+                {editArbitrationWaiting ? 'Reprendre' : 'Arbitrer'}
+              </button>
+            )}
+          </div>
+        )}
+        {hasCancelRequest && (
+          <div
+            className={`incident-decision-item incident-decision-item--delete${
+              cancelArbitrationWaiting ? ' is-waiting' : ''
+            }`}
+          >
+            <div>
+              <span className="incident-decision-state">
+                {cancelArbitrationWaiting ? 'En consultation' : 'Active'}
+              </span>
+              <strong>Annulation opérateur</strong>
+              <p>
+                {cancelArbitrationWaiting
+                  ? 'Consultée, décision encore ouverte.'
+                  : 'Décision nécessaire avant clôture de la demande.'}
+              </p>
+            </div>
+            {canReviewCancelRequest && (
+              <button
+                type="button"
+                className={cancelArbitrationWaiting ? 'btn btn-outline' : 'btn btn-danger'}
+                onClick={() => onReview('delete')}
+              >
+                {cancelArbitrationWaiting ? 'Reprendre' : 'Arbitrer'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </DrawerSection>
+  );
+}
+
 export default function IncidentDetailPanel({
   incident,
   lines,
@@ -99,14 +333,10 @@ export default function IncidentDetailPanel({
   const FIELD_LIMITS = useFieldLimits();
   const [responsibleDraft, setResponsibleDraft] = useState(incident.responsible_comment ?? '');
 
-  // Le panneau reste monté quand on navigue d'un incident à l'autre (le focus
-  // des boutons prev/next survit) : le brouillon se resynchronise ici.
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
   }, [incident.id, incident.responsible_comment]);
 
-  // Contexte machine : amène directement à l'historique / la connaissance de
-  // cette ligne+machine, filtre pré-rempli (P3 — répondre, pas faire chercher).
   const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
 
   const canRequestEdit = canPerform(userRole, 'requestEdit', incident, userId);
@@ -137,35 +367,34 @@ export default function IncidentDetailPanel({
   const takenByName = incident.taken_by_first_name
     ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
     : '';
-  const hasPrimaryActions =
-    isResponsable ||
-    canReviewEditRequest ||
-    canReviewCancelRequest ||
-    canRequestEdit ||
-    canDirectEdit ||
-    canResponsableEdit ||
-    canWithdrawEdit ||
-    canTake;
-  const hasDangerActions = canRequestCancel || canCancel || canInvalidateClosed;
-  const hasDetailActions = hasPrimaryActions || hasDangerActions;
   const hasNarrative =
     Boolean(incident.comment) ||
     Boolean(incident.diagnostic) ||
-    Boolean(incident.intervention_note) ||
-    Boolean(incident.edit_request) ||
-    Boolean(incident.cancel_request);
-  const detailHasTreatmentActions =
-    canSetPending || canResume || canClose || canSetPriority || canEditResponsibleComment;
+    Boolean(incident.intervention_note);
+  const hasWorkflowActions = canTake || canSetPending || canResume || canClose || canSetPriority;
+  const hasStandardActions =
+    canRequestEdit || canDirectEdit || canResponsableEdit || canWithdrawEdit;
+  const hasDangerActions = canRequestCancel || canCancel || canInvalidateClosed;
+  const hasResponsibleInstruction =
+    Boolean(incident.responsible_comment) || canEditResponsibleComment;
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
+  const headerSubtitle = [
+    incident.machine_brand,
+    incident.robot_label,
+    `Tête ${incident.head_number}`,
+    currentProduct ? `Produit ${currentProduct}` : 'Produit non renseigné',
+  ].join(' · ');
 
   return (
     <>
       <div className="incident-detail-topbar">
         <div className="incident-detail-heading">
+          <span className="incident-detail-eyebrow">Dossier incident</span>
           <h2 className="incident-detail-title">
             Incident {incident.line_number} · {incident.machine_id}
           </h2>
+          <p className="incident-detail-subtitle">{headerSubtitle}</p>
           <div className="incident-detail-badges" aria-label="Statuts de l'incident">
             <IncidentStateChip incident={incident} />
             <IncidentPriorityChip incident={incident} />
@@ -174,397 +403,287 @@ export default function IncidentDetailPanel({
             {!isResolved && <IncidentTakenChip incident={incident} />}
           </div>
         </div>
-        {navigation && navigation.total > 1 && (
-          <div
-            className="incident-detail-nav"
-            role="group"
-            aria-label="Navigation entre les incidents de la liste"
-          >
+        <div className="incident-detail-toolbar">
+          {navigation && navigation.total > 1 && (
+            <div
+              className="incident-detail-nav"
+              role="group"
+              aria-label="Navigation entre les incidents de la liste"
+            >
+              <button
+                type="button"
+                className="incident-detail-iconbtn"
+                onClick={navigation.onPrev}
+                disabled={navigation.index <= 0}
+                aria-label="Incident précédent"
+                title="Incident précédent"
+              >
+                <ChevronUpIcon />
+              </button>
+              <span className="incident-detail-position" aria-live="polite">
+                {navigation.index + 1}/{navigation.total}
+              </span>
+              <button
+                type="button"
+                className="incident-detail-iconbtn"
+                onClick={navigation.onNext}
+                disabled={navigation.index >= navigation.total - 1}
+                aria-label="Incident suivant"
+                title="Incident suivant"
+              >
+                <ChevronDownIcon />
+              </button>
+            </div>
+          )}
+          {isResponsable && (
             <button
               type="button"
-              className="incident-detail-iconbtn"
-              onClick={navigation.onPrev}
-              disabled={navigation.index <= 0}
-              aria-label="Incident précédent"
-              title="Incident précédent"
+              className={`incident-detail-iconbtn incident-detail-followbtn${
+                incident.is_followed ? ' is-active' : ''
+              }`}
+              onClick={() => void onToggleFollow(incident)}
+              aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
+              title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
+              <StarIcon filled={Boolean(incident.is_followed)} />
             </button>
-            <span className="incident-detail-position" aria-live="polite">
-              {navigation.index + 1}/{navigation.total}
-            </span>
-            <button
-              type="button"
-              className="incident-detail-iconbtn"
-              onClick={navigation.onNext}
-              disabled={navigation.index >= navigation.total - 1}
-              aria-label="Incident suivant"
-              title="Incident suivant"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-          </div>
-        )}
-        <button
-          type="button"
-          className="incident-detail-iconbtn"
-          onClick={onBack}
-          aria-label="Fermer le détail"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            aria-hidden="true"
+          )}
+          <button
+            type="button"
+            className="incident-detail-iconbtn"
+            onClick={onBack}
+            aria-label="Fermer le détail"
+            title="Fermer"
           >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+            <CloseIcon />
+          </button>
+        </div>
       </div>
 
-      {hasDetailActions && (
-        <div className="incident-detail-header">
-          <div className="incident-detail-actions">
-            {(canReviewEditRequest || canReviewCancelRequest) && (
-              <div className="incident-action-group" aria-label="Actions d'arbitrage">
-                {canReviewEditRequest && (
-                  <button className="btn btn-outline" onClick={() => modal.openReview(incident, 'edit')}>
-                    {editArbitrationWaiting ? 'Reprendre la correction' : 'Arbitrer la correction'}
-                  </button>
-                )}
-                {canReviewCancelRequest && (
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => modal.openReview(incident, 'delete')}
-                  >
-                    {cancelArbitrationWaiting
-                      ? "Reprendre l'annulation"
-                      : "Arbitrer l'annulation"}
-                  </button>
-                )}
-              </div>
+      <div className="incident-detail-content">
+        <section className="incident-summary-strip" aria-label="Synthèse de l'incident">
+          <SummaryItem label="État">
+            <IncidentStateChip incident={incident} />
+          </SummaryItem>
+          <SummaryItem label="Statut">
+            <IncidentStatusChip incident={incident} showOpen />
+          </SummaryItem>
+          <SummaryItem label="Priorité" muted={!incident.is_priority || isResolved}>
+            {incident.is_priority && !isResolved ? (
+              <IncidentPriorityChip incident={incident} />
+            ) : (
+              'Normale'
             )}
-            {hasPrimaryActions && (
-              <div className="incident-action-group" aria-label="Actions principales">
-                {isResponsable && (
-                  <button
-                    className={incident.is_followed ? 'btn btn-secondary' : 'btn btn-primary'}
-                    onClick={() => void onToggleFollow(incident)}
-                  >
-                    {incident.is_followed ? 'Retirer du suivi' : 'Suivre'}
-                  </button>
-                )}
-                {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
-                  <button className="btn btn-outline" onClick={() => modal.openModal('edit')}>
-                    {canRequestEdit ? 'Demander une correction' : 'Modifier'}
-                  </button>
-                )}
-                {canWithdrawEdit && (
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => void patchIncident(incident.id, { withdrawEditRequest: true })}
-                  >
-                    Retirer ma demande
-                  </button>
-                )}
-                {canTake && (
-                  <button className="btn btn-primary" onClick={() => modal.openModal('takeCharge')}>
-                    Prendre en charge
-                  </button>
-                )}
-              </div>
-            )}
-            {hasDangerActions && (
-              <div
-                className="incident-action-group incident-action-group--danger"
-                aria-label="Actions sensibles"
-              >
-                {(canRequestCancel || canCancel) && (
-                  <button
-                    className="btn btn-danger"
-                    onClick={() =>
-                      canCancel
-                        ? modal.openModal('maintenanceDirect')
-                        : modal.openModal('deleteRequest')
-                    }
-                  >
-                    {canCancel ? "Annuler l'incident" : "Demander l'annulation"}
-                  </button>
-                )}
-                {canInvalidateClosed && (
-                  <button className="btn btn-danger" onClick={() => modal.openModal('invalidate')}>
-                    Invalider
-                  </button>
-                )}
-              </div>
-            )}
+          </SummaryItem>
+          <SummaryItem label="Prise en charge">
+            <IncidentTakenChip incident={incident} />
+          </SummaryItem>
+          <SummaryItem label="Ancienneté">
+            <span title={formatDateTime(incident.created_at)}>
+              Depuis {formatElapsed(incident.created_at)}
+            </span>
+          </SummaryItem>
+        </section>
+
+        <IncidentDecisionBlock
+          incident={incident}
+          canReviewEditRequest={canReviewEditRequest}
+          canReviewCancelRequest={canReviewCancelRequest}
+          editArbitrationWaiting={editArbitrationWaiting}
+          cancelArbitrationWaiting={cancelArbitrationWaiting}
+          onReview={(type) => modal.openReview(incident, type)}
+        />
+
+        {hasWorkflowActions && (
+          <DrawerSection title="Pilotage du traitement" eyebrow="Actions">
+            <div className="incident-action-row">
+              {canTake && (
+                <button className="btn btn-primary" onClick={() => modal.openModal('takeCharge')}>
+                  Prendre en charge
+                </button>
+              )}
+              {canResume && (
+                <button className="btn btn-primary" onClick={() => modal.openModal('resume')}>
+                  Reprendre
+                </button>
+              )}
+              {canSetPending && (
+                <button className="btn btn-outline" onClick={() => modal.openModal('pending')}>
+                  Suspendre
+                </button>
+              )}
+              {canClose && (
+                <button className="btn btn-primary" onClick={() => modal.openModal('close')}>
+                  Clôturer
+                </button>
+              )}
+              {canSetPriority && (
+                <button
+                  className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-warning'}
+                  onClick={() => void onToggleUrgent(incident)}
+                >
+                  {incident.is_priority ? "Retirer l'urgence" : 'Déclarer urgent'}
+                </button>
+              )}
+            </div>
+          </DrawerSection>
+        )}
+
+        {hasStandardActions && (
+          <DrawerSection title="Actions disponibles">
+            <div className="incident-action-row">
+              {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
+                <button className="btn btn-outline" onClick={() => modal.openModal('edit')}>
+                  {canRequestEdit ? 'Demander une correction' : 'Modifier'}
+                </button>
+              )}
+              {canWithdrawEdit && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => void patchIncident(incident.id, { withdrawEditRequest: true })}
+                >
+                  Retirer ma demande
+                </button>
+              )}
+            </div>
+          </DrawerSection>
+        )}
+
+        <DrawerSection title="Dossier">
+          <div className="incident-detail-property-grid">
+            <DetailField label="Ligne">{incident.line_number}</DetailField>
+            <DetailField label="Machine">
+              {incident.machine_id} · {incident.machine_brand}
+            </DetailField>
+            <DetailField label="Robot">{incident.robot_label}</DetailField>
+            <DetailField label="Tête">{incident.head_number}</DetailField>
+            <DetailField label="Produit en cours">
+              {currentProduct || <span className="detail-value-muted">Non renseigné</span>}
+            </DetailField>
+            <DetailField label="Technicien">
+              {takenByName ? (
+                <>
+                  {takenByName}
+                  {incident.taken_by_role
+                    ? ` · ${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role}`
+                    : ''}
+                </>
+              ) : (
+                <span className="detail-value-muted">Aucun technicien</span>
+              )}
+            </DetailField>
+            <DetailField label="Déclaré par">{creatorName}</DetailField>
+            <DetailField label="Rôle créateur">
+              {ROLE_LABELS[incident.role] ?? incident.role}
+            </DetailField>
+            <DetailField label="Création">{formatDateTime(incident.created_at)}</DetailField>
           </div>
-        </div>
-      )}
+        </DrawerSection>
 
-      <div className="card incident-detail-card">
-        <div className="card-body incident-detail-body">
-          <section
-            className="incident-detail-section"
-            aria-labelledby={`incident-equipment-${incident.id}`}
-          >
-            <h3 id={`incident-equipment-${incident.id}`} className="incident-section-title">
-              Équipement
-            </h3>
-            <div className="incident-detail-section-grid">
-              <DetailField label="Ligne">{incident.line_number}</DetailField>
-              <DetailField label="Machine">
-                {incident.machine_id} · {incident.machine_brand}
-              </DetailField>
-              <DetailField label="Robot">{incident.robot_label}</DetailField>
-              <DetailField label="Tête">{incident.head_number}</DetailField>
-              <DetailField label="Produit en cours">
-                {currentProduct || <span className="detail-value-muted">Non renseigné</span>}
-              </DetailField>
+        {hasNarrative && (
+          <DrawerSection title="Narratif atelier">
+            <div className="incident-narrative-list">
+              <NarrativeItem label="Signalement" value={incident.comment} primary />
+              <NarrativeItem label="Diagnostic" value={incident.diagnostic} />
+              <NarrativeItem label="Intervention" value={incident.intervention_note} />
             </div>
-          </section>
+          </DrawerSection>
+        )}
 
-          <section
-            className="incident-detail-section"
-            aria-labelledby={`incident-treatment-${incident.id}`}
-          >
-            <h3 id={`incident-treatment-${incident.id}`} className="incident-section-title">
-              Traitement
-            </h3>
-            <div className="incident-detail-section-grid">
-              <DetailField label="Statut">
-                <IncidentStatusChip incident={incident} showOpen />
-              </DetailField>
-              <DetailField label="Priorité">
-                {incident.is_priority && !isResolved ? (
-                  <IncidentPriorityChip incident={incident} />
-                ) : (
-                  <span className="incident-chip incident-chip--neutral">Normale</span>
-                )}
-              </DetailField>
-              <DetailField label="Prise en charge">
-                <IncidentTakenChip incident={incident} />
-              </DetailField>
-              <DetailField label="Technicien">
-                {takenByName ? (
-                  <>
-                    {takenByName}
-                    {incident.taken_by_role
-                      ? ` · ${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role}`
-                      : ''}
-                  </>
-                ) : (
-                  <span className="detail-value-muted">Aucun technicien</span>
-                )}
-              </DetailField>
-            </div>
-          </section>
-
-          <section
-            className="incident-detail-section"
-            aria-labelledby={`incident-origin-${incident.id}`}
-          >
-            <h3 id={`incident-origin-${incident.id}`} className="incident-section-title">
-              Origine
-            </h3>
-            <div className="incident-detail-section-grid">
-              <DetailField label="Déclaré par">{creatorName}</DetailField>
-              <DetailField label="Rôle créateur">
-                {ROLE_LABELS[incident.role] ?? incident.role}
-              </DetailField>
-              <DetailField label="Création">{formatDateTime(incident.created_at)}</DetailField>
-            </div>
-          </section>
-
-          <section
-            className="incident-detail-section"
-            aria-labelledby={`incident-context-${incident.id}`}
-          >
-            <h3 id={`incident-context-${incident.id}`} className="incident-section-title">
-              Contexte machine
-            </h3>
-            <div className="machine-context-actions">
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => navigate(`/workshop/knowledge?${machineContextQuery}`)}
-              >
-                Solutions déjà appliquées
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => navigate(`/workshop/history?${machineContextQuery}`)}
-              >
-                Historique de la machine
-              </button>
-            </div>
-          </section>
-
-          {hasNarrative && (
-            <section
-              className="incident-detail-section incident-detail-section--notes"
-              aria-labelledby={`incident-notes-${incident.id}`}
-            >
-              <h3 id={`incident-notes-${incident.id}`} className="incident-section-title">
-                Notes
-              </h3>
-              {incident.comment && (
-                <div className="incident-detail-note">
-                  <span className="detail-field-label">Signalement</span>
-                  <p>{incident.comment}</p>
-                </div>
-              )}
-              {incident.diagnostic && (
-                <div className="incident-detail-note">
-                  <span className="detail-field-label">Diagnostic</span>
-                  <p>{incident.diagnostic}</p>
-                </div>
-              )}
-              {incident.intervention_note && (
-                <div className="incident-detail-note">
-                  <span className="detail-field-label">Intervention</span>
-                  <p>{incident.intervention_note}</p>
-                </div>
-              )}
-              {incident.edit_request && (
-                <div
-                  className={`incident-detail-request incident-detail-request--edit${
-                    editArbitrationWaiting ? ' is-waiting' : ''
-                  }`}
-                >
-                  {editArbitrationWaiting
-                    ? 'Correction opérateur en consultation.'
-                    : "Correction opérateur en attente d'arbitrage."}
-                </div>
-              )}
-              {incident.cancel_request && (
-                <div
-                  className={`incident-detail-request incident-detail-request--delete${
-                    cancelArbitrationWaiting ? ' is-waiting' : ''
-                  }`}
-                >
-                  {cancelArbitrationWaiting
-                    ? 'Annulation opérateur en consultation.'
-                    : "Annulation opérateur en attente d'arbitrage."}
-                </div>
-              )}
-            </section>
-          )}
-
-          {detailHasTreatmentActions && (
-            <section
-              className="incident-detail-section"
-              aria-labelledby={`incident-treatment-actions-${incident.id}`}
-            >
-              <h3
-                id={`incident-treatment-actions-${incident.id}`}
-                className="incident-section-title"
-              >
-                Actions de traitement
-              </h3>
-              <div className="action-bar">
-                {canResume && (
-                  <button className="btn btn-outline" onClick={() => modal.openModal('resume')}>
-                    Reprendre
-                  </button>
-                )}
-                {canSetPending && (
-                  <button className="btn btn-outline" onClick={() => modal.openModal('pending')}>
-                    Suspendre
-                  </button>
-                )}
-                {canClose && (
-                  <button className="btn btn-primary" onClick={() => modal.openModal('close')}>
-                    Clôturer
-                  </button>
-                )}
-                {canSetPriority && (
-                  <button
-                    className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-warning'}
-                    onClick={() => void onToggleUrgent(incident)}
-                  >
-                    {incident.is_priority ? "Retirer l'urgence" : 'Déclarer urgent'}
-                  </button>
-                )}
+        {hasResponsibleInstruction && (
+          <DrawerSection title="Consigne responsable">
+            {incident.responsible_comment && (
+              <div className="incident-instruction-card">
+                <p>{incident.responsible_comment}</p>
               </div>
-              {canEditResponsibleComment && (
-                <div className="incident-responsible-editor">
-                  <div className="form-group">
-                    <label
-                      className="form-label"
-                      htmlFor={`responsible-comment-detail-${incident.id}`}
-                    >
-                      Consigne responsable
-                    </label>
-                    <textarea
-                      id={`responsible-comment-detail-${incident.id}`}
-                      className="form-input"
-                      rows={3}
-                      value={responsibleDraft}
-                      onChange={(e) =>
-                        setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))
-                      }
-                      maxLength={FIELD_LIMITS.COMMENT}
-                      placeholder="Consigne courte pour orienter le traitement"
-                    />
-                    <CharCounter current={responsibleDraft.length} max={FIELD_LIMITS.COMMENT} />
-                  </div>
-                  <div className="action-bar">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() =>
-                        void patchIncident(incident.id, {
-                          responsibleComment: responsibleDraft.trim(),
-                        })
-                      }
-                      disabled={!responsibleDraft.trim()}
-                    >
-                      {incident.responsible_comment ? 'Mettre à jour' : 'Ajouter'}
-                    </button>
-                    {incident.responsible_comment && (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => modal.setDeleteCommentConfirm(incident)}
-                      >
-                        Retirer la consigne
-                      </button>
-                    )}
-                  </div>
+            )}
+            {canEditResponsibleComment && (
+              <div className="incident-responsible-editor">
+                <div className="form-group">
+                  <label className="sr-only" htmlFor={`responsible-comment-detail-${incident.id}`}>
+                    Consigne responsable
+                  </label>
+                  <textarea
+                    id={`responsible-comment-detail-${incident.id}`}
+                    className="form-input"
+                    rows={3}
+                    value={responsibleDraft}
+                    onChange={(e) =>
+                      setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))
+                    }
+                    maxLength={FIELD_LIMITS.COMMENT}
+                    placeholder="Consigne courte pour orienter le traitement"
+                  />
+                  <CharCounter current={responsibleDraft.length} max={FIELD_LIMITS.COMMENT} />
                 </div>
+                <div className="incident-action-row incident-action-row--compact">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() =>
+                      void patchIncident(incident.id, {
+                        responsibleComment: responsibleDraft.trim(),
+                      })
+                    }
+                    disabled={!responsibleDraft.trim()}
+                  >
+                    {incident.responsible_comment ? 'Enregistrer' : 'Ajouter'}
+                  </button>
+                  {incident.responsible_comment && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => modal.setDeleteCommentConfirm(incident)}
+                    >
+                      Retirer la consigne
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </DrawerSection>
+        )}
+
+        <DrawerSection title="Contexte machine">
+          <div className="machine-context-actions">
+            <button
+              type="button"
+              className="incident-context-link"
+              onClick={() => navigate(`/workshop/knowledge?${machineContextQuery}`)}
+            >
+              Solutions déjà appliquées
+            </button>
+            <button
+              type="button"
+              className="incident-context-link"
+              onClick={() => navigate(`/workshop/history?${machineContextQuery}`)}
+            >
+              Historique de la machine
+            </button>
+          </div>
+        </DrawerSection>
+
+        {hasDangerActions && (
+          <DrawerSection title="Zone sensible" tone="danger">
+            <div className="incident-action-row">
+              {(canRequestCancel || canCancel) && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() =>
+                    canCancel
+                      ? modal.openModal('maintenanceDirect')
+                      : modal.openModal('deleteRequest')
+                  }
+                >
+                  {canCancel ? "Annuler l'incident" : "Demander l'annulation"}
+                </button>
               )}
-            </section>
-          )}
-        </div>
+              {canInvalidateClosed && (
+                <button className="btn btn-danger" onClick={() => modal.openModal('invalidate')}>
+                  Invalider
+                </button>
+              )}
+            </div>
+          </DrawerSection>
+        )}
       </div>
 
       {/* Modales du panneau détail */}

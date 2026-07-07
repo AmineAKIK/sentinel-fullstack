@@ -121,7 +121,7 @@ function renderPanel({
 }
 
 describe('IncidentDetailPanel', () => {
-  it('affiche les badges et sections métier du drawer', () => {
+  it('affiche la synthèse, le dossier et les décisions du drawer', () => {
     renderPanel({
       incident: mockIncident({
         edit_request: { state: 'DEGRADEE' },
@@ -129,17 +129,17 @@ describe('IncidentDetailPanel', () => {
       }),
     });
 
-    expect(screen.getByRole('heading', { name: 'Équipement' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Traitement' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Origine' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Décision requise' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Dossier' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Narratif atelier' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Contexte machine' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Notes' })).toBeDefined();
     expect(screen.getAllByText('Urgent').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Ouvert').length).toBeGreaterThan(0);
     expect(screen.getByText('Suivi')).toBeDefined();
     expect(screen.getAllByText('Non pris').length).toBeGreaterThan(0);
-    expect(screen.getByText("Correction opérateur en attente d'arbitrage.")).toBeDefined();
-    expect(screen.getByText("Annulation opérateur en attente d'arbitrage.")).toBeDefined();
+    expect(screen.getByText('Correction opérateur')).toBeDefined();
+    expect(screen.getByText('Annulation opérateur')).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Notes' })).toBeNull();
   });
 
   it('nomme explicitement l’action destructive responsable', () => {
@@ -175,8 +175,29 @@ describe('IncidentDetailPanel', () => {
     });
     const { modal } = renderPanel({ incident });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reprendre la correction' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reprendre' }));
 
     expect(modal.openReview).toHaveBeenCalledWith(incident, 'edit');
+  });
+
+  it('affiche la consigne responsable même sans droit d’édition', () => {
+    renderPanel({
+      incident: mockIncident({
+        responsible_comment: 'Prioriser après contrôle qualité.',
+        is_taken: true,
+        taken_by_user_id: 9,
+        taken_by_first_name: 'Assia',
+        taken_by_last_name: 'AKIK',
+        taken_by_role: 'MAINTENANCE',
+      }),
+      userRole: 'MAINTENANCE',
+      userId: 9,
+      isResponsable: false,
+      isMaintenance: true,
+    });
+
+    expect(screen.getByRole('heading', { name: 'Consigne responsable' })).toBeDefined();
+    expect(screen.getByText('Prioriser après contrôle qualité.')).toBeDefined();
+    expect(screen.queryByRole('textbox', { name: 'Consigne responsable' })).toBeNull();
   });
 });
