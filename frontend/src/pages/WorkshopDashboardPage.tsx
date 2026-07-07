@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
@@ -438,39 +438,53 @@ export default function WorkshopDashboardPage() {
             </div>
           ) : (
             <div className="incident-list">
-              {sortedIncidents.map((incident) => (
-                <IncidentCard
-                  key={incident.id}
-                  incident={incident}
-                  isSelected={selectedIncident?.id === incident.id}
-                  isDragging={draggedIncidentId === incident.id}
-                  isDropTarget={
-                    dragOverIncidentId === incident.id && draggedIncidentId !== incident.id
-                  }
-                  canReorder={
-                    sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)
-                  }
-                  isResponsable={isResponsable}
-                  isMaintenance={isMaintenance}
-                  onToggleFollow={actions.handleToggleFollow}
-                  onDragStart={(_e, id) => setDraggedIncidentId(id)}
-                  onDragOver={(_e, id, clientY) => {
-                    if (draggedIncidentId && draggedIncidentId !== id) {
-                      scheduleAutoScroll(clientY);
-                      setDropTarget(id);
-                    }
-                  }}
-                  onDragLeave={(id) => clearDropTarget(id)}
-                  onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
-                  onDragEnd={resetDragState}
-                  onClick={(inc) => {
-                    setSelectedIncident(inc);
-                    setIncidentUrlParam(inc.id);
-                  }}
-                  onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
-                  onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
-                />
-              ))}
+              {sortedIncidents.map((incident, index) => {
+                // Repère visuel de ligne : n'apparaît que quand deux cartes
+                // consécutives partagent la même ligne, pour donner un point
+                // de repère sans re-trier ni casser l'ordre de traitement
+                // (priorité + tri manuel du responsable).
+                const previous = sortedIncidents[index - 1];
+                const showLineMarker = previous?.line_number === incident.line_number;
+                return (
+                  <Fragment key={incident.id}>
+                    {showLineMarker && (
+                      <div className="incident-line-marker" aria-hidden="true">
+                        Autre cas · Ligne {incident.line_number}
+                      </div>
+                    )}
+                    <IncidentCard
+                      incident={incident}
+                      isSelected={selectedIncident?.id === incident.id}
+                      isDragging={draggedIncidentId === incident.id}
+                      isDropTarget={
+                        dragOverIncidentId === incident.id && draggedIncidentId !== incident.id
+                      }
+                      canReorder={
+                        sortOrder === 'default' && canPerform(user?.role, 'reorder', incident)
+                      }
+                      isResponsable={isResponsable}
+                      isMaintenance={isMaintenance}
+                      onToggleFollow={actions.handleToggleFollow}
+                      onDragStart={(_e, id) => setDraggedIncidentId(id)}
+                      onDragOver={(_e, id, clientY) => {
+                        if (draggedIncidentId && draggedIncidentId !== id) {
+                          scheduleAutoScroll(clientY);
+                          setDropTarget(id);
+                        }
+                      }}
+                      onDragLeave={(id) => clearDropTarget(id)}
+                      onDrop={(_e, id) => void actions.reorderDraggedIncident(id)}
+                      onDragEnd={resetDragState}
+                      onClick={(inc) => {
+                        setSelectedIncident(inc);
+                        setIncidentUrlParam(inc.id);
+                      }}
+                      onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
+                      onReviewDelete={(_e, inc) => openReviewFromIncident(inc, 'delete')}
+                    />
+                  </Fragment>
+                );
+              })}
             </div>
           )}
         </div>
@@ -512,9 +526,7 @@ export default function WorkshopDashboardPage() {
               onRejectEditRequest={actions.handleRejectEditRequest}
               onApproveDeleteRequest={actions.handleApproveDeleteRequest}
               onRejectDeleteRequest={actions.handleRejectDeleteRequest}
-              onConsultArbitration={() =>
-                void handleConsultArbitration(modal.state.reviewIncident)
-              }
+              onConsultArbitration={() => void handleConsultArbitration(modal.state.reviewIncident)}
               onReportArbitration={() => handleReportArbitration(modal.state.reviewIncident)}
               onEditSuccess={(updated) => {
                 upsertIncident(updated);
