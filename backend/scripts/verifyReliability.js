@@ -362,6 +362,8 @@ check('Workshop event log has payloads for important operational decisions', () 
     'backend/src/modules/workshop/workshop.service.edit.ts',
     'backend/src/modules/workshop/workshop.service.mutations.ts',
   ]);
+  const events = read('backend/src/modules/workshop/workshop.events.ts');
+  const labels = read('frontend/src/utils/labels.ts');
   return service.includes('INCIDENT_CREATED')
     && service.includes('EDIT_REQUESTED')
     && service.includes('EDIT_APPLIED')
@@ -372,7 +374,8 @@ check('Workshop event log has payloads for important operational decisions', () 
     && service.includes('INCIDENT_RESUMED')
     && service.includes('INCIDENT_CLOSED')
     && service.includes('PRIORITY_CHANGED')
-    && service.includes('INCIDENT_REORDERED')
+    && events.includes("'INCIDENT_REORDERED'")
+    && labels.includes('INCIDENT_REORDERED')
     && service.includes('RESPONSIBLE_COMMENT_UPDATED')
     && service.includes('requestedChangeKeys');
 });
