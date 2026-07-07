@@ -214,49 +214,124 @@ export default function ReviewIncidentRequestModal({
       isLoading={loading}
       variant="default"
       size="lg"
+      className="modal--arbitration"
+      overlayClassName="modal-overlay--depth-focus"
       footer={footer}
     >
-      <div className="arbitration-modal-layout">
-        <section
-          className={`arbitration-decision-card arbitration-decision-card--${isDelete ? 'delete' : 'edit'}`}
-        >
-          <div className="arbitration-decision-head">
-            <div>
-              <span className="detail-field-label">Décision attendue</span>
-              <h2>{decisionTitle}</h2>
+      <div
+        className={`arbitration-modal-layout arbitration-modal-layout--${
+          isDelete ? 'delete' : 'edit'
+        }`}
+      >
+        <div className="arbitration-command-grid">
+          <section
+            className={`arbitration-decision-card arbitration-decision-card--${isDelete ? 'delete' : 'edit'}`}
+          >
+            <div className="arbitration-decision-head">
+              <div>
+                <span className="detail-field-label">Décision attendue</span>
+                <h2>{decisionTitle}</h2>
+              </div>
+              <span
+                className={`arbitration-state-pill arbitration-state-pill--${
+                  isRequestWaiting(currentRequestState) ? 'waiting' : isDelete ? 'delete' : 'edit'
+                }`}
+              >
+                {currentRequestLabel}
+              </span>
             </div>
-            <span
-              className={`arbitration-state-pill arbitration-state-pill--${
-                isRequestWaiting(currentRequestState) ? 'waiting' : isDelete ? 'delete' : 'edit'
-              }`}
-            >
-              {currentRequestLabel}
-            </span>
-          </div>
-          <p className="arbitration-decision-hint">{currentRequestHint}</p>
-          <div className="arbitration-decision-meta">
-            <DecisionField label="Demandeur" emphasis>
-              {creatorName || 'Non renseigné'}
-            </DecisionField>
-            <DecisionField label="Rôle">{requesterRole}</DecisionField>
-            <DecisionField label="Date de demande">{requestDateLabel}</DecisionField>
-            <DecisionField label="Ancienneté">
-              {requestAge && requestAge !== '—' ? requestAge : 'Non calculée'}
-            </DecisionField>
-          </div>
-        </section>
+            <p className="arbitration-decision-hint">{currentRequestHint}</p>
+            <div className="arbitration-decision-meta">
+              <DecisionField label="Demandeur" emphasis>
+                {creatorName || 'Non renseigné'}
+              </DecisionField>
+              <DecisionField label="Rôle">{requesterRole}</DecisionField>
+              <DecisionField label="Demande">{requestDateLabel}</DecisionField>
+              <DecisionField label="Ancienneté">
+                {requestAge && requestAge !== '—' ? requestAge : 'Non calculée'}
+              </DecisionField>
+            </div>
+          </section>
 
-        {requestCount > 1 && (
-          <div className="arbitration-system-note arbitration-system-note--strong">
-            Deux demandes sont ouvertes sur cet incident. La décision finale doit tenir compte des
-            deux.
-          </div>
-        )}
+          <section
+            className={`arbitration-request-card arbitration-request-card--${
+              isDelete ? 'delete' : 'edit'
+            }`}
+          >
+            <div className="arbitration-section-head">
+              <h3>{isDelete ? 'Demande d’annulation' : 'Correction demandée'}</h3>
+            </div>
 
-        <section className="arbitration-section">
-          <div className="arbitration-section-head">
+            {isDelete ? (
+              <>
+                <div className="arbitration-reason-card">
+                  <span className="detail-field-label">Motif opérateur</span>
+                  <p>{incident.cancel_request_reason || 'Non renseigné'}</p>
+                </div>
+                {deleteWarning && <div className="arbitration-system-note">{deleteWarning}</div>}
+                {deleteApprovalDisabled && (
+                  <div className="arbitration-system-note arbitration-system-note--danger">
+                    Annulation impossible après prise en charge.
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {editWarning && <div className="arbitration-system-note">{editWarning}</div>}
+                <div className="arbitration-diff-list">
+                  {changeRows.length === 0 ? (
+                    <div className="arbitration-empty-state">Aucune modification détectée.</div>
+                  ) : (
+                    changeRows.map((row) => (
+                      <div className="arbitration-diff-row" key={row.label}>
+                        <div className="arbitration-diff-field">{row.label}</div>
+                        <div className="arbitration-diff-values">
+                          <div>
+                            <span className="detail-field-label">Actuel</span>
+                            <p>{row.current}</p>
+                          </div>
+                          <div className="arbitration-diff-requested">
+                            <span className="detail-field-label">Demandé</span>
+                            <p>{row.requested}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+
+        <section className="arbitration-context-card">
+          <div className="arbitration-context-head">
             <h3>Contexte incident</h3>
+            <div
+              className="arbitration-request-state-row"
+              aria-label="État des demandes d'arbitrage"
+            >
+              {hasEditRequest && (
+                <span
+                  className={`arbitration-request-chip arbitration-request-chip--edit${
+                    isRequestWaiting(editState) ? ' is-waiting' : ''
+                  }`}
+                >
+                  Correction · {requestStateLabel(editState)}
+                </span>
+              )}
+              {hasCancelRequest && (
+                <span
+                  className={`arbitration-request-chip arbitration-request-chip--delete${
+                    isRequestWaiting(cancelState) ? ' is-waiting' : ''
+                  }`}
+                >
+                  Annulation · {requestStateLabel(cancelState)}
+                </span>
+              )}
+            </div>
           </div>
+
           <div className="arbitration-context-grid">
             <DecisionField label="Incident" emphasis>
               {incident.line_number} · {incident.machine_id}
@@ -279,100 +354,26 @@ export default function ReviewIncidentRequestModal({
             </div>
           )}
 
-          <div className="arbitration-request-state-row" aria-label="État des demandes d'arbitrage">
-            {hasEditRequest && (
-              <span
-                className={`arbitration-request-chip arbitration-request-chip--edit${
-                  isRequestWaiting(editState) ? ' is-waiting' : ''
-                }`}
-              >
-                Correction · {requestStateLabel(editState)}
-              </span>
-            )}
-            {hasCancelRequest && (
-              <span
-                className={`arbitration-request-chip arbitration-request-chip--delete${
-                  isRequestWaiting(cancelState) ? ' is-waiting' : ''
-                }`}
-              >
-                Annulation · {requestStateLabel(cancelState)}
-              </span>
-            )}
-          </div>
-        </section>
-
-        <section className="arbitration-section">
-          <div className="arbitration-section-head">
-            <h3>{isDelete ? 'Demande d’annulation' : 'Correction demandée'}</h3>
-          </div>
-
-          {isDelete ? (
-            <>
-              <div className="arbitration-reason-card">
-                <span className="detail-field-label">Motif opérateur</span>
-                <p>{incident.cancel_request_reason || 'Non renseigné'}</p>
-              </div>
-              {deleteWarning && <div className="arbitration-system-note">{deleteWarning}</div>}
-              {deleteApprovalDisabled && (
-                <div className="arbitration-system-note arbitration-system-note--danger">
-                  Annulation impossible après prise en charge.
-                </div>
+          {hasNarrativeContext && (
+            <div className="arbitration-narrative-strip" aria-label="Contexte atelier">
+              {incident.comment && (
+                <DecisionField label="Signalement">{incident.comment}</DecisionField>
               )}
-            </>
-          ) : (
-            <>
-              {editWarning && <div className="arbitration-system-note">{editWarning}</div>}
-              <div className="arbitration-diff-list">
-                {changeRows.length === 0 ? (
-                  <div className="arbitration-empty-state">Aucune modification détectée.</div>
-                ) : (
-                  changeRows.map((row) => (
-                    <div className="arbitration-diff-row" key={row.label}>
-                      <div className="arbitration-diff-field">{row.label}</div>
-                      <div className="arbitration-diff-values">
-                        <div>
-                          <span className="detail-field-label">Actuel</span>
-                          <p>{row.current}</p>
-                        </div>
-                        <div className="arbitration-diff-requested">
-                          <span className="detail-field-label">Demandé</span>
-                          <p>{row.requested}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
+              {incident.diagnostic && (
+                <DecisionField label="Diagnostic">{incident.diagnostic}</DecisionField>
+              )}
+              {incident.intervention_note && (
+                <DecisionField label="Intervention">{incident.intervention_note}</DecisionField>
+              )}
+            </div>
           )}
         </section>
 
-        {hasNarrativeContext && (
-          <section className="arbitration-section">
-            <div className="arbitration-section-head">
-              <h3>Contexte atelier</h3>
-            </div>
-            <div className="arbitration-narrative-list">
-              {incident.comment && (
-                <div className="incident-narrative-item">
-                  <span className="detail-field-label">Signalement</span>
-                  <p>{incident.comment}</p>
-                </div>
-              )}
-              {incident.diagnostic && (
-                <div className="incident-narrative-item">
-                  <span className="detail-field-label">Diagnostic</span>
-                  <p>{incident.diagnostic}</p>
-                </div>
-              )}
-              {incident.intervention_note && (
-                <div className="incident-narrative-item">
-                  <span className="detail-field-label">Intervention</span>
-                  <p>{incident.intervention_note}</p>
-                </div>
-              )}
-            </div>
-          </section>
+        {requestCount > 1 && (
+          <div className="arbitration-system-note arbitration-system-note--strong">
+            Deux demandes sont ouvertes sur cet incident. La décision finale doit tenir compte des
+            deux.
+          </div>
         )}
 
         {error && <div className="error-message">{error}</div>}

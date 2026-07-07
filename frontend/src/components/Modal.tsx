@@ -11,6 +11,8 @@ interface ModalProps {
   isLoading?: boolean;
   size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'danger';
+  className?: string;
+  overlayClassName?: string;
   dirtyMessage?: string;
 }
 
@@ -25,6 +27,8 @@ export default function Modal({
   isLoading = false,
   size = 'md',
   variant = 'default',
+  className = '',
+  overlayClassName = '',
   dirtyMessage = 'Les modifications en cours seront perdues.',
 }: ModalProps) {
   const [confirmClose, setConfirmClose] = useState(false);
@@ -34,8 +38,13 @@ export default function Modal({
   const canClose = Boolean(onClose) && !isLoading;
   const escapeEnabled = closeOnEscape ?? closeOnOverlay;
   const modalClassName = useMemo(() => {
-    return ['modal', `modal-${size}`, variant === 'danger' ? 'modal-danger' : ''].filter(Boolean).join(' ');
-  }, [size, variant]);
+    return ['modal', `modal-${size}`, variant === 'danger' ? 'modal-danger' : '', className]
+      .filter(Boolean)
+      .join(' ');
+  }, [className, size, variant]);
+  const overlayClassNames = useMemo(() => {
+    return ['modal-overlay', overlayClassName].filter(Boolean).join(' ');
+  }, [overlayClassName]);
 
   function requestClose(): void {
     if (!canClose) return;
@@ -126,7 +135,7 @@ export default function Modal({
 
   return (
     <div
-      className="modal-overlay"
+      className={overlayClassNames}
       role="presentation"
       onClick={(e) => {
         if (!closeOnOverlay) return;

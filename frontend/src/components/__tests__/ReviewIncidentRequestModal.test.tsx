@@ -67,6 +67,12 @@ describe('ReviewIncidentRequestModal', () => {
       />
     );
 
+    const dialog = screen.getByRole('dialog', { name: 'Arbitrage correction' });
+    expect(dialog.classList.contains('modal--arbitration')).toBe(true);
+    expect(dialog.closest('.modal-overlay')?.classList.contains('modal-overlay--depth-focus')).toBe(
+      true
+    );
+
     fireEvent.click(screen.getByRole('button', { name: 'Reporter' }));
     expect(onReport).toHaveBeenCalledTimes(1);
     expect(onConsult).not.toHaveBeenCalled();
