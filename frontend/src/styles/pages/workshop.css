@@ -1056,6 +1056,7 @@ button.workshop-metric:hover,
 .modal-overlay--depth-focus {
   align-items: center;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background-color: rgba(248, 251, 255, 0.28);
   -webkit-backdrop-filter: blur(7px) saturate(0.82);
   backdrop-filter: blur(7px) saturate(0.82);
@@ -1079,6 +1080,7 @@ button.workshop-metric:hover,
 .modal--arbitration .modal-body {
   flex: 0 0 auto;
   gap: 0;
+  min-height: 0;
   padding: 14px 18px 12px;
   overflow: visible;
 }
@@ -1377,8 +1379,13 @@ button.workshop-metric:hover,
 
 .arbitration-footer-group {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.arbitration-footer .btn {
+  flex: 0 0 auto;
 }
 
 .arbitration-footer-group--decision {
@@ -1387,12 +1394,37 @@ button.workshop-metric:hover,
 
 @media (max-width: 760px) {
   .modal-overlay--depth-focus {
-    align-items: flex-start;
+    align-items: center;
     padding: var(--space-3);
+    overflow: hidden;
   }
 
   .modal--arbitration {
+    width: min(100%, 520px);
     max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    overflow: hidden;
+  }
+
+  .modal--arbitration .modal-header {
+    flex: 0 0 auto;
+    padding: 12px 14px;
+  }
+
+  .modal--arbitration .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 12px 14px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal--arbitration .modal-footer {
+    flex: 0 0 auto;
+    padding: 10px 14px 12px;
+    box-shadow: 0 -10px 24px rgba(11, 18, 32, 0.06);
   }
 
   .arbitration-command-grid,
@@ -1400,15 +1432,43 @@ button.workshop-metric:hover,
     grid-template-columns: 1fr;
   }
 
+  .modal--arbitration .arbitration-decision-meta,
+  .modal--arbitration .arbitration-context-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-2) var(--space-3);
+  }
+
   .arbitration-context-head,
   .arbitration-footer {
     align-items: stretch;
     flex-direction: column;
+    gap: var(--space-2);
   }
 
   .arbitration-footer-group,
   .arbitration-footer-group--decision {
-    justify-content: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: normal;
+    width: 100%;
+  }
+
+  .arbitration-footer-group > .btn:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .arbitration-footer .btn {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: var(--text-sm);
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .arbitration-footer-group--decision .btn-primary,
+  .arbitration-footer-group--decision .btn-danger {
+    font-weight: 700;
   }
 }
 
@@ -1574,8 +1634,7 @@ button.workshop-metric:hover,
   .incident-action-row .btn,
   .machine-context-actions .incident-context-link,
   .incident-action-group .btn,
-  .machine-context-actions .btn,
-  .arbitration-footer .btn {
+  .machine-context-actions .btn {
     flex: 1 1 180px;
   }
 
@@ -1588,6 +1647,29 @@ button.workshop-metric:hover,
 
   .arbitration-state-pill {
     align-self: flex-start;
+  }
+
+  .modal--arbitration .arbitration-modal-layout,
+  .modal--arbitration .arbitration-command-grid {
+    gap: var(--space-2);
+  }
+
+  .modal--arbitration .arbitration-decision-card,
+  .modal--arbitration .arbitration-context-card,
+  .modal--arbitration .arbitration-request-card {
+    gap: var(--space-2);
+    padding: 10px;
+  }
+
+  .modal--arbitration .arbitration-decision-head {
+    flex-flow: row wrap;
+    align-items: flex-start;
+  }
+
+  .modal--arbitration .arbitration-decision-meta,
+  .modal--arbitration .arbitration-context-grid {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: var(--space-2) var(--space-3);
   }
 
   .arbitration-diff-row,
@@ -1623,6 +1705,28 @@ button.workshop-metric:hover,
   .workshop-search-bar .btn {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .modal--arbitration {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .modal-overlay--depth-focus {
+    padding: var(--space-2);
+  }
+
+  .modal--arbitration .modal-header,
+  .modal--arbitration .modal-body,
+  .modal--arbitration .modal-footer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .arbitration-footer-group,
+  .arbitration-footer-group--decision {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -204,4 +204,28 @@ describe('ReviewIncidentRequestModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Consulter les demandes' }));
     expect(onConsult).toHaveBeenCalledTimes(1);
   });
+
+  it('structure les actions d’arbitrage en groupes de décision distincts', () => {
+    const { container } = render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onReport={vi.fn()}
+        onConsult={vi.fn()}
+      />
+    );
+
+    const actionGroups = container.querySelectorAll('.arbitration-footer-group');
+
+    expect(actionGroups).toHaveLength(2);
+    expect(actionGroups[0].textContent).toContain('Reporter');
+    expect(actionGroups[0].textContent).toContain('Consulter le dossier');
+    expect(actionGroups[1].classList.contains('arbitration-footer-group--decision')).toBe(true);
+    expect(actionGroups[1].textContent).toContain('Refuser la demande');
+    expect(actionGroups[1].textContent).toContain('Appliquer la correction');
+  });
 });
