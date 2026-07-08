@@ -19,7 +19,6 @@ import { useFieldLimits } from '../routes/FieldLimitsContext';
 import { ROLE_LABELS } from '../utils/labels';
 import { canPerform } from '../utils/workshopPermissions';
 import { ModalStateApi } from '../hooks/useModalState';
-import { sortIncidents } from '../utils/incidentSort';
 import {
   IncidentPriorityChip,
   IncidentStateChip,
@@ -752,15 +751,4 @@ export default function IncidentDetailPanel({
       )}
     </>
   );
-}
-
-export function useSortedIncidents(
-  incidents: Array<ReturnType<typeof sortIncidents>[0]>,
-  sortOrder: 'default' | 'date_desc' | 'date_asc'
-) {
-  if (sortOrder === 'default') return incidents;
-  return [...incidents].sort((a, b) => {
-    const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return sortOrder === 'date_desc' ? diff : -diff;
-  });
 }

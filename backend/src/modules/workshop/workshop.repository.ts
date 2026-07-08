@@ -242,6 +242,21 @@ function appendScalarIncidentFilters(
   }
 }
 
+/**
+ * Règle "qu'est-ce qu'une fiche connaissance valide" — CLOSED + note
+ * d'intervention non vide. Deux implémentations couplées à maintenir
+ * ensemble : ce prédicat JS (utilisé par getKnowledgeIncidentService pour
+ * la lecture d'une fiche unique) et le filtre SQL équivalent ci-dessous
+ * dans buildIncidentWorkspaceFilters, mode 'knowledge' (utilisé pour la
+ * liste). Si la règle évolue, modifier les deux.
+ */
+export function isKnowledgeEligible(incident: {
+  status: string;
+  intervention_note: string | null | undefined;
+}): boolean {
+  return incident.status === 'CLOSED' && Boolean(incident.intervention_note?.trim());
+}
+
 function buildIncidentWorkspaceFilters(
   query: QueryParams,
   mode: IncidentListMode
@@ -252,6 +267,7 @@ function buildIncidentWorkspaceFilters(
   const safeLimit = boundedInt(limit, 200, 1, 500);
 
   if (mode === 'knowledge') {
+    // Couplé à isKnowledgeEligible ci-dessus — même règle, dialecte SQL.
     filters.push(statusEqualsSql('wi.status', 'CLOSED'));
     filters.push(`wi.intervention_note IS NOT NULL`);
     filters.push(`btrim(wi.intervention_note) != ''`);

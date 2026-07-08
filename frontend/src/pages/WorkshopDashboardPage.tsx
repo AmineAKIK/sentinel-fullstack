@@ -12,6 +12,7 @@ import FilterSummary from '../components/FilterSummary';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import SelectField from '../components/ui/SelectField';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
+import { isIncidentResolved } from '../components/IncidentBadges';
 import { consultWorkshopArbitration, updateWorkshopIncident } from '../api/workshop';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { WorkshopIncident } from '../types';
@@ -182,10 +183,7 @@ export default function WorkshopDashboardPage() {
   }, [selectedIncident?.id]);
 
   const filteredIncidents = incidents.filter((incident) => {
-    const isResolved =
-      incident.status === 'CLOSED' ||
-      incident.status === 'CANCELED' ||
-      incident.status === 'INVALIDATED';
+    const isResolved = isIncidentResolved(incident);
     if (filters.scope === 'followed' && !incident.is_followed) return false;
     if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
     if (filters.scope === 'created_by_me' && incident.user_id !== user?.id) return false;
@@ -244,20 +242,14 @@ export default function WorkshopDashboardPage() {
   });
 
   const createdByMeCount = isOperator
-    ? incidents.filter((inc) => {
-        const isResolved =
-          inc.status === 'CLOSED' || inc.status === 'CANCELED' || inc.status === 'INVALIDATED';
-        return inc.user_id === user?.id && !isResolved;
-      }).length
+    ? incidents.filter((inc) => inc.user_id === user?.id && !isIncidentResolved(inc)).length
     : 0;
 
   // Inbox d'arbitrage du responsable : demandes de correction/annulation en attente.
   const requestsCount = isResponsable
-    ? incidents.filter((inc) => {
-        const isResolved =
-          inc.status === 'CLOSED' || inc.status === 'CANCELED' || inc.status === 'INVALIDATED';
-        return !isResolved && (Boolean(inc.edit_request) || Boolean(inc.cancel_request));
-      }).length
+    ? incidents.filter(
+        (inc) => !isIncidentResolved(inc) && (Boolean(inc.edit_request) || Boolean(inc.cancel_request))
+      ).length
     : 0;
 
   const sortedIncidents =

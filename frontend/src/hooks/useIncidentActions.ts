@@ -44,6 +44,24 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     return updated;
   }
 
+  // Annule côté serveur puis applique le patch optimiste local (statut
+  // CANCELED, reset de la demande d'annulation) — commun aux 3 chemins qui
+  // mènent à une annulation confirmée (approbation, annulation directe RESPONSABLE/MAINTENANCE).
+  async function applyCancelation(id: number) {
+    await cancelWorkshopIncident(id);
+    setIncidents((prev) =>
+      sortIncidents(
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
+            : item
+        )
+      )
+    );
+    if (selectedIncident?.id === id) clearSelectedIncident();
+    void refreshMetrics();
+  }
+
   async function handleConfirmTakeCharge() {
     if (!selectedIncident) return;
     await patchIncident(selectedIncident.id, { isTaken: true });
@@ -109,19 +127,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      await cancelWorkshopIncident(modal.state.reviewIncident.id);
-      const id = modal.state.reviewIncident.id;
-      setIncidents((prev) =>
-        sortIncidents(
-          prev.map((item) =>
-            item.id === id
-              ? { ...item, status: 'CANCELED', cancel_request: false, cancel_request_reason: null }
-              : item
-          )
-        )
-      );
-      if (selectedIncident?.id === id) clearSelectedIncident();
-      void refreshMetrics();
+      await applyCancelation(modal.state.reviewIncident.id);
       modal.closeReview();
     } catch (_err) {
       modal.setReviewError(actionErrorMessage(_err, "Impossible d'annuler l'incident."));
@@ -205,46 +211,12 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewError('');
     try {
       if (mode === 'approve' && modal.state.reviewIncident) {
-        const id = modal.state.reviewIncident.id;
-        await cancelWorkshopIncident(id);
-        setIncidents((prev) =>
-          sortIncidents(
-            prev.map((item) =>
-              item.id === id
-                ? {
-                    ...item,
-                    status: 'CANCELED',
-                    cancel_request: false,
-                    cancel_request_reason: null,
-                  }
-                : item
-            )
-          )
-        );
-        if (selectedIncident?.id === id) clearSelectedIncident();
-        void refreshMetrics();
+        await applyCancelation(modal.state.reviewIncident.id);
         modal.closeReview();
         return;
       }
       if (mode === 'direct' && selectedIncident) {
-        const id = selectedIncident.id;
-        await cancelWorkshopIncident(id);
-        setIncidents((prev) =>
-          sortIncidents(
-            prev.map((item) =>
-              item.id === id
-                ? {
-                    ...item,
-                    status: 'CANCELED',
-                    cancel_request: false,
-                    cancel_request_reason: null,
-                  }
-                : item
-            )
-          )
-        );
-        clearSelectedIncident();
-        void refreshMetrics();
+        await applyCancelation(selectedIncident.id);
         modal.closeModal();
       }
     } catch (err) {

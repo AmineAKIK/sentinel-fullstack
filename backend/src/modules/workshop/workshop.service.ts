@@ -94,12 +94,7 @@ export async function listKnowledgeIncidentsService(
 
 export async function getKnowledgeIncidentService(id: number): Promise<ServiceResult<unknown>> {
   const incident = await workshopRepository.fetchIncidentWithUsers(id);
-  if (
-    !incident ||
-    incident.status !== 'CLOSED' ||
-    !incident.intervention_note ||
-    !String(incident.intervention_note).trim()
-  ) {
+  if (!incident || !workshopRepository.isKnowledgeEligible(incident)) {
     return notFound('Fiche connaissance introuvable.');
   }
   return { ok: true, data: incident };

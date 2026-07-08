@@ -11,6 +11,10 @@ import {
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock('../workshop.repository', () => ({
+  // isKnowledgeEligible est un prédicat pur (pas d'accès DB) : on garde
+  // l'implémentation réelle pour que les tests exercent la vraie règle
+  // métier, pas un mock qui la contournerait.
+  ...jest.requireActual('../workshop.repository'),
   getActiveWorkshopLine: jest.fn(),
   fetchIncidentWithUsers: jest.fn(),
   createIncidentData: jest.fn(),
