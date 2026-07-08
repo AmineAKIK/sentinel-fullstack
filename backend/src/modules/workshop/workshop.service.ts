@@ -1,4 +1,5 @@
 import { badRequest, forbidden, notFound, ok, ServiceResult } from '../../utils/serviceResult';
+import { ANALYTICS_DEFAULT_WINDOW_DAYS } from '../../domain/constants';
 import * as workshopRepository from './workshop.repository';
 import type { ArbitrationRequestType } from './workshop.repository';
 import { logIncidentEvent } from './workshop.events';
@@ -155,7 +156,13 @@ export async function consultArbitrationRequestService(
 export async function getWorkshopAnalyticsService(
   query: Record<string, unknown>
 ): Promise<ServiceResult<unknown>> {
-  return ok(await workshopRepository.getWorkshopAnalytics(query));
+  const boundedQuery = { ...query };
+  if (!boundedQuery.start && !boundedQuery.end) {
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - ANALYTICS_DEFAULT_WINDOW_DAYS);
+    boundedQuery.start = windowStart.toISOString();
+  }
+  return ok(await workshopRepository.getWorkshopAnalytics(boundedQuery));
 }
 
 // ─── Routeur de mise à jour (compatibilité tests + API PATCH) ─────────────────

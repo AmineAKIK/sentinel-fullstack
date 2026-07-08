@@ -22,6 +22,13 @@ export const FIELD_LIMITS = {
   SEARCH: 120, // requêtes de recherche / filtres
 } as const;
 
+/**
+ * Fenêtre par défaut appliquée aux requêtes analytiques quand aucune borne
+ * de date n'est fournie — évite un scan complet de workshop_incidents
+ * (agrégations lourdes : percentiles, trend journalier).
+ */
+export const ANALYTICS_DEFAULT_WINDOW_DAYS = 90;
+
 export const INCIDENT_STATES = [
   'SKIPEE_PAR_MACHINE',
   'SKIPEE_PAR_CONDUCTEUR',

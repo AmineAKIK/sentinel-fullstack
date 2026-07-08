@@ -867,6 +867,28 @@ describe('getWorkshopAnalyticsService', () => {
       end: '2025-01-31',
     });
   });
+
+  it('plafonne à 90 jours quand ni start ni end ne sont fournis', async () => {
+    jest.mocked(repo.getWorkshopAnalytics).mockResolvedValue({} as never);
+    await getWorkshopAnalyticsService({ lineId: 3 });
+
+    expect(repo.getWorkshopAnalytics).toHaveBeenCalledTimes(1);
+    const calledWith = jest.mocked(repo.getWorkshopAnalytics).mock.calls[0][0] as {
+      start: string;
+      lineId: number;
+    };
+    expect(calledWith.lineId).toBe(3);
+    const daysSince = (Date.now() - new Date(calledWith.start).getTime()) / (1000 * 60 * 60 * 24);
+    expect(daysSince).toBeGreaterThan(89);
+    expect(daysSince).toBeLessThan(91);
+  });
+
+  it('ne plafonne pas si end seul est fourni (borne explicite)', async () => {
+    jest.mocked(repo.getWorkshopAnalytics).mockResolvedValue({} as never);
+    await getWorkshopAnalyticsService({ end: '2025-01-31' });
+
+    expect(repo.getWorkshopAnalytics).toHaveBeenCalledWith({ end: '2025-01-31' });
+  });
 });
 
 // ─── cas limites manquants ─────────────────────────────────────────────────────

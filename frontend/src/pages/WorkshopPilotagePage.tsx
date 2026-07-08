@@ -20,7 +20,7 @@ const PERIOD_LABELS: Record<HistoryPeriod, string> = {
   today: "Aujourd'hui",
   '7d': '7 derniers jours',
   '30d': '30 derniers jours',
-  lifetime: "Tout l'historique",
+  lifetime: '90 derniers jours (max)',
   custom: 'Personnalisée',
 };
 
@@ -335,11 +335,11 @@ export default function WorkshopPilotagePage() {
                     ariaLabel="Période"
                     onChange={(v) => setPeriod(v as HistoryPeriod)}
                     options={[
-                      { value: 'today', label: "Aujourd'hui" },
-                      { value: '7d', label: '7 derniers jours' },
-                      { value: '30d', label: '30 derniers jours' },
-                      { value: 'lifetime', label: "Tout l'historique" },
-                      { value: 'custom', label: 'Personnalisée' },
+                      { value: 'today', label: PERIOD_LABELS.today },
+                      { value: '7d', label: PERIOD_LABELS['7d'] },
+                      { value: '30d', label: PERIOD_LABELS['30d'] },
+                      { value: 'lifetime', label: PERIOD_LABELS.lifetime },
+                      { value: 'custom', label: PERIOD_LABELS.custom },
                     ]}
                   />
                 </div>
