@@ -17,7 +17,7 @@ import { Role } from '../types/common';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
 import { ROLE_LABELS } from '../utils/labels';
-import { ModalStateApi } from '../hooks/useModalState';
+import { ModalStateApi, ReviewType } from '../hooks/useModalState';
 import { useIncidentPermissions } from '../hooks/useIncidentPermissions';
 import {
   IncidentPriorityChip,
@@ -122,8 +122,6 @@ function NarrativeItem({
     </div>
   );
 }
-
-type ReviewType = 'edit' | 'delete';
 
 function IncidentDecisionBlock({
   incident,

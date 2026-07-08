@@ -24,7 +24,7 @@ import {
   DashboardFilters as DashboardFiltersState,
 } from '../hooks/useDashboardFilters';
 import { useIncidentsData } from '../hooks/useIncidentsData';
-import { useModalState } from '../hooks/useModalState';
+import { useModalState, ReviewType } from '../hooks/useModalState';
 import { useIncidentActions } from '../hooks/useIncidentActions';
 import { useIncidentDrawerPosition } from '../hooks/useIncidentDrawerPosition';
 
@@ -34,7 +34,6 @@ function isWithinLastDays(iso: string, days: number): boolean {
   return createdAt >= limit;
 }
 
-type ReviewType = 'edit' | 'delete';
 type PendingReviewRequest = {
   incidentId: number;
   type: ReviewType;

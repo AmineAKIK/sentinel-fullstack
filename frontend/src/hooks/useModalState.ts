@@ -1,6 +1,8 @@
 import { useReducer } from 'react';
 import { WorkshopIncident } from '../types';
 
+export type ReviewType = 'edit' | 'delete';
+
 export type ActiveModal =
   | 'create'
   | 'edit'
@@ -18,7 +20,7 @@ export type ActiveModal =
 interface ModalState {
   activeModal: ActiveModal;
   reviewIncident: WorkshopIncident | null;
-  reviewType: 'edit' | 'delete' | null;
+  reviewType: ReviewType | null;
   reviewError: string;
   reviewLoading: boolean;
   unfollowConfirmIncident: WorkshopIncident | null;
@@ -28,7 +30,7 @@ interface ModalState {
 type ModalAction =
   | { type: 'OPEN'; modal: ActiveModal }
   | { type: 'CLOSE' }
-  | { type: 'OPEN_REVIEW'; incident: WorkshopIncident; reviewType: 'edit' | 'delete' }
+  | { type: 'OPEN_REVIEW'; incident: WorkshopIncident; reviewType: ReviewType }
   | { type: 'CLOSE_REVIEW' }
   | { type: 'SET_REVIEW_ERROR'; error: string }
   | { type: 'SET_REVIEW_LOADING'; loading: boolean }
@@ -83,7 +85,7 @@ export interface ModalStateApi {
   state: ModalState;
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
-  openReview: (incident: WorkshopIncident, type: 'edit' | 'delete') => void;
+  openReview: (incident: WorkshopIncident, type: ReviewType) => void;
   closeReview: () => void;
   setReviewError: (error: string) => void;
   setReviewLoading: (loading: boolean) => void;

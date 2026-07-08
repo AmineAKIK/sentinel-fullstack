@@ -7,7 +7,8 @@ import Skeleton from '../components/ui/Skeleton';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import WorkshopFilterCard from '../components/WorkshopFilterCard';
 import { WorkshopIncident } from '../types';
-import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
+import { formatDateTime } from '../utils/workshopHistory';
+import { STATE_LABELS } from '../utils/labels';
 import { formatElapsed } from '../utils/date';
 import {
   lineFilterChip,
