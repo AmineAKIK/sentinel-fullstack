@@ -1337,7 +1337,7 @@ button.workshop-metric:hover,
 
 .arbitration-diff-row {
   display: grid;
-  grid-template-columns: minmax(86px, 0.32fr) minmax(0, 1fr);
+  grid-template-columns: minmax(128px, 0.34fr) minmax(0, 1fr);
   gap: var(--space-2);
   align-items: start;
   background-color: var(--color-surface);
@@ -1347,7 +1347,9 @@ button.workshop-metric:hover,
   color: var(--color-text);
   font-size: var(--text-base);
   font-weight: 700;
-  overflow-wrap: anywhere;
+  hyphens: none;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .arbitration-diff-values {
