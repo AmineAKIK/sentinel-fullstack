@@ -34,7 +34,6 @@ interface IncidentDetailPanelProps {
   modal: ModalStateApi;
   userRole: Role | undefined;
   userId: number | undefined;
-  isMaintenance: boolean;
   isResponsable: boolean;
   // Navigation dans la liste visible (triée/filtrée) sans quitter le drawer.
   navigation?: {
@@ -298,7 +297,6 @@ export default function IncidentDetailPanel({
   modal,
   userRole,
   userId,
-  isMaintenance: _isMaintenance,
   isResponsable,
   navigation,
   onBack,

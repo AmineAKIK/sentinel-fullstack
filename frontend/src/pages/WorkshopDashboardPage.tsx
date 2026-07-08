@@ -679,7 +679,6 @@ export default function WorkshopDashboardPage() {
                 modal={modal}
                 userRole={user?.role}
                 userId={user?.id}
-                isMaintenance={isMaintenance}
                 isResponsable={isResponsable}
                 navigation={
                   selectedIndex >= 0

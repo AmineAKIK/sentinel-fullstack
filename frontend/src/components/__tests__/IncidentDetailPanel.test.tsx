@@ -74,13 +74,11 @@ function renderPanel({
   userRole = 'RESPONSABLE',
   userId = 1,
   isResponsable = true,
-  isMaintenance = false,
 }: {
   incident?: WorkshopIncident;
   userRole?: 'OPERATOR' | 'MAINTENANCE' | 'RESPONSABLE';
   userId?: number;
   isResponsable?: boolean;
-  isMaintenance?: boolean;
 } = {}) {
   const modal = mockModal();
 
@@ -92,7 +90,6 @@ function renderPanel({
         modal={modal}
         userRole={userRole}
         userId={userId}
-        isMaintenance={isMaintenance}
         isResponsable={isResponsable}
         onBack={vi.fn()}
         onToggleFollow={vi.fn(resolvedVoid)}
@@ -187,7 +184,6 @@ describe('IncidentDetailPanel', () => {
       userRole: 'MAINTENANCE',
       userId: 9,
       isResponsable: false,
-      isMaintenance: true,
     });
 
     expect(screen.getByRole('heading', { name: 'Consigne responsable' })).toBeDefined();
