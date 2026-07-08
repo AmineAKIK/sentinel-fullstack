@@ -10,6 +10,7 @@ import {
   IncidentTakenChip,
   isIncidentResolved,
 } from './IncidentBadges';
+import StarIcon from './icons/StarIcon';
 
 interface IncidentCardProps {
   incident: WorkshopIncident;
@@ -101,19 +102,7 @@ export default function IncidentCard({
                 onToggleFollow?.(incident);
               }}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill={incident.is_followed ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2" />
-              </svg>
+              <StarIcon filled={Boolean(incident.is_followed)} />
             </button>
           )}
         </div>

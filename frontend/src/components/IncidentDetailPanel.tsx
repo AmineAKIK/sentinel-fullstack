@@ -17,15 +17,18 @@ import { Role } from '../types/common';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
 import { ROLE_LABELS } from '../utils/labels';
-import { canPerform } from '../utils/workshopPermissions';
 import { ModalStateApi } from '../hooks/useModalState';
+import { useIncidentPermissions } from '../hooks/useIncidentPermissions';
 import {
   IncidentPriorityChip,
   IncidentStateChip,
   IncidentStatusChip,
   IncidentTakenChip,
-  isIncidentResolved,
 } from './IncidentBadges';
+import ChevronUpIcon from './icons/ChevronUpIcon';
+import ChevronDownIcon from './icons/ChevronDownIcon';
+import CloseIcon from './icons/CloseIcon';
+import StarIcon from './icons/StarIcon';
 
 interface IncidentDetailPanelProps {
   incident: WorkshopIncident;
@@ -117,78 +120,6 @@ function NarrativeItem({
       <span className="detail-field-label">{label}</span>
       <p>{value}</p>
     </div>
-  );
-}
-
-function ChevronUpIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="18 15 12 9 6 15" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function StarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2" />
-    </svg>
   );
 }
 
@@ -322,29 +253,29 @@ export default function IncidentDetailPanel({
 
   const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
 
-  const canRequestEdit = canPerform(userRole, 'requestEdit', incident, userId);
-  const canDirectEdit = canPerform(userRole, 'directEdit', incident);
-  const canResponsableEdit = canPerform(userRole, 'responsableEdit', incident);
-  const canWithdrawEdit = canPerform(userRole, 'withdrawEdit', incident, userId);
-  const canRequestCancel = canPerform(userRole, 'requestCancel', incident, userId);
-  const canCancel = canPerform(userRole, 'cancel', incident);
-  const canTake = canPerform(userRole, 'take', incident);
-  const canSetPending = canPerform(userRole, 'setPending', incident);
-  const canResume = canPerform(userRole, 'resume', incident);
-  const canClose = canPerform(userRole, 'close', incident);
-  const canSetPriority = canPerform(userRole, 'setPriority', incident);
-  const canEditResponsibleComment = canPerform(userRole, 'responsibleComment', incident);
-  const canInvalidateClosed = canPerform(userRole, 'invalidateClosed', incident);
-  const isResolved = isIncidentResolved(incident);
-  const canReviewEditRequest =
-    isResponsable &&
-    incident.edit_request != null &&
-    (canPerform(userRole, 'approveEdit', incident) || canPerform(userRole, 'rejectEdit', incident));
-  const canReviewCancelRequest =
-    isResponsable &&
-    incident.cancel_request === true &&
-    (canPerform(userRole, 'approveCancel', incident) ||
-      canPerform(userRole, 'rejectCancel', incident));
+  const {
+    canRequestEdit,
+    canDirectEdit,
+    canResponsableEdit,
+    canWithdrawEdit,
+    canRequestCancel,
+    canCancel,
+    canTake,
+    canSetPending,
+    canResume,
+    canClose,
+    canSetPriority,
+    canEditResponsibleComment,
+    canInvalidateClosed,
+    canReviewEditRequest,
+    canReviewCancelRequest,
+    isResolved,
+    hasWorkflowActions,
+    hasStandardActions,
+    hasDangerActions,
+    hasResponsibleInstruction,
+  } = useIncidentPermissions(incident, userRole, userId, isResponsable);
+
   const creatorName = `${incident.first_name} ${incident.last_name}`.trim();
   const currentProduct = incident.current_product?.trim();
   const takenByName = incident.taken_by_first_name
@@ -354,12 +285,6 @@ export default function IncidentDetailPanel({
     Boolean(incident.comment) ||
     Boolean(incident.diagnostic) ||
     Boolean(incident.intervention_note);
-  const hasWorkflowActions = canTake || canSetPending || canResume || canClose || canSetPriority;
-  const hasStandardActions =
-    canRequestEdit || canDirectEdit || canResponsableEdit || canWithdrawEdit;
-  const hasDangerActions = canRequestCancel || canCancel || canInvalidateClosed;
-  const hasResponsibleInstruction =
-    Boolean(incident.responsible_comment) || canEditResponsibleComment;
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
 

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
@@ -26,6 +26,7 @@ import {
 import { useIncidentsData } from '../hooks/useIncidentsData';
 import { useModalState } from '../hooks/useModalState';
 import { useIncidentActions } from '../hooks/useIncidentActions';
+import { useIncidentDrawerPosition } from '../hooks/useIncidentDrawerPosition';
 
 function isWithinLastDays(iso: string, days: number): boolean {
   const createdAt = new Date(iso).getTime();
@@ -38,8 +39,6 @@ type PendingReviewRequest = {
   incidentId: number;
   type: ReviewType;
 };
-
-const STACKED_DETAIL_LAYOUT_QUERY = '(max-width: 1180px)';
 
 function isArbitrationRequestActive(incident: WorkshopIncident, type: ReviewType): boolean {
   if (type === 'edit') {
@@ -67,34 +66,6 @@ function getActiveArbitrationKey(incident: WorkshopIncident): string | null {
   return parts.length > 0 ? `${incident.id}:${parts.join('|')}` : null;
 }
 
-function getFocusViewport() {
-  const nav = document.querySelector<HTMLElement>('.nav-bar');
-  const navBottom = nav?.getBoundingClientRect().bottom ?? 0;
-  const top = Math.max(72, Math.round(navBottom + 16));
-  const bottom = Math.min(window.innerHeight - 16, Math.max(top + 180, window.innerHeight - 24));
-  const height = Math.max(180, bottom - top);
-  return {
-    top,
-    bottom,
-    height,
-    center: top + height / 2,
-  };
-}
-
-function prefersReducedMotion(): boolean {
-  return Boolean(
-    typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
-function usesStackedDetailLayout(): boolean {
-  return Boolean(
-    typeof window.matchMedia === 'function' &&
-      window.matchMedia(STACKED_DETAIL_LAYOUT_QUERY).matches
-  );
-}
-
 export default function WorkshopDashboardPage() {
   usePageTitle('Tableau de bord atelier');
   const { session } = useAppAuth();
@@ -103,7 +74,6 @@ export default function WorkshopDashboardPage() {
   const workbenchRef = useRef<HTMLDivElement | null>(null);
   const detailDrawerRef = useRef<HTMLElement | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
-  const [detailOffsetTop, setDetailOffsetTop] = useState(0);
   const [focusedIncidentId, setFocusedIncidentId] = useState<number | null>(null);
   const [pendingReviewRequest, setPendingReviewRequest] = useState<PendingReviewRequest | null>(
     null
@@ -292,6 +262,17 @@ export default function WorkshopDashboardPage() {
   const selectedIncidentId = selectedIncident?.id ?? null;
   const selectedIncidentUpdatedAt = selectedIncident?.updated_at ?? null;
 
+  const { detailOffsetTop } = useIncidentDrawerPosition({
+    workbenchRef,
+    detailDrawerRef,
+    selectedIncidentId,
+    selectedIncidentUpdatedAt,
+    sortedIncidentPositionKey,
+    loading,
+    sortOrder,
+    setFocusedIncidentId,
+  });
+
   function navigateToIncident(offset: number) {
     if (selectedIndex === -1) return;
     const next = sortedIncidents[selectedIndex + offset];
@@ -414,119 +395,6 @@ export default function WorkshopDashboardPage() {
   const detailDrawerStyle = {
     '--incident-detail-offset-top': `${detailOffsetTop}px`,
   } as CSSProperties;
-
-  useLayoutEffect(() => {
-    if (selectedIncidentId === null) {
-      setDetailOffsetTop(0);
-      return;
-    }
-
-    function updateDetailOffset() {
-      if (usesStackedDetailLayout()) {
-        setDetailOffsetTop(0);
-        return;
-      }
-
-      const workbenchElement = workbenchRef.current;
-      if (!workbenchElement) return;
-
-      const selectedCard = workbenchElement.querySelector<HTMLElement>(
-        `[data-incident-card-id="${selectedIncidentId}"]`
-      );
-      if (!selectedCard) {
-        setDetailOffsetTop(0);
-        return;
-      }
-
-      const workbenchTop = workbenchElement.getBoundingClientRect().top;
-      const cardRect = selectedCard.getBoundingClientRect();
-      const drawerRect = detailDrawerRef.current?.getBoundingClientRect();
-      const focusViewport = getFocusViewport();
-      const visualDrawerHeight = Math.min(
-        drawerRect?.height ?? cardRect.height,
-        Math.max(320, focusViewport.height)
-      );
-      const cardCenter = cardRect.top - workbenchTop + cardRect.height / 2;
-      const nextOffset = Math.max(0, Math.round(cardCenter - visualDrawerHeight / 2));
-      setDetailOffsetTop((currentOffset) =>
-        currentOffset === nextOffset ? currentOffset : nextOffset
-      );
-    }
-
-    updateDetailOffset();
-    const frameId = window.requestAnimationFrame(updateDetailOffset);
-    window.addEventListener('resize', updateDetailOffset);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      window.removeEventListener('resize', updateDetailOffset);
-    };
-  }, [
-    selectedIncidentId,
-    selectedIncidentUpdatedAt,
-    sortedIncidentPositionKey,
-    loading,
-    sortOrder,
-  ]);
-
-  useLayoutEffect(() => {
-    if (selectedIncidentId === null || loading) {
-      setFocusedIncidentId(null);
-      return;
-    }
-
-    setFocusedIncidentId(null);
-
-    function focusSelectedIncident() {
-      if (usesStackedDetailLayout()) {
-        const detailDrawer = detailDrawerRef.current;
-        if (!detailDrawer) return false;
-        detailDrawer.scrollIntoView({
-          block: 'start',
-          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        });
-        return true;
-      }
-
-      const workbenchElement = workbenchRef.current;
-      if (!workbenchElement) return false;
-
-      const selectedCard = workbenchElement.querySelector<HTMLElement>(
-        `[data-incident-card-id="${selectedIncidentId}"]`
-      );
-      if (!selectedCard) return false;
-
-      const cardRect = selectedCard.getBoundingClientRect();
-      if (cardRect.width === 0 && cardRect.height === 0) return true;
-
-      const focusViewport = getFocusViewport();
-      const cardCenter = cardRect.top + cardRect.height / 2;
-      const delta = cardCenter - focusViewport.center;
-      if (Math.abs(delta) > 8) {
-        window.scrollBy({
-          top: delta,
-          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        });
-      }
-      return true;
-    }
-
-    let settleTimer: number | undefined;
-    const frameId = window.requestAnimationFrame(() => {
-      const didResolveFocus = focusSelectedIncident();
-      settleTimer = window.setTimeout(
-        () => {
-          if (didResolveFocus) setFocusedIncidentId(selectedIncidentId);
-        },
-        prefersReducedMotion() ? 0 : 220
-      );
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      if (settleTimer !== undefined) window.clearTimeout(settleTimer);
-    };
-  }, [selectedIncidentId, loading, sortedIncidentPositionKey]);
 
   return (
     <>
