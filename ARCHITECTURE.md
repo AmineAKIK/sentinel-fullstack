@@ -144,7 +144,7 @@ Les actions possibles sur un incident sont contrôlées par un système de permi
 1. **Backend** (`workshop.policy.ts`) : source de vérité. Chaque action est vérifiée avant d'exécuter la logique métier.
 2. **Frontend** (`workshopPermissions.ts`) : miroir du backend pour désactiver les boutons côté UI. Ne remplace pas la vérification backend.
 
-### Les 19 actions possibles
+### Les 18 actions possibles
 | Action | Qui peut faire | Condition |
 |---|---|---|
 | `REQUEST_EDIT` | OPERATOR | Son incident actif |
@@ -153,7 +153,7 @@ Les actions possibles sur un incident sont contrôlées par un système de permi
 | `DIRECT_EDIT` | RESPONSABLE, MAINTENANCE | Actif + non pris |
 | `RESPONSABLE_EDIT` | RESPONSABLE | Incident actif, même après prise en charge |
 | `EDIT_AFTER_TAKE` | MAINTENANCE | Actif + pris par lui-même |
-| `CANCEL` | RESPONSABLE, MAINTENANCE | Actif + non pris |
+| `CANCEL` | RESPONSABLE, MAINTENANCE | Actif + non pris (ou PENDING, RESPONSABLE seul) |
 | `APPROVE_EDIT` | RESPONSABLE | Demande d'édition en attente |
 | `REJECT_EDIT` | RESPONSABLE | Demande d'édition en attente |
 | `APPROVE_CANCEL` | RESPONSABLE | Demande d'annulation en attente |
@@ -163,9 +163,14 @@ Les actions possibles sur un incident sont contrôlées par un système de permi
 | `RESUME` | MAINTENANCE | PENDING + pris |
 | `CLOSE` | MAINTENANCE | OPEN + pris |
 | `SET_PRIORITY` | RESPONSABLE | Incident actif |
-| `REORDER` | RESPONSABLE | Incident actif |
 | `RESPONSIBLE_COMMENT` | RESPONSABLE | Incident actif |
 | `INVALIDATE_CLOSED` | RESPONSABLE | Incident CLOSED |
+
+> Le réordonnancement manuel (`REORDER`) a existé puis a été retiré le
+> 2026-07-07 : la priorisation repose désormais uniquement sur le flag
+> `is_priority`. `INCIDENT_REORDERED` reste un type d'événement valide dans
+> `workshop_incident_events` pour ne pas altérer l'historique déjà écrit,
+> mais plus aucune action ne l'émet.
 
 ---
 
@@ -206,6 +211,7 @@ production_lines        # Lignes de production avec leurs machines (JSON)
 workshop_incidents      # Table principale des incidents
 workshop_incident_events # Log immuable de tous les événements (audit trail)
 workshop_incident_followers # Suivi d'incidents par le RESPONSABLE
+workshop_arbitration_consultations # Qui a consulté une demande d'arbitrage (edit/cancel) en attente, et quand
 account_audit_events    # Journal des modifications d'utilisateurs
 line_audit_events       # Journal des modifications de lignes
 admin_accounts          # Compte administrateur (unique)

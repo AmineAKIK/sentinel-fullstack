@@ -18,7 +18,7 @@
 10. [Module Atelier — Suivi des incidents (followers)](#10-module-atelier--suivi-des-incidents-followers)
 11. [Module Atelier — Dashboard opérationnel](#11-module-atelier--dashboard-opérationnel)
 12. [Module Atelier — Board grand écran](#12-module-atelier--board-grand-écran)
-13. [Module Atelier — Historique](#13-module-atelier--historique)
+13. [Module Atelier — Historique et Journal](#13-module-atelier--historique-et-journal)
 14. [Module Atelier — Pilotage](#14-module-atelier--pilotage)
 15. [Module Atelier — Base de connaissance](#15-module-atelier--base-de-connaissance)
 16. [Référentiel des statuts et états d'incident](#16-référentiel-des-statuts-et-états-dincident)
@@ -59,6 +59,7 @@ Sentinel
     ├── Dashboard opérationnel (incidents actifs)
     ├── Board grand écran (sans session requise)
     ├── Historique
+    ├── Journal (réservé RESPONSABLE)
     ├── Pilotage (indicateurs)
     └── Base de connaissance
 ```
@@ -112,7 +113,6 @@ Encadrant atelier. Se connecte via badge + mot de passe.
 - Modification directe d'un incident actif non pris en charge
 - Annulation directe d'un incident actif non pris en charge
 - Marquage de la priorité (urgence) d'un incident actif
-- Réordonnancement manuel des incidents prioritaires
 - Ajout/modification de consigne responsable
 - Invalidation d'un incident clôturé (avec motif obligatoire)
 - Suivi d'incidents spécifiques (follow/unfollow)
@@ -500,15 +500,19 @@ La page `/board` est accessible apres saisie du code board local. Elle consomme 
 | Demander annulation (`REQUEST_CANCEL`) | OPERATOR | Incident actif, non pris en charge, créé par l'opérateur lui-même | Flag `cancel_request = true` |
 | Approuver annulation (`APPROVE_CANCEL`) | RESPONSABLE | `cancel_request = true`, incident actif | Statut → CANCELED |
 | Refuser annulation (`REJECT_CANCEL`) | RESPONSABLE | `cancel_request = true`, incident actif | `cancel_request = false` |
-| Annuler directement (`CANCEL`) | MAINTENANCE, RESPONSABLE | Incident actif, non pris en charge | Statut → CANCELED |
+| Annuler directement (`CANCEL`) | MAINTENANCE, RESPONSABLE | Incident actif, non pris en charge (ou PENDING, RESPONSABLE seul — reprise de contrôle superviseur) | Statut → CANCELED |
 | Prendre en charge (`TAKE`) | MAINTENANCE | OPEN, non pris en charge | `is_taken = true`, `taken_by_user_id` et `taken_at` renseignés |
 | Mettre en attente (`SET_PENDING`) | MAINTENANCE | OPEN, pris en charge, diagnostic renseigné | Statut → PENDING |
 | Reprendre (`RESUME`) | MAINTENANCE | PENDING, pris en charge | Statut → OPEN |
 | Clôturer (`CLOSE`) | MAINTENANCE | OPEN, pris en charge, note d'intervention renseignée | Statut → CLOSED, `edit_request` effacé |
 | Invalider (`INVALIDATE_CLOSED`) | RESPONSABLE | CLOSED, motif fourni | Statut → INVALIDATED |
 | Marquer priorité (`SET_PRIORITY`) | RESPONSABLE | Incident actif | `is_priority` bascule |
-| Réordonner (`REORDER`) | RESPONSABLE | Incident actif | `display_order` mis à jour |
 | Consigne responsable (`RESPONSIBLE_COMMENT`) | RESPONSABLE | Incident actif | `responsible_comment` mis à jour |
+
+> Le réordonnancement manuel (`REORDER`, drag-and-drop) a été retiré le
+> 2026-07-07 (commit `f7607ba`) : la priorisation repose désormais uniquement
+> sur `is_priority`. `display_order` reste en base (valeur figée à la
+> création) mais n'est plus modifiable après coup.
 
 ### 9.4 Journalisation des événements incident
 
@@ -526,16 +530,18 @@ Chaque action génère un événement horodaté dans `workshop_incident_events` 
 | `INCIDENT_INVALIDATED` | Invalidation |
 | `INCIDENT_FOLLOWED` | Suivi activé par un RESPONSABLE |
 | `INCIDENT_UNFOLLOWED` | Suivi désactivé par un RESPONSABLE |
-| `INCIDENT_REORDERED` | Réordonnancement (une entrée par incident déplacé) |
 | `EDIT_REQUESTED` | Demande de correction |
 | `EDIT_APPLIED` | Correction approuvée |
 | `EDIT_REJECTED` | Correction refusée |
 | `CANCEL_REQUESTED` | Demande d'annulation |
 | `CANCEL_REQUEST_REJECTED` | Annulation refusée |
 | `PRIORITY_CHANGED` | Changement de priorité |
-| `ORDER_CHANGED` | Réordonnancement |
 | `RESPONSIBLE_COMMENT_UPDATED` | Consigne responsable |
 | `STATUS_CHANGED` | Changement de statut (usage interne) |
+
+> `INCIDENT_REORDERED` et `ORDER_CHANGED` restent des types valides côté
+> lecture (audit trail historique du réordonnancement manuel, retiré le
+> 2026-07-07) mais plus aucune action ne les émet aujourd'hui.
 
 ---
 
@@ -616,10 +622,6 @@ Chaque incident est affiché dans une carte présentant :
 - Indicateurs urgence et prise en charge
 - Actions contextuelles selon rôle et état
 
-### 11.5 Réordonnancement par glisser-déposer
-
-Le responsable peut réordonner manuellement les incidents prioritaires par drag-and-drop avec défilement automatique.
-
 ### 11.6 Modales d'action
 
 | Modale | Déclencheur |
@@ -690,15 +692,18 @@ Le produit reste une donnée décisionnelle de premier niveau. Une référence r
 
 ---
 
-## 13. Module Atelier — Historique
+## 13. Module Atelier — Historique et Journal
 
-### 13.1 Accès
+> Jusqu'au 2026-07-08, ces deux vues vivaient sur un seul écran
+> (`/workshop/history`). Elles répondent à deux questions distinctes — « que
+> s'est-il passé sur cet incident » vs « que s'est-il passé dans l'atelier » —
+> et ont été séparées en deux écrans (commit `2d638bd`) pour lever la
+> redondance entre le journal transverse et la trace déjà présente dans le
+> dossier de chaque incident.
 
-Nécessite une session atelier valide. Route : `/workshop/history`.
+### 13.1 Historique — dossier incident
 
-### 13.2 Deux vues complémentaires
-
-#### Vue incidents
+**Accès** : session atelier valide (tout rôle). Route : `/workshop/history`.
 
 Liste paginée (250 max) de tous les incidents (tous statuts).
 
@@ -708,20 +713,30 @@ Filtres :
 - Type d'anomalie
 - Ligne / Machine
 
-Sélection d'un incident → affichage du détail complet + timeline des événements.
+Sélection d'un incident → affichage du détail complet + timeline des événements
+de cet incident (« Trace complète »).
 
-#### Vue journal d'événements
+### 13.2 Journal — vue transverse
 
-Flux chronologique (80 événements max) des actions réalisées sur les incidents.
+**Accès** : réservé au rôle RESPONSABLE, côté route front
+(`WorkshopResponsableRoute`) et côté service backend
+(`listHistoryEventsService` renvoie `FORBIDDEN` hors RESPONSABLE). Route :
+`/workshop/journal`.
 
-Filtres supplémentaires :
-- Type d'événement (filtrage par code d'événement)
+Flux chronologique (80 événements max) des actions réalisées sur l'ensemble
+des incidents filtrés.
 
-Chaque ligne de journal inclut : type d'action, acteur (prénom, nom, badge, rôle), incident concerné, horodatage.
+Filtres : mêmes filtres que l'Historique, plus le type d'événement
+(filtrage par code d'événement).
+
+Chaque ligne inclut : type d'action, acteur (prénom, nom, badge, rôle),
+incident concerné, horodatage.
 
 ### 13.3 Navigation croisée
 
-Cliquer sur un événement du journal navigue vers l'incident correspondant avec mise en surbrillance de l'événement.
+Cliquer sur une ligne du Journal navigue vers l'Historique, sur le dossier de
+l'incident correspondant, avec mise en surbrillance de l'événement
+(`?incident=X&event=Y`).
 
 ---
 
@@ -865,7 +880,6 @@ Statuts actifs (inclus dans les métriques) : `OPEN` et `PENDING`.
 | Clôturer | — | ✓ (OPEN, pris) | — |
 | Invalider clôture | — | — | ✓ (CLOSED) |
 | Marquer priorité | — | — | ✓ (actif) |
-| Réordonner | — | — | ✓ (actif) |
 | Consigne responsable | — | — | ✓ (actif) |
 | Suivre / ne plus suivre | — | — | ✓ (tout incident) |
 
@@ -991,7 +1005,6 @@ line_audit_events
 | `GET` | `/api/workshop/lines` | Session | Lignes actives |
 | `GET` | `/api/workshop/incidents` | Session | Incidents actifs ; pour RESPONSABLE, inclut aussi les incidents terminaux suivis |
 | `POST` | `/api/workshop/incidents` | Session | Créer un incident |
-| `POST` | `/api/workshop/incidents/reorder` | Session | Réordonner atomiquement une liste d'incidents actifs |
 | `POST` | `/api/workshop/incidents/:id/follow` | Session | Suivre un incident (RESPONSABLE) |
 | `DELETE` | `/api/workshop/incidents/:id/follow` | Session | Arrêter le suivi d'un incident (RESPONSABLE) |
 | `POST` | `/api/workshop/incidents/:id/cancel` | Session | Annuler un incident |

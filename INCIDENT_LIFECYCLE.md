@@ -112,6 +112,15 @@
 - **Étape 2** : RESPONSABLE fait `APPROVE_CANCEL` → statut CANCELED
 - **Alternative** : RESPONSABLE fait `REJECT_CANCEL` → incident reste OPEN
 
+### PENDING → CANCELED (reprise de contrôle superviseur)
+- **Qui** : RESPONSABLE uniquement (pas MAINTENANCE)
+- **Action** : `CANCEL`
+- **Condition** : statut PENDING (donc `is_taken = true` par construction)
+- **Effet** : statut passe à CANCELED
+- **Pourquoi MAINTENANCE en est exclu** : un incident PENDING a déjà été pris
+  en charge par un technicien qui s'est engagé sur le diagnostic — l'annuler
+  à ce stade est une décision de supervision, pas une opération technique.
+
 ### CLOSED → INVALIDATED
 - **Qui** : RESPONSABLE uniquement
 - **Action** : `INVALIDATE_CLOSED`
