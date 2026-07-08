@@ -252,6 +252,53 @@ export function isKnowledgeEligible(incident: {
   return incident.status === 'CLOSED' && Boolean(incident.intervention_note?.trim());
 }
 
+/**
+ * Construit la clause `(col1 ILIKE $n OR col2 ILIKE $n OR ...)` pour une
+ * recherche texte, en poussant le paramètre unique `%q%` et en retournant
+ * le fragment SQL. `columns` doit être une liste de colonnes qualifiées
+ * (ex. `wi.comment`), différente selon la requête appelante.
+ */
+function buildFullTextFilter(
+  q: string,
+  params: Array<string | number>,
+  columns: string[]
+): string {
+  params.push(`%${q}%`);
+  const placeholder = `$${params.length}`;
+  return `(${columns.map((col) => `${col} ILIKE ${placeholder}`).join('\n      OR ')})`;
+}
+
+const INCIDENT_WORKSPACE_SEARCH_COLS = [
+  'wi.comment',
+  'wi.diagnostic',
+  'wi.intervention_note',
+  'wi.responsible_comment',
+  'wi.machine_id',
+  'wi.machine_brand',
+  'wi.line_number',
+  'wi.robot_label',
+  'wi.current_product',
+  'su.first_name',
+  'su.last_name',
+  'tu.first_name',
+  'tu.last_name',
+];
+
+const HISTORY_EVENT_SEARCH_COLS = [
+  'wi.comment',
+  'wi.diagnostic',
+  'wi.intervention_note',
+  'wi.responsible_comment',
+  'wi.machine_id',
+  'wi.machine_brand',
+  'wi.line_number',
+  'wi.robot_label',
+  'wi.current_product',
+  'we.event_type',
+  'su.first_name',
+  'su.last_name',
+];
+
 function buildIncidentWorkspaceFilters(
   query: QueryParams,
   mode: IncidentListMode
@@ -271,22 +318,7 @@ function buildIncidentWorkspaceFilters(
   appendScalarIncidentFilters(query, filters, params, mode === 'knowledge');
 
   if (q && String(q).trim()) {
-    params.push(`%${String(q).trim()}%`);
-    filters.push(`(
-      wi.comment ILIKE $${params.length}
-      OR wi.diagnostic ILIKE $${params.length}
-      OR wi.intervention_note ILIKE $${params.length}
-      OR wi.responsible_comment ILIKE $${params.length}
-      OR wi.machine_id ILIKE $${params.length}
-      OR wi.machine_brand ILIKE $${params.length}
-      OR wi.line_number ILIKE $${params.length}
-      OR wi.robot_label ILIKE $${params.length}
-      OR wi.current_product ILIKE $${params.length}
-      OR su.first_name ILIKE $${params.length}
-      OR su.last_name ILIKE $${params.length}
-      OR tu.first_name ILIKE $${params.length}
-      OR tu.last_name ILIKE $${params.length}
-    )`);
+    filters.push(buildFullTextFilter(String(q).trim(), params, INCIDENT_WORKSPACE_SEARCH_COLS));
   }
 
   return {
@@ -313,21 +345,7 @@ function buildHistoryEventFilters(query: QueryParams): {
     filters.push(`we.event_type = $${params.length}`);
   }
   if (q && String(q).trim()) {
-    params.push(`%${String(q).trim()}%`);
-    filters.push(`(
-      wi.comment ILIKE $${params.length}
-      OR wi.diagnostic ILIKE $${params.length}
-      OR wi.intervention_note ILIKE $${params.length}
-      OR wi.responsible_comment ILIKE $${params.length}
-      OR wi.machine_id ILIKE $${params.length}
-      OR wi.machine_brand ILIKE $${params.length}
-      OR wi.line_number ILIKE $${params.length}
-      OR wi.robot_label ILIKE $${params.length}
-      OR wi.current_product ILIKE $${params.length}
-      OR we.event_type ILIKE $${params.length}
-      OR su.first_name ILIKE $${params.length}
-      OR su.last_name ILIKE $${params.length}
-    )`);
+    filters.push(buildFullTextFilter(String(q).trim(), params, HISTORY_EVENT_SEARCH_COLS));
   }
 
   return {

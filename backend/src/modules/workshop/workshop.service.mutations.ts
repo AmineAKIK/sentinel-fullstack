@@ -3,6 +3,7 @@ import { withTransaction } from '../../db/transaction';
 import { logIncidentEvent } from './workshop.events';
 import { canPerform, hasCancelRequest } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
+import type { WorkshopIncidentRow } from './workshop.repository';
 import {
   notifyFollowersIncidentTaken,
   notifyFollowersIncidentSetPending,
@@ -17,6 +18,21 @@ import {
   notifyDeclarantCancelRejected,
   notifyResponsablesCancelRequested,
 } from '../notifications/notifications.service';
+
+// La plupart des mutations de workflow (TAKE, SET_PENDING, RESUME, CLOSE,
+// SET_PRIORITY, RESPONSIBLE_COMMENT) ne changent aucun champ de sélection
+// (ligne/machine/robot/tête) : updateIncidentData les exige quand même car
+// il réécrit toute la ligne. Ce helper évite de recopier les 5 champs à
+// l'identique à chaque appel.
+function unchangedSelectionFields(current: WorkshopIncidentRow) {
+  return {
+    selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
+    lineId: current.line_id,
+    machineId: current.machine_id,
+    robotLabel: current.robot_label,
+    headNumber: current.head_number,
+  };
+}
 
 export async function autoFollowForResponsable(
   incidentId: number,
@@ -47,11 +63,7 @@ export async function takeIncidentService(
         updates: { isTaken: true },
         role: actorRole,
         actorUserId,
-        selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
-        lineId: current.line_id,
-        machineId: current.machine_id,
-        robotLabel: current.robot_label,
-        headNumber: current.head_number,
+        ...unchangedSelectionFields(current),
       },
       client
     );
@@ -101,11 +113,7 @@ export async function setPendingIncidentService(
         updates: { status: 'PENDING', diagnostic },
         role: actorRole,
         actorUserId,
-        selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
-        lineId: current.line_id,
-        machineId: current.machine_id,
-        robotLabel: current.robot_label,
-        headNumber: current.head_number,
+        ...unchangedSelectionFields(current),
       },
       client
     );
@@ -154,11 +162,7 @@ export async function resumeIncidentService(
         updates: { status: 'OPEN' },
         role: actorRole,
         actorUserId,
-        selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
-        lineId: current.line_id,
-        machineId: current.machine_id,
-        robotLabel: current.robot_label,
-        headNumber: current.head_number,
+        ...unchangedSelectionFields(current),
       },
       client
     );
@@ -215,11 +219,7 @@ export async function closeIncidentService(
         updates: { status: 'CLOSED', interventionNote },
         role: actorRole,
         actorUserId,
-        selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
-        lineId: current.line_id,
-        machineId: current.machine_id,
-        robotLabel: current.robot_label,
-        headNumber: current.head_number,
+        ...unchangedSelectionFields(current),
       },
       client
     );
@@ -315,11 +315,7 @@ export async function setPriorityIncidentService(
         updates: { isPriority },
         role: actorRole,
         actorUserId,
-        selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
-        lineId: current.line_id,
-        machineId: current.machine_id,
-        robotLabel: current.robot_label,
-        headNumber: current.head_number,
+        ...unchangedSelectionFields(current),
       },
       client
     );
@@ -369,11 +365,7 @@ export async function setResponsibleCommentService(
         updates: { responsibleComment },
         role: actorRole,
         actorUserId,
-        selection: { lineNumber: current.line_number, machineBrand: current.machine_brand },
-        lineId: current.line_id,
-        machineId: current.machine_id,
-        robotLabel: current.robot_label,
-        headNumber: current.head_number,
+        ...unchangedSelectionFields(current),
       },
       client
     );
