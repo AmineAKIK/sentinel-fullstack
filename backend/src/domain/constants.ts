@@ -29,6 +29,14 @@ export const FIELD_LIMITS = {
  */
 export const ANALYTICS_DEFAULT_WINDOW_DAYS = 90;
 
+/**
+ * Limites de pagination des listes d'incidents/événements (historique,
+ * connaissance, journal). Partagées entre la validation Zod et le
+ * bornage appliqué côté repository.
+ */
+export const INCIDENT_LIST_DEFAULT_LIMIT = 200;
+export const INCIDENT_LIST_MAX_LIMIT = 500;
+
 export const INCIDENT_STATES = [
   'SKIPEE_PAR_MACHINE',
   'SKIPEE_PAR_CONDUCTEUR',

@@ -29,7 +29,7 @@ export function isActiveIncident(incident: CurrentIncident): boolean {
   );
 }
 
-function hasCancelRequest(incident: CurrentIncident): boolean {
+export function hasCancelRequest(incident: CurrentIncident): boolean {
   return incident.cancel_request === true || incident.delete_request === true;
 }
 

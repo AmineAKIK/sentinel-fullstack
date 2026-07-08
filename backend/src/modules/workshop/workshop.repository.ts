@@ -3,7 +3,8 @@ import pool from '../../db/pool';
 import { boundedInt, parseOptionalInt, statusEqualsSql, statusInSql } from '../../db/sql';
 import {
   ACTIVE_INCIDENT_STATUSES,
-  INCIDENT_STATUSES,
+  INCIDENT_LIST_DEFAULT_LIMIT,
+  INCIDENT_LIST_MAX_LIMIT,
   isIncidentState,
   isIncidentStatus,
   IncidentStatus,
@@ -17,11 +18,6 @@ type QueryParams = Record<string, unknown>;
 const activeIncidentStatusSql = statusInSql('status', ACTIVE_INCIDENT_STATUSES);
 const openStatusSql = statusEqualsSql('status', 'OPEN');
 const pendingStatusSql = statusEqualsSql('status', 'PENDING');
-const _closedStatusSql = statusEqualsSql('status', 'CLOSED');
-const _nonTerminalRejectedWorkshopIncidentStatusSql = statusInSql(
-  'wi.status',
-  INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED')
-);
 
 // ─── SQL column constants ─────────────────────────────────────────────────────
 
@@ -106,7 +102,6 @@ const INCIDENT_ARBITRATION_JOINS = `LEFT JOIN LATERAL (
 // ─── SQL time interval constants ──────────────────────────────────────────────
 
 const INCIDENT_CRITICAL_AGE = `'7 days'`;
-const _INCIDENT_RECENT_AGE = `'24 hours'`;
 
 export type StoredMachine =
   | {
@@ -264,7 +259,7 @@ function buildIncidentWorkspaceFilters(
   const { q, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
-  const safeLimit = boundedInt(limit, 200, 1, 500);
+  const safeLimit = boundedInt(limit, INCIDENT_LIST_DEFAULT_LIMIT, 1, INCIDENT_LIST_MAX_LIMIT);
 
   if (mode === 'knowledge') {
     // Couplé à isKnowledgeEligible ci-dessus — même règle, dialecte SQL.
@@ -309,7 +304,7 @@ function buildHistoryEventFilters(query: QueryParams): {
   const { q, eventType, limit } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
-  const safeLimit = boundedInt(limit, 200, 1, 500);
+  const safeLimit = boundedInt(limit, INCIDENT_LIST_DEFAULT_LIMIT, 1, INCIDENT_LIST_MAX_LIMIT);
 
   appendScalarIncidentFilters(query, filters, params);
 
@@ -822,8 +817,9 @@ export async function getIncidentMetrics(
   userId: number,
   role: string
 ): Promise<WorkshopIncidentMetricsResult> {
-  const { rows } = await pool.query(
-    `SELECT
+  const [{ rows }, followed, unconsultedArbitration] = await Promise.all([
+    pool.query(
+      `SELECT
        COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
        COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
        COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
@@ -836,20 +832,19 @@ export async function getIncidentMetrics(
        COUNT(*) FILTER (WHERE status = 'CLOSED'
          AND updated_at >= CURRENT_DATE AND updated_at < CURRENT_DATE + INTERVAL '1 day')::int AS closed_today
      FROM workshop_incidents`,
-    [userId]
-  );
-  const followed = await pool.query(
-    `SELECT
+      [userId]
+    ),
+    pool.query(
+      `SELECT
        COUNT(*)::int AS followed_count,
        COUNT(*) FILTER (WHERE wi.status IN ('CLOSED', 'CANCELED', 'INVALIDATED'))::int AS followed_resolved_count
      FROM workshop_incident_followers wif
      JOIN workshop_incidents wi ON wi.id = wif.incident_id
      WHERE wif.user_id = $1 AND wif.deleted_at IS NULL`,
-    [userId]
-  );
-
-  const unconsultedArbitration =
-    role === 'RESPONSABLE' ? await countUnconsultedArbitrationIncidents() : 0;
+      [userId]
+    ),
+    role === 'RESPONSABLE' ? countUnconsultedArbitrationIncidents() : Promise.resolve(0),
+  ]);
 
   const metrics = rows[0];
   const followMetrics = followed.rows[0];

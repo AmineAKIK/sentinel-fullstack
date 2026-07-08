@@ -1,7 +1,7 @@
 import { badRequest, forbidden, notFound, ServiceResult } from '../../utils/serviceResult';
 import { withTransaction } from '../../db/transaction';
 import { logIncidentEvent } from './workshop.events';
-import { canPerform } from './workshop.policy';
+import { canPerform, hasCancelRequest } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import {
   notifyFollowersIncidentTaken,
@@ -453,8 +453,7 @@ export async function rejectCancelIncidentService(
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
     if (!canPerform(actorRole, 'REJECT_CANCEL', current)) return { kind: 'forbidden' as const };
-    // Check both fields (delete_request is a legacy alias for cancel_request).
-    if (!current.cancel_request && !current.delete_request) {
+    if (!hasCancelRequest(current)) {
       return { kind: 'bad_request' as const, msg: "Aucune demande d'annulation à refuser." };
     }
 

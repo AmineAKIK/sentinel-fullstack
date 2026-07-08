@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { INCIDENT_STATES, INCIDENT_STATUSES, FIELD_LIMITS } from '../../domain/constants';
+import {
+  INCIDENT_STATES,
+  INCIDENT_STATUSES,
+  INCIDENT_LIST_MAX_LIMIT,
+  FIELD_LIMITS,
+} from '../../domain/constants';
 
 export const IncidentStateEnum = z.enum(INCIDENT_STATES);
 export const IncidentStatusEnum = z.enum(INCIDENT_STATUSES);
@@ -47,7 +52,7 @@ export const incidentWorkspaceQuerySchema = z.object({
   lineId: z.coerce.number().int().positive().optional(),
   machineId: z.string().trim().max(FIELD_LIMITS.SEARCH).optional(),
   eventType: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().int().min(1).max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(INCIDENT_LIST_MAX_LIMIT).optional(),
 });
 
 const isoDateTimeSchema = z
