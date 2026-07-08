@@ -718,6 +718,13 @@ export async function invalidateIncident(
   return rows[0]?.id ?? null;
 }
 
+// Dette connue : le UPDATE ci-dessous réécrit systématiquement les 18
+// colonnes (via updates.X ?? current.X), même quand une mutation ne change
+// qu'un seul champ (ex. SET_PRIORITY ne touche que is_priority). Un UPDATE
+// dynamique (clause SET construite selon les champs réellement fournis)
+// réduirait l'écriture, mais c'est une fonction appelée par toutes les
+// mutations de workflow — la retoucher pour un gain de perf marginal sur
+// ce volume de données n'est pas justifié à ce stade.
 export async function updateIncidentData(
   input: {
     incidentId: number;
@@ -898,6 +905,14 @@ export async function getIncidentMetrics(
   };
 }
 
+// Dette connue : cette requête et consultArbitrationRequest ci-dessous
+// (ainsi que INCIDENT_ARBITRATION_COLS/JOINS plus haut) réimplémentent
+// chacune la même logique "dernière demande EDIT/CANCEL active par
+// incident" en SQL brut, à 4 endroits. Elles ne sont pas identiques (COUNT
+// vs INSERT, filtrage par incident vs global, projection différente) : les
+// factoriser proprement demanderait une vue ou fonction SQL PostgreSQL
+// partagée, donc une migration de schéma — hors scope d'un nettoyage
+// cosmétique. Si la logique d'arbitrage évolue, modifier les 4 endroits.
 export async function countUnconsultedArbitrationIncidents(): Promise<number> {
   const { rows } = await pool.query<{ unread_count: number }>(
     `WITH active_requests AS (
