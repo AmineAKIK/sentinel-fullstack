@@ -258,11 +258,22 @@ il ne doit jamais agresser.
 Le Pilotage sert le niveau « projection » de la Situation Awareness : il éclaire
 l'avenir plutôt que le présent.
 
-### 4.4 Historique (journal)
+### 4.4 Historique (dossier incident)
 
-**Question : que s'est-il passé, et qui a contribué ?**
+**Question : que s'est-il passé sur cet incident, et qui a contribué ?**
 
-Sert la responsabilité (P6) et la relecture. Factuel et neutre.
+Consultation d'un incident précis, passé ou présent : liste + dossier complet
+(textes métier, trace complète). Sert la responsabilité (P6) et la relecture,
+à l'échelle d'un incident. Factuel et neutre.
+
+### 4.4bis Journal (`/workshop/journal`)
+
+**Question : que s'est-il passé dans l'atelier, tous incidents confondus ?**
+
+Vue transverse de `workshop_incident_events`, réservée au Responsable — celui
+qui « oriente pour le collectif » (§2). Distincte de l'Historique par la
+question posée (P3) : l'un lit un incident, l'autre relit l'activité globale.
+Ne doit jamais redevenir un doublon de la Trace complète du dossier incident.
 
 ### 4.5 Base de connaissance
 

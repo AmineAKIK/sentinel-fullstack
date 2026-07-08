@@ -741,12 +741,20 @@ describe('getKnowledgeIncidentService', () => {
 });
 
 describe('listHistoryEventsService', () => {
-  it('transmet la query au repository', async () => {
+  it('transmet la query au repository pour un RESPONSABLE', async () => {
     const events_data = [{ id: 1, event_type: 'INCIDENT_CREATED' }];
     jest.mocked(repo.listHistoryEvents).mockResolvedValue(events_data);
-    const result = await listHistoryEventsService({ lineId: '1' });
-    expect(result).toEqual(events_data);
+    const result = await listHistoryEventsService({ lineId: '1' }, 'RESPONSABLE');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(events_data);
     expect(repo.listHistoryEvents).toHaveBeenCalledWith({ lineId: '1' });
+  });
+
+  it('retourne FORBIDDEN pour un rôle non RESPONSABLE', async () => {
+    const result = await listHistoryEventsService({ lineId: '1' }, 'MAINTENANCE');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('FORBIDDEN');
+    expect(repo.listHistoryEvents).not.toHaveBeenCalled();
   });
 });
 

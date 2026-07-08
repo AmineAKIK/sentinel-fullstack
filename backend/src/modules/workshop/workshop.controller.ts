@@ -114,7 +114,9 @@ export async function listHistoryEvents(req: Request, res: Response): Promise<vo
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
-    res.json(await listHistoryEventsService(parsed.data));
+    const result = await listHistoryEventsService(parsed.data, req.workshopUser!.role);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listHistoryEvents', err);
   }

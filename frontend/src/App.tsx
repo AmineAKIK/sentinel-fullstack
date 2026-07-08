@@ -4,6 +4,7 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import WorkshopLoginPage from './pages/WorkshopLoginPage';
 import WorkshopDashboardPage from './pages/WorkshopDashboardPage';
 import WorkshopHistoryPage from './pages/WorkshopHistoryPage';
+import WorkshopJournalPage from './pages/WorkshopJournalPage';
 import WorkshopPilotagePage from './pages/WorkshopPilotagePage';
 import WorkshopKnowledgePage from './pages/WorkshopKnowledgePage';
 import BoardAccessPage from './pages/BoardAccessPage';
@@ -21,6 +22,7 @@ import { AppAuthProvider } from './routes/AppAuthContext';
 import { FieldLimitsProvider } from './routes/FieldLimitsContext';
 import AdminRoute from './routes/AdminRoute';
 import WorkshopRoute from './routes/WorkshopRoute';
+import WorkshopResponsableRoute from './routes/WorkshopResponsableRoute';
 import GuestRoute from './routes/GuestRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -82,6 +84,14 @@ export default function App() {
               <WorkshopRoute>
                 <WorkshopHistoryPage />
               </WorkshopRoute>
+            }
+          />
+          <Route
+            path="/workshop/journal"
+            element={
+              <WorkshopResponsableRoute>
+                <WorkshopJournalPage />
+              </WorkshopResponsableRoute>
             }
           />
           <Route

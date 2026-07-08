@@ -7,6 +7,7 @@
 /* Pages analytiques */
 @import './styles/pages/pilotage.css';
 @import './styles/pages/history.css';
+@import './styles/pages/journal.css';
 @import './styles/pages/knowledge.css';
 
 /* Media queries transverses */

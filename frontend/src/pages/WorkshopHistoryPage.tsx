@@ -8,7 +8,7 @@ import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import IncidentDossier from '../components/IncidentDossier';
 import { STATUS_LABELS, STATE_LABELS } from '../utils/labels';
-import { EVENT_LABELS, formatDateTime, formatEventActor, formatEventDetail } from '../utils/workshopHistory';
+import { formatDateTime } from '../utils/workshopHistory';
 import {
   getWorkshopMachineOptions,
   lineFilterChip,
@@ -18,19 +18,7 @@ import {
 } from '../utils/workshopFilters';
 import { formatIncidentDuration } from '../utils/durationFormat';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useHistoryData, readHistoryStatusFilter, SortCol } from '../hooks/useHistoryData';
-
-const EVENT_FILTER_OPTIONS = [
-  'INCIDENT_CREATED',
-  'INCIDENT_TAKEN',
-  'INCIDENT_SET_PENDING',
-  'INCIDENT_RESUMED',
-  'INCIDENT_CLOSED',
-  'INCIDENT_CANCELED',
-  'INCIDENT_INVALIDATED',
-  'PRIORITY_CHANGED',
-  'RESPONSIBLE_COMMENT_UPDATED',
-] as const;
+import { useHistoryData, readHistoryStatusFilter } from '../hooks/useHistoryData';
 
 export default function WorkshopHistoryPage() {
   usePageTitle('Historique');
@@ -43,11 +31,8 @@ export default function WorkshopHistoryPage() {
     selectedId,
     selectedIncident,
     events,
-    historyEvents,
-    sortedEvents,
     loading,
     eventsLoading,
-    historyEventsLoading,
     highlightedEventId,
     error,
     query,
@@ -55,22 +40,16 @@ export default function WorkshopHistoryPage() {
     lineFilter,
     machineFilter,
     stateFilter,
-    eventTypeFilter,
-    sortCol,
-    sortDir,
     incidentDetailRef,
     activeItemRef,
-    historyEventsLimit,
     setQuery,
     setStatusFilter,
     setMachineFilter,
     setStateFilter,
-    setEventTypeFilter,
     updateSearchFilter,
     updateLineFilter,
     selectIncident,
     clearFilters,
-    handleSort,
   } = useHistoryData();
 
   void isInitialDeepLinkRef;
@@ -288,177 +267,6 @@ export default function WorkshopHistoryPage() {
                 />
               ) : (
                 <EmptyState>Sélectionnez un incident pour consulter son dossier.</EmptyState>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Journal global */}
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-body">
-            <div className="history-timeline-header">
-              <div>
-                <span className="detail-field-label">Journal global</span>
-                <h2>Actions récentes dans le périmètre filtré</h2>
-              </div>
-            </div>
-
-            <div className="history-event-filter">
-              <select
-                className="history-event-select"
-                value={eventTypeFilter}
-                onChange={(e) => {
-                  setEventTypeFilter(e.target.value);
-                  updateSearchFilter('event', e.target.value);
-                }}
-              >
-                <option value="all">Toutes les actions</option>
-                {EVENT_FILTER_OPTIONS.map((key) => (
-                  <option key={key} value={key}>
-                    {EVENT_LABELS[key]}
-                  </option>
-                ))}
-              </select>
-              {eventTypeFilter !== 'all' && (
-                <button
-                  type="button"
-                  className="filter-chip"
-                  onClick={() => {
-                    setEventTypeFilter('all');
-                    updateSearchFilter('event', 'all');
-                  }}
-                  aria-label="Retirer le filtre action"
-                >
-                  <span>Action : {EVENT_LABELS[eventTypeFilter] ?? eventTypeFilter}</span>
-                  <span aria-hidden="true">×</span>
-                </button>
-              )}
-              <span className="history-event-count muted">
-                {historyEventsLoading ? 'Chargement…' : `${historyEvents.length} action(s)`}
-              </span>
-              {!historyEventsLoading && historyEvents.length >= historyEventsLimit && (
-                <span className="history-limit-notice">
-                  Limite de {historyEventsLimit} — affinez les filtres.
-                </span>
-              )}
-            </div>
-
-            {/* Tableau desktop */}
-            <div className="table-wrapper history-journal-table">
-              <table className="change-table" style={{ tableLayout: 'fixed' }}>
-                <colgroup>
-                  <col style={{ width: '16%' }} />
-                  <col style={{ width: '25%' }} />
-                  <col style={{ width: '30%' }} />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    {(['date', 'action', 'incident', 'actor'] as SortCol[]).map((col) => {
-                      const labels: Record<SortCol, string> = {
-                        date: 'Date',
-                        action: 'Action',
-                        incident: 'Incident',
-                        actor: 'Acteur',
-                      };
-                      const active = sortCol === col;
-                      return (
-                        <th
-                          key={col}
-                          scope="col"
-                          aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                        >
-                          <button
-                            type="button"
-                            className={`sort-th-btn${active ? ' sort-th-active' : ''}`}
-                            onClick={() => handleSort(col)}
-                          >
-                            {labels[col]}
-                          </button>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyEventsLoading ? (
-                    <tr>
-                      <td colSpan={4} className="empty-state">
-                        Chargement…
-                      </td>
-                    </tr>
-                  ) : sortedEvents.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="empty-state">
-                        Aucune action.
-                      </td>
-                    </tr>
-                  ) : (
-                    sortedEvents.map((event) => {
-                      const detail = formatEventDetail(event);
-                      return (
-                        <tr
-                          key={event.id}
-                          className={highlightedEventId === event.id ? 'is-selected-row' : ''}
-                        >
-                          <td>{formatDateTime(event.created_at)}</td>
-                          <td>
-                            {EVENT_LABELS[event.event_type] ?? event.event_type}
-                            {detail && <div className="muted">{detail}</div>}
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="inline-link-button"
-                              onClick={() => selectIncident(event.incident_id, event.id)}
-                            >
-                              Ligne {event.line_number} · {event.machine_id}
-                            </button>
-                            <div className="muted">
-                              {STATUS_LABELS[event.status] ?? event.status}
-                            </div>
-                          </td>
-                          <td>{formatEventActor(event)}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Cards mobile */}
-            <div className="history-journal-cards">
-              {historyEventsLoading ? (
-                <EmptyState>Chargement…</EmptyState>
-              ) : historyEvents.length === 0 ? (
-                <EmptyState>Aucune action.</EmptyState>
-              ) : (
-                historyEvents.map((event) => {
-                  const detail = formatEventDetail(event);
-                  return (
-                    <div
-                      key={event.id}
-                      className={`history-journal-card${highlightedEventId === event.id ? ' is-highlighted' : ''}`}
-                    >
-                      <div className="history-journal-card-top">
-                        <strong>{EVENT_LABELS[event.event_type] ?? event.event_type}</strong>
-                        <span className="muted">{formatDateTime(event.created_at)}</span>
-                      </div>
-                      {detail && <span className="muted">{detail}</span>}
-                      <div className="history-journal-card-bottom">
-                        <button
-                          type="button"
-                          className="inline-link-button"
-                          onClick={() => selectIncident(event.incident_id, event.id)}
-                        >
-                          Ligne {event.line_number} · {event.machine_id}
-                        </button>
-                        <span className="muted">{formatEventActor(event)}</span>
-                      </div>
-                    </div>
-                  );
-                })
               )}
             </div>
           </div>

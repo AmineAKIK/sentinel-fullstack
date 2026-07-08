@@ -97,8 +97,14 @@ export async function getKnowledgeIncidentService(id: number): Promise<ServiceRe
   return { ok: true, data: incident };
 }
 
-export async function listHistoryEventsService(query: Record<string, unknown>) {
-  return workshopRepository.listHistoryEvents(query);
+export async function listHistoryEventsService(
+  query: Record<string, unknown>,
+  role: string
+): Promise<ServiceResult<unknown>> {
+  if (role !== 'RESPONSABLE') {
+    return forbidden('Réservé au responsable atelier.');
+  }
+  return ok(await workshopRepository.listHistoryEvents(query));
 }
 
 export async function listIncidentEventsService(id: number) {

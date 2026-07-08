@@ -1,21 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   getWorkshopHistoryIncident,
   listIncidentEvents,
-  listWorkshopHistoryEvents,
   listWorkshopHistoryIncidents,
   listWorkshopLines,
 } from '../api/workshop';
-import { ProductionLine, WorkshopHistoryEvent, WorkshopIncident, WorkshopIncidentEvent } from '../types';
-import { EVENT_LABELS, formatEventActor } from '../utils/workshopHistory';
+import { ProductionLine, WorkshopIncident, WorkshopIncidentEvent } from '../types';
 import { buildIncidentWorkspaceParams, withWorkshopLineFilter, withWorkshopUrlFilter } from '../utils/workshopFilters';
 
 export type HistoryStatusFilter = 'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
-export type SortCol = 'date' | 'action' | 'incident' | 'actor';
-export type SortDir = 'asc' | 'desc';
-
-const HISTORY_EVENTS_LIMIT = 80;
 
 export function readHistoryStatusFilter(value: string | null): HistoryStatusFilter {
   return value === 'OPEN' ||
@@ -34,10 +28,8 @@ export function useHistoryData() {
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [events, setEvents] = useState<WorkshopIncidentEvent[]>([]);
-  const [historyEvents, setHistoryEvents] = useState<WorkshopHistoryEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [historyEventsLoading, setHistoryEventsLoading] = useState(true);
   const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
@@ -48,9 +40,6 @@ export function useHistoryData() {
   const [lineFilter, setLineFilter] = useState(searchParams.get('line') ?? 'all');
   const [machineFilter, setMachineFilter] = useState(searchParams.get('machine') ?? 'all');
   const [stateFilter, setStateFilter] = useState(searchParams.get('state') ?? 'all');
-  const [eventTypeFilter, setEventTypeFilter] = useState(searchParams.get('event') ?? 'all');
-  const [sortCol, setSortCol] = useState<SortCol>('date');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const incidentDetailRef = useRef<HTMLDivElement | null>(null);
   const activeItemRef = useRef<HTMLButtonElement | null>(null);
@@ -101,6 +90,11 @@ export function useHistoryData() {
   useEffect(() => {
     const requestedId = searchParams.get('incident');
     if (!requestedId) return;
+    const requestedEventId = searchParams.get('event');
+    const parsedEventId = requestedEventId ? Number(requestedEventId) : NaN;
+    if (Number.isInteger(parsedEventId) && parsedEventId > 0) {
+      setHighlightedEventId(parsedEventId);
+    }
     setIncidents((current) => {
       if (current.some((inc) => String(inc.id) === requestedId)) {
         setSelectedId(requestedId);
@@ -117,23 +111,6 @@ export function useHistoryData() {
       return current;
     });
   }, [searchParams]);
-
-  useEffect(() => {
-    const params = buildIncidentWorkspaceParams({
-      query,
-      statusFilter,
-      stateFilter,
-      lineFilter,
-      machineFilter,
-      eventTypeFilter,
-      limit: HISTORY_EVENTS_LIMIT,
-    });
-    setHistoryEventsLoading(true);
-    listWorkshopHistoryEvents(params)
-      .then(setHistoryEvents)
-      .catch(() => setHistoryEvents([]))
-      .finally(() => setHistoryEventsLoading(false));
-  }, [query, statusFilter, stateFilter, lineFilter, machineFilter, eventTypeFilter]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -181,47 +158,8 @@ export function useHistoryData() {
     setStateFilter('all');
     const nextParams = new URLSearchParams();
     if (selectedId) nextParams.set('incident', selectedId);
-    if (eventTypeFilter !== 'all') nextParams.set('event', eventTypeFilter);
     setSearchParams(nextParams);
   }
-
-  function handleSort(col: SortCol): void {
-    if (sortCol === col) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortCol(col);
-      setSortDir(col === 'date' ? 'desc' : 'asc');
-    }
-  }
-
-  const sortedEvents = useMemo(() => {
-    const copy = [...historyEvents];
-    const dir = sortDir === 'asc' ? 1 : -1;
-    copy.sort((a, b) => {
-      switch (sortCol) {
-        case 'date':
-          return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        case 'action':
-          return (
-            dir *
-            (EVENT_LABELS[a.event_type] ?? a.event_type).localeCompare(
-              EVENT_LABELS[b.event_type] ?? b.event_type,
-              'fr'
-            )
-          );
-        case 'incident':
-          return (
-            dir *
-            `${a.line_number}${a.machine_id}`.localeCompare(`${b.line_number}${b.machine_id}`, 'fr')
-          );
-        case 'actor':
-          return dir * formatEventActor(a).localeCompare(formatEventActor(b), 'fr');
-        default:
-          return 0;
-      }
-    });
-    return copy;
-  }, [historyEvents, sortCol, sortDir]);
 
   const selectedIncident = incidents.find((inc) => String(inc.id) === selectedId);
 
@@ -231,11 +169,8 @@ export function useHistoryData() {
     selectedId,
     selectedIncident,
     events,
-    historyEvents,
-    sortedEvents,
     loading,
     eventsLoading,
-    historyEventsLoading,
     highlightedEventId,
     error,
     query,
@@ -243,21 +178,15 @@ export function useHistoryData() {
     lineFilter,
     machineFilter,
     stateFilter,
-    eventTypeFilter,
-    sortCol,
-    sortDir,
     incidentDetailRef,
     activeItemRef,
-    historyEventsLimit: HISTORY_EVENTS_LIMIT,
     setQuery,
     setStatusFilter,
     setMachineFilter,
     setStateFilter,
-    setEventTypeFilter,
     updateSearchFilter,
     updateLineFilter,
     selectIncident,
     clearFilters,
-    handleSort,
   };
 }

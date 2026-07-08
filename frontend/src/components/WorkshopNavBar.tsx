@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppAuth } from '../routes/AppAuthContext';
 import ResponsiveNavBar, { NavItem } from './ResponsiveNavBar';
 
-const NAV_ITEMS: NavItem[] = [
+const BASE_NAV_ITEMS: NavItem[] = [
   { label: 'Tableau de bord', path: '/workshop/dashboard', match: ['/workshop/dashboard'] },
   { label: 'Pilotage', path: '/workshop/pilotage', match: ['/workshop/pilotage'] },
   { label: 'Historique', path: '/workshop/history', match: ['/workshop/history'] },
@@ -10,10 +10,21 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Assistance', path: '/workshop/support', match: ['/workshop/support'] },
 ];
 
+const JOURNAL_NAV_ITEM: NavItem = {
+  label: 'Journal',
+  path: '/workshop/journal',
+  match: ['/workshop/journal'],
+};
+
 export default function WorkshopNavBar() {
   const { session, logout } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const navigate = useNavigate();
+
+  const navItems =
+    user?.role === 'RESPONSABLE'
+      ? [...BASE_NAV_ITEMS.slice(0, 3), JOURNAL_NAV_ITEM, ...BASE_NAV_ITEMS.slice(3)]
+      : BASE_NAV_ITEMS;
 
   async function handleLogout() {
     await logout();
@@ -25,7 +36,7 @@ export default function WorkshopNavBar() {
       ariaLabel="Navigation atelier"
       brandPath="/workshop/dashboard"
       section="Atelier"
-      items={NAV_ITEMS}
+      items={navItems}
       actions={
         <>
           {user && (

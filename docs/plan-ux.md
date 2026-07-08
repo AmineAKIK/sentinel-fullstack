@@ -181,9 +181,18 @@ testable et déployable indépendamment.
 9. **S1 — Pilotage.** *Fait :* niveaux d'attention du hero (watch/tension)
    alignés sur la grammaire F1. L'écran sert déjà la projection (métriques
    agrégées, durées de résolution) ; pas de gold-plating ajouté.
-10. **S2 — Historique & Audit.** *Vérifié conforme :* le journal et l'audit sont
-    déjà factuels et neutres (« Acteur », « Cible »), sans mise au pilori —
-    conformes à P6. Rien à forcer ; les états de chargement sont traités
+10. **S2 — Historique & Audit.** *Vérifié conforme sur le ton* (P6, « Acteur »,
+    « Cible », sans mise au pilori), *mais pas sur la structure* (P3) : l'écran
+    Historique cumulait deux questions distinctes — le dossier d'un incident
+    (« que s'est-il passé sur celui-ci ») et le journal transverse de l'atelier
+    (« que s'est-il passé dans l'atelier »), sous forme d'un tableau
+    « Journal global » dupliquant la Trace complète du dossier incident sur les
+    mêmes données (`workshop_incident_events`). *Corrigé :* le journal
+    transverse est extrait vers un écran dédié `/workshop/journal`, réservé au
+    rôle Responsable (celui qui « oriente pour le collectif », doctrine §2),
+    protégé aussi bien côté route front que côté service backend
+    (`listHistoryEventsService`). Historique redevient : liste d'incidents +
+    dossier, une seule question (§4.4). Les états de chargement restent traités
     globalement en Phase 5 (X1).
 11. **S3 — Admin (Accueil/Users/Lines).** *Vérifié conforme :* l'accueil oriente
     déjà vers l'action (points qualité = boutons cliquables vers la correction,
@@ -229,7 +238,7 @@ testable et déployable indépendamment.
 | 3 | K1 Fiche connaissance (cas similaires) | P5 | ✅ Fait |
 | 3 | K2 Mémoire collective rendue visible | P5 | ✅ Fait |
 | 4 | S1 Pilotage | P1, P3, P7 | ✅ Fait (grammaire alignée) |
-| 4 | S2 Historique & Audit | P6 | ✅ Vérifié conforme |
+| 4 | S2 Historique & Audit | P3, P6 | ✅ Fait (journal extrait vers `/workshop/journal`) |
 | 4 | S3 Admin | P2, P3 | ✅ Vérifié conforme |
 | 5 | X1 États de chargement (skeletons) | P2 | ✅ Fait |
 | 5 | X2 Densité par contexte | P2 | ✅ Vérifié conforme |
