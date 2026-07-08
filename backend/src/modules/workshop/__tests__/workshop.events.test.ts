@@ -27,7 +27,7 @@ describe('logIncidentEvent', () => {
       logIncidentEvent(1, 7, 'INCIDENT_CREATED', { foo: 'bar' })
     ).resolves.toBeUndefined();
 
-    expect(mockedPool.query).toHaveBeenCalledTimes(1);
+    expect(mockedPool.query.mock.calls.length).toBe(1);
   });
 
   it("lève une erreur si l'acteur ne correspond à aucun utilisateur (0 ligne insérée)", async () => {

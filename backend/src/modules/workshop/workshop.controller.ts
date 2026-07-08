@@ -35,7 +35,9 @@ import {
 
 export async function getBoardData(_req: Request, res: Response): Promise<void> {
   try {
-    res.json(await getBoardDataService());
+    const result = await getBoardDataService();
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'getBoardData', err);
   }
@@ -43,7 +45,9 @@ export async function getBoardData(_req: Request, res: Response): Promise<void> 
 
 export async function listWorkshopLines(_req: Request, res: Response): Promise<void> {
   try {
-    res.json(await listWorkshopLinesService());
+    const result = await listWorkshopLinesService();
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listWorkshopLines', err);
   }
@@ -51,7 +55,9 @@ export async function listWorkshopLines(_req: Request, res: Response): Promise<v
 
 export async function listIncidents(req: Request, res: Response): Promise<void> {
   try {
-    res.json(await listIncidentsService(req.workshopUser!.userId, req.workshopUser!.role));
+    const result = await listIncidentsService(req.workshopUser!.userId, req.workshopUser!.role);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listIncidents', err);
   }
@@ -64,7 +70,9 @@ export async function listHistoryIncidents(req: Request, res: Response): Promise
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
-    res.json(await listHistoryIncidentsService(parsed.data));
+    const result = await listHistoryIncidentsService(parsed.data);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listHistoryIncidents', err);
   }
@@ -89,7 +97,9 @@ export async function listKnowledgeIncidents(req: Request, res: Response): Promi
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
-    res.json(await listKnowledgeIncidentsService(parsed.data));
+    const result = await listKnowledgeIncidentsService(parsed.data);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listKnowledgeIncidents', err);
   }
@@ -126,7 +136,9 @@ export async function listIncidentEvents(req: Request, res: Response): Promise<v
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
-    res.json(await listIncidentEventsService(id.data));
+    const result = await listIncidentEventsService(id.data);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listIncidentEvents', err);
   }
@@ -134,7 +146,9 @@ export async function listIncidentEvents(req: Request, res: Response): Promise<v
 
 export async function getIncidentMetrics(req: Request, res: Response): Promise<void> {
   try {
-    res.json(await getIncidentMetricsService(req.workshopUser!.userId, req.workshopUser!.role));
+    const result = await getIncidentMetricsService(req.workshopUser!.userId, req.workshopUser!.role);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'getIncidentMetrics', err);
   }
@@ -172,7 +186,9 @@ export async function getWorkshopAnalytics(req: Request, res: Response): Promise
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
-    res.json(await getWorkshopAnalyticsService(parsed.data));
+    const result = await getWorkshopAnalyticsService(parsed.data);
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'getWorkshopAnalytics', err);
   }

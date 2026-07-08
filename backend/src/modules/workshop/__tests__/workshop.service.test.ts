@@ -657,7 +657,8 @@ describe('getBoardDataService', () => {
     };
     jest.mocked(repo.getBoardData).mockResolvedValue(boardData);
     const result = await getBoardDataService();
-    expect(result).toEqual(boardData);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(boardData);
     expect(repo.getBoardData).toHaveBeenCalledTimes(1);
   });
 });
@@ -667,7 +668,8 @@ describe('listWorkshopLinesService', () => {
     const lines = [{ id: 1, line_number: 'L01', machines: [] }];
     jest.mocked(repo.listActiveWorkshopLines).mockResolvedValue(lines);
     const result = await listWorkshopLinesService();
-    expect(result).toEqual(lines);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(lines);
   });
 });
 
@@ -676,7 +678,8 @@ describe('listIncidentsService', () => {
     const incidents = [mockIncident()];
     jest.mocked(repo.listIncidents).mockResolvedValue(incidents);
     const result = await listIncidentsService(7, 'RESPONSABLE');
-    expect(result).toEqual(incidents);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(incidents);
     expect(repo.listIncidents).toHaveBeenCalledWith(7, 'RESPONSABLE');
   });
 });
@@ -686,7 +689,8 @@ describe('listHistoryIncidentsService', () => {
     const rows = [mockIncident({ status: 'CLOSED' })];
     jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(rows);
     const result = await listHistoryIncidentsService({ status: 'CLOSED' });
-    expect(result).toEqual(rows);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(rows);
     expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith({ status: 'CLOSED' }, 'history');
   });
 });
@@ -696,7 +700,8 @@ describe('listKnowledgeIncidentsService', () => {
     const rows = [mockIncident({ status: 'CLOSED', intervention_note: 'Ok' })];
     jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(rows);
     const result = await listKnowledgeIncidentsService({ q: 'robot' });
-    expect(result).toEqual(rows);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(rows);
     expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith({ q: 'robot' }, 'knowledge');
   });
 });
@@ -774,7 +779,8 @@ describe('listIncidentEventsService', () => {
     const evts = [{ id: 1, event_type: 'INCIDENT_CREATED', created_at: new Date() }];
     jest.mocked(repo.listIncidentEvents).mockResolvedValue(evts);
     const result = await listIncidentEventsService(1);
-    expect(result).toEqual(evts);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(evts);
     expect(repo.listIncidentEvents).toHaveBeenCalledWith(1);
   });
 });
@@ -797,7 +803,8 @@ describe('getIncidentMetricsService', () => {
     };
     jest.mocked(repo.getIncidentMetrics).mockResolvedValue(metrics);
     const result = await getIncidentMetricsService(7, 'RESPONSABLE');
-    expect(result).toEqual(metrics);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(metrics);
     expect(repo.getIncidentMetrics).toHaveBeenCalledWith(7, 'RESPONSABLE');
   });
 });
@@ -853,7 +860,8 @@ describe('getWorkshopAnalyticsService', () => {
     };
     jest.mocked(repo.getWorkshopAnalytics).mockResolvedValue(analytics);
     const result = await getWorkshopAnalyticsService({ start: '2025-01-01', end: '2025-01-31' });
-    expect(result).toEqual(analytics);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(analytics);
     expect(repo.getWorkshopAnalytics).toHaveBeenCalledWith({
       start: '2025-01-01',
       end: '2025-01-31',

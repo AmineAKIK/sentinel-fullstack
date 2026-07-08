@@ -58,20 +58,25 @@ import {
 
 // ─── Lecture / board / lignes ─────────────────────────────────────────────────
 
-export async function getBoardDataService() {
-  return workshopRepository.getBoardData();
+export async function getBoardDataService(): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.getBoardData());
 }
 
-export async function listWorkshopLinesService() {
-  return workshopRepository.listActiveWorkshopLines();
+export async function listWorkshopLinesService(): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.listActiveWorkshopLines());
 }
 
-export async function listIncidentsService(userId: number, role: string) {
-  return workshopRepository.listIncidents(userId, role);
+export async function listIncidentsService(
+  userId: number,
+  role: string
+): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.listIncidents(userId, role));
 }
 
-export async function listHistoryIncidentsService(query: Record<string, unknown>) {
-  return workshopRepository.listIncidentWorkspaceRows(query, 'history');
+export async function listHistoryIncidentsService(
+  query: Record<string, unknown>
+): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.listIncidentWorkspaceRows(query, 'history'));
 }
 
 export async function getHistoryIncidentService(id: number): Promise<ServiceResult<unknown>> {
@@ -80,8 +85,10 @@ export async function getHistoryIncidentService(id: number): Promise<ServiceResu
   return { ok: true, data: incident };
 }
 
-export async function listKnowledgeIncidentsService(query: Record<string, unknown>) {
-  return workshopRepository.listIncidentWorkspaceRows(query, 'knowledge');
+export async function listKnowledgeIncidentsService(
+  query: Record<string, unknown>
+): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.listIncidentWorkspaceRows(query, 'knowledge'));
 }
 
 export async function getKnowledgeIncidentService(id: number): Promise<ServiceResult<unknown>> {
@@ -107,12 +114,15 @@ export async function listHistoryEventsService(
   return ok(await workshopRepository.listHistoryEvents(query));
 }
 
-export async function listIncidentEventsService(id: number) {
-  return workshopRepository.listIncidentEvents(id);
+export async function listIncidentEventsService(id: number): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.listIncidentEvents(id));
 }
 
-export async function getIncidentMetricsService(userId: number, role: string) {
-  return workshopRepository.getIncidentMetrics(userId, role);
+export async function getIncidentMetricsService(
+  userId: number,
+  role: string
+): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.getIncidentMetrics(userId, role));
 }
 
 export async function consultArbitrationRequestService(
@@ -142,8 +152,10 @@ export async function consultArbitrationRequestService(
   return ok({ consulted, incident });
 }
 
-export async function getWorkshopAnalyticsService(query: Record<string, unknown>) {
-  return workshopRepository.getWorkshopAnalytics(query);
+export async function getWorkshopAnalyticsService(
+  query: Record<string, unknown>
+): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.getWorkshopAnalytics(query));
 }
 
 // ─── Routeur de mise à jour (compatibilité tests + API PATCH) ─────────────────
