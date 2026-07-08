@@ -41,28 +41,46 @@ export function usePilotageData() {
   const [machineFilter, setMachineFilter] = useState('all');
   const [rankingLimit, setRankingLimit] = useState<RankingLimit>('10');
 
-  function loadRealtime() {
+  function loadRealtime(cancelled?: { current: boolean }) {
     return Promise.all([listWorkshopIncidents(), getIncidentMetrics()])
       .then(([inc, met]) => {
+        if (cancelled?.current) return;
         setIncidents(inc);
         setMetrics(met);
         setLastRefresh(new Date());
         setError('');
       })
-      .catch(() => setError('Impossible de charger la situation temps réel.'));
+      .catch(() => {
+        if (cancelled?.current) return;
+        setError('Impossible de charger la situation temps réel.');
+      });
   }
 
   useEffect(() => {
+    const cancelled = { current: false };
     setRealtimeLoading(true);
-    Promise.all([listWorkshopLines(), loadRealtime()])
-      .then(([linesData]) => setLines(linesData))
+    Promise.all([listWorkshopLines(), loadRealtime(cancelled)])
+      .then(([linesData]) => {
+        if (cancelled.current) return;
+        setLines(linesData);
+      })
       .catch(() => {})
-      .finally(() => setRealtimeLoading(false));
+      .finally(() => {
+        if (cancelled.current) return;
+        setRealtimeLoading(false);
+      });
+    return () => {
+      cancelled.current = true;
+    };
   }, []);
 
   useEffect(() => {
-    const id = setInterval(loadRealtime, 60_000);
-    return () => clearInterval(id);
+    const cancelled = { current: false };
+    const id = setInterval(() => loadRealtime(cancelled), 60_000);
+    return () => {
+      cancelled.current = true;
+      clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {
@@ -70,15 +88,21 @@ export function usePilotageData() {
       setAnalyticsError('La date de début doit être antérieure à la date de fin.');
       return;
     }
+    const controller = new AbortController();
     setAnalyticsLoading(true);
     setAnalyticsError('');
-    getWorkshopAnalytics(buildAnalyticsParams(period, customStart, customEnd, lineFilter, machineFilter))
+    getWorkshopAnalytics(
+      buildAnalyticsParams(period, customStart, customEnd, lineFilter, machineFilter),
+      controller.signal
+    )
       .then(setAnalytics)
-      .catch(() => {
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setAnalytics(null);
         setAnalyticsError('Impossible de charger les indicateurs.');
       })
       .finally(() => setAnalyticsLoading(false));
+    return () => controller.abort();
   }, [period, customStart, customEnd, lineFilter, machineFilter]);
 
   const activeIncidents = useMemo(

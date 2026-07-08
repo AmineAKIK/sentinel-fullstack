@@ -25,6 +25,7 @@ import {
   withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 // ── Couleurs par type d'anomalie ───────────────────────────────────
 const STATE_TONE: Record<string, string> = {
@@ -210,6 +211,7 @@ export default function WorkshopKnowledgePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState(searchParams.get('q') || '');
+  const debouncedQuery = useDebouncedValue(query);
   const [lineFilter, setLineFilter] = useState(searchParams.get('line') || 'all');
   const [machineFilter, setMachineFilter] = useState(searchParams.get('machine') || 'all');
   const [stateFilter, setStateFilter] = useState(searchParams.get('state') || 'all');
@@ -224,8 +226,9 @@ export default function WorkshopKnowledgePage() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const params = buildIncidentWorkspaceParams({
-      query,
+      query: debouncedQuery,
       stateFilter,
       lineFilter,
       machineFilter,
@@ -234,7 +237,7 @@ export default function WorkshopKnowledgePage() {
 
     setLoading(true);
     setError('');
-    listWorkshopKnowledgeIncidents(params)
+    listWorkshopKnowledgeIncidents(params, controller.signal)
       .then((data) => {
         setIncidents(data);
         setSelectedId((cur) => {
@@ -242,9 +245,13 @@ export default function WorkshopKnowledgePage() {
           return data.some((i) => String(i.id) === cur) ? cur : String(data[0].id);
         });
       })
-      .catch(() => setError('Impossible de charger la base de connaissance.'))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setError('Impossible de charger la base de connaissance.');
+      })
       .finally(() => setLoading(false));
-  }, [query, stateFilter, lineFilter, machineFilter]);
+    return () => controller.abort();
+  }, [debouncedQuery, stateFilter, lineFilter, machineFilter]);
 
   useEffect(() => {
     const requestedId = searchParams.get('incident');

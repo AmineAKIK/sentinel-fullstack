@@ -8,6 +8,7 @@ import {
 } from '../api/workshop';
 import { ProductionLine, WorkshopIncident, WorkshopIncidentEvent } from '../types';
 import { buildIncidentWorkspaceParams, withWorkshopLineFilter, withWorkshopUrlFilter } from '../utils/workshopFilters';
+import { useDebouncedValue } from './useDebouncedValue';
 
 export type HistoryStatusFilter = 'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
 
@@ -34,6 +35,7 @@ export function useHistoryData() {
   const [error, setError] = useState('');
 
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const debouncedQuery = useDebouncedValue(query);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>(
     readHistoryStatusFilter(searchParams.get('status'))
   );
@@ -63,8 +65,9 @@ export function useHistoryData() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const params = buildIncidentWorkspaceParams({
-      query,
+      query: debouncedQuery,
       statusFilter,
       stateFilter,
       lineFilter,
@@ -73,7 +76,7 @@ export function useHistoryData() {
     });
     setLoading(true);
     setError('');
-    listWorkshopHistoryIncidents(params)
+    listWorkshopHistoryIncidents(params, controller.signal)
       .then((incidentData) => {
         setIncidents(incidentData);
         setSelectedId((currentId) => {
@@ -83,9 +86,13 @@ export function useHistoryData() {
             : String(incidentData[0].id);
         });
       })
-      .catch(() => setError("Impossible de charger l'historique atelier."))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setError("Impossible de charger l'historique atelier.");
+      })
       .finally(() => setLoading(false));
-  }, [query, statusFilter, stateFilter, lineFilter, machineFilter]);
+    return () => controller.abort();
+  }, [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter]);
 
   useEffect(() => {
     const requestedId = searchParams.get('incident');

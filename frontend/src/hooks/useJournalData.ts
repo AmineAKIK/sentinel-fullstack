@@ -5,6 +5,7 @@ import { ProductionLine, WorkshopHistoryEvent } from '../types';
 import { EVENT_LABELS, formatEventActor } from '../utils/workshopHistory';
 import { buildIncidentWorkspaceParams, withWorkshopLineFilter, withWorkshopUrlFilter } from '../utils/workshopFilters';
 import { readHistoryStatusFilter, HistoryStatusFilter } from './useHistoryData';
+import { useDebouncedValue } from './useDebouncedValue';
 
 export type SortCol = 'date' | 'action' | 'incident' | 'actor';
 export type SortDir = 'asc' | 'desc';
@@ -20,6 +21,7 @@ export function useJournalData() {
   const [error, setError] = useState('');
 
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const debouncedQuery = useDebouncedValue(query);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>(
     readHistoryStatusFilter(searchParams.get('status'))
   );
@@ -37,8 +39,9 @@ export function useJournalData() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const params = buildIncidentWorkspaceParams({
-      query,
+      query: debouncedQuery,
       statusFilter,
       stateFilter,
       lineFilter,
@@ -47,11 +50,15 @@ export function useJournalData() {
       limit: JOURNAL_EVENTS_LIMIT,
     });
     setHistoryEventsLoading(true);
-    listWorkshopHistoryEvents(params)
+    listWorkshopHistoryEvents(params, controller.signal)
       .then(setHistoryEvents)
-      .catch(() => setError('Impossible de charger le journal atelier.'))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setError('Impossible de charger le journal atelier.');
+      })
       .finally(() => setHistoryEventsLoading(false));
-  }, [query, statusFilter, stateFilter, lineFilter, machineFilter, eventTypeFilter]);
+    return () => controller.abort();
+  }, [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter, eventTypeFilter]);
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
     setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
