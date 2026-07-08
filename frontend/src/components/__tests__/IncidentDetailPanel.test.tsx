@@ -104,12 +104,6 @@ function renderPanel({
         onCloseIncident={vi.fn(resolvedVoid)}
         onInvalidateIncident={vi.fn(resolvedVoid)}
         onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
-        onApplyEditRequest={vi.fn(resolvedVoid)}
-        onRejectEditRequest={vi.fn(resolvedVoid)}
-        onApproveDeleteRequest={vi.fn(resolvedVoid)}
-        onRejectDeleteRequest={vi.fn(resolvedVoid)}
-        onConsultArbitration={vi.fn()}
-        onReportArbitration={vi.fn()}
         onEditSuccess={vi.fn()}
         onDeleteCommentConfirm={vi.fn(resolvedVoid)}
         patchIncident={vi.fn(() => Promise.resolve(incident))}

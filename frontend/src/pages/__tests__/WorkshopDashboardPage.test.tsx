@@ -1,7 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import WorkshopDashboardPage from '../WorkshopDashboardPage';
 import { useIncidentsData } from '../../hooks/useIncidentsData';
 import { WorkshopIncident, WorkshopIncidentMetrics } from '../../types';
@@ -126,6 +126,26 @@ function renderDashboard(initialPath = '/workshop/dashboard') {
   );
 }
 
+function DashboardWithBackControl() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button type="button" onClick={() => navigate(-1)}>
+        Retour navigateur
+      </button>
+      <WorkshopDashboardPage />
+    </>
+  );
+}
+
+function renderDashboardHistory(initialEntries: string[], initialIndex: number) {
+  return render(
+    <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
+      <DashboardWithBackControl />
+    </MemoryRouter>
+  );
+}
+
 describe('WorkshopDashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -216,5 +236,47 @@ describe('WorkshopDashboardPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Arbitrage annulation' })).toBeDefined();
     });
+
+    expect(screen.getAllByRole('dialog', { name: 'Arbitrage annulation' })).toHaveLength(1);
+  });
+
+  it("ferme l'arbitrage quand le retour navigateur sort du dossier incident", async () => {
+    mockDashboardData([
+      mockIncident({
+        id: 4,
+        line_id: 4,
+        line_number: '119',
+        machine_id: 'MCH-4119',
+        robot_label: 'Droite 8',
+        head_number: 1,
+        cancel_request: true,
+        cancel_request_reason: 'doublon',
+        arbitration: {
+          cancel: {
+            requestEventId: 7,
+            requestedAt: '2026-06-28T11:00:00.000Z',
+            state: 'ACTIVE',
+          },
+        },
+      }),
+    ]);
+
+    const { container } = renderDashboardHistory(
+      ['/workshop/dashboard', '/workshop/dashboard?incident=4'],
+      1
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Arbitrage annulation' })).toBeDefined();
+    });
+
+    expect(screen.getAllByRole('dialog', { name: 'Arbitrage annulation' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retour navigateur' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Arbitrage annulation' })).toBeNull();
+    });
+    expect(container.querySelector('.incident-detail-drawer')).toBeNull();
   });
 });

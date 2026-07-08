@@ -152,6 +152,9 @@ export default function WorkshopDashboardPage() {
   useEffect(() => {
     if (!selectedIncidentParam) {
       setSelectedIncident(null);
+      setFocusedIncidentId(null);
+      setPendingReviewRequest(null);
+      if (modal.state.reviewIncident) modal.closeReview();
       return;
     }
     const found = incidents.find((inc) => String(inc.id) === selectedIncidentParam);
@@ -163,7 +166,7 @@ export default function WorkshopDashboardPage() {
       setIncidentUrlParam(null, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIncidentParam, incidents, loading]);
+  }, [selectedIncidentParam, incidents, loading, modal.state.reviewIncident]);
 
   useEffect(() => {
     setReportedArbitrationKey(null);
@@ -674,14 +677,6 @@ export default function WorkshopDashboardPage() {
                 onCloseIncident={actions.handleCloseIncident}
                 onInvalidateIncident={actions.handleInvalidateIncident}
                 onMaintenanceDeleteConfirm={actions.handleMaintenanceDeleteConfirm}
-                onApplyEditRequest={actions.handleApplyEditRequest}
-                onRejectEditRequest={actions.handleRejectEditRequest}
-                onApproveDeleteRequest={actions.handleApproveDeleteRequest}
-                onRejectDeleteRequest={actions.handleRejectDeleteRequest}
-                onConsultArbitration={() =>
-                  void handleConsultArbitration(modal.state.reviewIncident)
-                }
-                onReportArbitration={() => handleReportArbitration(modal.state.reviewIncident)}
                 onEditSuccess={(updated) => {
                   upsertIncident(updated);
                   setSelectedIncident(updated);
@@ -725,9 +720,7 @@ export default function WorkshopDashboardPage() {
           />
         )}
 
-        {/* Ces trois modals sont aussi rendus par IncidentDetailPanel : quand le
-            panneau est ouvert, c'est lui qui les porte (sinon double rendu). */}
-        {!selectedIncident && modal.state.reviewIncident && modal.state.reviewType && (
+        {modal.state.reviewIncident && modal.state.reviewType && (
           <ReviewIncidentRequestModal
             incident={modal.state.reviewIncident}
             lines={lines}

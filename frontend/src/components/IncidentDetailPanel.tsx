@@ -8,7 +8,6 @@ import ResumeIncidentConfirmModal from './ResumeIncidentConfirmModal';
 import CloseIncidentModal from './CloseIncidentModal';
 import InvalidateIncidentModal from './InvalidateIncidentModal';
 import MaintenanceDeleteConfirmModal from './MaintenanceDeleteConfirmModal';
-import ReviewIncidentRequestModal from './ReviewIncidentRequestModal';
 import UnfollowIncidentConfirmModal from './UnfollowIncidentConfirmModal';
 import DeleteResponsibleCommentConfirmModal from './DeleteResponsibleCommentConfirmModal';
 import DetailField from './ui/DetailField';
@@ -54,12 +53,6 @@ interface IncidentDetailPanelProps {
   onCloseIncident: (note: string) => Promise<void>;
   onInvalidateIncident: (reason: string) => Promise<void>;
   onMaintenanceDeleteConfirm: (mode: 'direct' | 'approve') => Promise<void>;
-  onApplyEditRequest: () => Promise<void>;
-  onRejectEditRequest: () => Promise<void>;
-  onApproveDeleteRequest: () => Promise<void>;
-  onRejectDeleteRequest: () => Promise<void>;
-  onConsultArbitration: () => void;
-  onReportArbitration: () => void;
   onEditSuccess: (updated: WorkshopIncident) => void;
   onDeleteCommentConfirm: (incident: WorkshopIncident) => Promise<void>;
   patchIncident: (id: number, payload: Record<string, unknown>) => Promise<WorkshopIncident>;
@@ -318,12 +311,6 @@ export default function IncidentDetailPanel({
   onCloseIncident,
   onInvalidateIncident,
   onMaintenanceDeleteConfirm,
-  onApplyEditRequest,
-  onRejectEditRequest,
-  onApproveDeleteRequest,
-  onRejectDeleteRequest,
-  onConsultArbitration,
-  onReportArbitration,
   onEditSuccess,
   onDeleteCommentConfirm,
   patchIncident,
@@ -751,40 +738,6 @@ export default function IncidentDetailPanel({
             }
           />
         )}
-      {modal.state.reviewIncident && modal.state.reviewType && (
-        <ReviewIncidentRequestModal
-          incident={modal.state.reviewIncident}
-          lines={lines}
-          type={modal.state.reviewType}
-          loading={modal.state.reviewLoading}
-          error={modal.state.reviewError}
-          onClose={modal.closeReview}
-          onConsult={onConsultArbitration}
-          onReport={onReportArbitration}
-          onApplyEdit={onApplyEditRequest}
-          onRejectEdit={onRejectEditRequest}
-          onApproveDelete={onApproveDeleteRequest}
-          onRejectDelete={onRejectDeleteRequest}
-          allowDeleteApproval={canPerform(userRole, 'approveCancel', modal.state.reviewIncident)}
-          allowDeleteReject={canPerform(userRole, 'rejectCancel', modal.state.reviewIncident)}
-          deleteApprovalDisabled={
-            !canPerform(userRole, 'approveCancel', modal.state.reviewIncident)
-          }
-          deleteWarning={
-            canPerform(userRole, 'approveCancel', modal.state.reviewIncident)
-              ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
-              : undefined
-          }
-          allowEditApply={canPerform(userRole, 'approveEdit', modal.state.reviewIncident)}
-          allowEditReject={canPerform(userRole, 'rejectEdit', modal.state.reviewIncident)}
-          editDisabled={!canPerform(userRole, 'approveEdit', modal.state.reviewIncident)}
-          editWarning={
-            !canPerform(userRole, 'approveEdit', modal.state.reviewIncident)
-              ? 'Seul le responsable peut arbitrer une demande de correction active.'
-              : undefined
-          }
-        />
-      )}
       {modal.state.unfollowConfirmIncident && (
         <UnfollowIncidentConfirmModal
           incident={modal.state.unfollowConfirmIncident}
