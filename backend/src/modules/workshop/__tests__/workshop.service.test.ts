@@ -319,7 +319,7 @@ describe('followIncidentService', () => {
 
   it('permet au responsable de suivre un incident actif', async () => {
     const incident = mockIncident({ is_followed: true });
-    jest.mocked(repo.getIncidentStatus).mockResolvedValue({ status: 'OPEN' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(repo.followIncidentData).mockResolvedValue(undefined);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);
@@ -330,12 +330,23 @@ describe('followIncidentService', () => {
     expect(repo.followIncidentData).toHaveBeenCalledWith(1, 7, null);
     expect(events.logIncidentEvent).toHaveBeenCalledWith(1, 7, 'INCIDENT_FOLLOWED', {}, null);
   });
+
+  it('refuse de suivre un incident terminé', async () => {
+    const incident = mockIncident({ status: 'CLOSED' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+
+    const result = await followIncidentService(1, 7, 'RESPONSABLE');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('FORBIDDEN');
+    expect(repo.followIncidentData).not.toHaveBeenCalled();
+  });
 });
 
 describe('unfollowIncidentService', () => {
   it('permet au responsable de retirer un suivi', async () => {
     const incident = mockIncident({ is_followed: false });
-    jest.mocked(repo.incidentExists).mockResolvedValue(true);
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(repo.unfollowIncidentData).mockResolvedValue(undefined);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(undefined);

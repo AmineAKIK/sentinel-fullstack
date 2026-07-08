@@ -35,7 +35,7 @@ export async function logIncidentEvent(
 ): Promise<void> {
   const db = client ?? pool;
   try {
-    await db.query(
+    const { rowCount } = await db.query(
       `INSERT INTO workshop_incident_events
          (incident_id, actor_user_id, event_type, payload,
           actor_first_name, actor_last_name, actor_role, actor_badge_number)
@@ -45,6 +45,11 @@ export async function logIncidentEvent(
        WHERE su.id = $2`,
       [incidentId, actorUserId, eventType, payload ? JSON.stringify(payload) : null]
     );
+    if (!rowCount) {
+      throw new Error(
+        `logIncidentEvent: aucun événement inséré, actorUserId=${actorUserId} ne correspond à aucun sentinel_users`
+      );
+    }
   } catch (err) {
     logger.error({ err, eventType, incidentId }, 'Failed to log incident event');
     throw err;

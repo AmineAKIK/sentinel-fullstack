@@ -537,20 +537,24 @@ export async function followIncidentService(
 ): Promise<ServiceResult<unknown>> {
   if (actorRole !== 'RESPONSABLE') return forbidden('Seul le responsable peut suivre un incident.');
 
-  const incident = await workshopRepository.getIncidentStatus(incidentId);
-  if (!incident) return notFound('Incident introuvable.');
-  if (
-    incident.status === 'CLOSED' ||
-    incident.status === 'CANCELED' ||
-    incident.status === 'INVALIDATED'
-  ) {
-    return forbidden('Impossible de suivre un incident terminé.');
-  }
+  const result = await withTransaction(async (client) => {
+    const current = await workshopRepository.getIncidentById(incidentId, client);
+    if (!current) return { kind: 'not_found' as const };
+    if (
+      current.status === 'CLOSED' ||
+      current.status === 'CANCELED' ||
+      current.status === 'INVALIDATED'
+    ) {
+      return { kind: 'forbidden' as const };
+    }
 
-  await withTransaction(async (client) => {
     await workshopRepository.followIncidentData(incidentId, actorUserId, client);
     await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client);
+    return { kind: 'ok' as const };
   });
+
+  if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'forbidden') return forbidden('Impossible de suivre un incident terminé.');
 
   return {
     ok: true,
@@ -564,13 +568,17 @@ export async function unfollowIncidentService(
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
   if (actorRole !== 'RESPONSABLE') return forbidden('Seul le responsable peut retirer un suivi.');
-  if (!(await workshopRepository.incidentExists(incidentId)))
-    return notFound('Incident introuvable.');
 
-  await withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
+    const current = await workshopRepository.getIncidentById(incidentId, client);
+    if (!current) return { kind: 'not_found' as const };
+
     await workshopRepository.unfollowIncidentData(incidentId, actorUserId, client);
     await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_UNFOLLOWED', {}, client);
+    return { kind: 'ok' as const };
   });
+
+  if (result.kind === 'not_found') return notFound('Incident introuvable.');
 
   return {
     ok: true,
