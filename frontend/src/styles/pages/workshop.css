@@ -1394,37 +1394,31 @@ button.workshop-metric:hover,
 
 @media (max-width: 760px) {
   .modal-overlay--depth-focus {
-    align-items: center;
-    padding: var(--space-3);
-    overflow: hidden;
+    align-items: flex-start;
+    padding: var(--space-3) var(--space-2);
+    overflow-y: auto;
   }
 
   .modal--arbitration {
-    width: min(100%, 520px);
+    width: 100%;
     max-width: 100%;
-    max-height: calc(100dvh - 24px);
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
   }
 
   .modal--arbitration .modal-header {
-    flex: 0 0 auto;
     padding: 12px 14px;
   }
 
   .modal--arbitration .modal-body {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
     padding: 12px 14px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
   }
 
   .modal--arbitration .modal-footer {
-    flex: 0 0 auto;
     padding: 10px 14px 12px;
-    box-shadow: 0 -10px 24px rgba(11, 18, 32, 0.06);
+    box-shadow: none;
   }
 
   .arbitration-command-grid,
@@ -1434,7 +1428,7 @@ button.workshop-metric:hover,
 
   .modal--arbitration .arbitration-decision-meta,
   .modal--arbitration .arbitration-context-grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2) var(--space-3);
   }
 
@@ -1668,7 +1662,7 @@ button.workshop-metric:hover,
 
   .modal--arbitration .arbitration-decision-meta,
   .modal--arbitration .arbitration-context-grid {
-    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2) var(--space-3);
   }
 
@@ -1710,7 +1704,7 @@ button.workshop-metric:hover,
 
 @media (max-width: 420px) {
   .modal--arbitration {
-    max-height: calc(100dvh - 16px);
+    max-height: none;
   }
 
   .modal-overlay--depth-focus {
@@ -1726,6 +1720,11 @@ button.workshop-metric:hover,
 
   .arbitration-footer-group,
   .arbitration-footer-group--decision {
+    grid-template-columns: 1fr;
+  }
+
+  .modal--arbitration .arbitration-decision-meta,
+  .modal--arbitration .arbitration-context-grid {
     grid-template-columns: 1fr;
   }
 }
