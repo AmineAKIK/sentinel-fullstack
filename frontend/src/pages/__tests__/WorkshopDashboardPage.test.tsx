@@ -146,9 +146,27 @@ function renderDashboardHistory(initialEntries: string[], initialIndex: number) 
   );
 }
 
+function mockViewportQuery(isStackedDetailLayout = false) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query: string) => ({
+      matches: query === '(max-width: 1180px)' ? isStackedDetailLayout : false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
 describe('WorkshopDashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockViewportQuery(false);
     mockDashboardData([
       mockIncident(),
       mockIncident({
@@ -184,6 +202,32 @@ describe('WorkshopDashboardPage', () => {
     );
     expect(inlineDrawer).not.toBeNull();
     expect(inlineDrawer?.getAttribute('aria-label')).toContain("Détail de l'incident ligne 117");
+  });
+
+  it('remonte automatiquement au haut du dossier en layout empilé', async () => {
+    mockViewportQuery(true);
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    renderDashboard();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Ouvrir incident ligne 119, machine MCH-4119/i,
+      })
+    );
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalledWith(
+        expect.objectContaining({
+          block: 'start',
+          behavior: 'smooth',
+        })
+      );
+    });
   });
 
   it('ferme le dossier depuis Escape sans modifier la zone dashboard', async () => {

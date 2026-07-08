@@ -38,6 +38,8 @@ type PendingReviewRequest = {
   type: ReviewType;
 };
 
+const STACKED_DETAIL_LAYOUT_QUERY = '(max-width: 1180px)';
+
 function isArbitrationRequestActive(incident: WorkshopIncident, type: ReviewType): boolean {
   if (type === 'edit') {
     if (!incident.edit_request) return false;
@@ -82,6 +84,13 @@ function prefersReducedMotion(): boolean {
   return Boolean(
     typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function usesStackedDetailLayout(): boolean {
+  return Boolean(
+    typeof window.matchMedia === 'function' &&
+      window.matchMedia(STACKED_DETAIL_LAYOUT_QUERY).matches
   );
 }
 
@@ -421,6 +430,11 @@ export default function WorkshopDashboardPage() {
     }
 
     function updateDetailOffset() {
+      if (usesStackedDetailLayout()) {
+        setDetailOffsetTop(0);
+        return;
+      }
+
       const workbenchElement = workbenchRef.current;
       if (!workbenchElement) return;
 
@@ -472,6 +486,16 @@ export default function WorkshopDashboardPage() {
     setFocusedIncidentId(null);
 
     function focusSelectedIncident() {
+      if (usesStackedDetailLayout()) {
+        const detailDrawer = detailDrawerRef.current;
+        if (!detailDrawer) return false;
+        detailDrawer.scrollIntoView({
+          block: 'start',
+          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+        return true;
+      }
+
       const workbenchElement = workbenchRef.current;
       if (!workbenchElement) return false;
 
