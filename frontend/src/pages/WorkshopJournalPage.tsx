@@ -15,6 +15,12 @@ import {
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useJournalData, SortCol } from '../hooks/useJournalData';
 
+// Les 19 types d'événement effectivement émis par le backend (grep sur les
+// appels logIncidentEvent). INCIDENT_REORDERED, ORDER_CHANGED (réordonnancement
+// manuel retiré le 2026-07-07), DELETE_REQUESTED/DELETE_REQUEST_REJECTED
+// (alias legacy de CANCEL_REQUESTED/CANCEL_REQUEST_REJECTED) et STATUS_CHANGED
+// (type déclaré, jamais émis) sont volontairement exclus : les proposer au
+// filtre créerait une entrée qui ne renverra jamais aucun résultat.
 const EVENT_FILTER_OPTIONS = [
   'INCIDENT_CREATED',
   'INCIDENT_TAKEN',
@@ -23,8 +29,18 @@ const EVENT_FILTER_OPTIONS = [
   'INCIDENT_CLOSED',
   'INCIDENT_CANCELED',
   'INCIDENT_INVALIDATED',
+  'INCIDENT_FOLLOWED',
+  'INCIDENT_UNFOLLOWED',
+  'INCIDENT_UPDATED',
+  'EDIT_REQUESTED',
+  'EDIT_APPLIED',
+  'EDIT_REJECTED',
+  'EDIT_REQUEST_WITHDRAWN',
+  'CANCEL_REQUESTED',
+  'CANCEL_REQUEST_REJECTED',
   'PRIORITY_CHANGED',
   'RESPONSIBLE_COMMENT_UPDATED',
+  'ARBITRATION_CONSULTED',
 ] as const;
 
 export default function WorkshopJournalPage() {

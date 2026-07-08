@@ -82,4 +82,5 @@ export const WORKSHOP_EVENT_LABELS: Record<string, string> = {
   ORDER_CHANGED: 'Réordonnancement',
   RESPONSIBLE_COMMENT_UPDATED: 'Consigne responsable',
   STATUS_CHANGED: 'Statut modifié',
+  ARBITRATION_CONSULTED: "Dossier d'arbitrage consulté",
 };
