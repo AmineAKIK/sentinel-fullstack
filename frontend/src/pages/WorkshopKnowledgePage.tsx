@@ -1,31 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  getWorkshopKnowledgeIncident,
-  listWorkshopKnowledgeIncidents,
-  listWorkshopLines,
-} from '../api/workshop';
-import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import Skeleton from '../components/ui/Skeleton';
-import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
-import { ProductionLine, WorkshopIncident } from '../types';
+import WorkshopFilterCard from '../components/WorkshopFilterCard';
+import { WorkshopIncident } from '../types';
 import { formatDateTime, STATE_LABELS } from '../utils/workshopHistory';
 import { formatElapsed } from '../utils/date';
 import {
-  buildIncidentWorkspaceParams,
-  getWorkshopMachineOptions,
   lineFilterChip,
   machineFilterChip,
   searchFilterChip,
   stateFilterChip,
-  withWorkshopLineFilter,
-  withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useKnowledgeData } from '../hooks/useKnowledgeData';
 
 // ── Couleurs par type d'anomalie ───────────────────────────────────
 const STATE_TONE: Record<string, string> = {
@@ -205,89 +196,31 @@ function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, on
 export default function WorkshopKnowledgePage() {
   usePageTitle('Base de connaissance');
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
-  const [lines, setLines] = useState<ProductionLine[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [query, setQuery] = useState(searchParams.get('q') || '');
-  const debouncedQuery = useDebouncedValue(query);
-  const [lineFilter, setLineFilter] = useState(searchParams.get('line') || 'all');
-  const [machineFilter, setMachineFilter] = useState(searchParams.get('machine') || 'all');
-  const [stateFilter, setStateFilter] = useState(searchParams.get('state') || 'all');
-  const [selectedId, setSelectedId] = useState('');
   const [copied, setCopied] = useState(false);
   const detailRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    listWorkshopLines()
-      .then(setLines)
-      .catch(() => setError('Impossible de charger les référentiels atelier.'));
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const params = buildIncidentWorkspaceParams({
-      query: debouncedQuery,
-      stateFilter,
-      lineFilter,
-      machineFilter,
-      limit: 300,
-    });
-
-    setLoading(true);
-    setError('');
-    listWorkshopKnowledgeIncidents(params, controller.signal)
-      .then((data) => {
-        setIncidents(data);
-        setSelectedId((cur) => {
-          if (data.length === 0) return '';
-          return data.some((i) => String(i.id) === cur) ? cur : String(data[0].id);
-        });
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError('Impossible de charger la base de connaissance.');
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, [debouncedQuery, stateFilter, lineFilter, machineFilter]);
-
-  useEffect(() => {
-    const requestedId = searchParams.get('incident');
-    if (!requestedId) return;
-    if (incidents.some((i) => String(i.id) === requestedId)) {
-      setSelectedId(requestedId);
-      return;
-    }
-    const parsedId = Number(requestedId);
-    if (!Number.isInteger(parsedId) || parsedId <= 0) return;
-    getWorkshopKnowledgeIncident(parsedId)
-      .then((incident) => {
-        setIncidents((cur) => cur.some((i) => i.id === incident.id) ? cur : [incident, ...cur]);
-        setSelectedId(String(incident.id));
-      })
-      .catch(() => setError("Cette fiche connaissance n'est pas disponible."));
-  }, [searchParams, incidents]);
-
-  const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
-  const machineCount = new Set(incidents.map((i) => i.machine_id)).size;
-  const lastItem = incidents[0];
-  const selectedIncident = incidents.find((i) => String(i.id) === selectedId);
-
-  // Cas similaires : mêmes équipement ou anomalie que la fiche ouverte (P5).
-  // Priorité aux fiches même machine, puis même type d'anomalie ; limité à 4.
-  const relatedIncidents = selectedIncident
-    ? incidents
-        .filter((i) => i.id !== selectedIncident.id &&
-          (i.machine_id === selectedIncident.machine_id || i.state === selectedIncident.state))
-        .sort((a, b) => {
-          const aSame = a.machine_id === selectedIncident.machine_id ? 0 : 1;
-          const bSame = b.machine_id === selectedIncident.machine_id ? 0 : 1;
-          return aSame - bSame;
-        })
-        .slice(0, 4)
-    : [];
+  const {
+    incidents,
+    lines,
+    loading,
+    error,
+    query,
+    lineFilter,
+    machineFilter,
+    stateFilter,
+    selectedId,
+    selectedIncident,
+    relatedIncidents,
+    machineCount,
+    lastItem,
+    setQuery,
+    setMachineFilter,
+    setStateFilter,
+    updateSearchFilter,
+    updateLineFilter,
+    selectIncident: selectIncidentData,
+    clearFilters,
+  } = useKnowledgeData();
 
   // Chips de filtres actifs
   const filterChips: FilterChip[] = [
@@ -305,34 +238,11 @@ export default function WorkshopKnowledgePage() {
     : null;
 
   function selectIncident(id: number): void {
-    const next = new URLSearchParams(searchParams);
-    next.set('incident', String(id));
-    setSearchParams(next);
-    setSelectedId(String(id));
+    selectIncidentData(id);
     // Scroll vers le détail sur mobile
     setTimeout(() => {
       detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
-  }
-
-  function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
-    setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
-  }
-
-  function updateLineFilter(value: string): void {
-    setLineFilter(value);
-    setMachineFilter('all');
-    setSearchParams(withWorkshopLineFilter(searchParams, value));
-  }
-
-  function clearFilters(): void {
-    setQuery('');
-    setLineFilter('all');
-    setMachineFilter('all');
-    setStateFilter('all');
-    const next = new URLSearchParams();
-    if (selectedId) next.set('incident', selectedId);
-    setSearchParams(next);
   }
 
   function copyLink(): void {
@@ -365,64 +275,24 @@ export default function WorkshopKnowledgePage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        {/* ── Filtres ── */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-body">
-            <div className="history-grid">
-              <div className="form-group">
-                <label className="form-label">Recherche</label>
-                <input
-                  className="form-input"
-                  placeholder="Symptôme, solution, machine, produit..."
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); updateSearchFilter('q', e.target.value, ''); }}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Ligne</label>
-                <SelectField
-                  value={lineFilter}
-                  onChange={updateLineFilter}
-                  options={[
-                    { value: 'all', label: 'Toutes' },
-                    ...lines.map((l) => ({ value: String(l.id), label: l.line_number })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Machine</label>
-                <SelectField
-                  value={machineFilter}
-                  onChange={(v) => { setMachineFilter(v); updateSearchFilter('machine', v); }}
-                  disabled={lineFilter === 'all'}
-                  options={[
-                    { value: 'all', label: 'Toutes' },
-                    ...machineOptions.map((m) => ({ value: m.id, label: m.label })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Type d'anomalie</label>
-                <SelectField
-                  value={stateFilter}
-                  onChange={(v) => { setStateFilter(v); updateSearchFilter('state', v); }}
-                  options={[
-                    { value: 'all', label: 'Tous' },
-                    ...Object.entries(STATE_LABELS).map(([v, label]) => ({ value: v, label })),
-                  ]}
-                />
-              </div>
-            </div>
-            <FilterSummary
-              count={incidents.length}
-              countLabel="fiche(s) affichée(s)"
-              chips={filterChips}
-              onClear={clearFilters}
-              emptyText="Base complète"
-              className="filter-summary-embedded"
-            />
-          </div>
-        </div>
+        <WorkshopFilterCard
+          searchInputId="knowledge-search"
+          searchPlaceholder="Symptôme, solution, machine, produit..."
+          query={query}
+          onQueryChange={(v) => { setQuery(v); updateSearchFilter('q', v, ''); }}
+          lines={lines}
+          lineFilter={lineFilter}
+          onLineFilterChange={updateLineFilter}
+          machineFilter={machineFilter}
+          onMachineFilterChange={(v) => { setMachineFilter(v); updateSearchFilter('machine', v); }}
+          stateFilter={stateFilter}
+          onStateFilterChange={(v) => { setStateFilter(v); updateSearchFilter('state', v); }}
+          count={incidents.length}
+          countLabel="fiche(s) affichée(s)"
+          chips={filterChips}
+          onClear={clearFilters}
+          emptyText="Base complète"
+        />
 
         {/* ── Layout master-detail ── */}
         <div className="kb-layout">

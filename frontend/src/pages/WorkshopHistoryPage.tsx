@@ -1,16 +1,15 @@
 import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import Skeleton from '../components/ui/Skeleton';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
+import WorkshopFilterCard from '../components/WorkshopFilterCard';
 import IncidentDossier from '../components/IncidentDossier';
 import { STATUS_LABELS, STATE_LABELS } from '../utils/labels';
 import { formatDateTime } from '../utils/workshopHistory';
 import {
-  getWorkshopMachineOptions,
   lineFilterChip,
   machineFilterChip,
   searchFilterChip,
@@ -18,7 +17,7 @@ import {
 } from '../utils/workshopFilters';
 import { formatIncidentDuration } from '../utils/durationFormat';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useHistoryData, readHistoryStatusFilter } from '../hooks/useHistoryData';
+import { useHistoryData } from '../hooks/useHistoryData';
 
 export default function WorkshopHistoryPage() {
   usePageTitle('Historique');
@@ -53,8 +52,6 @@ export default function WorkshopHistoryPage() {
   } = useHistoryData();
 
   void isInitialDeepLinkRef;
-
-  const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
 
   const filterChips: FilterChip[] = [
     ...searchFilterChip(query, () => {
@@ -98,93 +95,40 @@ export default function WorkshopHistoryPage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        {/* Filtres */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-body">
-            <div className="history-grid">
-              <div className="form-group">
-                <label className="form-label" htmlFor="history-search">Recherche</label>
-                <input
-                  id="history-search"
-                  className="form-input"
-                  placeholder="Incident, machine, acteur, commentaire…"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    updateSearchFilter('q', e.target.value, '');
-                  }}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Statut</label>
-                <SelectField
-                  value={statusFilter}
-                  ariaLabel="Statut"
-                  onChange={(v) => {
-                    const value = readHistoryStatusFilter(v);
-                    setStatusFilter(value);
-                    updateSearchFilter('status', value);
-                  }}
-                  options={[
-                    { value: 'all', label: 'Tous' },
-                    ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Ligne</label>
-                <SelectField
-                  value={lineFilter}
-                  ariaLabel="Ligne"
-                  onChange={updateLineFilter}
-                  options={[
-                    { value: 'all', label: 'Toutes' },
-                    ...lines.map((l) => ({ value: String(l.id), label: l.line_number })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Machine</label>
-                <SelectField
-                  value={machineFilter}
-                  ariaLabel="Machine"
-                  onChange={(v) => {
-                    setMachineFilter(v);
-                    updateSearchFilter('machine', v);
-                  }}
-                  disabled={lineFilter === 'all'}
-                  options={[
-                    { value: 'all', label: 'Toutes' },
-                    ...machineOptions.map((m) => ({ value: m.id, label: m.label })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Type d'anomalie</label>
-                <SelectField
-                  value={stateFilter}
-                  ariaLabel="Type d'anomalie"
-                  onChange={(v) => {
-                    setStateFilter(v);
-                    updateSearchFilter('state', v);
-                  }}
-                  options={[
-                    { value: 'all', label: 'Tous' },
-                    ...Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label })),
-                  ]}
-                />
-              </div>
-            </div>
-            <FilterSummary
-              count={incidents.length}
-              countLabel="incident(s) affiché(s)"
-              chips={filterChips}
-              onClear={clearFilters}
-              emptyText="Historique complet"
-              className="filter-summary-embedded"
-            />
-          </div>
-        </div>
+        <WorkshopFilterCard
+          searchInputId="history-search"
+          searchPlaceholder="Incident, machine, acteur, commentaire…"
+          query={query}
+          onQueryChange={(v) => {
+            setQuery(v);
+            updateSearchFilter('q', v, '');
+          }}
+          status={{
+            value: statusFilter,
+            onChange: (v) => {
+              setStatusFilter(v);
+              updateSearchFilter('status', v);
+            },
+          }}
+          lines={lines}
+          lineFilter={lineFilter}
+          onLineFilterChange={updateLineFilter}
+          machineFilter={machineFilter}
+          onMachineFilterChange={(v) => {
+            setMachineFilter(v);
+            updateSearchFilter('machine', v);
+          }}
+          stateFilter={stateFilter}
+          onStateFilterChange={(v) => {
+            setStateFilter(v);
+            updateSearchFilter('state', v);
+          }}
+          count={incidents.length}
+          countLabel="incident(s) affiché(s)"
+          chips={filterChips}
+          onClear={clearFilters}
+          emptyText="Historique complet"
+        />
 
         {/* Layout liste + détail */}
         <div className="history-layout">

@@ -1,20 +1,18 @@
 import { useNavigate } from 'react-router-dom';
-import FilterSummary, { FilterChip } from '../components/FilterSummary';
+import { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
-import { STATUS_LABELS, STATE_LABELS } from '../utils/labels';
+import WorkshopFilterCard from '../components/WorkshopFilterCard';
+import { STATUS_LABELS } from '../utils/labels';
 import { EVENT_LABELS, formatDateTime, formatEventActor, formatEventDetail } from '../utils/workshopHistory';
 import {
-  getWorkshopMachineOptions,
   lineFilterChip,
   machineFilterChip,
   searchFilterChip,
   stateFilterChip,
 } from '../utils/workshopFilters';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { readHistoryStatusFilter } from '../hooks/useHistoryData';
 import { useJournalData, SortCol } from '../hooks/useJournalData';
 
 const EVENT_FILTER_OPTIONS = [
@@ -58,8 +56,6 @@ export default function WorkshopJournalPage() {
     clearFilters,
     handleSort,
   } = useJournalData();
-
-  const machineOptions = getWorkshopMachineOptions(lines, lineFilter);
 
   const filterChips: FilterChip[] = [
     ...searchFilterChip(query, () => {
@@ -106,92 +102,40 @@ export default function WorkshopJournalPage() {
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-body">
-            <div className="history-grid">
-              <div className="form-group">
-                <label className="form-label" htmlFor="journal-search">Recherche</label>
-                <input
-                  id="journal-search"
-                  className="form-input"
-                  placeholder="Incident, machine, acteur, commentaire…"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    updateSearchFilter('q', e.target.value, '');
-                  }}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Statut</label>
-                <SelectField
-                  value={statusFilter}
-                  ariaLabel="Statut"
-                  onChange={(v) => {
-                    const value = readHistoryStatusFilter(v);
-                    setStatusFilter(value);
-                    updateSearchFilter('status', value);
-                  }}
-                  options={[
-                    { value: 'all', label: 'Tous' },
-                    ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Ligne</label>
-                <SelectField
-                  value={lineFilter}
-                  ariaLabel="Ligne"
-                  onChange={updateLineFilter}
-                  options={[
-                    { value: 'all', label: 'Toutes' },
-                    ...lines.map((l) => ({ value: String(l.id), label: l.line_number })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Machine</label>
-                <SelectField
-                  value={machineFilter}
-                  ariaLabel="Machine"
-                  onChange={(v) => {
-                    setMachineFilter(v);
-                    updateSearchFilter('machine', v);
-                  }}
-                  disabled={lineFilter === 'all'}
-                  options={[
-                    { value: 'all', label: 'Toutes' },
-                    ...machineOptions.map((m) => ({ value: m.id, label: m.label })),
-                  ]}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" aria-hidden="true">Type d'anomalie</label>
-                <SelectField
-                  value={stateFilter}
-                  ariaLabel="Type d'anomalie"
-                  onChange={(v) => {
-                    setStateFilter(v);
-                    updateSearchFilter('state', v);
-                  }}
-                  options={[
-                    { value: 'all', label: 'Tous' },
-                    ...Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label })),
-                  ]}
-                />
-              </div>
-            </div>
-            <FilterSummary
-              count={historyEvents.length}
-              countLabel="action(s) affichée(s)"
-              chips={filterChips}
-              onClear={clearFilters}
-              emptyText="Journal complet"
-              className="filter-summary-embedded"
-            />
-          </div>
-        </div>
+        <WorkshopFilterCard
+          searchInputId="journal-search"
+          searchPlaceholder="Incident, machine, acteur, commentaire…"
+          query={query}
+          onQueryChange={(v) => {
+            setQuery(v);
+            updateSearchFilter('q', v, '');
+          }}
+          status={{
+            value: statusFilter,
+            onChange: (v) => {
+              setStatusFilter(v);
+              updateSearchFilter('status', v);
+            },
+          }}
+          lines={lines}
+          lineFilter={lineFilter}
+          onLineFilterChange={updateLineFilter}
+          machineFilter={machineFilter}
+          onMachineFilterChange={(v) => {
+            setMachineFilter(v);
+            updateSearchFilter('machine', v);
+          }}
+          stateFilter={stateFilter}
+          onStateFilterChange={(v) => {
+            setStateFilter(v);
+            updateSearchFilter('state', v);
+          }}
+          count={historyEvents.length}
+          countLabel="action(s) affichée(s)"
+          chips={filterChips}
+          onClear={clearFilters}
+          emptyText="Journal complet"
+        />
 
         <div className="card">
           <div className="card-body">
