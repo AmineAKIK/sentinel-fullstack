@@ -17,7 +17,7 @@ interface AppAuthContextValue {
 }
 
 const AppAuthContext = createContext<AppAuthContextValue | null>(null);
-const PUBLIC_AUTHLESS_PATHS = ['/login', '/board', '/admin/login', '/workshop/login'];
+const PUBLIC_AUTHLESS_PATHS = ['/login', '/board', '/admin/login', '/workshop/login', '/confidentialite'];
 
 function isPublic(pathname: string) {
   return PUBLIC_AUTHLESS_PATHS.some((p) => pathname.startsWith(p));
