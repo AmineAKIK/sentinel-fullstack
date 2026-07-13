@@ -85,7 +85,10 @@ check('Workshop permissions are mirrored backend/frontend', () => {
 });
 
 check('Canceled and invalidated incidents are preserved but excluded from operational metrics', () => {
-  const repository = read('backend/src/modules/workshop/workshop.repository.ts');
+  const repository = readMany([
+    'backend/src/modules/workshop/workshop.repository.ts',
+    'backend/src/modules/workshop/workshop.repository.analytics.ts',
+  ]);
   return repository.includes("SET status = 'CANCELED'")
     && repository.includes("SET status = 'INVALIDATED'")
     && repository.includes("COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total")
@@ -195,7 +198,7 @@ check('Legacy auth surfaces are removed', () => {
   return files.every((relativePath) => !fs.existsSync(path.join(repoRoot, relativePath)));
 });
 
-check('Workshop history, pilotage, and knowledge are separated pages', () => {
+check('Workshop history, journal, pilotage, and knowledge are separated pages', () => {
   const pilotage = readMany([
     'frontend/src/pages/WorkshopPilotagePage.tsx',
     'frontend/src/hooks/usePilotageData.ts',
@@ -204,16 +207,25 @@ check('Workshop history, pilotage, and knowledge are separated pages', () => {
     'frontend/src/pages/WorkshopHistoryPage.tsx',
     'frontend/src/hooks/useHistoryData.ts',
   ]);
-  const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
+  const journal = readMany([
+    'frontend/src/pages/WorkshopJournalPage.tsx',
+    'frontend/src/hooks/useJournalData.ts',
+  ]);
+  const knowledge = readMany([
+    'frontend/src/pages/WorkshopKnowledgePage.tsx',
+    'frontend/src/hooks/useKnowledgeData.ts',
+  ]);
   const api = read('frontend/src/api/workshop.ts');
   const repository = read('backend/src/modules/workshop/workshop.repository.ts');
   return pilotage.includes('getWorkshopAnalytics')
     && !pilotage.includes('mode=')
     && history.includes('listWorkshopHistoryIncidents')
-    && history.includes('listWorkshopHistoryEvents')
     && history.includes('listIncidentEvents')
     && !history.includes('listWorkshopIncidents')
     && !history.includes('getWorkshopAnalytics')
+    && journal.includes('listWorkshopHistoryEvents')
+    && !journal.includes('listWorkshopHistoryIncidents')
+    && !journal.includes('listIncidentEvents')
     && knowledge.includes('listWorkshopKnowledgeIncidents')
     && !knowledge.includes('listWorkshopIncidents')
     && !knowledge.includes('listIncidentEvents')
@@ -225,7 +237,10 @@ check('Workshop history, pilotage, and knowledge are separated pages', () => {
 });
 
 check('Workshop knowledge page presents validated intervention cards', () => {
-  const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
+  const knowledge = readMany([
+    'frontend/src/pages/WorkshopKnowledgePage.tsx',
+    'frontend/src/hooks/useKnowledgeData.ts',
+  ]);
   const styles = read('frontend/src/styles/pages/knowledge.css');
   return knowledge.includes('kb-card')
     && knowledge.includes('kb-detail')
@@ -273,7 +288,10 @@ check('Workshop knowledge and history are cross-linked by incident trace', () =>
     'frontend/src/hooks/useHistoryData.ts',
     'frontend/src/components/IncidentDossier.tsx',
   ]);
-  const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
+  const knowledge = readMany([
+    'frontend/src/pages/WorkshopKnowledgePage.tsx',
+    'frontend/src/hooks/useKnowledgeData.ts',
+  ]);
   const styles = readMany([
     'frontend/src/styles/pages/history.css',
     'frontend/src/styles/pages/knowledge.css',
@@ -299,7 +317,10 @@ check('Workshop history and knowledge filters are URL-restorable', () => {
     'frontend/src/pages/WorkshopHistoryPage.tsx',
     'frontend/src/hooks/useHistoryData.ts',
   ]);
-  const knowledge = read('frontend/src/pages/WorkshopKnowledgePage.tsx');
+  const knowledge = readMany([
+    'frontend/src/pages/WorkshopKnowledgePage.tsx',
+    'frontend/src/hooks/useKnowledgeData.ts',
+  ]);
   const styles = read('frontend/src/styles/base.css');
   return history.includes("searchParams.get('q')")
     && history.includes("searchParams.get('status')")
