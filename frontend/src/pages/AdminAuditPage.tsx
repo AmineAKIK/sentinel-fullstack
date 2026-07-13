@@ -83,12 +83,33 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
     lastName: 'nom',
     badgeNumber: 'badge',
     role: 'rôle',
+    emailConfigured: 'email professionnel configuré',
+    email: 'email professionnel',
     lineNumber: 'numéro de ligne',
     machines: 'machines',
     machinesCount: 'machines',
     isActive: 'statut',
   };
-  return keys.map((key) => labels[key] || key).join(', ');
+  return keys.map((key) => {
+    if (key === 'emailConfigured') {
+      return changes[key] === true
+        ? 'email professionnel configuré'
+        : 'aucun email professionnel configuré';
+    }
+    if (key === 'email') {
+      const value = changes[key];
+      const action = value && typeof value === 'object' && 'action' in value
+        ? String(value.action)
+        : '';
+      const actionLabels: Record<string, string> = {
+        configured: 'email professionnel ajouté',
+        updated: 'email professionnel modifié',
+        removed: 'email professionnel supprimé',
+      };
+      return actionLabels[action] ?? labels[key];
+    }
+    return labels[key] || key;
+  }).join(', ');
 }
 
 function dateBoundary(period: string, customStart: string, customEnd: string) {

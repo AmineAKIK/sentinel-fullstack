@@ -117,7 +117,33 @@ describe('createAccountService', () => {
       expect(result.data).toEqual({ ...created, password_setup_code: 'ABCD234567' });
     }
     expect(repo.createAccountData).toHaveBeenCalledWith(input, 'hashed-setup-code', new Date('2025-01-02T00:00:00Z'), null);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(created.id, 1, 'USER_CREATED', expect.any(Object), null);
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(created.id, 1, 'USER_CREATED', {
+      firstName: 'Jean',
+      lastName: 'Dupont',
+      badgeNumber: 'B001',
+      role: 'OPERATOR',
+      emailConfigured: false,
+    }, null);
+  });
+
+  it('journalise uniquement la présence de l\'email professionnel à la création', async () => {
+    const email = 'jean.dupont@example.test';
+    const created = mockAccount({ email });
+    jest.mocked(repo.accountBadgeExists).mockResolvedValue(false);
+    jest.mocked(repo.createAccountData).mockResolvedValue(created);
+    jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
+
+    await createAccountService({ ...input, email }, 1);
+
+    const auditChanges = jest.mocked(events.createAccountAuditEvent).mock.calls[0][3];
+    expect(auditChanges).toEqual({
+      firstName: 'Jean',
+      lastName: 'Dupont',
+      badgeNumber: 'B001',
+      role: 'OPERATOR',
+      emailConfigured: true,
+    });
+    expect(JSON.stringify(auditChanges)).not.toContain(email);
   });
 });
 
@@ -192,6 +218,40 @@ describe('updateAccountService', () => {
     const result = await updateAccountService(1, { firstName: 'Pierre' }, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(updated);
+  });
+
+  it.each([
+    {
+      label: 'ajout',
+      currentEmail: null,
+      nextEmail: 'jean.dupont@example.test',
+      action: 'configured',
+    },
+    {
+      label: 'modification',
+      currentEmail: 'ancienne@example.test',
+      nextEmail: 'nouvelle@example.test',
+      action: 'updated',
+    },
+    {
+      label: 'suppression',
+      currentEmail: 'jean.dupont@example.test',
+      nextEmail: null,
+      action: 'removed',
+    },
+  ])('journalise le type d\'action sans adresse lors de la $label d\'un email', async ({ currentEmail, nextEmail, action }) => {
+    const current = mockAccount({ email: currentEmail });
+    const updated = mockAccount({ email: nextEmail });
+    jest.mocked(repo.getAccountData).mockResolvedValue(current);
+    jest.mocked(repo.updateAccountData).mockResolvedValue(updated);
+    jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
+
+    await updateAccountService(1, { email: nextEmail }, 1);
+
+    const auditChanges = jest.mocked(events.createAccountAuditEvent).mock.calls[0][3];
+    expect(auditChanges).toEqual({ email: { action } });
+    if (currentEmail) expect(JSON.stringify(auditChanges)).not.toContain(currentEmail);
+    if (nextEmail) expect(JSON.stringify(auditChanges)).not.toContain(nextEmail);
   });
 });
 

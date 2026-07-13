@@ -83,7 +83,7 @@ export default function UserForm({
         {badgeError && <div className="field-error">{badgeError}</div>}
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor="email">Email (notifications)</label>
+        <label className="form-label" htmlFor="email">Email professionnel (notifications)</label>
         <input
           id="email"
           className="form-input"
@@ -93,8 +93,12 @@ export default function UserForm({
           disabled={disabled}
           placeholder="jean.dupont@entreprise.fr"
           autoComplete="email"
+          aria-describedby="email-professional-hint"
           maxLength={254}
         />
+        <span id="email-professional-hint" className="form-hint">
+          Facultatif. Utilisé uniquement pour les notifications professionnelles Sentinel.
+        </span>
       </div>
       <div className="form-group">
         <label className="form-label" htmlFor="role">Rôle *</label>

@@ -19,7 +19,7 @@ interface UseUserFormReturn {
   isDirty: boolean;
 }
 
-const EMPTY: UserFormData = { firstName: '', lastName: '', badgeNumber: '', role: '' };
+const EMPTY: UserFormData = { firstName: '', lastName: '', badgeNumber: '', email: '', role: '' };
 
 export function useUserForm(): UseUserFormReturn {
   const [form, setForm] = useState<UserFormData>(EMPTY);
@@ -56,6 +56,11 @@ export function useUserForm(): UseUserFormReturn {
       issues.push('Veuillez sélectionner un rôle.');
     }
 
+    const email = form.email?.trim();
+    if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)) {
+      issues.push("L'adresse email professionnelle est invalide.");
+    }
+
     if (issues.length > 1) {
       setError('Merci de compléter les champs obligatoires.');
       return;
@@ -90,6 +95,7 @@ export function useUserForm(): UseUserFormReturn {
     form.firstName.trim() !== '' ||
     form.lastName.trim() !== '' ||
     form.badgeNumber.trim() !== '' ||
+    Boolean(form.email?.trim()) ||
     form.role !== ''
   );
 

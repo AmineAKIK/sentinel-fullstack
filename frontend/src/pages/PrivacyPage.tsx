@@ -12,44 +12,102 @@ export default function PrivacyPage() {
         </header>
 
         <div className="privacy-content">
-          <h2>Responsable de traitement</h2>
+          <h2>Responsable du traitement</h2>
           <p>
-            Le traitement des données est opéré par l'administrateur de l'instance Sentinel
-            au sein de l'établissement. Pour toute demande relative à vos données, adressez-vous
-            directement à l'administrateur via l'espace d'administration.
+            Le responsable de traitement est l'entreprise ou l'établissement qui exploite
+            l'instance Sentinel et en détermine les usages. L'administrateur de l'application
+            intervient pour son compte afin de gérer les utilisateurs, les habilitations et les
+            paramètres de l'instance. Pour toute question relative à vos données, utilisez le
+            canal interne prévu par votre entreprise ou adressez-vous à l'administrateur, qui
+            transmettra la demande au service compétent.
           </p>
 
           <h2>Données collectées</h2>
           <p>
             Sentinel traite les données strictement nécessaires au fonctionnement du suivi
-            d'atelier : nom, prénom, numéro de badge et, le cas échéant, adresse e-mail
-            (utilisée uniquement pour les notifications de réinitialisation de mot de passe).
-            Aucune donnée biométrique, de localisation ou de navigation n'est collectée.
+            d'atelier : nom, prénom, numéro de badge professionnel, rôle et, de manière
+            facultative, adresse e-mail professionnelle. Le champ e-mail est destiné à recevoir
+            une adresse fournie par l'entreprise ; lorsqu'elle permet d'identifier une personne,
+            cette adresse reste une donnée personnelle. Les comptes d'administration comportent
+            un nom d'utilisateur et peuvent également comporter une adresse e-mail professionnelle.
+            Les actions réalisées sur les comptes et les incidents génèrent par ailleurs des traces
+            horodatées nécessaires au suivi de l'activité.
+          </p>
+          <p>
+            Sentinel ne collecte aucune donnée biométrique ou de géolocalisation et n'utilise
+            aucun dispositif de suivi publicitaire.
+          </p>
+
+          <h2>Utilisation des adresses e-mail</h2>
+          <p>
+            L'adresse e-mail professionnelle d'un compte atelier est facultative. Lorsqu'elle est
+            renseignée et que le compte est actif, Sentinel peut l'utiliser pour envoyer les
+            notifications opérationnelles correspondant au rôle de la personne ou à son lien avec
+            un incident : demande d'arbitrage, urgence, prise en charge, changement de statut,
+            consigne ou résultat d'une demande. L'absence d'adresse e-mail n'empêche pas l'accès
+            à l'atelier par badge et mot de passe.
+          </p>
+          <p>
+            La réinitialisation d'un mot de passe suit un circuit distinct : la demande d'un
+            utilisateur atelier est enregistrée pour être traitée par l'administrateur. Si le canal
+            correspondant est activé et qu'une adresse d'administration est configurée, une alerte
+            peut également y être envoyée. L'administrateur génère ensuite un nouveau code
+            temporaire. L'adresse e-mail facultative du compte atelier n'est pas utilisée comme
+            canal de récupération du mot de passe. Aucune adresse n'est utilisée à des fins
+            commerciales ou publicitaires.
           </p>
 
           <h2>Finalité et base légale</h2>
           <p>
-            Ces données servent exclusivement à la traçabilité des interventions de
-            production : identification des déclarants, suivi des prises en charge et
-            horodatage des clôtures. Le traitement repose sur l'intérêt légitime de
-            l'exploitant au titre du pilotage de son activité industrielle.
+            Les données servent à gérer les comptes et les habilitations, sécuriser les accès,
+            coordonner le traitement des incidents et assurer la traçabilité des signalements,
+            interventions et décisions. Dans le contexte d'une entreprise privée, ce traitement
+            peut reposer sur son intérêt légitime à assurer le suivi de production et la
+            continuité des interventions, sous réserve qu'elle en documente la nécessité et la
+            proportionnalité. Il appartient à l'entreprise responsable de traitement de confirmer
+            la base légale applicable à son contexte et de respecter les droits des personnes.
+          </p>
+
+          <h2>Destinataires</h2>
+          <p>
+            Les données de compte sont accessibles aux administrateurs habilités. Les informations
+            relatives aux incidents et les notifications associées sont accessibles ou adressées
+            uniquement aux utilisateurs autorisés selon leur rôle et leur implication dans
+            l'incident. Lorsqu'un service d'envoi d'e-mails est configuré, son prestataire
+            technique traite les données strictement nécessaires à l'acheminement des messages
+            pour le compte de l'entreprise exploitante. Les données ne sont ni vendues ni utilisées
+            à des fins de prospection.
           </p>
 
           <h2>Durée de conservation</h2>
           <p>
-            À la suppression d'un compte, les données personnelles sont immédiatement
-            anonymisées : le nom est remplacé par « Utilisateur Supprimé », le badge par
-            un identifiant neutre, et les éléments d'authentification sont détruits.
-            L'historique des incidents est conservé sous forme anonymisée pour les
-            besoins de traçabilité industrielle.
+            Les données du compte sont conservées tant que l'habilitation est nécessaire. La
+            désactivation bloque l'accès et les notifications opérationnelles, sans effacer le
+            compte. Lors de sa suppression par un administrateur, le compte opérationnel est
+            pseudonymisé : le nom est remplacé par « Utilisateur Supprimé », le badge par un
+            identifiant neutre, et l'adresse e-mail ainsi que les éléments d'authentification sont
+            supprimés.
+          </p>
+          <p>
+            Pour préserver l'intégrité de la traçabilité industrielle, certains incidents et
+            événements d'audit conservent l'identité professionnelle telle qu'elle a été enregistrée
+            au moment de l'action. Ces traces historiques restent soumises à un accès restreint et
+            à la politique de conservation définie par l'entreprise exploitante. Sentinel
+            n'applique actuellement aucun délai de suppression automatique à ces historiques.
           </p>
 
           <h2>Vos droits</h2>
           <p>
             Conformément au RGPD (articles 15 à 22), vous disposez d'un droit d'accès,
-            de rectification, d'effacement et d'opposition. Ces droits s'exercent auprès
-            de l'administrateur de l'application, qui dispose des outils nécessaires dans
-            l'espace d'administration.
+            de rectification, d'effacement, de limitation et d'opposition, dans les conditions
+            prévues par les textes. Ces droits s'exercent auprès de l'entreprise responsable de
+            traitement, par son canal interne ou par l'intermédiaire de l'administrateur Sentinel.
+            Une demande portant sur des traces historiques est examinée au regard des besoins de
+            traçabilité et des obligations applicables. Vous pouvez également introduire une
+            réclamation auprès de la CNIL sur{' '}
+            <a href="https://www.cnil.fr" target="_blank" rel="noreferrer">
+              cnil.fr
+            </a>.
           </p>
 
           <h2>Cookies</h2>
@@ -75,7 +133,7 @@ export default function PrivacyPage() {
         </div>
 
         <footer className="privacy-footer">
-          <p className="privacy-update">Mis à jour le 28 juin 2026</p>
+          <p className="privacy-update">Mis à jour le 13 juillet 2026</p>
           <Link to="/login" className="privacy-back-link">Retour à l'accueil</Link>
         </footer>
       </section>

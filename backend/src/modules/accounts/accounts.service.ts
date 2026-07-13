@@ -62,6 +62,9 @@ export async function createAccountService(input: CreateAccountInput, adminId: n
       lastName: input.lastName,
       badgeNumber: input.badgeNumber,
       role: input.role,
+      // L'adresse elle-même n'a pas sa place dans le journal d'audit : seule
+      // l'existence d'un canal de notification professionnel est pertinente.
+      emailConfigured: Boolean(input.email),
     }, client);
     return account;
   });
@@ -99,11 +102,22 @@ export async function updateAccountService(
     if (guard) return guard;
   }
 
-  const changes: Record<string, { old: unknown; new: unknown }> = {};
+  const changes: Record<string, unknown> = {};
   if (updates.firstName !== undefined && updates.firstName !== current.first_name) changes.firstName = { old: current.first_name, new: updates.firstName };
   if (updates.lastName !== undefined && updates.lastName !== current.last_name) changes.lastName = { old: current.last_name, new: updates.lastName };
   if (updates.badgeNumber !== undefined && updates.badgeNumber !== current.badge_number) changes.badgeNumber = { old: current.badge_number, new: updates.badgeNumber };
   if (updates.role !== undefined && updates.role !== current.role) changes.role = { old: current.role, new: updates.role };
+  if (updates.email !== undefined && updates.email !== current.email) {
+    // On conserve la nature de l'action, jamais l'ancienne ou la nouvelle
+    // adresse, afin de ne pas dupliquer cette donnée personnelle dans l'audit.
+    changes.email = {
+      action: updates.email === null
+        ? 'removed'
+        : current.email
+          ? 'updated'
+          : 'configured',
+    };
+  }
 
   const account = await withTransaction(async (client) => {
     const updated = await updateAccountData(id, updates, client);

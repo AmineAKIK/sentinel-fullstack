@@ -32,6 +32,7 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         badgeNumber: form.badgeNumber.trim(),
+        email: form.email?.trim() || null,
         role: form.role as Role,
       });
       setCreatedUser(user);
@@ -127,6 +128,10 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
             <div className="detail-field">
               <span className="detail-field-label">Rôle</span>
               <span className="detail-field-value">{form.role || '-'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-field-label">Email professionnel</span>
+              <span className="detail-field-value">{form.email?.trim() || 'Non renseigné'}</span>
             </div>
           </div>
         </div>

@@ -79,17 +79,32 @@ function sendMail(to: string | string[], subject: string, html: string): void {
   const mailer = getMailer();
   if (!mailer) return;
 
-  const recipients = Array.isArray(to) ? to : [to];
+  const recipients = Array.from(new Set(
+    (Array.isArray(to) ? to : [to])
+      .map((recipient) => recipient.trim())
+      .filter(Boolean)
+  ));
   if (recipients.length === 0) return;
 
-  mailer.sendMail({
-    from: getSenderAddress(),
-    to: recipients.join(', '),
-    subject,
-    html,
-  }).catch((err: unknown) => {
-    logger.error({ err, subject, recipients }, '[mailer] Failed to send email');
-  });
+  // Un message par destinataire : aucune adresse professionnelle n'est
+  // divulguée aux autres personnes notifiées via l'en-tête To.
+  for (const recipient of recipients) {
+    mailer.sendMail({
+      from: getSenderAddress(),
+      to: recipient,
+      subject,
+      html,
+    }).catch((err: unknown) => {
+      // L'erreur Nodemailer peut contenir le destinataire dans son message ou
+      // ses propriétés. Ne journaliser que des métadonnées techniques sûres.
+      const mailError = err as { name?: unknown; code?: unknown };
+      logger.error({
+        errorName: typeof mailError?.name === 'string' ? mailError.name : 'Error',
+        errorCode: typeof mailError?.code === 'string' ? mailError.code : undefined,
+        subject,
+      }, '[mailer] Failed to send email');
+    });
+  }
 }
 
 function clientOrigin(): string {

@@ -1,4 +1,4 @@
-import { layout } from './layout';
+import { escapeHtml, layout } from './layout';
 
 export interface PasswordResetRequestedData {
   firstName: string;
@@ -13,11 +13,15 @@ export function subject(): string {
 }
 
 export function html(data: PasswordResetRequestedData): string {
-  const date = data.requestedAt.toLocaleString('fr-FR', {
+  const date = escapeHtml(data.requestedAt.toLocaleString('fr-FR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
     timeZone: 'Europe/Paris',
-  });
+  }));
+  const firstName = escapeHtml(data.firstName);
+  const lastName = escapeHtml(data.lastName);
+  const badgeNumber = escapeHtml(data.badgeNumber);
+  const adminUrl = escapeHtml(data.adminUrl);
 
   const body = `
     <h2 style="margin:0 0 8px 0;color:#1a1a2e;font-size:20px;">Demande de réinitialisation</h2>
@@ -31,13 +35,13 @@ export function html(data: PasswordResetRequestedData): string {
       <tr>
         <td style="padding:6px 0;">
           <span style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nom</span><br/>
-          <span style="color:#111827;font-size:15px;font-weight:500;">${data.lastName} ${data.firstName}</span>
+          <span style="color:#111827;font-size:15px;font-weight:500;">${lastName} ${firstName}</span>
         </td>
       </tr>
       <tr>
         <td style="padding:6px 0;border-top:1px solid #e5e7eb;">
           <span style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Badge</span><br/>
-          <span style="color:#111827;font-size:15px;font-weight:500;font-family:monospace;">${data.badgeNumber}</span>
+          <span style="color:#111827;font-size:15px;font-weight:500;font-family:monospace;">${badgeNumber}</span>
         </td>
       </tr>
     </table>
@@ -47,7 +51,7 @@ export function html(data: PasswordResetRequestedData): string {
       puis transmettez le code temporaire à l'utilisateur par voie interne sécurisée.
     </p>
 
-    <a href="${data.adminUrl}"
+    <a href="${adminUrl}"
        style="display:inline-block;background:#1a1a2e;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">
       Accéder à l'administration
     </a>
