@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { handleControllerError } from '../../utils/controller';
+import { handleControllerError, parseIdParam, sendServiceError } from '../../utils/controller';
 import {
   getReferenceDashboardService,
   getReferenceQualityService,
@@ -43,14 +43,16 @@ export async function listPendingPasswordResetRequests(_req: Request, res: Respo
 
 export async function markPasswordResetRequestHandled(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) { res.status(400).json({ error: { code: 'INVALID_ID', message: 'ID invalide.' } }); return; }
-    const ok = await markPasswordResetRequestHandledService(id);
-    if (!ok) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Demande introuvable ou déjà traitée.' } }); return; }
+    const id = parseIdParam(req.params.id);
+    if (sendServiceError(res, id)) return;
+
+    const result = await markPasswordResetRequestHandledService(id.data);
+    if (sendServiceError(res, result)) return;
+
     if (req.admin) {
-      await createAdminSystemAuditEvent(req.admin.adminId, 'PASSWORD_RESET_REQUEST_HANDLED', { requestId: id });
+      await createAdminSystemAuditEvent(req.admin.adminId, 'PASSWORD_RESET_REQUEST_HANDLED', { requestId: id.data });
     }
-    res.json({ ok: true });
+    res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'markPasswordResetRequestHandled', err);
   }

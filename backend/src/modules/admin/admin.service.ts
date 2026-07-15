@@ -1,4 +1,5 @@
 import { boundedInt } from '../../db/sql';
+import { notFound, ok, ServiceResult } from '../../utils/serviceResult';
 import {
   getReferenceDashboardData,
   getReferenceQualityRawData,
@@ -99,6 +100,10 @@ export async function listPendingPasswordResetRequestsService(): Promise<Passwor
   return listPendingPasswordResetRequestsData();
 }
 
-export async function markPasswordResetRequestHandledService(id: number): Promise<boolean> {
-  return markPasswordResetRequestHandledData(id);
+export async function markPasswordResetRequestHandledService(
+  id: number
+): Promise<ServiceResult<{ message: string }>> {
+  const handled = await markPasswordResetRequestHandledData(id);
+  if (!handled) return notFound('Demande introuvable ou déjà traitée.');
+  return ok({ message: 'Demande marquée comme traitée.' });
 }
