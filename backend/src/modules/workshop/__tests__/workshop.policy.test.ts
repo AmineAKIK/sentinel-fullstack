@@ -95,20 +95,25 @@ describe('OPERATOR permissions', () => {
 
 describe('MAINTENANCE permissions', () => {
   it('can TAKE an open, non-taken incident', () => {
-    expect(canPerform('MAINTENANCE', 'TAKE', incident({ status: 'OPEN', is_taken: false }))).toBe(
-      true
-    );
+    expect(
+      canPerform('MAINTENANCE', 'TAKE', incident({ status: 'OPEN', is_taken: false }), ACTOR_ID)
+    ).toBe(true);
   });
 
-  it('can TAKE an already-taken incident (retake — team play, every transfer is logged)', () => {
-    expect(canPerform('MAINTENANCE', 'TAKE', incident({ status: 'OPEN', is_taken: true }))).toBe(
-      true
-    );
+  it('can transfer an incident owned by another technician, but not retake its own', () => {
+    const taken = incident({ status: 'OPEN', is_taken: true, taken_by_user_id: 99 });
+    expect(canPerform('MAINTENANCE', 'TAKE', taken, ACTOR_ID)).toBe(true);
+    expect(canPerform('MAINTENANCE', 'TAKE', taken, 99)).toBe(false);
   });
 
   it('cannot TAKE a PENDING incident', () => {
     expect(
-      canPerform('MAINTENANCE', 'TAKE', incident({ status: 'PENDING', is_taken: false }))
+      canPerform(
+        'MAINTENANCE',
+        'TAKE',
+        incident({ status: 'PENDING', is_taken: false }),
+        ACTOR_ID
+      )
     ).toBe(false);
   });
 

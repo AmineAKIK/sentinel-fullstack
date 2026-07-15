@@ -8,94 +8,53 @@
 | `PENDING` | MAINTENANCE a mis en pause (en attente de pièces, d'informations, etc.) |
 | `CLOSED` | Incident résolu par MAINTENANCE |
 | `CANCELED` | Incident annulé (erreur de déclaration, etc.) |
-| `INVALIDATED` | Incident clôturé à tort, réouvert par RESPONSABLE |
+| `INVALIDATED` | Clôture invalidée par RESPONSABLE ; état terminal conservé dans l'historique |
 
 ---
 
 ## Diagramme des transitions
 
+```mermaid
+stateDiagram-v2
+    [*] --> OPEN_NON_PRIS : création
+    OPEN_NON_PRIS --> OPEN_PRIS : TAKE
+    OPEN_PRIS --> OPEN_PRIS : TAKE par une autre maintenance
+    OPEN_PRIS --> PENDING : SET_PENDING + diagnostic
+    PENDING --> OPEN_PRIS : RESUME
+    OPEN_PRIS --> CLOSED : CLOSE + note d'intervention
+    OPEN_NON_PRIS --> CANCELED : CANCEL direct ou APPROVE_CANCEL
+    PENDING --> CANCELED : CANCEL par RESPONSABLE
+    CLOSED --> INVALIDATED : INVALIDATE_CLOSED + motif
 ```
-                        ┌──────────────────────────────────────────────┐
-                        │                                              │
-                        │  OPERATOR déclare un problème machine        │
-                        │                                              │
-                        └──────────────────┬───────────────────────────┘
-                                           │
-                                           ▼
-                              ┌────────────────────────┐
-                              │                        │
-                              │   OPEN (non pris)      │◄──────────────────────────────────────────┐
-                              │                        │                                           │
-                              └────────┬───────────────┘                                           │
-                                       │                                                           │
-           ┌───────────────────────────┼───────────────────────────────┐                          │
-           │                           │                               │                          │
-           ▼                           ▼                               ▼                          │
-   [MAINTENANCE : TAKE]        [RESPONSABLE/MAINTENANCE :      [OPERATOR :                        │
-           │                    CANCEL direct]                  REQUEST_CANCEL]                    │
-           │                           │                               │                          │
-           ▼                           ▼                               ▼                          │
-┌──────────────────────┐        ┌──────────┐                  [RESPONSABLE :                      │
-│                      │        │          │                   APPROVE_CANCEL]                     │
-│   OPEN (pris)        │        │ CANCELED │◄─────────────────────────┘                           │
-│   is_taken = true    │        │          │                                                       │
-│                      │        └──────────┘                                                       │
-└──────┬───────────────┘                                                                           │
-       │                                                                                           │
-       ├──────────────────────────────────────────────────────────────────────────────────────┐    │
-       │                                                                                      │    │
-       ▼                                                                                      │    │
-[MAINTENANCE : SET_PENDING]                                                                   │    │
-       │                                                                                      │    │
-       ▼                                                                                      │    │
-┌──────────────────────┐                                                                      │    │
-│                      │                                                                      │    │
-│      PENDING         │──────────[MAINTENANCE : RESUME]──────────────────────────────────────┘    │
-│                      │                                                                           │
-└──────────────────────┘                                                                           │
-                                                                                                   │
-       ▼ (depuis OPEN pris uniquement)                                                             │
-[MAINTENANCE : CLOSE]                                                                              │
-       │                                                                                           │
-       ▼                                                                                           │
-┌──────────────────────┐                                                                           │
-│                      │                                                                           │
-│      CLOSED          │──────────[RESPONSABLE : INVALIDATE_CLOSED]────────────────────────────────┘
-│                      │                        │
-└──────────────────────┘                        │
-                                                ▼
-                                       ┌──────────────────┐
-                                       │                  │
-                                       │   INVALIDATED    │
-                                       │                  │
-                                       └──────────────────┘
-```
+
+`OPEN_NON_PRIS` et `OPEN_PRIS` représentent le même statut SQL `OPEN`, distingué ici par
+la valeur de `is_taken`. `CLOSED`, `CANCELED` et `INVALIDATED` sont des états terminaux.
 
 ---
 
 ## Détail des transitions
 
-### OPEN (non pris) → OPEN (pris)
+### OPEN → OPEN (pris ou repris)
 - **Qui** : MAINTENANCE uniquement
 - **Action** : `TAKE`
-- **Condition** : statut OPEN, `is_taken = false`
-- **Effet** : `is_taken = true`, `taken_by_user_id = actorId`, RESPONSABLE auto-follow
+- **Condition** : statut OPEN ; l'incident peut être non pris ou déjà pris par un autre technicien. Le technicien actuellement affecté ne peut pas répéter une prise en charge sans effet.
+- **Effet** : `is_taken = true`, `taken_by_user_id = actorId`, avec journalisation du technicien précédent en cas de reprise
 
 ### OPEN (pris) → PENDING
-- **Qui** : MAINTENANCE (celui qui a pris l'incident)
+- **Qui** : tout utilisateur MAINTENANCE
 - **Action** : `SET_PENDING`
 - **Condition** : statut OPEN, `is_taken = true`
 - **Requis** : un diagnostic doit exister (saisi maintenant ou précédemment)
 - **Effet** : statut passe à PENDING
 
 ### PENDING → OPEN (pris)
-- **Qui** : MAINTENANCE (celui qui a pris l'incident)
+- **Qui** : tout utilisateur MAINTENANCE
 - **Action** : `RESUME`
 - **Condition** : statut PENDING, `is_taken = true`
 - **Effet** : statut repasse à OPEN
 
 ### OPEN (pris) → CLOSED
-- **Qui** : MAINTENANCE (celui qui a pris l'incident)
+- **Qui** : tout utilisateur MAINTENANCE
 - **Action** : `CLOSE`
 - **Condition** : statut OPEN, `is_taken = true` (pas depuis PENDING)
 - **Requis** : une note d'intervention doit exister
@@ -108,7 +67,7 @@
 - **Effet** : statut passe à CANCELED
 
 ### OPEN → CANCELED (via demande)
-- **Étape 1** : OPERATOR fait `REQUEST_CANCEL` avec un motif obligatoire
+- **Étape 1** : l'OPERATOR déclarant fait `REQUEST_CANCEL` avec un motif obligatoire, tant que l'incident est actif et non pris
 - **Étape 2** : RESPONSABLE fait `APPROVE_CANCEL` → statut CANCELED
 - **Alternative** : RESPONSABLE fait `REJECT_CANCEL` → incident reste OPEN
 
@@ -126,7 +85,7 @@
 - **Action** : `INVALIDATE_CLOSED`
 - **Condition** : statut CLOSED
 - **Requis** : motif d'invalidation obligatoire
-- **Effet** : statut passe à INVALIDATED (l'incident est historisé mais marqué comme invalide)
+- **Effet** : statut passe à INVALIDATED ; l'incident reste historisé et n'est pas rouvert
 
 ---
 
@@ -170,7 +129,7 @@ Ce sont les types d'anomalie qu'un OPERATOR peut déclarer, indépendamment du s
 
 1. **On ne peut pas clôturer un incident PENDING** — il faut d'abord le reprendre (RESUME) pour repasser en OPEN, puis clôturer.
 2. **Seul MAINTENANCE peut prendre en charge** — RESPONSABLE supervise mais n'intervient pas techniquement.
-3. **OPERATOR ne peut demander l'annulation que si l'incident n'est pas encore pris** — une fois pris, c'est le RESPONSABLE qui décide.
+3. **OPERATOR ne peut demander l'annulation que si l'incident n'est pas encore pris** — un incident OPEN déjà pris ne peut pas être annulé directement ; lorsqu'il est PENDING, seul RESPONSABLE peut l'annuler.
 4. **Diagnostic obligatoire avant PENDING** — on ne peut pas mettre en attente sans avoir documenté le problème.
 5. **Note d'intervention obligatoire avant CLOSE** — on ne peut pas clôturer sans avoir documenté ce qui a été fait.
-6. **Toutes les transitions génèrent un événement d'audit** — traçabilité complète de qui a fait quoi et quand.
+6. **Toutes les transitions réussies génèrent un événement d'audit** — journal append-only au niveau applicatif, avec l'acteur et l'horodatage de l'action.

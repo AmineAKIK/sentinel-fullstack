@@ -742,7 +742,9 @@ export async function updateIncidentData(
 ): Promise<number | null> {
   const db = client ?? pool;
   const { current, updates } = input;
-  const tookOwnership = updates.isTaken === true && !current.is_taken;
+  const tookOwnership =
+    updates.isTaken === true &&
+    (!current.is_taken || current.taken_by_user_id !== input.actorUserId);
   const nextTakenByUserId = tookOwnership ? input.actorUserId : current.taken_by_user_id;
   const nextTakenAt = tookOwnership ? new Date() : current.taken_at;
 

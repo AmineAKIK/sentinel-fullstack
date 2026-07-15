@@ -79,6 +79,26 @@ export default function PrivacyPage() {
             à des fins de prospection.
           </p>
 
+          <h2>Assistance conversationnelle</h2>
+          <p>
+            Lorsque l'assistance externe est activée par la configuration d'une clé API, Sentinel
+            transmet à l'API DeepSeek le message saisi, jusqu'aux dix derniers messages de
+            l'historique de conversation fourni par le navigateur, ainsi que la documentation
+            fonctionnelle statique nécessaire pour répondre aux questions d'utilisation.
+          </p>
+          <p>
+            Aucune donnée opérationnelle de Sentinel — incidents, utilisateurs, lignes, journaux
+            ou informations en temps réel — n'est consultée ni ajoutée automatiquement à cette
+            requête. Le texte saisi par l'utilisateur est toutefois transmis au prestataire : il ne
+            faut donc y renseigner aucune donnée personnelle, confidentielle ou industrielle.
+          </p>
+          <p>
+            Avant d'activer ce service, l'entreprise responsable du traitement doit valider le
+            cadre contractuel applicable avec le prestataire, ses conditions de conservation et de
+            sécurité, ainsi que la localisation du traitement et, le cas échéant, les garanties
+            encadrant les transferts internationaux de données.
+          </p>
+
           <h2>Durée de conservation</h2>
           <p>
             Les données du compte sont conservées tant que l'habilitation est nécessaire. La
@@ -117,23 +137,26 @@ export default function PrivacyPage() {
           </p>
           <ul className="privacy-list">
             <li>
-              <strong>sentinel_auth_token</strong> — session administration et atelier
-              (HTTP-only, durée de session)
+              <strong>sentinel_admin_token</strong> — session d'administration
+              (HTTP-only, durée configurée pour l'administration)
             </li>
             <li>
-              <strong>sentinel_refresh_token</strong> — renouvellement silencieux de
-              session (HTTP-only, durée étendue)
+              <strong>sentinel_workshop_token</strong> — session de l'espace Atelier
+              (HTTP-only, durée configurée pour l'atelier)
             </li>
             <li>
               <strong>sentinel_board_token</strong> — accès au tableau d'atelier partagé
               (HTTP-only, durée de session)
             </li>
           </ul>
-          <p>Aucun cookie analytique, publicitaire ou tiers n'est déposé.</p>
+          <p>
+            Sentinel n'utilise pas de mécanisme de refresh token. Aucun cookie analytique,
+            publicitaire ou tiers n'est déposé.
+          </p>
         </div>
 
         <footer className="privacy-footer">
-          <p className="privacy-update">Mis à jour le 13 juillet 2026</p>
+          <p className="privacy-update">Mis à jour le 14 juillet 2026</p>
           <Link to="/login" className="privacy-back-link">Retour à l'accueil</Link>
         </footer>
       </section>

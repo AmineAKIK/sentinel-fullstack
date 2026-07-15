@@ -110,15 +110,15 @@ describe('OPERATOR permissions', () => {
 
 describe('MAINTENANCE permissions', () => {
   it('can take an open non-taken incident', () => {
-    expect(canPerform('MAINTENANCE', 'take', incident({ status: 'OPEN', is_taken: false }))).toBe(
-      true
-    );
+    expect(
+      canPerform('MAINTENANCE', 'take', incident({ status: 'OPEN', is_taken: false }), 7)
+    ).toBe(true);
   });
 
-  it('can retake an already-taken open incident', () => {
-    expect(canPerform('MAINTENANCE', 'take', incident({ status: 'OPEN', is_taken: true }))).toBe(
-      true
-    );
+  it('can transfer an incident owned by another technician, but not retake its own', () => {
+    const taken = incident({ status: 'OPEN', is_taken: true, taken_by_user_id: 9 });
+    expect(canPerform('MAINTENANCE', 'take', taken, 7)).toBe(true);
+    expect(canPerform('MAINTENANCE', 'take', taken, 9)).toBe(false);
   });
 
   it('can setPending when OPEN and taken', () => {

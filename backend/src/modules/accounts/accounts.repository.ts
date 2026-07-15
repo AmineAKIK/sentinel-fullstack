@@ -169,7 +169,11 @@ export async function updateAccountData(
 export async function setAccountActive(id: number, isActive: boolean, client?: PoolClient): Promise<AccountDto | null> {
   const db = client ?? pool;
   const { rows } = await db.query<AccountDto>(
-    `UPDATE sentinel_users SET is_active = $2, updated_at = NOW()
+    `UPDATE sentinel_users
+     SET is_active = $2,
+         session_version = session_version
+           + CASE WHEN is_active IS DISTINCT FROM $2 THEN 1 ELSE 0 END,
+         updated_at = NOW()
      WHERE id = $1 AND is_deleted = FALSE
      RETURNING ${accountSelect}`,
     [id, isActive]
@@ -234,6 +238,7 @@ export async function resetAccountPasswordData(
      SET password_hash = NULL,
          password_setup_token_hash = $2,
          password_setup_expires_at = $3,
+         session_version = session_version + 1,
          updated_at = NOW()
      WHERE id = $1 AND is_deleted = FALSE AND is_active = TRUE
      RETURNING ${accountSelect}`,

@@ -10,6 +10,7 @@ import {
   consultArbitrationRequest,
   countUnconsultedArbitrationIncidents,
   getBoardData,
+  updateIncidentData,
 } from '../workshop.repository';
 
 const mockedPool = jest.mocked(pool);
@@ -74,5 +75,63 @@ describe('arbitration consultation tracking', () => {
     expect(sql).toContain('INSERT INTO workshop_arbitration_consultations');
     expect(sql).toContain('ON CONFLICT (request_event_id) DO NOTHING');
     expect(mockedPool.query.mock.calls[0]?.[1]).toEqual([12, 7, 'ALL']);
+  });
+});
+
+describe('updateIncidentData ownership transfer', () => {
+  beforeEach(() => {
+    mockedPool.query.mockReset();
+  });
+
+  it('replaces the technician, timestamp and identity snapshot when an OPEN incident is retaken', async () => {
+    const previousTakenAt = new Date('2026-07-01T08:00:00.000Z');
+    mockedPool.query
+      .mockResolvedValueOnce(result([{ id: 10 }]))
+      .mockResolvedValueOnce(result([]));
+
+    await updateIncidentData({
+      incidentId: 10,
+      current: {
+        id: 10,
+        user_id: 1,
+        line_id: 2,
+        line_number: 'L02',
+        machine_id: 'M02',
+        machine_brand: 'Panasonic',
+        robot_label: 'R1',
+        head_number: 3,
+        state: 'DEGRADEE',
+        comment: null,
+        current_product: 'REF-10',
+        is_taken: true,
+        taken_by_user_id: 7,
+        taken_at: previousTakenAt,
+        is_priority: false,
+        status: 'OPEN',
+        diagnostic: null,
+        intervention_note: null,
+        responsible_comment: null,
+        edit_request: null,
+        cancel_request: false,
+        display_order: 0,
+        created_at: new Date('2026-07-01T07:00:00.000Z'),
+        updated_at: previousTakenAt,
+      },
+      updates: { isTaken: true },
+      role: 'MAINTENANCE',
+      actorUserId: 9,
+      selection: { lineNumber: 'L02', machineBrand: 'Panasonic' },
+      lineId: 2,
+      machineId: 'M02',
+      robotLabel: 'R1',
+      headNumber: 3,
+    });
+
+    const updateParams = mockedPool.query.mock.calls[0]?.[1] as unknown[];
+    expect(updateParams[15]).toBe(9);
+    expect(updateParams[16]).toBeInstanceOf(Date);
+    expect(updateParams[16]).not.toBe(previousTakenAt);
+    expect(mockedPool.query.mock.calls[1]?.[1]).toEqual([10, 9]);
+    expect(String(mockedPool.query.mock.calls[1]?.[0])).toContain('taken_by_first_name');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getBoardData, logoutBoardSession } from '../api/board';
 import { ApiResponseError } from '../api/client';
@@ -40,6 +40,7 @@ type BoardSettings = {
 
 const BOARD_SETTINGS_KEY = 'sentinel.board.settings.v1';
 const NO_LINES_SELECTED = '__none__';
+const EMPTY_INCIDENTS: WorkshopBoardIncident[] = [];
 const DEFAULT_SETTINGS: BoardSettings = {
   preset: 'default',
   showAlerts: true,
@@ -135,7 +136,7 @@ export default function WorkshopBoardPage() {
     setSearchParams(nextParams, { replace: true });
   }, [screenId, screenParam, searchParams, setSearchParams]);
 
-  async function refreshBoard() {
+  const refreshBoard = useCallback(async () => {
     try {
       const boardData = await getBoardData();
       setIncidents(boardData.incidents);
@@ -151,7 +152,7 @@ export default function WorkshopBoardPage() {
       }
       setDataError(true);
     }
-  }
+  }, [navigate]);
 
   useEffect(() => {
     void refreshBoard();
@@ -161,7 +162,7 @@ export default function WorkshopBoardPage() {
       window.clearInterval(refreshId);
       window.clearInterval(clockId);
     };
-  }, []);
+  }, [refreshBoard]);
 
   useEffect(() => {
     const nextSettings = loadBoardSettings(storageKey);
@@ -171,7 +172,7 @@ export default function WorkshopBoardPage() {
     setPageIndex(0);
   }, [storageKey]);
 
-  const safeIncidents = incidents ?? [];
+  const safeIncidents = incidents ?? EMPTY_INCIDENTS;
   const safeLines = lines ?? [];
 
   const activeIncidents = useMemo(() => {

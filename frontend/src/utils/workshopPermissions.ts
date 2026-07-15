@@ -111,9 +111,15 @@ export function canPerform(
         role === 'RESPONSABLE' && isActiveIncident(incident) && incident.cancel_request === true
       );
     case 'take':
-      // Any MAINTENANCE member can take or retake an OPEN incident — team play,
-      // every transfer is logged in the event history.
-      return role === 'MAINTENANCE' && incident.status === 'OPEN';
+      // Claim an OPEN incident, or transfer one owned by another technician.
+      // The current owner must not be offered a no-op that would create a
+      // misleading second TAKE event.
+      return (
+        role === 'MAINTENANCE' &&
+        incident.status === 'OPEN' &&
+        actorId !== undefined &&
+        (!incident.is_taken || incident.taken_by_user_id !== actorId)
+      );
     case 'setPending':
       return role === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
     case 'resume':

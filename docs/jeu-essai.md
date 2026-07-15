@@ -4,8 +4,12 @@
 > représentative de l'application (elle traverse les 4 couches du backend, la matrice de
 > permissions et l'audit trail).
 >
-> Exécution du 11/06/2026 contre l'API réelle (Express + PostgreSQL locale), avec les données
-> de test décrites ci-dessous. Les réponses « obtenues » sont les réponses JSON brutes de l'API.
+> Relevé exécuté le 11/06/2026 contre l'API réelle (Express + PostgreSQL locale), avec les
+> données de test décrites ci-dessous. Les réponses horodatées sont les réponses JSON brutes
+> conservées de cette exécution. Révision documentaire du 14/07/2026 : les limites de champs
+> et de rate limiting qui ont évolué depuis ce relevé sont signalées et appuyées par les tests
+> automatisés actuels ; elles doivent être rejouées avant d'être présentées comme une nouvelle
+> preuve d'exécution manuelle.
 
 ---
 
@@ -38,8 +42,8 @@ Création des données : insertion SQL directe (voir « Reproduire ce jeu d'essa
 | | |
 |---|---|
 | **Entrée** | `POST /api/workshop/incidents` — `{"lineId":13,"machineId":"JE-M1","robotLabel":"R01","headNumber":2,"state":"DEGRADEE","comment":"Cadence réduite de 30 % sur tête 2, à vérifier.","currentProduct":"REF-4821"}` |
-| **Attendu** | 200, incident créé en statut `OPEN`, non pris en charge, rattaché à l'opératrice |
-| **Obtenu** | `{"id":1,"user_id":1,"status":"OPEN","is_taken":false,"taken_by_user_id":null,"state":"DEGRADEE","head_number":2,...}` ✅ |
+| **Attendu actuel** | 201, incident créé en statut `OPEN`, non pris en charge, rattaché à l'opératrice |
+| **Obtenu le 11/06/2026** | Corps JSON conforme : `{"id":1,"user_id":1,"status":"OPEN","is_taken":false,"taken_by_user_id":null,"state":"DEGRADEE","head_number":2,...}`. Le code HTTP n'a pas été consigné dans le relevé brut ; réponse à recapturer pour prouver le `201` actuel. |
 
 ### 1.c Prise en charge par la maintenance (TAKE)
 
@@ -78,7 +82,7 @@ Création des données : insertion SQL directe (voir « Reproduire ce jeu d'essa
 | | |
 |---|---|
 | **Entrée** | `GET /api/workshop/incidents/1/events` |
-| **Attendu** | Un événement immuable par transition, dans l'ordre |
+| **Attendu** | Un événement append-only au niveau applicatif par transition, dans l'ordre |
 | **Obtenu** | `INCIDENT_CREATED → INCIDENT_TAKEN → INCIDENT_SET_PENDING → INCIDENT_RESUMED → INCIDENT_CLOSED` (affichés du plus récent au plus ancien) ✅ |
 
 **Analyse des écarts : aucun.** Chaque transition produit l'état attendu et son événement d'audit.
@@ -133,7 +137,7 @@ validation hiérarchique — c'est la règle métier centrale du module.
 | 4.a Énumérations invalides | `POST /incidents` avec `"state":"ARRET"` | 400 + message explicite | `400 VALIDATION_ERROR : "Invalid enum value. Expected 'SKIPEE_PAR_MACHINE' \| 'SKIPEE_PAR_CONDUCTEUR' \| 'DEGRADEE' \| 'INDISPONIBLE', received 'ARRET' …"` ✅ |
 | 4.b Numéro de tête hors référentiel | `"headNumber":0` | 400 | `400 VALIDATION_ERROR` (« La tête doit correspondre au référentiel de la machine. ») ✅ |
 | 4.c Ligne inexistante | `"lineId":99999` | 404 | `404 {"error":{"code":"NOT_FOUND","message":"Ligne introuvable ou inactive."}}` ✅ |
-| 4.d Commentaire de 1 200 caractères | `comment` = 1 200 × `X` | 400 (max 1 000) | `400 VALIDATION_ERROR : "String must contain at most 1000 character(s)"` ✅ |
+| 4.d Commentaire de 501 caractères | `comment` = 501 × `X` | 400 (max 500) | Couvert par `workshop.validation.test.ts` : 500 accepté, 501 refusé ✅ — réponse API à recapturer |
 
 **Analyse des écarts : aucun.** La validation Zod s'exécute dans le controller : aucune donnée
 invalide n'atteint le service ni la base.
@@ -145,13 +149,14 @@ invalide n'atteint le service ni la base.
 | Cas | Entrée | Attendu | Obtenu |
 |---|---|---|---|
 | 5.a Accès sans session | `GET /api/workshop/incidents` sans cookie | 401 | `401 {"error":{"code":"UNAUTHORIZED","message":"Authentification requise."}}` ✅ |
-| 5.b Force brute sur le login | 21 × `POST /api/auth/login` avec mot de passe erroné | 401 répétés puis 429 | 401 jusqu'à la 18ᵉ, puis `429 {"error":{"code":"RATE_LIMITED","message":"Trop de tentatives. Réessayez dans 14 minute(s)."}}` + header `Retry-After: 791` ✅ |
+| 5.b Force brute sur le login | 11 × `POST /api/auth/login` avec mot de passe erroné, réglage par défaut | 10 réponses 401 puis 429 à la 11ᵉ tentative | Couvert par `loginRateLimit.test.ts` : blocage après 10 échecs sur 5 min, clé IP + identifiant ✅ — réponse API à recapturer |
 
-**Analyse des écarts : un écart mineur, expliqué.** Le blocage est survenu à la 19ᵉ tentative
-et non à la 21ᵉ : les requêtes des scénarios précédents, émises depuis la même adresse IP,
-avaient déjà consommé une partie du **limiteur global par IP**. Ce quota est configurable et se
-cumule avec le limiteur de login (10 échecs / 5 min par IP + identifiant). Le comportement
-de protection est donc conforme, et même légèrement plus strict en situation de trafic réel.
+**État actuel.** Le limiteur de connexion compte uniquement les échecs et utilise une clé
+combinant l'adresse IP et l'identifiant. Son seuil est configurable dans l'administration
+(`login_max_attempts`, 10 par défaut) et sa fenêtre est de 5 minutes. Le limiteur global est
+distinct et autorise par défaut 3 000 requêtes par IP sur 15 minutes. Les compteurs sont stockés
+en mémoire du processus : ils sont réinitialisés au redémarrage et ne sont pas partagés entre
+plusieurs instances du backend.
 
 ---
 
@@ -159,12 +164,16 @@ de protection est donc conforme, et même légèrement plus strict en situation 
 
 | Scénario | Cas testés | Conformes | Écarts |
 |---|---|---|---|
-| 1 — Cycle de vie complet | 7 | 7 | 0 |
+| 1 — Cycle de vie complet | 7 | 6 relevés complets + 1 corps JSON conforme | Code HTTP de création à recapturer |
 | 2 — Permissions | 3 | 3 | 0 |
 | 3 — Workflow d'approbation | 2 | 2 | 0 |
-| 4 — Validation des entrées | 4 | 4 | 0 |
-| 5 — Sécurité des accès | 2 | 2 | 1 mineur (expliqué) |
-| **Total** | **18** | **18** | — |
+| 4 — Validation des entrées | 4 | 3 relevés API + 1 test automatisé actuel | Cas 4.d à recapturer avec la limite 500 |
+| 5 — Sécurité des accès | 2 | 1 relevé API + 1 test automatisé actuel | Cas 5.b à recapturer avec le seuil par défaut 10 |
+| **Total** | **18** | **15 relevés API historiques complets + 1 corps JSON conforme + 2 preuves automatisées actuelles** | **3 réponses API à rafraîchir** |
+
+Ce tableau distingue volontairement les réponses réellement observées le 11/06/2026 des deux
+comportements modifiés depuis et du code HTTP qui n'avait pas été consigné. Il ne présente pas
+un test automatisé comme une capture d'API.
 
 ---
 

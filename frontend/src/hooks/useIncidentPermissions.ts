@@ -20,7 +20,7 @@ export function useIncidentPermissions(
   const canWithdrawEdit = canPerform(userRole, 'withdrawEdit', incident, userId);
   const canRequestCancel = canPerform(userRole, 'requestCancel', incident, userId);
   const canCancel = canPerform(userRole, 'cancel', incident);
-  const canTake = canPerform(userRole, 'take', incident);
+  const canTake = canPerform(userRole, 'take', incident, userId);
   const canSetPending = canPerform(userRole, 'setPending', incident);
   const canResume = canPerform(userRole, 'resume', incident);
   const canClose = canPerform(userRole, 'close', incident);

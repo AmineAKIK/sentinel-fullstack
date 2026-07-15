@@ -54,7 +54,9 @@ export async function takeIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
-    if (!canPerform(actorRole, 'TAKE', current)) return { kind: 'forbidden' as const };
+    if (!canPerform(actorRole, 'TAKE', current, actorUserId)) {
+      return { kind: 'forbidden' as const };
+    }
 
     const id = await workshopRepository.updateIncidentData(
       {

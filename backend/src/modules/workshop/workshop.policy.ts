@@ -112,9 +112,15 @@ export function canPerform(
         workshopRole === 'RESPONSABLE' && isActiveIncident(incident) && hasCancelRequest(incident)
       );
     case 'TAKE':
-      // Any MAINTENANCE member can take or retake an OPEN incident at any time.
-      // Technicians are autonomous — the ball changes feet, every transfer is logged.
-      return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN';
+      // A MAINTENANCE member can claim an OPEN incident or transfer one that
+      // belongs to another technician. Re-taking one's own incident would be
+      // a no-op that resets timestamps and creates a misleading audit event.
+      return (
+        workshopRole === 'MAINTENANCE' &&
+        incident.status === 'OPEN' &&
+        actorId !== undefined &&
+        (!incident.is_taken || incident.taken_by_user_id !== actorId)
+      );
     case 'SET_PENDING':
       return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
     case 'RESUME':
