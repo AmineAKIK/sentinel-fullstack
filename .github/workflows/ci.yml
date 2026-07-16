@@ -25,8 +25,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -48,8 +48,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -87,8 +87,8 @@ jobs:
       NODE_ENV: test
       LOG_LEVEL: warn
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -124,8 +124,8 @@ jobs:
       CLIENT_ORIGIN: http://127.0.0.1:5174
       GLOBAL_API_RATE_LIMIT_MAX: 10000
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -161,7 +161,7 @@ jobs:
       TRUST_PROXY: 'true'
       CADDY_DOMAIN: sentinel.example.test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Compose interpolation and schema
         run: docker compose config --quiet
       - name: Build production images
@@ -180,7 +180,7 @@ jobs:
           -e CADDY_DOMAIN=sentinel.example.test
           -v "${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile:ro"
           caddy:2.11.4-alpine
-          validate --config /etc/caddy/Caddyfile
+          caddy validate --config /etc/caddy/Caddyfile
       - name: ShellCheck operational scripts
         run: >-
           docker run --rm

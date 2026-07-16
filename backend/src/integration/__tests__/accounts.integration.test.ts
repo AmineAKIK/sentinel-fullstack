@@ -18,6 +18,11 @@ import runMigrations from '../../db/migrate';
 import { hashWorkshopPassword } from '../../auth/bcrypt';
 import { deleteAccountService, listAccountsService } from '../../modules/accounts/accounts.service';
 import { verifyWorkshopSession } from '../../modules/auth/auth.service';
+import {
+  acquireIntegrationAdminFixture,
+  releaseIntegrationAdminFixture,
+  type IntegrationAdminFixture,
+} from '../helpers/adminFixture';
 
 const DB_URL = process.env.DATABASE_URL;
 const RUN = Boolean(DB_URL);
@@ -27,6 +32,7 @@ const describeIntegration = RUN ? describe : describe.skip;
 let pool: Pool;
 let userId: number;
 let adminId: number;
+let adminFixture: IntegrationAdminFixture | undefined;
 
 // Cleanup is surgical: only rows created by this suite are deleted, so the tests
 // are safe to run against a shared development database.
@@ -39,11 +45,10 @@ beforeAll(async () => {
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
 
-  // The audit trail has a real FK to admin_accounts. Sentinel enforces a single
-  // administrator account (uq_admin_singleton_key), so the suite reuses whichever
-  // admin already exists rather than inserting a second one.
-  const { rows } = await pool.query<{ id: number }>(`SELECT id FROM admin_accounts LIMIT 1`);
-  adminId = rows[0].id;
+  // The audit trail has a real FK to admin_accounts. Reuse an existing admin on
+  // shared test databases, or provision a suite-owned fixture on an empty one.
+  adminFixture = await acquireIntegrationAdminFixture(pool);
+  adminId = adminFixture.admin.id;
 }, 30_000);
 
 beforeEach(async () => {
@@ -62,11 +67,15 @@ beforeEach(async () => {
 
 afterAll(async () => {
   if (!RUN) return;
-  await pool.query(`DELETE FROM account_audit_events WHERE target_user_id = ANY($1::int[])`, [
-    createdUserIds,
-  ]);
-  await pool.query(`DELETE FROM sentinel_users WHERE id = ANY($1::int[])`, [createdUserIds]);
-  await pool.end();
+  try {
+    await pool.query(`DELETE FROM account_audit_events WHERE target_user_id = ANY($1::int[])`, [
+      createdUserIds,
+    ]);
+    await pool.query(`DELETE FROM sentinel_users WHERE id = ANY($1::int[])`, [createdUserIds]);
+    if (adminFixture) await releaseIntegrationAdminFixture(pool, adminFixture);
+  } finally {
+    await pool.end();
+  }
 });
 
 describeIntegration('RGPD — anonymisation à la suppression de compte', () => {

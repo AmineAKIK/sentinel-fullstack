@@ -8,10 +8,12 @@ selon [audit-prod.md](audit-prod.md) et
 
 - Node local : `24.13.0` ; npm : `11.6.2` ;
 - cible déclarée et CI : Node `24.14.1`, npm `>=10` ;
-- PostgreSQL temporaire réel sur `127.0.0.1:55432` ;
+- PostgreSQL temporaire réel sur `127.0.0.1:55432`, puis reproduction sur une
+  seconde base vierge isolée sur le port `55433` ;
 - Chromium piloté par Playwright ;
-- Docker et ShellCheck indisponibles dans cette distribution WSL : leur contrat
-  est exécuté par le job CI `Containers / Production contract` ;
+- Caddy `2.11.4` et ShellCheck `0.10.0` exécutés localement avec les versions
+  exactes de la CI ; Docker reste indisponible dans cette distribution WSL et
+  son contrat complet est exécuté par le job `Containers / Production contract` ;
 - aucune donnée de production utilisée.
 
 Ce rapport distingue les preuves réellement exécutées des campagnes qui exigent
@@ -20,17 +22,18 @@ verte.
 
 ## Synthèse
 
-| Contrat | Résultat local |
-| --- | --- |
-| Installation reproductible | OK, `npm ci` backend et frontend |
-| Format, lint, types, builds | OK |
-| Backend unitaire | **30 suites, 327 tests** |
-| Frontend unitaire | **34 fichiers, 346 tests** |
-| Fiabilité structurelle | **20 contrôles sur 20** |
-| Intégration PostgreSQL | **4 suites, 37 tests** |
-| E2E Chromium | **4 parcours sur 4** |
-| Audit npm | **0 vulnérabilité** sur les deux projets |
-| Contrat conteneurs | À confirmer par la CI distante |
+| Contrat                         | Résultat local                            |
+| ------------------------------- | ----------------------------------------- |
+| Installation reproductible      | OK, `npm ci` backend et frontend          |
+| Format, lint, types, builds     | OK                                        |
+| Backend unitaire                | **30 suites, 327 tests**                  |
+| Frontend unitaire               | **34 fichiers, 346 tests**                |
+| Fiabilité structurelle          | **20 contrôles sur 20**                   |
+| Intégration PostgreSQL          | **4 suites, 37 tests**                    |
+| E2E Chromium                    | **4 parcours sur 4**                      |
+| Audit npm                       | **0 vulnérabilité** sur les deux projets  |
+| Caddy et scripts d'exploitation | OK, Caddy `2.11.4` et ShellCheck `0.10.0` |
+| Construction des conteneurs     | À confirmer par la CI distante            |
 
 ## Qualité et couverture
 
@@ -51,12 +54,12 @@ npm audit --audit-level=high
 
 Couverture du périmètre critique configuré dans Jest :
 
-| Mesure | Résultat | Seuil |
-| --- | ---: | ---: |
-| Statements | 82,15 % | 80 % |
-| Branches | 77,38 % | 75 % |
-| Fonctions | 74,73 % | 70 % |
-| Lignes | 87,57 % | 85 % |
+| Mesure     | Résultat | Seuil |
+| ---------- | -------: | ----: |
+| Statements |  82,15 % |  80 % |
+| Branches   |  77,38 % |  75 % |
+| Fonctions  |  74,73 % |  70 % |
+| Lignes     |  87,57 % |  85 % |
 
 ### Frontend
 
@@ -73,12 +76,12 @@ npm audit --audit-level=high
 
 Couverture du périmètre critique configuré dans Vitest :
 
-| Mesure | Résultat | Seuil |
-| --- | ---: | ---: |
-| Statements | 88,74 % | 85 % |
-| Branches | 80,73 % | 80 % |
-| Fonctions | 91,28 % | 90 % |
-| Lignes | 91,04 % | 90 % |
+| Mesure     | Résultat | Seuil |
+| ---------- | -------: | ----: |
+| Statements |  88,74 % |  85 % |
+| Branches   |  80,73 % |  80 % |
+| Fonctions  |  91,28 % |  90 % |
+| Lignes     |  91,04 % |  90 % |
 
 Le build Vite est découpé par route. Le plus gros chunk partagé produit mesure
 164,28 Ko brut / 54,13 Ko gzip ; le dashboard Atelier mesure 71,11 Ko brut /
@@ -89,7 +92,10 @@ Le build Vite est découpé par route. Le plus gros chunk partagé produit mesur
 Les quatre suites PostgreSQL couvrent l'authentification, les comptes, les
 lignes et l'Atelier. Elles repartent d'un schéma migré, vérifient notamment les
 contraintes, les collisions et les invalidations de session, puis nettoient leur
-jeu de données.
+jeu de données. Une exécution supplémentaire sur une base entièrement vierge a
+validé la création autonome de l'administrateur de test et son nettoyage : après
+les 37 tests, les compteurs de fixtures admin, utilisateurs et lignes étaient
+tous à zéro.
 
 Les quatre parcours Playwright valident :
 
@@ -116,7 +122,8 @@ Vérifications obtenues :
 - journal d'audit actor-aware et snapshots de ligne ;
 - outbox durable, retry borné et arrêt gracieux ;
 - recherche statique sans secret réel, test exclusif ni artefact généré suivi ;
-- fichiers YAML parsés et scripts backup/restore valides avec `bash -n`.
+- fichiers YAML parsés par Prettier et scripts backup/restore valides avec
+  `bash -n` et ShellCheck `0.10.0`.
 
 La livraison SMTP est volontairement **au moins une fois**. La source d'outbox
 est dédupliquée, mais un crash après acceptation par le fournisseur et avant

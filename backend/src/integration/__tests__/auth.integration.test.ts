@@ -25,6 +25,12 @@ import {
   hashWorkshopPasswordSetupCode,
   getWorkshopPasswordSetupExpiry,
 } from '../../auth/setupCode';
+import {
+  acquireIntegrationAdminFixture,
+  releaseIntegrationAdminFixture,
+  type IntegrationAdminFixture,
+  type IntegrationAdminRecord,
+} from '../helpers/adminFixture';
 
 const DB_URL = process.env.DATABASE_URL;
 const RUN = Boolean(DB_URL);
@@ -43,7 +49,8 @@ const BADGE_PREFIX = 'IA-';
 // Sentinel n'autorise qu'un seul compte admin (uq_admin_singleton_key) : les tests
 // de login admin ne peuvent pas insérer un second compte, ils réécrivent
 // temporairement l'unique ligne existante puis restaurent son état d'origine.
-let originalAdmin: { id: number; username: string; password_hash: string | null };
+let originalAdmin: IntegrationAdminRecord | undefined;
+let adminFixture: IntegrationAdminFixture | undefined;
 
 beforeAll(async () => {
   if (!RUN) return;
@@ -51,17 +58,19 @@ beforeAll(async () => {
   // Run all migrations against the real DB
   await runMigrations();
 
-  const { rows } = await pool.query(
-    `SELECT id, username, password_hash FROM admin_accounts LIMIT 1`
-  );
-  originalAdmin = rows[0];
+  adminFixture = await acquireIntegrationAdminFixture(pool);
+  originalAdmin = adminFixture.admin;
 }, 30_000);
 
 afterAll(async () => {
   if (!RUN) return;
-  await restoreAdminFixture();
-  await cleanAuthFixtures();
-  await pool.end();
+  try {
+    if (originalAdmin) await restoreAdminFixture();
+    await cleanAuthFixtures();
+    if (adminFixture) await releaseIntegrationAdminFixture(pool, adminFixture);
+  } finally {
+    await pool.end();
+  }
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -70,22 +79,29 @@ async function cleanAuthFixtures() {
   await pool.query('DELETE FROM sentinel_users WHERE badge_number LIKE $1', [`${BADGE_PREFIX}%`]);
 }
 
+function requireOriginalAdmin(): IntegrationAdminRecord {
+  if (!originalAdmin) throw new Error('Integration administrator fixture is unavailable.');
+  return originalAdmin;
+}
+
 async function restoreAdminFixture() {
+  const admin = requireOriginalAdmin();
   await pool.query('UPDATE admin_accounts SET username = $2, password_hash = $3 WHERE id = $1', [
-    originalAdmin.id,
-    originalAdmin.username,
-    originalAdmin.password_hash,
+    admin.id,
+    admin.username,
+    admin.password_hash,
   ]);
 }
 
 async function insertAdmin(username: string, password: string): Promise<number> {
+  const admin = requireOriginalAdmin();
   const hash = await hashAdminPassword(password);
   await pool.query(`UPDATE admin_accounts SET username = $2, password_hash = $3 WHERE id = $1`, [
-    originalAdmin.id,
+    admin.id,
     username,
     hash,
   ]);
-  return originalAdmin.id;
+  return admin.id;
 }
 
 async function insertWorkshopUser(opts: {
