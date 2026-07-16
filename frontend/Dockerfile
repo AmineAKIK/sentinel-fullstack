@@ -12,7 +12,7 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-FROM nginx:1.30.4-alpine3.24 AS production
+FROM nginx:1.31.3-alpine3.24 AS production
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
