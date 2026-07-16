@@ -187,4 +187,4 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          scripts/backup.sh scripts/restore.sh
+          shellcheck scripts/backup.sh scripts/restore.sh
