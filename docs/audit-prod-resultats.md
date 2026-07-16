@@ -33,7 +33,7 @@ verte.
 | E2E Chromium                    | **4 parcours sur 4**                      |
 | Audit npm                       | **0 vulnérabilité** sur les deux projets  |
 | Caddy et scripts d'exploitation | OK, Caddy `2.11.4` et ShellCheck `0.10.0` |
-| Construction des conteneurs     | À confirmer par la CI distante            |
+| Contrat conteneurs              | **OK dans la CI distante**                |
 
 ## Qualité et couverture
 
@@ -139,22 +139,29 @@ du lot de stabilisation, notamment Express 5, React 19, React Router 7, Zod 4 et
 TypeScript 7. Elles exigent chacune une campagne dédiée et ne sont pas introduites
 à la veille d'une soutenance.
 
+## Validation distante
+
+Le candidat technique `b9690d75422010e7bb19513d9aa1477ae7b061fb` a été
+validé par le [run GitHub Actions 231](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29540419011).
+Les cinq jobs sont verts : qualité backend, qualité frontend, intégration
+PostgreSQL, parcours navigateur et contrat de production des conteneurs. Ce
+dernier confirme Compose, les deux images, leurs utilisateurs non-root, Nginx,
+Caddy et ShellCheck.
+
 ## Contrôles restant externes
 
 Ces points ne constituent pas une preuve locale et restent obligatoires avant un
 GO de production :
 
-1. CI GitHub verte sur le SHA publié, notamment images non-root, Compose, Nginx,
-   Caddy et ShellCheck ;
-2. restauration réelle d'un backup sur un environnement isolé avec mesure RTO ;
-3. charge et endurance sur un volume représentatif ;
-4. audit axe/Lighthouse, clavier et lecteur d'écran ;
-5. recette Chrome, Edge, Firefox, Safari et écran Board cible ;
-6. vérification HTTPS réelle des cookies, headers, CORS, SMTP et logs.
+1. restauration réelle d'un backup sur un environnement isolé avec mesure RTO ;
+2. charge et endurance sur un volume représentatif ;
+3. audit axe/Lighthouse, clavier et lecteur d'écran ;
+4. recette Chrome, Edge, Firefox, Safari et écran Board cible ;
+5. vérification HTTPS réelle des cookies, headers, CORS, SMTP et logs.
 
 ## Verdict
 
-**GO local pour publication vers la CI.** Aucun défaut bloquant n'est connu dans
-les contrats exécutables sur ce poste. Le **GO production reste conditionnel** à
-la CI distante puis aux six campagnes iso-production ci-dessus. Cette réserve est
-une limite de preuve, pas une validation implicite.
+**GO technique pour publication.** Aucun défaut bloquant n'est connu dans les
+contrats locaux ou distants automatisés. Le **GO production reste conditionnel**
+aux cinq campagnes iso-production ci-dessus. Cette réserve est une limite de
+preuve, pas une validation implicite.
