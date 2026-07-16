@@ -139,6 +139,13 @@ du lot de stabilisation, notamment Express 5, React 19, React Router 7, Zod 4 et
 TypeScript 7. Elles exigent chacune une campagne dédiée et ne sont pas introduites
 à la veille d'une soutenance.
 
+Dependabot regroupe les mises à jour mineures et correctives, tandis que les
+versions majeures restent réservées à ces campagnes de migration. Les mises à
+jour de sécurité ne sont pas désactivées. Pour l'image frontend, la branche
+Nginx `1.31.x` mainline est exclue afin de rester sur la branche stable `1.30.x`.
+L'image de production utilise `nginx:1.30.4-alpine3.24`, dernière publication
+stable disponible au moment de l'audit.
+
 ## Validation distante
 
 Le candidat technique `b9690d75422010e7bb19513d9aa1477ae7b061fb` a été

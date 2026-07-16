@@ -8,6 +8,10 @@ updates:
     groups:
       backend-dependencies:
         patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directory: /frontend
@@ -17,27 +21,50 @@ updates:
     groups:
       frontend-dependencies:
         patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: docker
     directory: /backend
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: docker
     directory: /frontend
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Sentinel deploys the stable Nginx branch; 1.31.x is mainline.
+      - dependency-name: nginx
+        versions: ['1.31.x']
 
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: monday
+    groups:
+      github-actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
