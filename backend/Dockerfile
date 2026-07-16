@@ -1,4 +1,4 @@
-FROM node:24.14.1-alpine3.23 AS builder
+FROM node:26.5.0-alpine3.23 AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ COPY migrations ./migrations
 
 RUN npm run build
 
-FROM node:24.14.1-alpine3.23 AS production
+FROM node:26.5.0-alpine3.23 AS production
 
 WORKDIR /app
 
