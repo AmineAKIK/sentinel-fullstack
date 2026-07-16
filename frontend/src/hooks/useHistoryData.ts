@@ -15,12 +15,7 @@ import {
 import { useDebouncedValue } from './useDebouncedValue';
 
 export type HistoryStatusFilter =
-  | 'all'
-  | 'OPEN'
-  | 'PENDING'
-  | 'CLOSED'
-  | 'CANCELED'
-  | 'INVALIDATED';
+  'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
 
 export function readHistoryStatusFilter(value: string | null): HistoryStatusFilter {
   return value === 'OPEN' ||

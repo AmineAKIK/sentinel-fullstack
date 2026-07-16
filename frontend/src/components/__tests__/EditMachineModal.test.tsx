@@ -14,7 +14,9 @@ import { LineMachine, ProductionLine } from '../../types';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function singleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot: false }>> = {}): LineMachine {
+function singleMachine(
+  overrides: Partial<Extract<LineMachine, { hasDoubleRobot: false }>> = {}
+): LineMachine {
   return {
     machineId: 'MCH-1114',
     brand: 'Panasonic',
@@ -38,15 +40,16 @@ function mockLine(overrides: Partial<ProductionLine> = {}): ProductionLine {
 }
 
 function renderModal(line = mockLine(), onClose = vi.fn(), onSuccess = vi.fn()) {
-  render(
-    <EditMachineModal line={line} machineIndex={0} onClose={onClose} onSuccess={onSuccess} />
-  );
+  render(<EditMachineModal line={line} machineIndex={0} onClose={onClose} onSuccess={onSuccess} />);
   return { onClose, onSuccess };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(linesApi.checkLineConflicts).mockResolvedValue({ lineExists: false, machineConflicts: [] });
+  vi.mocked(linesApi.checkLineConflicts).mockResolvedValue({
+    lineExists: false,
+    machineConflicts: [],
+  });
   vi.mocked(linesApi.updateLine).mockImplementation((_id, payload) =>
     Promise.resolve(mockLine(payload as Partial<ProductionLine>))
   );
@@ -55,7 +58,7 @@ beforeEach(() => {
 // ─── aucun changement : ne jamais confirmer une non-action ─────────────────────
 
 describe('EditMachineModal – aucun changement', () => {
-  it('désactive le bouton Aperçu tant que rien n\'a changé', () => {
+  it("désactive le bouton Aperçu tant que rien n'a changé", () => {
     renderModal();
     expect(screen.getByRole('button', { name: /Aperçu/i })).toBeDisabled();
   });
@@ -76,7 +79,7 @@ describe('EditMachineModal – aucun changement', () => {
 // ─── changement réel : aperçu avant/après puis confirmation ────────────────────
 
 describe('EditMachineModal – modification réelle', () => {
-  it('active l\'aperçu, montre le récap avant/après, puis confirme', async () => {
+  it("active l'aperçu, montre le récap avant/après, puis confirme", async () => {
     const { onSuccess } = renderModal();
 
     // On modifie la marque.
@@ -100,7 +103,7 @@ describe('EditMachineModal – modification réelle', () => {
     expect(onSuccess).toHaveBeenCalledTimes(1);
   });
 
-  it('redevient non modifié si on revient à la valeur d\'origine après un détour', () => {
+  it("redevient non modifié si on revient à la valeur d'origine après un détour", () => {
     renderModal();
     const brandInput = screen.getByLabelText(/Marque/i);
     fireEvent.change(brandInput, { target: { value: 'Fuji' } });

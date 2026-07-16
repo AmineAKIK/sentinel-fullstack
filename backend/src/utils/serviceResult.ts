@@ -1,8 +1,7 @@
 import { ErrorCode } from './errors';
 
 export type ServiceResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; code: ErrorCode; message: string };
+  { ok: true; data: T } | { ok: false; status: number; code: ErrorCode; message: string };
 
 export function ok<T>(data: T): ServiceResult<T> {
   return { ok: true, data };

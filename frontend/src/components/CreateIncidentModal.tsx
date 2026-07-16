@@ -4,11 +4,7 @@ import SelectField from './ui/SelectField';
 import CharCounter from './ui/CharCounter';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
 import { ApiResponseError } from '../api/client';
-import {
-  IncidentState,
-  ProductionLine,
-  WorkshopIncident,
-} from '../types';
+import { IncidentState, ProductionLine, WorkshopIncident } from '../types';
 import { getRobotOptions } from '../utils/lineMachines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { STATE_LABELS } from '../utils/labels';
@@ -95,26 +91,34 @@ export default function CreateIncidentModal({
         : await createWorkshopIncident(payload);
       onSuccess(saved);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
   }
 
   const isEditing = Boolean(incident);
-  const isDirty = !showPreview && (
-    lineId !== (incident ? String(incident.line_id) : '') ||
-    machineId !== (incident?.machine_id || '') ||
-    robotLabel !== (incident?.robot_label || '') ||
-    headNumber !== (incident ? String(incident.head_number) : '') ||
-    state !== (incident?.state || '') ||
-    comment !== (incident?.comment || '') ||
-    currentProduct !== (incident?.current_product || '')
-  );
+  const isDirty =
+    !showPreview &&
+    (lineId !== (incident ? String(incident.line_id) : '') ||
+      machineId !== (incident?.machine_id || '') ||
+      robotLabel !== (incident?.robot_label || '') ||
+      headNumber !== (incident ? String(incident.head_number) : '') ||
+      state !== (incident?.state || '') ||
+      comment !== (incident?.comment || '') ||
+      currentProduct !== (incident?.current_product || ''));
 
   return (
     <Modal
-      title={showPreview ? "Aperçu de l'incident" : incident ? "Modifier l'incident" : 'Créer un incident'}
+      title={
+        showPreview
+          ? "Aperçu de l'incident"
+          : incident
+            ? "Modifier l'incident"
+            : 'Créer un incident'
+      }
       onClose={loading ? undefined : onClose}
       closeOnOverlay={false}
       isDirty={isDirty}
@@ -123,11 +127,23 @@ export default function CreateIncidentModal({
       footer={
         showPreview ? (
           <>
-            <button className="btn btn-secondary" onClick={() => setShowPreview(false)} disabled={loading}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowPreview(false)}
+              disabled={loading}
+            >
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : isEditing ? 'Valider la modification' : 'Valider la création'}
+              {loading ? (
+                <>
+                  <span className="spinner" aria-hidden="true" /> Enregistrement…
+                </>
+              ) : isEditing ? (
+                'Valider la modification'
+              ) : (
+                'Valider la création'
+              )}
             </button>
           </>
         ) : (
@@ -153,7 +169,9 @@ export default function CreateIncidentModal({
                 </tr>
                 <tr>
                   <th scope="row">Machine</th>
-                  <td>{selectedMachine?.machineId} - {selectedMachine?.brand}</td>
+                  <td>
+                    {selectedMachine?.machineId} - {selectedMachine?.brand}
+                  </td>
                 </tr>
                 <tr>
                   <th scope="row">Robot</th>
@@ -178,139 +196,174 @@ export default function CreateIncidentModal({
               </tbody>
             </table>
           </div>
-          {error && <div id="create-incident-error-preview" className="error-message" role="alert">{error}</div>}
+          {error && (
+            <div id="create-incident-error-preview" className="error-message" role="alert">
+              {error}
+            </div>
+          )}
         </>
       ) : (
         <>
-      {!hasLineReferences && (
-        <div className="error-message" style={{ marginBottom: 12 }}>
-          Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration avant de déclarer un incident.
-        </div>
-      )}
+          {!hasLineReferences && (
+            <div className="error-message" style={{ marginBottom: 12 }}>
+              Aucune ligne active n'est disponible. Créez ou activez une ligne dans l’administration
+              avant de déclarer un incident.
+            </div>
+          )}
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentLine">Ligne *</label>
-        <SelectField
-          id="incidentLine"
-          value={lineId}
-          onChange={(value) => {
-            setLineId(value);
-            setMachineId('');
-            setRobotLabel('');
-            setHeadNumber('');
-          }}
-          disabled={loading || !hasLineReferences}
-          ariaLabel="Ligne"
-          options={[
-            { value: '', label: hasLineReferences ? 'Sélectionner une ligne' : 'Aucune ligne active' },
-            ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
-          ]}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentLine">
+              Ligne *
+            </label>
+            <SelectField
+              id="incidentLine"
+              value={lineId}
+              onChange={(value) => {
+                setLineId(value);
+                setMachineId('');
+                setRobotLabel('');
+                setHeadNumber('');
+              }}
+              disabled={loading || !hasLineReferences}
+              ariaLabel="Ligne"
+              options={[
+                {
+                  value: '',
+                  label: hasLineReferences ? 'Sélectionner une ligne' : 'Aucune ligne active',
+                },
+                ...lines.map((line) => ({ value: String(line.id), label: line.line_number })),
+              ]}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentMachine">Machine *</label>
-        <SelectField
-          id="incidentMachine"
-          value={machineId}
-          onChange={(value) => {
-            setMachineId(value);
-            setRobotLabel('');
-            setHeadNumber('');
-          }}
-          disabled={loading || !selectedLine}
-          ariaLabel="Machine"
-          options={[
-            { value: '', label: selectedLine ? 'Sélectionner une machine' : 'Choisir une ligne d’abord' },
-            ...(selectedLine?.machines.map((machine) => ({
-              value: machine.machineId,
-              label: `${machine.machineId} · ${machine.brand}`,
-            })) ?? []),
-          ]}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentMachine">
+              Machine *
+            </label>
+            <SelectField
+              id="incidentMachine"
+              value={machineId}
+              onChange={(value) => {
+                setMachineId(value);
+                setRobotLabel('');
+                setHeadNumber('');
+              }}
+              disabled={loading || !selectedLine}
+              ariaLabel="Machine"
+              options={[
+                {
+                  value: '',
+                  label: selectedLine ? 'Sélectionner une machine' : 'Choisir une ligne d’abord',
+                },
+                ...(selectedLine?.machines.map((machine) => ({
+                  value: machine.machineId,
+                  label: `${machine.machineId} · ${machine.brand}`,
+                })) ?? []),
+              ]}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentRobot">Robot *</label>
-        <SelectField
-          id="incidentRobot"
-          value={robotLabel}
-          onChange={(value) => {
-            setRobotLabel(value);
-            setHeadNumber('');
-          }}
-          disabled={loading || !selectedMachine}
-          ariaLabel="Robot"
-          options={[
-            { value: '', label: selectedMachine ? 'Sélectionner un robot' : 'Choisir une machine d’abord' },
-            ...robots.map((robot) => ({ value: robot.label, label: robot.label })),
-          ]}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentRobot">
+              Robot *
+            </label>
+            <SelectField
+              id="incidentRobot"
+              value={robotLabel}
+              onChange={(value) => {
+                setRobotLabel(value);
+                setHeadNumber('');
+              }}
+              disabled={loading || !selectedMachine}
+              ariaLabel="Robot"
+              options={[
+                {
+                  value: '',
+                  label: selectedMachine ? 'Sélectionner un robot' : 'Choisir une machine d’abord',
+                },
+                ...robots.map((robot) => ({ value: robot.label, label: robot.label })),
+              ]}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentHead">Tête *</label>
-        <SelectField
-          id="incidentHead"
-          value={headNumber}
-          onChange={setHeadNumber}
-          disabled={loading || !selectedRobot}
-          ariaLabel="Tête"
-          options={[
-            { value: '', label: selectedRobot ? 'Sélectionner une tête' : 'Choisir un robot d’abord' },
-            ...heads.map((head) => ({ value: String(head), label: String(head) })),
-          ]}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentHead">
+              Tête *
+            </label>
+            <SelectField
+              id="incidentHead"
+              value={headNumber}
+              onChange={setHeadNumber}
+              disabled={loading || !selectedRobot}
+              ariaLabel="Tête"
+              options={[
+                {
+                  value: '',
+                  label: selectedRobot ? 'Sélectionner une tête' : 'Choisir un robot d’abord',
+                },
+                ...heads.map((head) => ({ value: String(head), label: String(head) })),
+              ]}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentState">État *</label>
-        <SelectField
-          id="incidentState"
-          value={state}
-          onChange={(value) => setState(value as IncidentState)}
-          disabled={loading}
-          ariaLabel="État"
-          options={[
-            { value: '', label: 'Sélectionner un état' },
-            ...STATES.map((item) => ({ value: item.value, label: item.label })),
-          ]}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentState">
+              État *
+            </label>
+            <SelectField
+              id="incidentState"
+              value={state}
+              onChange={(value) => setState(value as IncidentState)}
+              disabled={loading}
+              ariaLabel="État"
+              options={[
+                { value: '', label: 'Sélectionner un état' },
+                ...STATES.map((item) => ({ value: item.value, label: item.label })),
+              ]}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentComment">Commentaire</label>
-        <textarea
-          id="incidentComment"
-          className="form-input"
-          value={comment}
-          onChange={(e) => setComment(e.target.value.slice(0, FIELD_LIMITS.COMMENT))}
-          disabled={loading}
-          rows={3}
-          maxLength={FIELD_LIMITS.COMMENT}
-          placeholder="Ajouter un commentaire"
-          aria-invalid={Boolean(error) || undefined}
-          aria-describedby={error ? 'create-incident-error' : undefined}
-        />
-        <CharCounter current={comment.length} max={FIELD_LIMITS.COMMENT} />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentComment">
+              Commentaire
+            </label>
+            <textarea
+              id="incidentComment"
+              className="form-input"
+              value={comment}
+              onChange={(e) => setComment(e.target.value.slice(0, FIELD_LIMITS.COMMENT))}
+              disabled={loading}
+              rows={3}
+              maxLength={FIELD_LIMITS.COMMENT}
+              placeholder="Ajouter un commentaire"
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'create-incident-error' : undefined}
+            />
+            <CharCounter current={comment.length} max={FIELD_LIMITS.COMMENT} />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label" htmlFor="incidentProduct">Produit en cours *</label>
-        <input
-          id="incidentProduct"
-          className="form-input"
-          value={currentProduct}
-          onChange={(e) => setCurrentProduct(e.target.value)}
-          disabled={loading}
-          maxLength={FIELD_LIMITS.PRODUCT}
-          placeholder="Référence produit"
-          aria-invalid={Boolean(error) || undefined}
-          aria-describedby={error ? 'create-incident-error' : undefined}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="incidentProduct">
+              Produit en cours *
+            </label>
+            <input
+              id="incidentProduct"
+              className="form-input"
+              value={currentProduct}
+              onChange={(e) => setCurrentProduct(e.target.value)}
+              disabled={loading}
+              maxLength={FIELD_LIMITS.PRODUCT}
+              placeholder="Référence produit"
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'create-incident-error' : undefined}
+            />
+          </div>
 
-      {error && <div id="create-incident-error" className="error-message" role="alert">{error}</div>}
+          {error && (
+            <div id="create-incident-error" className="error-message" role="alert">
+              {error}
+            </div>
+          )}
         </>
       )}
     </Modal>

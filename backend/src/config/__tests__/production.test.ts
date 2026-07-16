@@ -1,4 +1,4 @@
-import { assertProductionConfig } from '../production';
+import { assertProductionConfig, parseBooleanEnv, parsePort, parseTrustProxy } from '../production';
 
 const ORIGINAL_ENV = process.env;
 
@@ -13,6 +13,12 @@ function setProductionEnv(overrides: NodeJS.ProcessEnv = {}): void {
     CLIENT_ORIGIN: 'https://sentinel.example.com',
     TRUST_PROXY: 'true',
     BOARD_ACCESS_CODE_HASH: '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234',
+    DEEPSEEK_API_KEY: 'test-deepseek-key',
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_PORT: '587',
+    SMTP_SECURE: 'false',
+    SMTP_FROM: 'Sentinel <noreply@example.com>',
+    ADMIN_EMAIL: 'admin@example.com',
     ...overrides,
   };
 }
@@ -83,5 +89,87 @@ describe('assertProductionConfig', () => {
   it('requires explicit reverse-proxy trust in production', () => {
     setProductionEnv({ TRUST_PROXY: '' });
     expect(() => assertProductionConfig()).toThrow('TRUST_PROXY');
+
+    setProductionEnv({ TRUST_PROXY: 'false' });
+    expect(() => assertProductionConfig()).toThrow('must be true');
+  });
+
+  it('rejects invalid runtime ports', () => {
+    setProductionEnv({ PORT: '3000oops' });
+    expect(() => assertProductionConfig()).toThrow('PORT');
+
+    setProductionEnv({ PORT: '65536' });
+    expect(() => assertProductionConfig()).toThrow('PORT');
+  });
+
+  it('requires a coherent SMTP configuration when delivery is enabled', () => {
+    setProductionEnv({ SMTP_HOST: 'smtp.example.com', SMTP_FROM: undefined });
+    expect(() => assertProductionConfig()).toThrow('SMTP_FROM');
+
+    setProductionEnv({
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_FROM: 'Sentinel <noreply@example.com>',
+      SMTP_USER: 'sentinel',
+      SMTP_PASS: undefined,
+    });
+    expect(() => assertProductionConfig()).toThrow('configured together');
+
+    setProductionEnv({
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_FROM: 'Sentinel <noreply@example.com>',
+      SMTP_PORT: 'invalid',
+    });
+    expect(() => assertProductionConfig()).toThrow('SMTP_PORT');
+  });
+});
+
+describe('parseTrustProxy', () => {
+  it.each([
+    [undefined, false],
+    ['', false],
+    ['false', false],
+    ['0', false],
+    ['true', 1],
+    ['1', 1],
+    [' TRUE ', 1],
+  ] as const)('normalise %p vers %p', (value, expected) => {
+    expect(parseTrustProxy(value)).toBe(expected);
+  });
+
+  it('refuse les valeurs ambiguës', () => {
+    expect(() => parseTrustProxy('loopback')).toThrow('TRUST_PROXY');
+  });
+});
+
+describe('parsePort', () => {
+  it.each([
+    [undefined, 3000],
+    ['', 3000],
+    ['1', 1],
+    [' 587 ', 587],
+    ['65535', 65_535],
+  ] as const)('normalise %p vers %p', (value, expected) => {
+    expect(parsePort(value, 'PORT', 3000)).toBe(expected);
+  });
+
+  it.each(['0', '-1', '1.5', '3000oops', '65536'])('refuse %p', (value) => {
+    expect(() => parsePort(value, 'PORT', 3000)).toThrow('PORT');
+  });
+});
+
+describe('parseBooleanEnv', () => {
+  it.each([
+    [undefined, false],
+    ['', false],
+    ['true', true],
+    ['1', true],
+    ['false', false],
+    ['0', false],
+  ] as const)('normalise %p vers %p', (value, expected) => {
+    expect(parseBooleanEnv(value, 'SMTP_SECURE', false)).toBe(expected);
+  });
+
+  it('refuse une valeur ambiguë', () => {
+    expect(() => parseBooleanEnv('yes', 'SMTP_SECURE', false)).toThrow('SMTP_SECURE');
   });
 });

@@ -22,11 +22,15 @@ describe('formatEventActor', () => {
   });
 
   it('concatène prénom nom', () => {
-    expect(formatEventActor(event({ first_name: 'Alice', last_name: 'Martin', role: null }))).toBe('Alice Martin');
+    expect(formatEventActor(event({ first_name: 'Alice', last_name: 'Martin', role: null }))).toBe(
+      'Alice Martin'
+    );
   });
 
   it('ajoute le rôle si présent', () => {
-    const result = formatEventActor(event({ first_name: 'Bob', last_name: 'Smith', role: 'MAINTENANCE' }));
+    const result = formatEventActor(
+      event({ first_name: 'Bob', last_name: 'Smith', role: 'MAINTENANCE' })
+    );
     expect(result).toContain('Bob Smith');
     expect(result).toContain('MAINTENANCE');
   });
@@ -38,49 +42,69 @@ describe('formatEventDetail', () => {
   });
 
   it('PRIORITY_CHANGED avec value=true → "Urgent"', () => {
-    expect(formatEventDetail(event({ event_type: 'PRIORITY_CHANGED', payload: { value: true } }))).toBe('Urgent');
+    expect(
+      formatEventDetail(event({ event_type: 'PRIORITY_CHANGED', payload: { value: true } }))
+    ).toBe('Urgent');
   });
 
   it('PRIORITY_CHANGED avec value=false → "Normal"', () => {
-    expect(formatEventDetail(event({ event_type: 'PRIORITY_CHANGED', payload: { value: false } }))).toBe('Normal');
+    expect(
+      formatEventDetail(event({ event_type: 'PRIORITY_CHANGED', payload: { value: false } }))
+    ).toBe('Normal');
   });
 
   it('PRIORITY_CHANGED avec to=true (nouveau format) → "Urgent"', () => {
-    expect(formatEventDetail(event({ event_type: 'PRIORITY_CHANGED', payload: { to: true } }))).toBe('Urgent');
+    expect(
+      formatEventDetail(event({ event_type: 'PRIORITY_CHANGED', payload: { to: true } }))
+    ).toBe('Urgent');
   });
 
   it('ORDER_CHANGED → "position X → Y"', () => {
-    const result = formatEventDetail(event({ event_type: 'ORDER_CHANGED', payload: { from: 2, to: 5 } }));
+    const result = formatEventDetail(
+      event({ event_type: 'ORDER_CHANGED', payload: { from: 2, to: 5 } })
+    );
     expect(result).toBe('position 2 → 5');
   });
 
   it('INCIDENT_UPDATED avec fields → liste des champs', () => {
-    const result = formatEventDetail(event({ event_type: 'INCIDENT_UPDATED', payload: { fields: ['comment', 'state'] } }));
+    const result = formatEventDetail(
+      event({ event_type: 'INCIDENT_UPDATED', payload: { fields: ['comment', 'state'] } })
+    );
     expect(result).toBe('champs: comment, state');
   });
 
   it('RESPONSIBLE_COMMENT_UPDATED → texte fixe', () => {
-    expect(formatEventDetail(event({ event_type: 'RESPONSIBLE_COMMENT_UPDATED', payload: {} }))).toBe('consigne mise à jour');
+    expect(
+      formatEventDetail(event({ event_type: 'RESPONSIBLE_COMMENT_UPDATED', payload: {} }))
+    ).toBe('consigne mise à jour');
   });
 
   it('INCIDENT_INVALIDATED avec reason', () => {
-    const result = formatEventDetail(event({ event_type: 'INCIDENT_INVALIDATED', payload: { reason: 'Fausse alarme' } }));
+    const result = formatEventDetail(
+      event({ event_type: 'INCIDENT_INVALIDATED', payload: { reason: 'Fausse alarme' } })
+    );
     expect(result).toBe('Fausse alarme');
   });
 
   it('INCIDENT_SET_PENDING avec diagnostic tronqué à 60 chars', () => {
     const long = 'A'.repeat(80);
-    const result = formatEventDetail(event({ event_type: 'INCIDENT_SET_PENDING', payload: { diagnostic: long } }));
+    const result = formatEventDetail(
+      event({ event_type: 'INCIDENT_SET_PENDING', payload: { diagnostic: long } })
+    );
     expect(result).toBe(`diagnostic: ${'A'.repeat(60)}`);
   });
 
   it('INCIDENT_CLOSED avec interventionNote', () => {
-    const result = formatEventDetail(event({ event_type: 'INCIDENT_CLOSED', payload: { interventionNote: 'Réparé' } }));
+    const result = formatEventDetail(
+      event({ event_type: 'INCIDENT_CLOSED', payload: { interventionNote: 'Réparé' } })
+    );
     expect(result).toBe('note: Réparé');
   });
 
   it('DELETE_REQUESTED avec reason', () => {
-    const result = formatEventDetail(event({ event_type: 'DELETE_REQUESTED', payload: { reason: 'Doublon' } }));
+    const result = formatEventDetail(
+      event({ event_type: 'DELETE_REQUESTED', payload: { reason: 'Doublon' } })
+    );
     expect(result).toBe('Doublon');
   });
 

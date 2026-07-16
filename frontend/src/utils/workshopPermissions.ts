@@ -95,7 +95,9 @@ export function canPerform(
         (role === 'RESPONSABLE' || role === 'MAINTENANCE')
       );
     case 'responsableEdit':
-      return role === 'RESPONSABLE' && isActiveIncident(incident) && !hasPendingArbitration(incident);
+      return (
+        role === 'RESPONSABLE' && isActiveIncident(incident) && !hasPendingArbitration(incident)
+      );
     case 'editAfterTake':
       return (
         role === 'MAINTENANCE' &&

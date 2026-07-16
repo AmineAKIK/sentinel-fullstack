@@ -19,7 +19,11 @@ describe('formatAuditEventTarget', () => {
   });
 
   it('scope=user avec badge si includeBadge=true', () => {
-    const target: AuditEventTarget = { first_name: 'Alice', last_name: 'Martin', badge_number: 'B001' };
+    const target: AuditEventTarget = {
+      first_name: 'Alice',
+      last_name: 'Martin',
+      badge_number: 'B001',
+    };
     expect(formatAuditEventTarget(target, true)).toBe('Alice Martin (B001)');
   });
 

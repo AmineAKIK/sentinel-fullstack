@@ -76,7 +76,15 @@ describe('DashboardFilters – interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: /Tout effacer/i }));
     expect(onSetFilters).toHaveBeenCalledTimes(1);
     const updater = onSetFilters.mock.calls[0][0];
-    const result = updater({ lineId: '1', status: 'OPEN', priority: 'urgent', taken: 'not_taken', scope: 'all', query: 'test', aging: 'over_7d' });
+    const result = updater({
+      lineId: '1',
+      status: 'OPEN',
+      priority: 'urgent',
+      taken: 'not_taken',
+      scope: 'all',
+      query: 'test',
+      aging: 'over_7d',
+    });
     expect(result.lineId).toBe('all');
     expect(result.status).toBe('all');
     expect(result.priority).toBe('all');

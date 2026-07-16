@@ -26,7 +26,8 @@ Trois audiences utilisent la même origine mais des sessions séparées :
 
 - `admin` : administration du référentiel et de la sécurité ;
 - `workshop` : utilisateurs atelier `OPERATOR`, `MAINTENANCE`, `RESPONSABLE` ;
-- `board` : lecture seule du tableau grand écran.
+- `board` : lecture seule du tableau grand écran. Une session Atelier valide
+  peut aussi lire cette projection, sans réciprocité.
 
 ## 2. Backend
 
@@ -129,7 +130,7 @@ de reset sont générés aléatoirement et seul leur condensat est stocké.
 
 - `OPERATOR` déclare et suit les incidents de production ;
 - `MAINTENANCE` prend en charge, suspend, reprend et clôture selon les règles ;
-- `RESPONSABLE` priorise, réordonne, arbitre et pilote.
+- `RESPONSABLE` priorise, arbitre, suit et pilote.
 
 La fonction backend `canPerform` est la source d'autorité. Le frontend reflète
 les mêmes règles pour l'ergonomie, mais ne remplace jamais le contrôle serveur.
@@ -233,6 +234,12 @@ d'envoyer l'e-mail avant leur commit. Le worker :
 
 Les données dynamiques sont échappées avant insertion dans les modèles HTML.
 L'arrêt gracieux attend la fin du worker avant de fermer le pool.
+
+La garantie est **au moins une tentative** : la clé source empêche de créer deux
+éléments d'outbox pour le même événement, mais un arrêt brutal après acceptation
+par le fournisseur SMTP et avant le passage local à `COMPLETED` peut provoquer
+un nouvel envoi. C'est une limite explicite des effets externes non
+transactionnels, à surveiller côté exploitation.
 
 ## 7. Frontend
 

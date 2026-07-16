@@ -23,7 +23,10 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!identifier.trim()) { setError('Renseignez votre identifiant.'); return; }
+    if (!identifier.trim()) {
+      setError('Renseignez votre identifiant.');
+      return;
+    }
 
     if (!showPassword) {
       setLoading(true);
@@ -43,7 +46,10 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (!password) { setError('Renseignez votre mot de passe.'); return; }
+    if (!password) {
+      setError('Renseignez votre mot de passe.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -62,7 +68,9 @@ export default function AdminLoginPage() {
       setSession({ accountType: 'admin', admin: { id: response.id, username: response.username } });
       navigate('/admin/accueil', { replace: true, state: null });
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.'
+      );
     } finally {
       setLoading(false);
     }
@@ -71,7 +79,9 @@ export default function AdminLoginPage() {
   return (
     <main className="board-access-page" id="main-content">
       <section className="board-access-card board-access-card-locked">
-        <Link to="/login" className="board-access-back">Retour</Link>
+        <Link to="/login" className="board-access-back">
+          Retour
+        </Link>
 
         <div className="board-access-title">
           <span>PILOTAGE SYSTÈME</span>
@@ -83,13 +93,19 @@ export default function AdminLoginPage() {
           {reason && <div className="notice">{reason}</div>}
 
           <div className="form-group">
-            <label className="form-label" htmlFor="identifier">Identifiant</label>
+            <label className="form-label" htmlFor="identifier">
+              Identifiant
+            </label>
             <input
               id="identifier"
               className="form-input"
               type="text"
               value={identifier}
-              onChange={(e) => { setIdentifier(e.target.value); setShowPassword(false); setError(''); }}
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+                setShowPassword(false);
+                setError('');
+              }}
               disabled={loading}
               autoComplete="username"
               autoFocus
@@ -102,7 +118,9 @@ export default function AdminLoginPage() {
 
           {showPassword && (
             <div className="form-group">
-              <label className="form-label" htmlFor="password">Mot de passe</label>
+              <label className="form-label" htmlFor="password">
+                Mot de passe
+              </label>
               <input
                 id="password"
                 className="form-input"
@@ -120,12 +138,22 @@ export default function AdminLoginPage() {
             </div>
           )}
 
-          {error && <div id="admin-login-error" className="error-message" role="alert">{error}</div>}
+          {error && (
+            <div id="admin-login-error" className="error-message" role="alert">
+              {error}
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading
-              ? <><span className="spinner" aria-hidden="true" /> Vérification...</>
-              : showPassword ? 'Se connecter' : 'Continuer'}
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Vérification...
+              </>
+            ) : showPassword ? (
+              'Se connecter'
+            ) : (
+              'Continuer'
+            )}
           </button>
         </form>
       </section>

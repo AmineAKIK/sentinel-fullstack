@@ -79,7 +79,9 @@ export function useUserForm(): UseUserFormReturn {
       }
       setStep('preview');
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
@@ -91,13 +93,25 @@ export function useUserForm(): UseUserFormReturn {
     setStep('form');
   }
 
-  const isDirty = step === 'form' && (
-    form.firstName.trim() !== '' ||
-    form.lastName.trim() !== '' ||
-    form.badgeNumber.trim() !== '' ||
-    Boolean(form.email?.trim()) ||
-    form.role !== ''
-  );
+  const isDirty =
+    step === 'form' &&
+    (form.firstName.trim() !== '' ||
+      form.lastName.trim() !== '' ||
+      form.badgeNumber.trim() !== '' ||
+      Boolean(form.email?.trim()) ||
+      form.role !== '');
 
-  return { form, setForm, error, badgeError, setBadgeError, loading, step, setStep, handlePreview, handleBack, isDirty };
+  return {
+    form,
+    setForm,
+    error,
+    badgeError,
+    setBadgeError,
+    loading,
+    step,
+    setStep,
+    handlePreview,
+    handleBack,
+    isDirty,
+  };
 }

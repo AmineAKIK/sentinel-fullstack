@@ -45,9 +45,15 @@
   letter-spacing: -0.01em;
 }
 
-.pilotage-hero-state-stable  { color: var(--color-success); }
-.pilotage-hero-state-watch   { color: var(--color-watch); }
-.pilotage-hero-state-tension { color: var(--color-danger); }
+.pilotage-hero-state-stable {
+  color: var(--color-success);
+}
+.pilotage-hero-state-watch {
+  color: var(--color-watch);
+}
+.pilotage-hero-state-tension {
+  color: var(--color-danger);
+}
 
 /* Hero stats — 4 tuiles cliquables */
 .pilotage-hero-stats {
@@ -67,7 +73,9 @@
   background: none;
   text-align: left;
   cursor: default;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
   min-width: 0;
 }
 
@@ -86,7 +94,11 @@
 }
 
 .pilotage-hero-stat-watch:hover {
-  background-color: color-mix(in srgb, var(--attention-watch-bg) 60%, var(--color-surface-alt)) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--attention-watch-bg) 60%,
+    var(--color-surface-alt)
+  ) !important;
 }
 
 .pilotage-hero-stat-tension {
@@ -95,7 +107,11 @@
 }
 
 .pilotage-hero-stat-tension:hover {
-  background-color: color-mix(in srgb, var(--color-danger-bg) 60%, var(--color-danger-border)) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--color-danger-bg) 60%,
+    var(--color-danger-border)
+  ) !important;
 }
 
 .pilotage-hero-stat-label {
@@ -393,9 +409,15 @@
 
 /* ── Tone modifiers ───────────────────────────────────────────── */
 
-.pilotage-status-stable  { border-left-color: var(--color-success) !important; }
-.pilotage-status-watch   { border-left-color: var(--color-primary) !important; }
-.pilotage-status-tension { border-left-color: var(--color-danger)  !important; }
+.pilotage-status-stable {
+  border-left-color: var(--color-success) !important;
+}
+.pilotage-status-watch {
+  border-left-color: var(--color-primary) !important;
+}
+.pilotage-status-tension {
+  border-left-color: var(--color-danger) !important;
+}
 
 /* ── Action buttons (gardés pour compatibilité bandeau hero) ─── */
 
@@ -435,9 +457,15 @@
   flex-shrink: 0;
 }
 
-.pilotage-status-dot-stable  { background-color: var(--color-success); }
-.pilotage-status-dot-watch   { background-color: var(--color-watch); }
-.pilotage-status-dot-tension { background-color: var(--color-danger); }
+.pilotage-status-dot-stable {
+  background-color: var(--color-success);
+}
+.pilotage-status-dot-watch {
+  background-color: var(--color-watch);
+}
+.pilotage-status-dot-tension {
+  background-color: var(--color-danger);
+}
 
 .pilotage-decision-title {
   margin: 4px 0 6px;
@@ -623,9 +651,15 @@
   border-radius: var(--radius-pill);
 }
 
-.pilotage-ranking-blue i  { background-color: var(--color-primary); }
-.pilotage-ranking-green i { background-color: var(--color-success); }
-.pilotage-ranking-red i   { background-color: var(--color-danger); }
+.pilotage-ranking-blue i {
+  background-color: var(--color-primary);
+}
+.pilotage-ranking-green i {
+  background-color: var(--color-success);
+}
+.pilotage-ranking-red i {
+  background-color: var(--color-danger);
+}
 
 .pilotage-ranking-count-wrap {
   display: grid;
@@ -689,8 +723,12 @@
   flex-shrink: 0;
 }
 
-.pilotage-trend-legend-created::before { background-color: var(--color-primary); }
-.pilotage-trend-legend-closed::before  { background-color: var(--color-success); }
+.pilotage-trend-legend-created::before {
+  background-color: var(--color-primary);
+}
+.pilotage-trend-legend-closed::before {
+  background-color: var(--color-success);
+}
 
 .pilotage-trend-bars {
   display: flex;
@@ -730,8 +768,14 @@
   transition: height 0.25s ease;
 }
 
-.pilotage-trend-bar-created { background-color: var(--color-primary); opacity: 0.85; }
-.pilotage-trend-bar-closed  { background-color: var(--color-success); opacity: 0.85; }
+.pilotage-trend-bar-created {
+  background-color: var(--color-primary);
+  opacity: 0.85;
+}
+.pilotage-trend-bar-closed {
+  background-color: var(--color-success);
+  opacity: 0.85;
+}
 
 .pilotage-trend-col-date {
   color: var(--color-text-muted);
@@ -931,4 +975,3 @@
 .inline-link-button:hover {
   text-decoration: underline;
 }
-

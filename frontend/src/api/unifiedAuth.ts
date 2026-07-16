@@ -15,10 +15,7 @@ export interface PasswordRequired {
 }
 
 export type UnifiedLoginResponse =
-  | AdminLoginSuccess
-  | WorkshopLoginSuccess
-  | PasswordRequired
-  | WorkshopPasswordSetupRequired;
+  AdminLoginSuccess | WorkshopLoginSuccess | PasswordRequired | WorkshopPasswordSetupRequired;
 
 export async function unifiedLogin(
   identifier: string,

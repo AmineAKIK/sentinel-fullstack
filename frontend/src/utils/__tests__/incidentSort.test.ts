@@ -1,10 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { sortIncidents, groupIncidentsByLine } from '../incidentSort';
 
-type Incident = { is_priority: boolean; display_order: number; is_taken: boolean; created_at: string };
+type Incident = {
+  is_priority: boolean;
+  display_order: number;
+  is_taken: boolean;
+  created_at: string;
+};
 
 function inc(overrides: Partial<Incident> = {}): Incident {
-  return { is_priority: false, display_order: 0, is_taken: false, created_at: '2024-01-01T00:00:00Z', ...overrides };
+  return {
+    is_priority: false,
+    display_order: 0,
+    is_taken: false,
+    created_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  };
 }
 
 type LineIncident = { line_id: number; line_number: string };
@@ -72,7 +83,7 @@ describe('groupIncidentsByLine', () => {
     expect(groups.find((g) => g.lineId === 2)?.incidents).toEqual([b]);
   });
 
-  it('préserve l\'ordre relatif des incidents à l\'intérieur d\'un groupe', () => {
+  it("préserve l'ordre relatif des incidents à l'intérieur d'un groupe", () => {
     const first = lineInc({ line_id: 1, line_number: '1' });
     const second = lineInc({ line_id: 1, line_number: '1' });
     const third = lineInc({ line_id: 1, line_number: '1' });
@@ -97,7 +108,7 @@ describe('groupIncidentsByLine', () => {
     expect(groups.map((g) => g.lineNumber)).toEqual(['A', 'B']);
   });
 
-  it('ordre des groupes indépendant du contenu (pas influencé par l\'urgence ou le volume)', () => {
+  it("ordre des groupes indépendant du contenu (pas influencé par l'urgence ou le volume)", () => {
     // La ligne 1 n'a qu'un incident normal, la ligne 2 en a deux dont un urgent :
     // l'ordre des groupes doit rester 1 puis 2, jamais réordonné par priorité.
     const line1 = lineInc({ line_id: 1, line_number: '1' });

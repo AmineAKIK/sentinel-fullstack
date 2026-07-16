@@ -106,7 +106,7 @@ export default function WorkshopDashboardPage() {
       upsertIncidentData(updated);
       setSelectedIncident((current) => (current?.id === updated.id ? updated : current));
     },
-    [upsertIncidentData]
+    [setSelectedIncident, upsertIncidentData]
   );
   const modal = useModalState();
   const { closeReview, openReview } = modal;

@@ -134,7 +134,16 @@ const DEFAULT_METRIC_ORDER = ['priority', 'not_taken', 'pending', 'over_7d', 'op
 const ROLE_METRIC_ORDER: Record<string, string[]> = {
   OPERATOR: ['created_by_me', 'pending', 'not_taken', 'priority', 'over_7d', 'open', 'total'],
   MAINTENANCE: ['priority', 'not_taken', 'assigned_to_me', 'pending', 'over_7d', 'open', 'total'],
-  RESPONSABLE: ['requests', 'priority', 'not_taken', 'over_7d', 'pending', 'followed', 'open', 'total'],
+  RESPONSABLE: [
+    'requests',
+    'priority',
+    'not_taken',
+    'over_7d',
+    'pending',
+    'followed',
+    'open',
+    'total',
+  ],
 };
 
 function getOrderedMetricConfigs(role?: string): MetricConfig[] {
@@ -160,9 +169,7 @@ export default function IncidentMetricsBar({
   const orderedMetrics = getOrderedMetricConfigs(role);
   const showClosedToday = !metricsLoading && !!metrics && (metrics.closed_today ?? 0) > 0;
   const tileCount =
-    metricsLoading || !metrics
-      ? 0
-      : orderedMetrics.length + (showClosedToday ? 1 : 0);
+    metricsLoading || !metrics ? 0 : orderedMetrics.length + (showClosedToday ? 1 : 0);
 
   function renderClosedTodayTile(metricData: WorkshopIncidentMetrics) {
     return (
@@ -179,9 +186,7 @@ export default function IncidentMetricsBar({
     const hasNotificationBadge = badgeValue > 0;
     const badgeLabel = badgeValue > 99 ? '99+' : String(badgeValue);
     const toneClass =
-      cfg.tone && typeof value === 'number' && value > 0
-        ? ` workshop-metric--${cfg.tone}`
-        : '';
+      cfg.tone && typeof value === 'number' && value > 0 ? ` workshop-metric--${cfg.tone}` : '';
     const notificationClass = hasNotificationBadge ? ' workshop-metric--has-notif' : '';
 
     return (
@@ -193,9 +198,7 @@ export default function IncidentMetricsBar({
             ? `${cfg.label}, ${badgeValue} nouveau${badgeValue > 1 ? 'x' : ''} cas non consulté${badgeValue > 1 ? 's' : ''}`
             : undefined
         }
-        onClick={() =>
-          onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))
-        }
+        onClick={() => onSetFilters((prev: Filters) => ({ ...prev, ...cfg.getFilter(prev) }))}
         type="button"
       >
         <span className="workshop-metric-label">{cfg.label}</span>

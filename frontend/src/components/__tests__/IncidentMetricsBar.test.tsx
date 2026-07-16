@@ -30,20 +30,32 @@ const defaultFilters = {
 };
 
 function metricLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.workshop-metric-label')).map((node) => node.textContent ?? '');
+  return Array.from(container.querySelectorAll('.workshop-metric-label')).map(
+    (node) => node.textContent ?? ''
+  );
 }
 
 describe('IncidentMetricsBar – rendu', () => {
   it('affiche un spinner quand metricsLoading est vrai', () => {
     const { container } = render(
-      <IncidentMetricsBar metricsLoading metrics={null} filters={defaultFilters} onSetFilters={vi.fn()} />
+      <IncidentMetricsBar
+        metricsLoading
+        metrics={null}
+        filters={defaultFilters}
+        onSetFilters={vi.fn()}
+      />
     );
     expect(container.querySelector('.spinner')).toBeDefined();
   });
 
   it('affiche les compteurs quand les métriques sont disponibles', () => {
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={mockMetrics()} filters={defaultFilters} onSetFilters={vi.fn()} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={defaultFilters}
+        onSetFilters={vi.fn()}
+      />
     );
     expect(screen.getByText('10')).toBeDefined();
     expect(screen.getByText('5')).toBeDefined();
@@ -52,7 +64,12 @@ describe('IncidentMetricsBar – rendu', () => {
 
   it('affiche "KPI indisponibles" quand metrics est null et non loading', () => {
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={null} filters={defaultFilters} onSetFilters={vi.fn()} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={null}
+        filters={defaultFilters}
+        onSetFilters={vi.fn()}
+      />
     );
     expect(screen.getByText('KPI indisponibles')).toBeDefined();
   });
@@ -140,7 +157,9 @@ describe('IncidentMetricsBar – ordre métier', () => {
       />
     );
 
-    const arbitrationTile = screen.getByRole('button', { name: /À arbitrer, 2 nouveaux cas non consultés/i });
+    const arbitrationTile = screen.getByRole('button', {
+      name: /À arbitrer, 2 nouveaux cas non consultés/i,
+    });
     expect(arbitrationTile).toBeDefined();
     expect(arbitrationTile.textContent).toContain('5');
     expect(screen.getAllByText('2').length).toBeGreaterThan(0);
@@ -190,7 +209,12 @@ describe('IncidentMetricsBar – filtres', () => {
     const onSetFilters = vi.fn();
     const filters = { ...defaultFilters, status: 'OPEN', priority: 'urgent', taken: 'not_taken' };
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={mockMetrics()} filters={filters} onSetFilters={onSetFilters} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={filters}
+        onSetFilters={onSetFilters}
+      />
     );
     fireEvent.click(screen.getByRole('button', { name: /Total/i }));
     expect(onSetFilters).toHaveBeenCalledTimes(1);
@@ -206,10 +230,17 @@ describe('IncidentMetricsBar – filtres', () => {
     const onSetFilters = vi.fn();
     const filters = { ...defaultFilters, priority: 'urgent', taken: 'not_taken' };
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={mockMetrics()} filters={filters} onSetFilters={onSetFilters} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={filters}
+        onSetFilters={onSetFilters}
+      />
     );
     const btns = screen.getAllByRole('button');
-    const ouverts = btns.find((b) => b.textContent?.includes('Ouverts') && !b.textContent?.includes('7j'));
+    const ouverts = btns.find(
+      (b) => b.textContent?.includes('Ouverts') && !b.textContent?.includes('7j')
+    );
     if (!ouverts) throw new Error('Bouton Ouverts introuvable');
     fireEvent.click(ouverts);
     const updater = onSetFilters.mock.calls[0][0];
@@ -223,7 +254,12 @@ describe('IncidentMetricsBar – filtres', () => {
     const onSetFilters = vi.fn();
     const filters = { ...defaultFilters, priority: 'urgent' };
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={mockMetrics()} filters={filters} onSetFilters={onSetFilters} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={filters}
+        onSetFilters={onSetFilters}
+      />
     );
     fireEvent.click(screen.getByRole('button', { name: /En attente/i }));
     const updater = onSetFilters.mock.calls[0][0];
@@ -237,7 +273,12 @@ describe('IncidentMetricsBar – filtres', () => {
     const onSetFilters = vi.fn();
     const filters = { ...defaultFilters, priority: 'urgent', taken: 'not_taken' };
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={mockMetrics()} filters={filters} onSetFilters={onSetFilters} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={filters}
+        onSetFilters={onSetFilters}
+      />
     );
     fireEvent.click(screen.getByRole('button', { name: /7j/i }));
     const updater = onSetFilters.mock.calls[0][0];
@@ -250,10 +291,17 @@ describe('IncidentMetricsBar – filtres', () => {
   it('le bouton "Ouverts" est actif quand status === OPEN', () => {
     const filters = { ...defaultFilters, status: 'OPEN' };
     render(
-      <IncidentMetricsBar metricsLoading={false} metrics={mockMetrics()} filters={filters} onSetFilters={vi.fn()} />
+      <IncidentMetricsBar
+        metricsLoading={false}
+        metrics={mockMetrics()}
+        filters={filters}
+        onSetFilters={vi.fn()}
+      />
     );
     const btns = screen.getAllByRole('button');
-    const ouverts = btns.find((b) => b.textContent?.includes('Ouverts') && !b.textContent?.includes('7j'));
+    const ouverts = btns.find(
+      (b) => b.textContent?.includes('Ouverts') && !b.textContent?.includes('7j')
+    );
     if (!ouverts) throw new Error('Bouton Ouverts introuvable');
     expect(ouverts.className).toContain('active');
   });

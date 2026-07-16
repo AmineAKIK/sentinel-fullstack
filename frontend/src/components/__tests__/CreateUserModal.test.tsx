@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe('CreateUserModal — email professionnel', () => {
-  it('valide, prévisualise et transmet l\'email à la création', async () => {
+  it("valide, prévisualise et transmet l'email à la création", async () => {
     const createdUser = {
       id: 1,
       first_name: 'Jean',
@@ -64,7 +64,7 @@ describe('CreateUserModal — email professionnel', () => {
     });
   });
 
-  it('refuse une adresse professionnelle invalide avant l\'appel API', async () => {
+  it("refuse une adresse professionnelle invalide avant l'appel API", async () => {
     render(<CreateUserModal onClose={vi.fn()} onSuccess={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText('Prénom *'), { target: { value: 'Jean' } });

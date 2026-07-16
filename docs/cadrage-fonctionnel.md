@@ -23,12 +23,12 @@ décisions humaines et leur trace.
 | Espace | Public | Usage |
 | --- | --- | --- |
 | Portail `/login` | oui | choix Board, Administration ou Atelier |
-| Board `/board` | code + session Board | affichage lecture seule grand écran |
+| Board `/board` | code Board ou session Atelier | affichage lecture seule grand écran |
 | Administration `/admin/*` | session Admin | référentiel, sécurité et audit |
 | Atelier `/workshop/*` | session Atelier | incidents et vues métier |
 
-Les sessions sont indépendantes. L'accès Board ne confère aucun droit Atelier
-ou Admin.
+Une session Atelier peut lire la projection Board. La réciproque est impossible
+et les sessions Admin restent séparées.
 
 ## 3. Acteurs
 
@@ -92,7 +92,8 @@ une réauthentification, sans créer une nouvelle session parallèle.
 ### Board
 
 Le code local est comparé à un hash bcrypt. La session est limitée dans le temps,
-révocable par version et ne donne accès qu'à la projection Board.
+révocable par version et ne donne accès qu'à la projection Board. Un utilisateur
+Atelier déjà connecté peut aussi lire cette projection sans obtenir de nouveau droit.
 
 ## 5. Administration des comptes
 
@@ -257,7 +258,7 @@ Principes :
 - aucune donnée détaillée non nécessaire ;
 - aucune action métier ;
 - priorité, ancienneté, prise en charge et consigne lisibles à distance ;
-- session Board obligatoire ;
+- session Board ou Atelier valide obligatoire ;
 - cache HTTP désactivé pour les réponses sensibles.
 
 ## 12. Historique, journal et connaissance

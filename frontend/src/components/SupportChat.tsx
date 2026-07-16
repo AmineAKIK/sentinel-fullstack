@@ -53,16 +53,19 @@ export default function SupportChat({ onSend }: Props) {
       setHistory([...nextHistory, { role: 'assistant', content: reply }]);
     } catch (requestError) {
       if (controller.signal.aborted) return;
-      setError(apiErrorMessage(
-        requestError,
-        'Une erreur est survenue. Vérifiez votre connexion et réessayez.'
-      ));
+      setError(
+        apiErrorMessage(
+          requestError,
+          'Une erreur est survenue. Vérifiez votre connexion et réessayez.'
+        )
+      );
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
-      if (controller.signal.aborted) return;
-      setLoading(false);
-      // Re-focus after the re-render re-enables the textarea (disabled while loading).
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        // Re-focus after the re-render re-enables the textarea (disabled while loading).
+        requestAnimationFrame(() => textareaRef.current?.focus());
+      }
     }
   }
 
@@ -77,7 +80,9 @@ export default function SupportChat({ onSend }: Props) {
     <div className="support-layout">
       <div className="support-chat-header">
         <div className="support-agent">
-          <div className="support-agent-mark" aria-hidden="true">SENTINEL</div>
+          <div className="support-agent-mark" aria-hidden="true">
+            SENTINEL
+          </div>
           <div>
             <p className="support-agent-title">Assistant Sentinel</p>
             <p className="support-agent-subtitle">Aide sur l'utilisation de l'application</p>
@@ -102,13 +107,13 @@ export default function SupportChat({ onSend }: Props) {
         {history.map((msg, i) =>
           msg.role === 'user' ? (
             <div key={i} className="support-row support-row--user">
-              <div className="support-bubble support-bubble--user">
-                {msg.content}
-              </div>
+              <div className="support-bubble support-bubble--user">{msg.content}</div>
             </div>
           ) : (
             <div key={i} className="support-row support-row--assistant">
-              <div className="support-avatar" aria-hidden="true">S</div>
+              <div className="support-avatar" aria-hidden="true">
+                S
+              </div>
               <div className="support-bubble support-bubble--assistant">
                 {renderMarkdown(msg.content)}
               </div>
@@ -118,17 +123,23 @@ export default function SupportChat({ onSend }: Props) {
 
         {loading && (
           <div className="support-row support-row--assistant">
-            <div className="support-avatar" aria-hidden="true">S</div>
+            <div className="support-avatar" aria-hidden="true">
+              S
+            </div>
             <div className="support-bubble support-bubble--assistant support-bubble--loading">
               <span className="support-typing" aria-label="En train d'écrire">
-                <span /><span /><span />
+                <span />
+                <span />
+                <span />
               </span>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="support-error" role="alert">{error}</div>
+          <div className="support-error" role="alert">
+            {error}
+          </div>
         )}
 
         <div ref={bottomRef} />

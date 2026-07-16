@@ -9,7 +9,9 @@ const lines: ProductionLine[] = [
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    machines: [{ machineId: 'M1', brand: 'Fanuc', hasDoubleRobot: false, robotNumber: 'R1', robotHeads: 1 }],
+    machines: [
+      { machineId: 'M1', brand: 'Fanuc', hasDoubleRobot: false, robotNumber: 'R1', robotHeads: 1 },
+    ],
   },
   {
     id: 2,
@@ -17,7 +19,9 @@ const lines: ProductionLine[] = [
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    machines: [{ machineId: 'M2', brand: 'ABB', hasDoubleRobot: false, robotNumber: 'R2', robotHeads: 1 }],
+    machines: [
+      { machineId: 'M2', brand: 'ABB', hasDoubleRobot: false, robotNumber: 'R2', robotHeads: 1 },
+    ],
   },
 ];
 

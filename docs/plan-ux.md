@@ -1,14 +1,16 @@
-# Analyse & plan d'application de la doctrine UX
+# Analyse et plan UX (archive du chantier)
 
-Ce document confronte l'état actuel de l'interface à la [doctrine d'expérience](doctrine-ux.md),
-écran par écran et de façon transversale, puis en déduit un plan d'action
-priorisé. Les principes cités (P1–P7) renvoient à la doctrine.
+Ce document conserve l'analyse qui a précédé le chantier UX. Les constats de la
+partie A décrivent donc l'état **avant** les lots listés à la fin et ne doivent
+pas être lus comme des défauts encore ouverts. Tous les lots du tableau de bord
+ont été clôturés ; la recette courante se trouve dans
+[manual-tests.md](manual-tests.md).
 
-Statut de l'existant : l'application est **fonctionnellement complète et
-techniquement saine** (design tokens en place : couleurs, rayons, typo,
-espacements, transitions). Le chantier qui suit ne corrige pas des bugs : il met
-l'interface en **conformité avec la doctrine** pour passer de « cohérent » à
-« intentionnel ».
+Les principes cités (P1-P7) renvoient à la
+[doctrine d'expérience](doctrine-ux.md).
+
+Le chantier visait à passer d'une interface cohérente à une interface
+intentionnelle, sans changer les règles métier.
 
 ---
 

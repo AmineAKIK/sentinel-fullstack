@@ -245,7 +245,7 @@
   border-right: none;
 }
 
-.kb-meta-item:nth-child(n+4) {
+.kb-meta-item:nth-child(n + 4) {
   border-bottom: none;
 }
 
@@ -337,7 +337,9 @@
   background-color: var(--color-surface);
   cursor: pointer;
   text-align: left;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
 }
 
 .kb-related-item:hover {

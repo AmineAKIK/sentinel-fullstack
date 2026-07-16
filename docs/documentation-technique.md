@@ -334,7 +334,7 @@ Mutations :
 | --- | --- | --- |
 | POST | `/api/board/session` | rate limit + code bcrypt |
 | GET | `/api/board/me` | cookie Board |
-| GET | `/api/board/data` | cookie Board, projection lecture seule |
+| GET | `/api/board/data` | cookie Board ou Atelier, projection lecture seule |
 | POST | `/api/board/logout` | effacement du cookie |
 
 Le Board ne réutilise pas les endpoints détaillés Atelier.
@@ -343,7 +343,7 @@ Le Board ne réutilise pas les endpoints détaillés Atelier.
 
 L'envoi direct au milieu d'une transaction est interdit. Les services déposent
 un message durable avec une clé de déduplication. Le worker réserve par lot,
-envoie, marque `SENT` ou programme une nouvelle tentative.
+envoie, marque `COMPLETED` ou programme une nouvelle tentative.
 
 Les templates :
 
@@ -486,5 +486,7 @@ nettoie la base temporaire et tente le retour arrière si la bascule est incompl
   migration corrective ou une restauration ;
 - l'observabilité repose sur logs et healthcheck, sans stack métrique fournie ;
 - SMTP et DeepSeek sont des intégrations optionnelles à superviser séparément ;
+- l'outbox déduplique la source et livre au moins une fois ; un crash entre
+  l'acceptation SMTP et l'acquittement local peut donc déclencher un nouvel envoi ;
 - les tests de charge et audits de navigateur assistés restent des campagnes de
   recette, pas des preuves permanentes de la CI standard.

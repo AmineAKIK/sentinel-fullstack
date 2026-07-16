@@ -59,7 +59,6 @@
   width: 100%;
 }
 
-
 .board-access-page {
   min-height: 100vh;
   display: grid;
@@ -67,8 +66,7 @@
   padding: 18px;
   min-width: 0;
   background:
-    linear-gradient(180deg, rgba(8, 17, 31, 0.05), rgba(8, 17, 31, 0.11)),
-    var(--color-bg);
+    linear-gradient(180deg, rgba(8, 17, 31, 0.05), rgba(8, 17, 31, 0.11)), var(--color-bg);
 }
 
 .board-access-card {
@@ -150,4 +148,3 @@
   flex-direction: column;
   gap: var(--space-4);
 }
-

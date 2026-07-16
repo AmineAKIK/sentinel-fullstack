@@ -11,7 +11,11 @@ vi.mock('../../api/workshop', () => ({
 
 vi.mock('../../api/client', () => ({
   ApiResponseError: class ApiResponseError extends Error {
-    constructor(public code: string, message: string, public status: number) {
+    constructor(
+      public code: string,
+      message: string,
+      public status: number
+    ) {
       super(message);
     }
   },
@@ -48,9 +52,7 @@ function renderModal(
   onClose = vi.fn(),
   onSuccess = vi.fn()
 ) {
-  return render(
-    <CreateIncidentModal lines={lines} onClose={onClose} onSuccess={onSuccess} />
-  );
+  return render(<CreateIncidentModal lines={lines} onClose={onClose} onSuccess={onSuccess} />);
 }
 
 function chooseOption(label: string, option: string) {
@@ -106,7 +108,7 @@ describe('CreateIncidentModal – isDirty', () => {
 // ─── soumission ───────────────────────────────────────────────────────────────
 
 describe('CreateIncidentModal – soumission', () => {
-  it('n\'appelle pas createWorkshopIncident si le formulaire est incomplet', () => {
+  it("n'appelle pas createWorkshopIncident si le formulaire est incomplet", () => {
     renderModal();
     const aperçuBtn = screen.getByRole('button', { name: /Aperçu/i });
     fireEvent.click(aperçuBtn);
@@ -150,7 +152,7 @@ describe('CreateIncidentModal – soumission réussie', () => {
     });
   });
 
-  it('gère l\'erreur API 400 et affiche un message', async () => {
+  it("gère l'erreur API 400 et affiche un message", async () => {
     const { ApiResponseError } = await import('../../api/client');
     vi.mocked(workshopApi.createWorkshopIncident).mockRejectedValue(
       new ApiResponseError('VALIDATION_ERROR', 'Sélection invalide', 400)
@@ -166,16 +168,36 @@ describe('CreateIncidentModal – soumission réussie', () => {
 describe('CreateIncidentModal – mode requestOnly', () => {
   it("affiche Modifier l'incident si un incident est fourni (mode édition)", () => {
     const incident = {
-      id: 1, line_id: 1, line_number: 'L01',
-      machine_id: 'M01', machine_brand: 'Fanuc', robot_label: 'R01', head_number: 1,
-      state: 'DEGRADEE' as const, status: 'OPEN' as const, is_taken: false,
-      is_priority: false, comment: null, current_product: null, display_order: 0,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      diagnostic: null, intervention_note: null, responsible_comment: null,
-      edit_request: null, delete_request: false, delete_request_reason: null,
-      taken_by_user_id: null, taken_at: null, taken_by_first_name: null,
-      taken_by_last_name: null, taken_by_role: null,
-      first_name: 'Jean', last_name: 'Dupont', role: 'OPERATOR' as const,
+      id: 1,
+      line_id: 1,
+      line_number: 'L01',
+      machine_id: 'M01',
+      machine_brand: 'Fanuc',
+      robot_label: 'R01',
+      head_number: 1,
+      state: 'DEGRADEE' as const,
+      status: 'OPEN' as const,
+      is_taken: false,
+      is_priority: false,
+      comment: null,
+      current_product: null,
+      display_order: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      diagnostic: null,
+      intervention_note: null,
+      responsible_comment: null,
+      edit_request: null,
+      delete_request: false,
+      delete_request_reason: null,
+      taken_by_user_id: null,
+      taken_at: null,
+      taken_by_first_name: null,
+      taken_by_last_name: null,
+      taken_by_role: null,
+      first_name: 'Jean',
+      last_name: 'Dupont',
+      role: 'OPERATOR' as const,
     };
     render(
       <CreateIncidentModal

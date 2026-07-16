@@ -1,205 +1,189 @@
-# Audit & stress-test de mise en production — Sentinel
+# Protocole d'audit de production Sentinel
 
-Ce document est la checklist d'audit **go / no-go** avant de déclarer Sentinel
-prêt pour la production. Il ne suffit pas que « ça marche » : on vérifie
-fiabilité, sécurité, performance, accessibilité et exploitabilité, comme le ferait
-une équipe produit sérieuse.
+Ce protocole complète la [checklist de publication](release-checklist.md). Il
+décrit les campagnes qui exigent un environnement iso-production et ne doivent
+pas être confondues avec les contrôles automatiques de chaque commit.
 
-**Règle d'or :** une ligne en ❌ bloque la mise en prod tant qu'elle n'est pas
-traitée ou explicitement acceptée comme risque connu.
+## 1. Conditions de départ
 
-Légende : ✅ vérifié OK · ⚠️ à vérifier · ❌ bloquant · N/A hors périmètre.
+- commit candidat identifié par SHA et CI entièrement verte ;
+- images construites depuis ce SHA, sans modification locale ;
+- environnement séparé de la production mais de topologie identique ;
+- configuration `NODE_ENV=production` avec secrets temporaires forts ;
+- PostgreSQL dédié et backup initial ;
+- jeu de données anonymisé ou synthétique ;
+- fenêtre et responsable de test définis.
 
----
+Une ligne en échec non expliquée bloque le GO.
 
-## 0. Pré-requis de l'audit
+## 2. Contrats automatiques obligatoires
 
-- Environnement de test **iso-prod** (mêmes images Docker, `NODE_ENV=production`,
-  base PostgreSQL dédiée, jamais la prod réelle).
-- Jeu de données réaliste : utiliser `seedWorkshopProductionDemo.js` puis amplifier
-  (voir §4) — pas 3 incidents, mais des centaines.
-- Un backup pris avant tout test destructif.
+Les cinq jobs de `.github/workflows/ci.yml` doivent réussir :
 
----
+| Contrat | Preuve |
+| --- | --- |
+| Backend | format, lint, typecheck scripts, build, couverture, fiabilité, audit npm |
+| Frontend | format, lint, build, couverture, audit npm |
+| PostgreSQL | migrations et suites d'intégration sur base réelle |
+| Navigateur | parcours Playwright et mobile arbitration |
+| Conteneurs | Compose, images non-root, Nginx, Caddy et ShellCheck |
 
-## 1. Fondations qualité (déjà en place — à confirmer vertes)
+Vérifier également qu'aucun test n'est marqué `only`, qu'aucun artefact de test
+n'est suivi et que Dependabot n'a pas d'alerte high/critical non traitée.
 
-| # | Contrôle | Comment | Critère |
-|---|----------|---------|---------|
-| 1.1 | Lint backend + frontend | `npm run lint` (×2) | 0 erreur |
-| 1.2 | Build backend + frontend | `npm run build` (×2) | 0 erreur TS |
-| 1.3 | Tests unitaires backend | `npm test -- --selectProjects unit` | 100 % passent |
-| 1.4 | Tests intégration backend | `npm test -- --selectProjects integration` (Postgres requis) | 100 % passent |
-| 1.5 | Tests frontend | `npm test` | 100 % passent |
-| 1.6 | Reliability checks | `node scripts/verifyReliability.js` | tous passent |
-| 1.7 | Build images Docker | `docker compose build` | succès |
-| 1.8 | CI verte sur la branche | GitHub Actions | tous les jobs ✅ |
+## 3. Données et volume
 
-> Ces 8 points sont déjà couverts par la CI. L'audit confirme qu'ils sont verts
-> sur le commit candidat à la prod.
+Préparer au minimum :
 
----
+- 50 lignes ;
+- 200 machines ;
+- 10 000 incidents répartis sur plusieurs mois ;
+- incidents actifs, en attente, clôturés, annulés et invalidés ;
+- cas d'arbitrage actifs, consultés et décidés ;
+- événements, followers et outbox représentatifs.
 
-## 2. Couverture de test (combler les trous)
+Mesurer, navigateur sans cache puis cache chaud :
 
-| # | Contrôle | État | Action |
-|---|----------|------|--------|
-| 2.1 | Couverture backend mesurée | ⚠️ | Lancer `npm test -- --coverage`, viser ≥ 70 % sur les services/policies (le cœur métier). |
-| 2.2 | Couverture frontend mesurée | ⚠️ | `npm test -- --coverage` ; cibler utils + composants critiques (cartes, modals). |
-| 2.3 | **Parcours E2E critiques** | ❌ absent | Voir §3 — le plus gros manque actuel. |
-| 2.4 | Tests des invariants métier | ✅ | Couverts par les tests d'intégration workshop (cycle de vie incident, permissions). |
+| Vue | Objectif indicatif |
+| --- | --- |
+| Dashboard actif | première donnée utile < 1 s sur LAN |
+| Historique filtré | réponse API p95 < 500 ms |
+| Pilotage 30 jours | réponse API p95 < 1 s |
+| Board | rendu stable sans croissance mémoire |
+| Recherche | résultat p95 < 500 ms |
 
----
+Les objectifs doivent être adaptés à l'infrastructure réelle et consignés avec
+CPU, RAM, latence réseau et volume exact.
 
-## 3. Tests end-to-end (parcours réels — à créer)
+Activer temporairement `log_min_duration_statement` sur la base de test pour
+identifier les requêtes lentes. Conserver les `EXPLAIN (ANALYZE, BUFFERS)` des
+requêtes problématiques, sans données personnelles.
 
-C'est le **principal angle mort**. Les premium valident les parcours complets dans
-un vrai navigateur (Playwright recommandé : rapide, multi-navigateurs, headless en
-CI). Scénarios bloquants à couvrir :
+## 4. Charge et endurance
 
-| # | Parcours | Rôle |
-|---|----------|------|
-| 3.1 | Connexion admin → créer un utilisateur → récupérer le code de setup | Admin |
-| 3.2 | Première connexion atelier (badge + code → définition mot de passe) | Opérateur |
-| 3.3 | Cycle de vie complet d'un incident : déclarer → prendre en charge → mettre en attente → reprendre → clôturer | Opérateur + Maintenance |
-| 3.4 | Demande de correction opérateur → approbation responsable | Opérateur + Responsable |
-| 3.5 | Demande d'annulation → revue → décision | Opérateur + Responsable |
-| 3.6 | Accès board par code → affichage lecture seule → rotation des vues | Board |
-| 3.7 | Consultation Connaissance → ouverture d'un cas similaire | Maintenance |
-| 3.8 | Déconnexion / expiration de session → redirection login | Tous |
+Utiliser k6, Artillery ou un outil équivalent avec des sessions réalistes.
 
-**Référence existante :** `docs/manual-tests.md` décrit déjà ces scénarios à la
-main. L'objectif est de les **automatiser** (au moins 3.1–3.3, les plus critiques).
+Scénarios :
 
----
+1. lecture `/api/health` de référence ;
+2. lecture incidents authentifiée avec filtres variés ;
+3. polling Board avec plusieurs écrans ;
+4. créations concurrentes sur emplacements différents ;
+5. collision volontaire sur le même emplacement ;
+6. décisions concurrentes sur un même arbitrage ;
+7. endurance 30 à 60 minutes à charge nominale.
 
-## 4. Performance & charge (stress-test)
+Critères minimaux :
 
-Objectif : confirmer que Sentinel tient avec des données et un trafic réalistes,
-pas seulement avec 3 incidents.
+- aucune violation d'unicité métier ;
+- aucun double événement métier ni double élément d'outbox pour une même source ;
+- le scénario de crash après acceptation SMTP documente le risque résiduel de
+  nouvel envoi inhérent à la livraison « au moins une fois » ;
+- aucun 5xx inexpliqué ;
+- mémoire backend sans croissance linéaire ;
+- pool PostgreSQL stable ;
+- p95 et taux d'erreur conformes aux objectifs définis.
 
-### 4.1 Volume de données
-- Amplifier le seed à **5 000–10 000 incidents**, 50 lignes, 200 machines.
-- Vérifier que Dashboard, Board, Pilotage, Historique, Connaissance **restent
-  fluides** (< 1 s de rendu perçu) avec ce volume.
-- Surveiller les requêtes SQL lentes : activer les logs Postgres `log_min_duration_statement`.
+Le rate limiting doit être ajusté pour la campagne sans être désactivé en
+production réelle.
 
-### 4.2 Charge HTTP (outil : **k6** ou **Artillery**)
-| # | Test | Cible | Critère |
-|---|------|-------|---------|
-| 4.2.1 | Montée en charge `/api/health` | 50 → 200 req/s | p95 < 200 ms, 0 erreur 5xx |
-| 4.2.2 | Lecture incidents `/api/workshop/incidents` (authentifié) | 50 utilisateurs simultanés | p95 < 500 ms |
-| 4.2.3 | Board `/api/board` (lecture seule, fort trafic potentiel) | 100 req/s soutenu 5 min | stable, pas de fuite mémoire |
-| 4.2.4 | Création d'incidents en rafale | 20 req/s | pas de doublon, intégrité respectée |
+## 5. Sécurité dynamique
 
-### 4.3 Endurance
-- Laisser tourner 30 min sous charge modérée ; surveiller `docker stats` :
-  la mémoire backend ne doit **pas croître linéairement** (fuite).
+### Sessions
 
-### 4.4 Pagination / limites
-- Confirmer que les listes sont bornées (limites déjà en place : 500 max sur les
-  queries). Aucune requête ne doit ramener « tout » sans borne.
+- token Admin présenté à une route Atelier : refus ;
+- token Atelier présenté à une route Admin : refus ;
+- token Board présenté ailleurs que `/api/board` : refus ;
+- token Atelier autorisé sur la projection Board mais jamais sur l'Admin ;
+- token signé avec autre audience/issuer/algorithme : refus ;
+- changement de rôle, désactivation et rotation : session immédiatement refusée ;
+- cookies `HttpOnly`, `Secure`, `SameSite=Strict` sous HTTPS.
 
----
+### Entrées
 
-## 5. Sécurité (audit ciblé)
+- payload JSON > 50 Ko refusé ;
+- recherches avec quotes, wildcards et Unicode sans injection ;
+- HTML/script dans noms, commentaires, motifs, support et e-mails échappé ;
+- IDs invalides et objets JSON mal formés retournent 4xx ;
+- conflits SQL concurrents retournent une erreur métier stable.
 
-| # | Contrôle | État | Comment |
-|---|----------|------|---------|
-| 5.1 | Secrets jamais en dur / jamais loggés | ✅ | Logs redacted (cookie, authorization) ; secrets via `.env`. |
-| 5.2 | Refus de démarrer si secrets faibles en prod | ✅ | Logique dans `config/production.ts`. |
-| 5.3 | Headers de sécurité | ✅ | `securityHeaders` (HSTS, nosniff, frame-options, CSP). À re-vérifier en prod réelle avec [securityheaders.com](https://securityheaders.com). |
-| 5.4 | Rate limiting login + global | ✅ | `loginRateLimit` + `globalApiRateLimit`. Tester qu'un brute-force est bien bloqué (429). |
-| 5.5 | Limite taille payload | ✅ | `express.json({ limit: '50kb' })`. |
-| 5.6 | Bornes de longueur sur tous les champs | ✅ | `FIELD_LIMITS` + Zod (audité précédemment). |
-| 5.7 | Autorisation : chaque route protégée | ✅ | `router.use(adminAuth/workshopAuth)` avant chaque route. |
-| 5.8 | Cookies HTTP-only + Secure en prod | ⚠️ | Confirmer `secure: true` effectif derrière HTTPS (Caddy/Nginx). |
-| 5.9 | `npm audit` sans vuln high/critical | ✅ | Dans la CI (`--audit-level=high`). Re-lancer au moment de la release. |
-| 5.10 | Test d'injection SQL | ✅ | Requêtes paramétrées (audité). Re-confirmer via un fuzzing léger sur les champs de recherche. |
-| 5.11 | Pas d'accès aux routes admin avec un token atelier (et inversement) | ⚠️ | À tester explicitement (cross-role). |
-| 5.12 | CORS restreint à l'origine de prod | ⚠️ | Vérifier `CLIENT_ORIGIN` exact, pas de wildcard. |
+### Infrastructure
 
----
+- TLS valide et renouvelable ;
+- headers vérifiés avec un outil externe ;
+- aucun port 3000, 5432 ou 8080 exposé ;
+- conteneurs frontend/backend non-root et read-only ;
+- `.env` non lisible par les autres comptes ;
+- logs sans cookie, bearer, mot de passe ou clé API.
 
-## 6. Accessibilité (a11y)
+Un scan DAST peut compléter ces tests, mais ses alertes doivent être vérifiées
+manuellement avant conclusion.
 
-| # | Contrôle | État | Outil |
-|---|----------|------|-------|
-| 6.1 | Audit automatisé par page | ⚠️ | **axe-core** / Lighthouse a11y ≥ 90 sur chaque écran. |
-| 6.2 | Navigation clavier complète | ⚠️ | Tab/Enter/Échap sur modals, cartes, formulaires (déjà amorcé : `role`, `aria-label`, focus-visible). |
-| 6.3 | Contraste des couleurs | ⚠️ | Vérifier la grammaire d'attention (texte/fond) en ratio AA (4.5:1). |
-| 6.4 | Lecteur d'écran | ⚠️ | Passe rapide VoiceOver/NVDA sur les parcours clés. |
-| 6.5 | `prefers-reduced-motion` respecté | ✅ | Déjà en place. |
+## 6. Accessibilité
 
----
+Sur les pages principales et les deux formats 393 x 851 / 1920 x 1080 :
 
-## 7. Robustesse & dégradation gracieuse
+- Lighthouse/axe sans violation critique ;
+- navigation complète au clavier ;
+- ordre de focus cohérent ;
+- modale : focus initial, piège, Escape, restauration ;
+- lecteurs NVDA ou VoiceOver sur login, dashboard et arbitrage ;
+- zoom navigateur 200 % sans perte d'action ;
+- contraste AA pour texte et contrôles ;
+- `prefers-reduced-motion` respecté.
 
-| # | Scénario | Comportement attendu |
-|---|----------|----------------------|
-| 7.1 | Backend coupé pendant l'usage | Le front affiche une erreur claire, pas un écran blanc (ErrorBoundary en place). |
-| 7.2 | DB injoignable | `/api/health` renvoie 503 ; le front dégrade proprement. |
-| 7.3 | DeepSeek (chat) indisponible | Le support se désactive sans casser l'app (déjà géré). |
-| 7.4 | Réseau lent / latence | Skeletons et états de chargement s'affichent (déjà en place). |
-| 7.5 | Données corrompues / champs nuls | Pas de crash (états vides « Non renseigné », `?? '—'`). |
-| 7.6 | Double-soumission de formulaire | Boutons désactivés pendant `loading` (à confirmer partout). |
+Les scores automatiques ne remplacent pas la passe clavier/lecteur d'écran.
 
----
+## 7. Responsive et compatibilité
 
-## 8. Compatibilité
+Navigateurs : versions récentes de Chrome, Edge, Firefox et Safari.
 
-| # | Cible | Critère |
-|---|-------|---------|
-| 8.1 | Chrome / Firefox / Safari / Edge récents | Rendu et fonctionnement OK |
-| 8.2 | Mobile (atelier sur tablette/téléphone) | Responsive validé (breakpoints en place) |
-| 8.3 | Board sur grand écran / TV | Lisibilité de loin, rotation des vues OK |
+Viewports :
 
----
+- téléphone 393 x 851 ;
+- tablette portrait/paysage ;
+- desktop 1366 x 768 et 1920 x 1080 ;
+- écran Board cible réel.
 
-## 9. Exploitation & reprise (déjà documenté — à éprouver)
+Contrôler : absence de scroll horizontal, taille des cibles, modales d'arbitrage,
+ouverture du dossier, restauration de position, clavier virtuel, menu mobile et
+rotation du Board.
 
-| # | Contrôle | Référence |
-|---|----------|-----------|
-| 9.1 | Backup DB fonctionne et restaure | `docs/runbook.md` §3-4 — **tester une restauration réelle** sur env temporaire |
-| 9.2 | Migrations rejouables sans casse | Démarrage backend rejoue les migrations (idempotentes) |
-| 9.3 | Rollback applicatif | `docs/runbook.md` §11 |
-| 9.4 | Rotation des secrets | `docs/runbook.md` §6 |
-| 9.5 | Monitoring `/api/health` externe | UptimeRobot ou équivalent (§9 runbook) |
-| 9.6 | Logs consultables sans fuite de secret | ✅ redaction en place |
+## 8. Dégradations
 
----
+| Panne simulée | Attendu |
+| --- | --- |
+| PostgreSQL coupé | santé 503, erreur explicite, aucun faux succès |
+| SMTP coupé | décision métier validée, outbox en retry |
+| DeepSeek lent/invalide | timeout borné, support en erreur seulement |
+| backend redémarré | sessions cohérentes, worker reprend l'outbox |
+| double clic / réseau lent | une mutation au plus |
+| réponse précédente tardive | aucun état UI obsolète |
+| SIGTERM pendant trafic | arrêt gracieux dans la fenêtre Compose |
 
-## 10. Recette manuelle finale
+## 9. Reprise
 
-Exécuter intégralement `docs/manual-tests.md` sur l'environnement iso-prod, puis
-la `docs/release-checklist.md`.
+Campagne obligatoire sur l'environnement dédié :
 
----
+1. créer un backup avec `scripts/backup.sh` ;
+2. vérifier gzip et checksum ;
+3. modifier des données témoins ;
+4. restaurer avec `scripts/restore.sh` ;
+5. comparer les données témoins et le ledger de migrations ;
+6. rejouer santé, connexion, incident et audit ;
+7. mesurer RTO et point de reprise obtenu ;
+8. vérifier la copie hors site.
 
-## Décision Go / No-Go
+Ne jamais présenter un script non exécuté comme une restauration prouvée.
 
-La mise en production est validée **uniquement si** :
+## 10. Décision
 
-1. §1 (fondations) entièrement ✅ ;
-2. §3 : au moins les parcours 3.1–3.3 automatisés et verts (ou recette manuelle
-   complète signée) ;
-3. §4 : aucun écroulement ni fuite mémoire sous charge réaliste ;
-4. §5 : aucun point sécurité en ❌ ; les ⚠️ tranchés (vérifiés ou risque accepté) ;
-5. §6 : a11y ≥ 90 sur les écrans principaux ;
-6. §9.1 : une restauration de backup réellement testée.
+Le compte rendu doit inclure : SHA, date, environnement, versions, volumes,
+commandes, métriques, captures utiles, anomalies, risques acceptés et signataires.
 
-Tout ❌ non traité = **No-Go**.
+Décisions possibles :
 
----
-
-## Priorisation réaliste (si le temps est limité)
-
-Dans l'ordre de criticité, pour un projet d'examen avec jury :
-
-1. **Confirmer §1 vert** (rapide, déjà en place) — non négociable.
-2. **§5.8, §5.11, §5.12** (sécurité, 3 vérifs ciblées) — rapide, fort enjeu.
-3. **§4.1 volume de données** (seed amplifié) — révèle les vrais problèmes de perf.
-4. **§9.1 restauration de backup** — prouve l'exploitabilité.
-5. **§3.1–3.3 E2E** (Playwright) — le plus gros chantier, mais le plus probant
-   devant un jury.
-6. **§6 a11y** (Lighthouse) — rapide, valorisant.
+- **GO** : aucun bloquant, preuves complètes ;
+- **GO conditionnel** : uniquement réserves non bloquantes avec responsable et
+  échéance ;
+- **NO-GO** : intégrité, sécurité, reprise ou parcours critique non prouvé.

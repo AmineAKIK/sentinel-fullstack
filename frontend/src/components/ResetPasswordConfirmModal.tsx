@@ -28,7 +28,9 @@ export default function ResetPasswordConfirmModal({
       const updated = await resetAccountPassword(user.id);
       setUpdatedUser(updated);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
@@ -64,12 +66,19 @@ export default function ResetPasswordConfirmModal({
           </SuccessBanner>
           <div className="detail-field" style={{ marginBottom: 14 }}>
             <span className="detail-field-label">Code temporaire</span>
-            <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>
+            <span
+              className="detail-field-value"
+              style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}
+            >
               {updatedUser.password_setup_code}
             </span>
           </div>
           <div className="notice">
-            Ce code est affiché une seule fois. Il expire le {updatedUser.password_setup_expires_at ? formatDateTime(updatedUser.password_setup_expires_at) : 'prochainement'}.
+            Ce code est affiché une seule fois. Il expire le{' '}
+            {updatedUser.password_setup_expires_at
+              ? formatDateTime(updatedUser.password_setup_expires_at)
+              : 'prochainement'}
+            .
           </div>
         </div>
       ) : (

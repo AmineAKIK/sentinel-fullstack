@@ -31,7 +31,18 @@ export default function DashboardFilters({
           <button
             className="btn btn-secondary"
             type="button"
-            onClick={() => onSetFilters((prev: Filters) => ({ ...prev, lineId: 'all', status: 'all', priority: 'all', taken: 'all', scope: 'all', aging: 'all', query: '' }))}
+            onClick={() =>
+              onSetFilters((prev: Filters) => ({
+                ...prev,
+                lineId: 'all',
+                status: 'all',
+                priority: 'all',
+                taken: 'all',
+                scope: 'all',
+                aging: 'all',
+                query: '',
+              }))
+            }
           >
             Tout effacer
           </button>
@@ -62,14 +73,19 @@ export default function DashboardFilters({
             {lines.map((line) => {
               const selected = filters.lineId === String(line.id);
               return (
-                <label className={`board-line-select-chip ${selected ? 'active' : ''}`} key={line.id}>
+                <label
+                  className={`board-line-select-chip ${selected ? 'active' : ''}`}
+                  key={line.id}
+                >
                   <input
                     type="checkbox"
                     checked={selected}
-                    onChange={() => onSetFilters((prev: Filters) => ({
-                      ...prev,
-                      lineId: selected ? 'all' : String(line.id),
-                    }))}
+                    onChange={() =>
+                      onSetFilters((prev: Filters) => ({
+                        ...prev,
+                        lineId: selected ? 'all' : String(line.id),
+                      }))
+                    }
                   />
                   <span>Ligne {line.line_number}</span>
                   <strong>{selected ? 'incluse' : 'disponible'}</strong>

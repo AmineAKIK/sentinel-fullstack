@@ -40,16 +40,36 @@ export default function EditSummaryModal({
   const changes: { field: string; label: string; oldVal: string; newVal: string }[] = [];
 
   if (form.firstName.trim() !== user.first_name) {
-    changes.push({ field: 'firstName', label: FIELD_LABELS.firstName, oldVal: user.first_name, newVal: form.firstName.trim() });
+    changes.push({
+      field: 'firstName',
+      label: FIELD_LABELS.firstName,
+      oldVal: user.first_name,
+      newVal: form.firstName.trim(),
+    });
   }
   if (form.lastName.trim() !== user.last_name) {
-    changes.push({ field: 'lastName', label: FIELD_LABELS.lastName, oldVal: user.last_name, newVal: form.lastName.trim() });
+    changes.push({
+      field: 'lastName',
+      label: FIELD_LABELS.lastName,
+      oldVal: user.last_name,
+      newVal: form.lastName.trim(),
+    });
   }
   if (form.badgeNumber.trim() !== user.badge_number) {
-    changes.push({ field: 'badgeNumber', label: FIELD_LABELS.badgeNumber, oldVal: user.badge_number, newVal: form.badgeNumber.trim() });
+    changes.push({
+      field: 'badgeNumber',
+      label: FIELD_LABELS.badgeNumber,
+      oldVal: user.badge_number,
+      newVal: form.badgeNumber.trim(),
+    });
   }
   if (form.role !== user.role) {
-    changes.push({ field: 'role', label: FIELD_LABELS.role, oldVal: roleLabel(user.role), newVal: roleLabel(form.role) });
+    changes.push({
+      field: 'role',
+      label: FIELD_LABELS.role,
+      oldVal: roleLabel(user.role),
+      newVal: roleLabel(form.role),
+    });
   }
   const formEmail = form.email?.trim() || null;
   const userEmail = user.email || null;
@@ -79,7 +99,8 @@ export default function EditSummaryModal({
     const payload: Record<string, string | null> = {};
     if (form.firstName.trim() !== user.first_name) payload.firstName = form.firstName.trim();
     if (form.lastName.trim() !== user.last_name) payload.lastName = form.lastName.trim();
-    if (form.badgeNumber.trim() !== user.badge_number) payload.badgeNumber = form.badgeNumber.trim();
+    if (form.badgeNumber.trim() !== user.badge_number)
+      payload.badgeNumber = form.badgeNumber.trim();
     if (form.role !== user.role) payload.role = form.role;
     if (formEmail !== userEmail) payload.email = formEmail;
 
@@ -89,9 +110,7 @@ export default function EditSummaryModal({
         updated = await updateAccount(user.id, payload);
       }
       if (statusChange) {
-        updated = form.isActive
-          ? await activateAccount(user.id)
-          : await deactivateAccount(user.id);
+        updated = form.isActive ? await activateAccount(user.id) : await deactivateAccount(user.id);
       }
       onSuccess(updated);
     } catch (err) {
@@ -117,14 +136,26 @@ export default function EditSummaryModal({
           <button className="btn btn-secondary" onClick={onBack} disabled={loading}>
             Retour
           </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={loading || changes.length === 0}>
-            {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={loading || changes.length === 0}
+          >
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Enregistrement…
+              </>
+            ) : (
+              'Enregistrer'
+            )}
           </button>
         </>
       }
     >
       {changes.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Aucune modification détectée.</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>
+          Aucune modification détectée.
+        </p>
       ) : (
         <div className="table-wrapper">
           <table className="change-table">
@@ -138,9 +169,15 @@ export default function EditSummaryModal({
             <tbody>
               {changes.map((c) => (
                 <tr key={c.field}>
-                  <td><strong>{c.label}</strong></td>
-                  <td><span className="val-old">{c.oldVal}</span></td>
-                  <td><span className="val-new">{c.newVal}</span></td>
+                  <td>
+                    <strong>{c.label}</strong>
+                  </td>
+                  <td>
+                    <span className="val-old">{c.oldVal}</span>
+                  </td>
+                  <td>
+                    <span className="val-new">{c.newVal}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>

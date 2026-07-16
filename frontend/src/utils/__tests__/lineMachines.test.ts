@@ -14,7 +14,9 @@ import type { LineMachine } from '../../types';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function singleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot: false }>> = {}): LineMachine {
+function singleMachine(
+  overrides: Partial<Extract<LineMachine, { hasDoubleRobot: false }>> = {}
+): LineMachine {
   return {
     machineId: 'M01',
     brand: 'Fanuc',
@@ -25,7 +27,9 @@ function singleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot:
   };
 }
 
-function doubleMachine(overrides: Partial<Extract<LineMachine, { hasDoubleRobot: true }>> = {}): LineMachine {
+function doubleMachine(
+  overrides: Partial<Extract<LineMachine, { hasDoubleRobot: true }>> = {}
+): LineMachine {
   return {
     machineId: 'M02',
     brand: 'KUKA',
@@ -81,7 +85,12 @@ describe('normalizeLineMachine', () => {
   });
 
   it('trims whitespace from double-robot fields', () => {
-    const m = doubleMachine({ machineId: ' M02 ', brand: ' KUKA ', leftRobotNumber: ' L1 ', rightRobotNumber: ' R1 ' });
+    const m = doubleMachine({
+      machineId: ' M02 ',
+      brand: ' KUKA ',
+      leftRobotNumber: ' L1 ',
+      rightRobotNumber: ' R1 ',
+    });
     const result = normalizeLineMachine(m);
     expect(result.machineId).toBe('M02');
     if (result.hasDoubleRobot) {
@@ -196,11 +205,15 @@ describe('lineMachineEquals', () => {
   });
 
   it('ignores non-significant whitespace (normalises before comparing)', () => {
-    expect(lineMachineEquals(singleMachine({ machineId: ' M01 ' }), singleMachine({ machineId: 'M01' }))).toBe(true);
+    expect(
+      lineMachineEquals(singleMachine({ machineId: ' M01 ' }), singleMachine({ machineId: 'M01' }))
+    ).toBe(true);
   });
 
   it('detects a brand change', () => {
-    expect(lineMachineEquals(singleMachine({ brand: 'Fanuc' }), singleMachine({ brand: 'KUKA' }))).toBe(false);
+    expect(
+      lineMachineEquals(singleMachine({ brand: 'Fanuc' }), singleMachine({ brand: 'KUKA' }))
+    ).toBe(false);
   });
 
   it('detects a robot mode switch', () => {
@@ -208,17 +221,28 @@ describe('lineMachineEquals', () => {
   });
 
   it('detects a heads-count change on a single robot', () => {
-    expect(lineMachineEquals(singleMachine({ robotHeads: 2 }), singleMachine({ robotHeads: 4 }))).toBe(false);
+    expect(
+      lineMachineEquals(singleMachine({ robotHeads: 2 }), singleMachine({ robotHeads: 4 }))
+    ).toBe(false);
   });
 
   it('detects a change on the right robot of a double machine', () => {
-    expect(lineMachineEquals(doubleMachine({ rightRobotHeads: 3 }), doubleMachine({ rightRobotHeads: 8 }))).toBe(false);
+    expect(
+      lineMachineEquals(
+        doubleMachine({ rightRobotHeads: 3 }),
+        doubleMachine({ rightRobotHeads: 8 })
+      )
+    ).toBe(false);
   });
 
   it('ignores residual fields of the inactive mode (no false negative)', () => {
     // Une machine simple ayant gardé des champs « double » résiduels reste
     // égale à une machine simple propre : seul le mode actif compte.
-    const withResidual = { ...singleMachine(), leftRobotNumber: 'X9', leftRobotHeads: 99 } as LineMachine;
+    const withResidual = {
+      ...singleMachine(),
+      leftRobotNumber: 'X9',
+      leftRobotHeads: 99,
+    } as LineMachine;
     expect(lineMachineEquals(withResidual, singleMachine())).toBe(true);
   });
 });
@@ -227,7 +251,9 @@ describe('lineMachineEquals', () => {
 
 describe('lineMachinesEqual', () => {
   it('considers identical lists equal', () => {
-    expect(lineMachinesEqual([singleMachine(), doubleMachine()], [singleMachine(), doubleMachine()])).toBe(true);
+    expect(
+      lineMachinesEqual([singleMachine(), doubleMachine()], [singleMachine(), doubleMachine()])
+    ).toBe(true);
   });
 
   it('detects a different length', () => {
@@ -252,7 +278,14 @@ describe('machineRobotSummary', () => {
   });
 
   it('generates a summary for a double-robot machine', () => {
-    const summary = machineRobotSummary(doubleMachine({ leftRobotNumber: 'L1', leftRobotHeads: 2, rightRobotNumber: 'R1', rightRobotHeads: 3 }));
+    const summary = machineRobotSummary(
+      doubleMachine({
+        leftRobotNumber: 'L1',
+        leftRobotHeads: 2,
+        rightRobotNumber: 'R1',
+        rightRobotHeads: 3,
+      })
+    );
     expect(summary).toContain('Double robot');
     expect(summary).toContain('L1');
     expect(summary).toContain('R1');

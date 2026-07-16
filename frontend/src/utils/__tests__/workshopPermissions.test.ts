@@ -175,17 +175,12 @@ describe('MAINTENANCE permissions', () => {
         state: 'ACTIVE' as const,
       },
     };
-    expect(
-      canPerform(
-        'MAINTENANCE',
-        'take',
-        incident({ is_taken: false, arbitration }),
-        7
-      )
-    ).toBe(false);
-    expect(
-      canPerform('MAINTENANCE', 'close', incident({ is_taken: true, arbitration }))
-    ).toBe(false);
+    expect(canPerform('MAINTENANCE', 'take', incident({ is_taken: false, arbitration }), 7)).toBe(
+      false
+    );
+    expect(canPerform('MAINTENANCE', 'close', incident({ is_taken: true, arbitration }))).toBe(
+      false
+    );
     expect(
       canPerform('MAINTENANCE', 'directEdit', incident({ is_taken: false, arbitration }))
     ).toBe(false);

@@ -21,7 +21,8 @@ export default function DeleteResponsibleCommentConfirmModal({
       variant="danger"
     >
       <div className="notice">
-        Vous allez retirer la consigne responsable de l'incident {incident.line_number} · {incident.machine_id}. Cette information ne sera plus visible sur la carte.
+        Vous allez retirer la consigne responsable de l'incident {incident.line_number} ·{' '}
+        {incident.machine_id}. Cette information ne sera plus visible sur la carte.
       </div>
     </ConfirmModal>
   );

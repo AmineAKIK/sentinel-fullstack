@@ -47,8 +47,8 @@ export default function ResponsiveNavBar({
   }, [menuOpen]);
 
   function isActive(matches: string[]): boolean {
-    return matches.some((path) =>
-      location.pathname === path || location.pathname.startsWith(`${path}/`)
+    return matches.some(
+      (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
     );
   }
 
@@ -94,9 +94,7 @@ export default function ResponsiveNavBar({
             );
           })}
         </div>
-        <div className="nav-actions">
-          {actions}
-        </div>
+        <div className="nav-actions">{actions}</div>
       </div>
     </nav>
   );

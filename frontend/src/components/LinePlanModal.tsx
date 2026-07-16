@@ -41,7 +41,9 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
       const updated = await updateLine(line.id, { machines });
       onSuccess(updated);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
       setLoading(false);
     }
   }
@@ -75,7 +77,13 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
-              {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Confirmer'}
+              {loading ? (
+                <>
+                  <span className="spinner" aria-hidden="true" /> Enregistrement…
+                </>
+              ) : (
+                'Confirmer'
+              )}
             </button>
           </>
         ) : (
@@ -83,7 +91,11 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
             <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={handlePreview} disabled={loading || !hasChanges}>
+            <button
+              className="btn btn-primary"
+              onClick={handlePreview}
+              disabled={loading || !hasChanges}
+            >
               Aperçu
             </button>
           </>
@@ -108,9 +120,7 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
         </div>
       ) : (
         <>
-          <p className="plan-hint">
-            Glissez pour réorganiser les machines de la SPI vers le four.
-          </p>
+          <p className="plan-hint">Glissez pour réorganiser les machines de la SPI vers le four.</p>
           <div className="plan-list">
             {machines.map((machine, index) => (
               <div
@@ -126,7 +136,9 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
                   setDragIndex(index);
                 }}
               >
-                <div className="plan-handle" aria-hidden="true">⋮⋮</div>
+                <div className="plan-handle" aria-hidden="true">
+                  ⋮⋮
+                </div>
                 <div className="plan-order">{index + 1}</div>
                 <div className="plan-info">
                   <strong>{machine.machineId}</strong>

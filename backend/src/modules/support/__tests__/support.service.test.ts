@@ -50,7 +50,7 @@ describe('support service', () => {
     const body = JSON.parse(String(request?.body)) as { messages: Array<{ content: string }> };
     expect(body.messages).toHaveLength(12);
     expect(body.messages[1].content).toBe('message-4');
-    expect(body.messages.at(-1)?.content).toBe('Question finale');
+    expect(body.messages[body.messages.length - 1]?.content).toBe('Question finale');
   });
 
   it('refuse une réponse 200 dont le contrat JSON est invalide', async () => {

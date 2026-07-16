@@ -32,7 +32,9 @@ describe('PrivacyPage', () => {
     expect(screen.getByText(/transmet à l'API DeepSeek le message saisi/i)).toBeInTheDocument();
     expect(screen.getByText(/dix derniers messages de l'historique/i)).toBeInTheDocument();
     expect(screen.getByText(/n'est consultée ni ajoutée automatiquement/i)).toBeInTheDocument();
-    expect(screen.getByText(/aucune donnée personnelle, confidentielle ou industrielle/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/aucune donnée personnelle, confidentielle ou industrielle/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/transferts internationaux de données/i)).toBeInTheDocument();
   });
 });

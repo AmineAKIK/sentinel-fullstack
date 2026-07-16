@@ -137,7 +137,12 @@ describeIntegration('Admin login (real DB)', () => {
   });
 
   it('returns invalid_credentials for unknown username', async () => {
-    const result = await unifiedLoginService('int-auth-nobody', 'any_password', undefined, undefined);
+    const result = await unifiedLoginService(
+      'int-auth-nobody',
+      'any_password',
+      undefined,
+      undefined
+    );
     expect(result.kind).toBe('invalid_credentials');
   });
 

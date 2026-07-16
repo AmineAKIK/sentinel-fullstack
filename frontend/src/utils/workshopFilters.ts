@@ -3,7 +3,10 @@ import type { FilterChip } from '../components/FilterSummary';
 import type { ProductionLine } from '../types';
 import { STATE_LABELS } from './workshopHistory';
 
-export function getWorkshopMachineOptions(lines: ProductionLine[], lineFilter: string): { id: string; label: string }[] {
+export function getWorkshopMachineOptions(
+  lines: ProductionLine[],
+  lineFilter: string
+): { id: string; label: string }[] {
   const line = lines.find((item) => String(item.id) === lineFilter);
   if (!line) return [];
   return line.machines.map((machine) => ({ id: machine.machineId, label: machine.machineId }));
@@ -13,7 +16,7 @@ export function withWorkshopUrlFilter(
   searchParams: URLSearchParams,
   name: string,
   value: string,
-  fallback = 'all',
+  fallback = 'all'
 ): URLSearchParams {
   const nextParams = new URLSearchParams(searchParams);
   if (!value || value === fallback) nextParams.delete(name);
@@ -21,7 +24,10 @@ export function withWorkshopUrlFilter(
   return nextParams;
 }
 
-export function withWorkshopLineFilter(searchParams: URLSearchParams, value: string): URLSearchParams {
+export function withWorkshopLineFilter(
+  searchParams: URLSearchParams,
+  value: string
+): URLSearchParams {
   const nextParams = new URLSearchParams(searchParams);
   if (value === 'all') nextParams.delete('line');
   else nextParams.set('line', value);
@@ -50,7 +56,8 @@ export function buildIncidentWorkspaceParams(filters: {
   }
   if (filters.lineFilter !== 'all') params.lineId = Number(filters.lineFilter);
   if (filters.machineFilter !== 'all') params.machineId = filters.machineFilter;
-  if (filters.eventTypeFilter && filters.eventTypeFilter !== 'all') params.eventType = filters.eventTypeFilter;
+  if (filters.eventTypeFilter && filters.eventTypeFilter !== 'all')
+    params.eventType = filters.eventTypeFilter;
 
   return params;
 }
@@ -61,7 +68,11 @@ export function searchFilterChip(query: string, onRemove: () => void): FilterChi
   return [{ key: 'search', label: `Recherche: ${trimmedQuery}`, onRemove }];
 }
 
-export function lineFilterChip(lines: ProductionLine[], lineFilter: string, onRemove: () => void): FilterChip[] {
+export function lineFilterChip(
+  lines: ProductionLine[],
+  lineFilter: string,
+  onRemove: () => void
+): FilterChip[] {
   if (lineFilter === 'all') return [];
   const label = lines.find((line) => String(line.id) === lineFilter)?.line_number || lineFilter;
   return [{ key: 'line', label: `Ligne ${label}`, onRemove }];
@@ -74,9 +85,11 @@ export function machineFilterChip(machineFilter: string, onRemove: () => void): 
 
 export function stateFilterChip(stateFilter: string, onRemove: () => void): FilterChip[] {
   if (stateFilter === 'all') return [];
-  return [{
-    key: 'state',
-    label: `État ligne : ${STATE_LABELS[stateFilter] || stateFilter}`,
-    onRemove,
-  }];
+  return [
+    {
+      key: 'state',
+      label: `État ligne : ${STATE_LABELS[stateFilter] || stateFilter}`,
+      onRemove,
+    },
+  ];
 }

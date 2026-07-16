@@ -23,7 +23,8 @@ export default function UnfollowIncidentConfirmModal({
       variant="danger"
     >
       <div className="notice">
-        Vous allez retirer de vos suivis le cas {resolvedLabel} {incident.line_number} · {incident.machine_id}. Il disparaîtra de la vue Suivis.
+        Vous allez retirer de vos suivis le cas {resolvedLabel} {incident.line_number} ·{' '}
+        {incident.machine_id}. Il disparaîtra de la vue Suivis.
       </div>
     </ConfirmModal>
   );

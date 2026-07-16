@@ -73,7 +73,9 @@ export default function EditLineSummaryModal({
       });
       onSuccess(updated);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
@@ -91,14 +93,26 @@ export default function EditLineSummaryModal({
           <button className="btn btn-secondary" onClick={onBack} disabled={loading}>
             Retour
           </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={loading || changes.length === 0}>
-            {loading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={loading || changes.length === 0}
+          >
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Enregistrement…
+              </>
+            ) : (
+              'Enregistrer'
+            )}
           </button>
         </>
       }
     >
       {changes.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Aucune modification détectée.</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>
+          Aucune modification détectée.
+        </p>
       ) : (
         <div className="recap-list">
           {changes.map((change) => (

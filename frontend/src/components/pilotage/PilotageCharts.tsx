@@ -86,7 +86,10 @@ export function TrendChart({ trend }: TrendChartProps) {
                   {delta > 0 ? `+${delta}` : delta < 0 ? String(delta) : '='}
                 </span>
                 <span className="pilotage-trend-label">
-                  {new Date(item.day).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                  {new Date(item.day).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })}
                 </span>
               </div>
             );

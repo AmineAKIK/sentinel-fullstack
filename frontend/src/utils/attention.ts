@@ -19,7 +19,11 @@ interface IncidentLike {
  * - calme : tout le reste (résolu, clôturé).
  */
 export function incidentAttentionLevel(incident: IncidentLike): AttentionLevel {
-  if (incident.status === 'CLOSED' || incident.status === 'CANCELED' || incident.status === 'INVALIDATED') {
+  if (
+    incident.status === 'CLOSED' ||
+    incident.status === 'CANCELED' ||
+    incident.status === 'INVALIDATED'
+  ) {
     return 'calm';
   }
   if (incident.is_priority) return 'critical';

@@ -37,9 +37,11 @@ describe('SupportChat', () => {
   });
 
   it('displays the API business error', async () => {
-    const onSend = vi.fn().mockRejectedValue(
-      new ApiResponseError('SUPPORT_UNAVAILABLE', 'Assistance momentanément indisponible.', 503)
-    );
+    const onSend = vi
+      .fn()
+      .mockRejectedValue(
+        new ApiResponseError('SUPPORT_UNAVAILABLE', 'Assistance momentanément indisponible.', 503)
+      );
     render(<SupportChat onSend={onSend} />);
 
     fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });

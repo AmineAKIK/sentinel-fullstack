@@ -25,12 +25,17 @@ export function formatEventDetail(event: WorkshopIncidentEvent): string {
     if (payload.value !== undefined) return payload.value ? 'Urgent' : 'Normal';
     if (payload.to !== undefined) return payload.to ? 'Urgent' : 'Normal';
   }
-  if (event.event_type === 'ORDER_CHANGED' && payload.from !== undefined && payload.to !== undefined) {
+  if (
+    event.event_type === 'ORDER_CHANGED' &&
+    payload.from !== undefined &&
+    payload.to !== undefined
+  ) {
     return `position ${asString(payload.from)} → ${asString(payload.to)}`;
   }
   if (event.event_type === 'INCIDENT_UPDATED') {
     const fields = Array.isArray(payload.fields) ? payload.fields : payload.changedFields;
-    if (Array.isArray(fields) && fields.length > 0) return `champs: ${(fields as string[]).join(', ')}`;
+    if (Array.isArray(fields) && fields.length > 0)
+      return `champs: ${(fields as string[]).join(', ')}`;
   }
   if (event.event_type === 'RESPONSIBLE_COMMENT_UPDATED') return 'consigne mise à jour';
   if (event.event_type === 'INCIDENT_INVALIDATED') {

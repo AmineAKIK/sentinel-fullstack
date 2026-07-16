@@ -58,7 +58,10 @@ export default function WorkshopLoginPage() {
     setError('');
     setWarning('');
 
-    if (!identifier.trim()) { setError('Renseignez votre identifiant.'); return; }
+    if (!identifier.trim()) {
+      setError('Renseignez votre identifiant.');
+      return;
+    }
 
     if (mode === 'identifier') {
       setLoading(true);
@@ -85,7 +88,10 @@ export default function WorkshopLoginPage() {
     }
 
     if (mode === 'password') {
-      if (!password) { setError('Renseignez votre mot de passe.'); return; }
+      if (!password) {
+        setError('Renseignez votre mot de passe.');
+        return;
+      }
       setLoading(true);
       try {
         const response = await unifiedLogin(identifier.trim(), password);
@@ -113,7 +119,9 @@ export default function WorkshopLoginPage() {
         if (err instanceof ApiResponseError && err.status === 403) {
           setWarning(err.message);
         } else {
-          setError(err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.');
+          setError(
+            err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.'
+          );
         }
       } finally {
         setLoading(false);
@@ -122,9 +130,18 @@ export default function WorkshopLoginPage() {
     }
 
     if (mode === 'setup') {
-      if (!setupCode.trim()) { setError('Renseignez le code temporaire.'); return; }
-      if (newPassword.length < 6) { setError('Le mot de passe doit contenir au moins 6 caractères.'); return; }
-      if (newPassword !== confirmPassword) { setError('Les mots de passe ne correspondent pas.'); return; }
+      if (!setupCode.trim()) {
+        setError('Renseignez le code temporaire.');
+        return;
+      }
+      if (newPassword.length < 6) {
+        setError('Le mot de passe doit contenir au moins 6 caractères.');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setError('Les mots de passe ne correspondent pas.');
+        return;
+      }
       setLoading(true);
       try {
         const response = await unifiedLogin(identifier.trim(), undefined, newPassword, setupCode);
@@ -154,10 +171,15 @@ export default function WorkshopLoginPage() {
   return (
     <main className="board-access-page" id="main-content">
       <section className="board-access-card board-access-card-locked">
-        {mode !== 'identifier'
-          ? <button type="button" className="board-access-back" onClick={resetToIdentifier}>Retour</button>
-          : <Link to="/login" className="board-access-back">Retour</Link>
-        }
+        {mode !== 'identifier' ? (
+          <button type="button" className="board-access-back" onClick={resetToIdentifier}>
+            Retour
+          </button>
+        ) : (
+          <Link to="/login" className="board-access-back">
+            Retour
+          </Link>
+        )}
 
         <div className="board-access-title">
           <span>ACCÈS ATELIER</span>
@@ -170,13 +192,18 @@ export default function WorkshopLoginPage() {
           {reason && <div className="notice">{reason}</div>}
 
           <div className="form-group">
-            <label className="form-label" htmlFor="identifier">Numéro de badge</label>
+            <label className="form-label" htmlFor="identifier">
+              Numéro de badge
+            </label>
             <input
               id="identifier"
               className="form-input"
               type="text"
               value={identifier}
-              onChange={(e) => { setIdentifier(e.target.value); resetToIdentifier(); }}
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+                resetToIdentifier();
+              }}
               disabled={loading}
               autoComplete="username"
               autoFocus={mode === 'identifier'}
@@ -189,7 +216,9 @@ export default function WorkshopLoginPage() {
 
           {mode === 'password' && (
             <div className="form-group">
-              <label className="form-label" htmlFor="password">Mot de passe</label>
+              <label className="form-label" htmlFor="password">
+                Mot de passe
+              </label>
               <input
                 id="password"
                 className="form-input"
@@ -225,7 +254,9 @@ export default function WorkshopLoginPage() {
           {mode === 'setup' && (
             <>
               <div className="form-group">
-                <label className="form-label" htmlFor="setupCode">Code temporaire</label>
+                <label className="form-label" htmlFor="setupCode">
+                  Code temporaire
+                </label>
                 <input
                   id="setupCode"
                   className="form-input"
@@ -242,7 +273,9 @@ export default function WorkshopLoginPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="newPassword">Nouveau mot de passe</label>
+                <label className="form-label" htmlFor="newPassword">
+                  Nouveau mot de passe
+                </label>
                 <input
                   id="newPassword"
                   className="form-input"
@@ -258,7 +291,9 @@ export default function WorkshopLoginPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="confirmPassword">Confirmer le mot de passe</label>
+                <label className="form-label" htmlFor="confirmPassword">
+                  Confirmer le mot de passe
+                </label>
                 <input
                   id="confirmPassword"
                   className="form-input"
@@ -276,15 +311,29 @@ export default function WorkshopLoginPage() {
             </>
           )}
 
-          {warning && <div id="workshop-login-warning" className="notice" role="alert">{warning}</div>}
-          {error && <div id="workshop-login-error" className="error-message" role="alert">{error}</div>}
+          {warning && (
+            <div id="workshop-login-warning" className="notice" role="alert">
+              {warning}
+            </div>
+          )}
+          {error && (
+            <div id="workshop-login-error" className="error-message" role="alert">
+              {error}
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading
-              ? <><span className="spinner" aria-hidden="true" /> Vérification…</>
-              : mode === 'setup' ? 'Activer mon compte'
-              : mode === 'password' ? 'Se connecter'
-              : 'Continuer'}
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Vérification…
+              </>
+            ) : mode === 'setup' ? (
+              'Activer mon compte'
+            ) : mode === 'password' ? (
+              'Se connecter'
+            ) : (
+              'Continuer'
+            )}
           </button>
         </form>
       </section>
@@ -298,9 +347,15 @@ export default function WorkshopLoginPage() {
           loadingLabel="Envoi…"
           loading={loading}
         >
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-            Une demande de réinitialisation sera envoyée à l'administrateur, qui vous
-            contactera par voie interne pour vous communiquer un nouveau code d'accès.
+          <p
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
+            Une demande de réinitialisation sera envoyée à l'administrateur, qui vous contactera par
+            voie interne pour vous communiquer un nouveau code d'accès.
           </p>
         </ConfirmModal>
       )}

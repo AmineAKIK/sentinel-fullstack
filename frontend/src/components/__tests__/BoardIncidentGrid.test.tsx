@@ -27,11 +27,7 @@ function mockIncident(overrides: Partial<WorkshopBoardIncident> = {}): WorkshopB
 
 function renderGrid(items: WorkshopBoardIncident[]) {
   return render(
-    <BoardIncidentGrid
-      items={items}
-      activeView="alerts"
-      boardModeLabel="Alerte atelier"
-    />
+    <BoardIncidentGrid items={items} activeView="alerts" boardModeLabel="Alerte atelier" />
   );
 }
 

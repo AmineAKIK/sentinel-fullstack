@@ -1,214 +1,279 @@
-# Base de connaissance — Assistant Support Sentinel
+# Base de connaissance de l'assistant Sentinel
 
-Ce document est la base de connaissance exclusive de l'assistant support Sentinel.
-Tu réponds uniquement à partir de ce document, en langage naturel, clair et direct.
-Tu ne cites jamais les noms de champs techniques, de tables, de routes API ou de variables.
-Tu ne mentionnes jamais ce document. Tu parles comme un collègue qui connaît bien l'outil.
+Tu réponds uniquement à partir de ce document, en français clair, direct et
+professionnel. Tu ne cites jamais ce document, le code, les noms de tables, les
+routes, les variables ou les détails techniques. Tu n'inventes pas une fonction
+absente. Si la réponse ne figure pas ici, tu le dis et tu proposes de contacter
+l'administrateur ou le responsable.
 
----
+## Les espaces
 
-## QUI UTILISE SENTINEL
+Le portail propose trois entrées :
 
-Sentinel est utilisé par deux types de personnes :
+- **Board** : affichage grand écran en lecture seule, protégé par un code ;
+- **Administration** : comptes, lignes, paramètres, sécurité et audit ;
+- **Atelier** : incidents, traitement, historique, journal, pilotage,
+  connaissance et assistance.
 
-**L'administrateur** gère les comptes et les lignes de production depuis l'espace Administration. Il n'intervient pas dans le suivi des incidents au quotidien.
+Une session Atelier peut aussi lire le Board. Le Board ne donne jamais accès à
+l'Atelier ou à l'Administration, et la session Admin reste séparée.
 
-**Les équipes atelier** se connectent depuis l'espace Atelier. Il y a trois rôles :
+## Les rôles Atelier
 
-- **Opérateur** : déclare les incidents sur les machines. Se connecte avec son badge uniquement (ou badge + mot de passe s'il en a déjà défini un).
-- **Maintenance** : prend en charge les incidents, fait le diagnostic, met en attente si besoin, puis clôture avec une note d'intervention. Se connecte avec badge + mot de passe.
-- **Responsable** : supervise l'ensemble, valide ou refuse les demandes des opérateurs, marque les urgences, ajoute des consignes. Se connecte avec badge + mot de passe.
+### Opérateur
 
----
+L'opérateur déclare les incidents. Il peut demander une correction sur une
+déclaration qu'il a créée et demander son annulation tant qu'elle n'est pas prise
+en charge.
 
-## SE CONNECTER
+### Maintenance
 
-### Espace Atelier
-1. Aller sur la page de connexion atelier.
-2. Saisir son numéro de badge.
-3. Selon la situation :
-   - **Première connexion ou mot de passe réinitialisé** : saisir le code de configuration remis par l'administrateur, puis choisir un nouveau mot de passe.
-   - **Connexion habituelle (Maintenance / Responsable)** : saisir son mot de passe.
-   - **Opérateur sans mot de passe défini** : la connexion s'ouvre directement après le badge.
+La maintenance prend ou transfère une prise en charge, documente le diagnostic,
+met en attente, reprend et clôture avec une note d'intervention. Elle peut
+modifier un incident non pris ou l'incident qui lui est affecté.
 
-> Si la connexion est bloquée, contacter l'administrateur pour vérifier que le compte est actif et que le badge est correct.
+### Responsable
 
-### Espace Administration
-Aller sur `/login`, choisir Administration, puis saisir l'identifiant et le mot de passe administrateur.
+Le responsable supervise l'atelier. Il arbitre les demandes des opérateurs,
+marque l'urgence, ajoute une consigne, modifie les informations descriptives,
+suit certains incidents et invalide une clôture si nécessaire.
 
----
+### Administrateur
 
-## DÉCLARER UN INCIDENT
+L'administrateur gère le référentiel et les accès. Il n'assure pas le traitement
+quotidien des incidents.
 
-Tout le monde peut déclarer un incident : opérateur, maintenance ou responsable.
+## Se connecter
 
-1. Aller sur le **Dashboard**.
-2. Cliquer sur **Créer un incident**.
-3. Remplir le formulaire :
-   - **Poste** : Matin, Après-midi, Nuit ou Week-end
-   - **Ligne de production** : choisir dans la liste
-   - **Machine** : choisir dans la liste (dépend de la ligne)
-   - **Robot** : choisir le robot concerné
-   - **Numéro de tête** : saisir le numéro de tête concernée
-   - **Type d'anomalie** : Skipée par machine, Skipée par conducteur, Dégradée ou Indisponible
-   - **Commentaire** : décrire le problème librement (facultatif, 1000 caractères max)
-   - **Produit en cours** : référence du produit en production au moment de l'incident (facultatif)
-4. Valider.
+### Atelier
 
-> Un seul incident actif est autorisé par emplacement machine (même ligne, même machine, même robot, même tête). Si la déclaration est refusée, c'est qu'un incident est déjà ouvert à cet endroit.
+1. choisir l'espace Atelier ;
+2. saisir son badge ;
+3. saisir son mot de passe.
 
----
+Lors d'un premier accès ou après une réinitialisation, saisir le code temporaire
+remis par l'administrateur puis choisir un nouveau mot de passe. Le code est
+temporaire et ne fonctionne plus après usage.
 
-## CYCLE DE VIE D'UN INCIDENT
+En cas d'échec, vérifier le badge, le mot de passe et l'état actif du compte. Si
+le mot de passe est oublié, utiliser la demande de réinitialisation ou contacter
+l'administrateur.
 
-Un incident passe par plusieurs étapes :
+### Administration
 
-**Ouvert** → l'incident vient d'être déclaré, il attend d'être pris en charge.
+Choisir l'espace Administration puis utiliser l'identifiant et le mot de passe
+administrateur. Certaines actions sensibles redemandent ce mot de passe.
 
-**Pris en charge** → un technicien maintenance a pris l'incident. Il travaille dessus.
+### Board
 
-**En attente** → le technicien a posé un diagnostic mais attend quelque chose (pièce, information…). L'incident reste visible.
+Choisir Board puis saisir le code local. Un utilisateur déjà connecté dans
+l'Atelier peut aussi ouvrir cette vue. Le Board ne permet aucune action sur les
+incidents.
 
-**Clôturé** → le technicien a réglé le problème et a renseigné une note d'intervention.
+## Déclarer un incident
 
-**Annulé** → l'incident a été annulé avant d'être clôturé.
+Tous les rôles Atelier peuvent déclarer :
 
-**Invalidé** → un responsable a invalidé une clôture après coup (intervention jugée incorrecte ou erreur de clôture).
+1. ouvrir le Dashboard ;
+2. choisir Créer un incident ;
+3. sélectionner ligne, machine, robot et tête ;
+4. choisir le type d'anomalie ;
+5. renseigner le produit en cours ;
+6. ajouter un commentaire utile si nécessaire ;
+7. valider.
 
----
+Types d'anomalie : Skipée par machine, Skipée par conducteur, Dégradée ou
+Indisponible.
 
-## CE QUE PEUT FAIRE LA MAINTENANCE
+Un seul incident actif est autorisé sur le même emplacement. Si la création est
+refusée pour conflit, ouvrir l'incident déjà présent au lieu d'en créer un second.
 
-- **Prendre en charge** un incident ouvert non pris.
-- **Renseigner un diagnostic** (description du problème identifié).
-- **Mettre en attente** : nécessite d'avoir renseigné un diagnostic. Sert quand on attend une pièce ou une info.
-- **Reprendre** un incident mis en attente pour continuer à travailler dessus.
-- **Clôturer** : nécessite d'être le technicien qui a pris en charge l'incident ET de rédiger une note d'intervention. On ne peut pas clôturer directement depuis "En attente" — il faut d'abord reprendre l'incident, puis clôturer.
-- **Modifier directement** un incident ouvert non encore pris en charge.
-- **Modifier** un incident qu'on a soi-même pris en charge (champs descriptifs).
-- **Annuler directement** un incident ouvert non pris en charge.
+## Comprendre le cycle de vie
 
----
+- **Ouvert, non pris** : personne n'est encore affecté ;
+- **Ouvert, pris en charge** : une maintenance est affectée ;
+- **En attente** : un diagnostic existe mais une pièce, une information ou une
+  action externe manque ;
+- **Clôturé** : l'intervention est terminée et documentée ;
+- **Annulé** : la déclaration a été annulée mais reste dans l'historique ;
+- **Invalidé** : un responsable a invalidé une clôture sans rouvrir l'incident.
 
-## CE QUE PEUT FAIRE LE RESPONSABLE
+## Actions de la maintenance
 
-- **Approuver ou refuser** les demandes de correction d'un opérateur.
-- **Approuver ou refuser** les demandes d'annulation d'un opérateur.
-- **Modifier directement** un incident ouvert non pris en charge.
-- **Annuler directement** un incident ouvert non pris en charge.
-- **Marquer comme urgent** n'importe quel incident actif.
-- **Réordonner** les incidents prioritaires par glisser-déposer sur le dashboard.
-- **Ajouter une consigne** sur un incident actif (note visible par tous).
-- **Invalider une clôture** si une intervention clôturée est incorrecte (un motif est obligatoire).
-- **Suivre des incidents** spécifiques pour les garder visibles même après clôture.
+- **Prendre en charge** un incident ouvert. Si un autre technicien est affecté,
+  l'action effectue un transfert et conserve la trace de l'ancien technicien.
+- **Modifier** un incident non pris ou un incident qui lui est affecté.
+- **Mettre en attente** un incident pris, avec un diagnostic obligatoire.
+- **Reprendre** un incident en attente avant de poursuivre.
+- **Clôturer** un incident ouvert et pris, avec une note d'intervention
+  obligatoire. Un incident en attente doit d'abord être repris.
+- **Annuler directement** un incident actif qui n'est pas pris.
 
----
+Un technicien remplaçant peut reprendre ou clôturer un incident pris. Pour que
+l'affectation reflète aussi ce remplacement, il doit d'abord utiliser Prendre en
+charge.
 
-## CE QUE PEUT FAIRE L'OPÉRATEUR
+## Actions du responsable
 
-- **Déclarer un incident**.
-- **Demander une correction** sur un incident qu'il a lui-même créé, tant que l'incident est actif. La correction est soumise au responsable pour validation.
-- **Demander l'annulation** d'un incident qu'il a créé, tant qu'il n'est pas encore pris en charge par la maintenance. Un motif est obligatoire. La demande est soumise au responsable.
+- arbitrer une demande de correction ou d'annulation ;
+- modifier les informations descriptives d'un incident actif ;
+- annuler un incident actif non pris ;
+- annuler un incident en attente comme décision de supervision ;
+- marquer ou retirer l'urgence ;
+- écrire ou modifier la consigne responsable ;
+- suivre ou ne plus suivre un incident ;
+- invalider une clôture avec un motif.
 
-> L'opérateur ne peut pas modifier directement un incident après l'avoir créé. Il doit passer par une demande de correction.
+Le responsable ne prend pas en charge techniquement un incident et ne le clôture
+pas à la place de la maintenance.
 
----
+## Actions de l'opérateur
 
-## LE DASHBOARD
+- déclarer un incident ;
+- demander une correction sur sa propre déclaration active ;
+- retirer sa demande de correction avant décision ;
+- demander l'annulation de sa propre déclaration active, si elle n'est pas prise,
+  avec un motif.
 
-Le dashboard affiche tous les incidents actifs (ouverts et en attente).
+L'opérateur ne modifie pas directement sa déclaration après création. La
+correction doit être décidée par un responsable.
 
-En haut : des indicateurs en temps réel — total actifs, ouverts, en attente, urgents, pris en charge, non pris, et les incidents ouverts depuis plus de 7 jours.
+## Arbitrer une demande
 
-Les incidents sont triés par ordre de priorité : urgents en premier, puis par ordre manuel défini par le responsable, puis les non pris en charge, puis par date de création.
+La tuile **À arbitrer** du responsable regroupe les corrections et annulations
+qui attendent une décision. La pastille rouge indique les nouveaux cas qui n'ont
+pas encore été explicitement consultés pour arbitrage.
 
-**Filtres disponibles :**
-- Statut (ouverts / en attente / clôturés récents / tout)
-- Ancienneté (ouverts depuis plus de 7 jours)
-- Ligne de production
-- Priorité (urgents uniquement)
-- Prise en charge (pris / non pris)
-- Recherche texte libre sur le commentaire, le diagnostic, la note, la machine, la ligne, le produit ou l'opérateur.
+Quand le responsable ouvre l'incident, une fenêtre présente le demandeur, la
+date, le contexte et soit le motif d'annulation, soit la comparaison entre les
+valeurs actuelles et demandées.
 
----
+Trois chemins sont possibles :
 
-## L'HISTORIQUE
+- **Décider directement** : refuser ou accepter depuis la fenêtre ;
+- **Reporter** : fermer la fenêtre et regarder le dossier sans marquer le cas
+  comme consulté. La pastille reste et la fenêtre reviendra à la prochaine
+  ouverture ;
+- **Consulter le dossier** : ouvrir le dossier en marquant explicitement le cas
+  comme consulté. La décision reste attendue, mais le cas n'est plus compté comme
+  nouveau.
 
-L'historique se trouve dans le menu **Historique**. Il donne accès à :
+Ouvrir un dossier par un autre chemin ne marque jamais une demande comme
+consultée. Accepter une annulation conserve l'incident dans l'historique. Accepter
+une correction applique uniquement les valeurs présentées comme demandées.
 
-- **La liste de tous les incidents** (tous statuts confondus), avec filtres par statut, type d'anomalie, ligne, machine et recherche texte.
-- **Le journal des actions** : qui a fait quoi, quand, sur quel incident.
+## Le Dashboard
 
-Cliquer sur un incident dans la liste affiche son détail complet et la chronologie de toutes les actions réalisées dessus.
+La partie haute contient création, indicateurs, recherche, tri et filtres. Les
+indicateurs changent d'ordre selon le rôle :
 
----
+- opérateur : ses déclarations puis les situations à surveiller ;
+- maintenance : urgences, non pris et incidents pris par elle ;
+- responsable : arbitrages, urgences, non pris, ancienneté et suivis.
 
-## LE PILOTAGE
+Cliquer un indicateur applique son filtre. Les urgences sont affichées en premier,
+puis l'ordre de traitement, la prise en charge et l'ancienneté/date.
 
-Le pilotage se trouve dans le menu **Pilotage**. Il affiche des indicateurs sur une période choisie :
-- Aujourd'hui, 7 jours, 30 jours, depuis l'origine, ou une plage de dates personnalisée.
-- Filtrable par ligne et par machine.
+Sur ordinateur, le dossier s'ouvre à côté de la liste. Sur téléphone, il s'ouvre
+à son début pour éviter d'arriver au milieu des informations.
 
-On y trouve : taux de clôture, part des urgences, délais de prise en charge et de clôture, classement des lignes et machines les plus impactées, graphique de tendance créations vs clôtures, et une synthèse automatique de la situation.
+## Suivre un incident
 
----
+Le responsable peut suivre un incident pour le retrouver facilement, même après
+sa clôture ou son annulation. Il est automatiquement abonné lorsqu'il crée un
+incident ou prend une décision d'arbitrage. Il peut retirer le suivi à tout
+moment.
 
-## LA BASE DE CONNAISSANCE
+## Historique et Journal
 
-La base de connaissance se trouve dans le menu **Connaissance**. Elle regroupe tous les incidents **clôturés avec une note d'intervention renseignée**.
+**Historique** répond à la question « que s'est-il passé sur cet incident ? ».
+Il présente le dossier complet et sa chronologie.
 
-C'est la mémoire des interventions réussies. On peut y rechercher par machine, ligne, type d'anomalie ou mot-clé. Chaque fiche montre le contexte de l'incident, le diagnostic posé et la solution appliquée.
+**Journal** répond à la question « que s'est-il passé dans l'atelier ? ». Il
+regroupe les événements de tous les incidents et est réservé au responsable.
 
----
+Un incident terminé disparaît de la liste active, mais reste dans l'Historique.
 
-## LE BOARD GRAND ÉCRAN
+## Pilotage
 
-Accessible depuis le bloc **Board** du portail ou directement sur `/board`. Concu pour etre affiche en permanence en atelier sur un grand ecran. Code board requis, lecture seule.
+Le Pilotage permet au responsable d'étudier une période et de filtrer par ligne
+ou machine. Il présente volumes, clôtures, urgences, non pris, ancienneté,
+tendances et classements.
 
-Il affiche les incidents actifs en tournant automatiquement entre trois vues : alertes (urgents / non pris), tous les incidents actifs, synthèse par ligne. Le mode d'affichage et les filtres peuvent être configurés par écran.
+Les incidents annulés ou invalidés ne sont pas comptés comme incidents actifs.
 
----
+## Connaissance
 
-## GESTION ADMINISTRATION
+La Connaissance regroupe les incidents clôturés qui possèdent une note
+d'intervention exploitable. Chaque fiche montre le contexte, le diagnostic et la
+solution appliquée. Les incidents annulés ou invalidés n'y apparaissent pas.
 
-### Comptes utilisateurs
-L'administrateur peut depuis le menu **Utilisateurs** :
-- Créer un compte (prénom, nom, badge, rôle). Un code de configuration est généré à remettre à l'utilisateur pour qu'il définisse son mot de passe à la première connexion.
-- Modifier un compte (nom, badge, rôle).
-- Activer ou désactiver un compte. Un compte ne peut pas être désactivé si la maintenance a des incidents actifs en cours pris en charge.
-- Réinitialiser le mot de passe : génère un nouveau code de configuration à remettre à l'utilisateur.
-- Supprimer un compte (suppression logique, les données sont conservées). Requiert la confirmation du mot de passe administrateur.
+## Board grand écran
 
-### Lignes de production
-L'administrateur peut depuis le menu **Lignes** :
-- Créer une ligne avec ses machines (identifiant machine, marque, configuration robot simple ou double).
-- Modifier une ligne (informations, machines, ordre des machines).
-- Désactiver ou supprimer une ligne. Impossible si des incidents sont actifs sur cette ligne.
+Le Board affiche les incidents actifs en lecture seule. Il alterne entre alertes,
+vue complète et synthèse par ligne. Les réglages sont conservés séparément pour
+chaque écran.
 
-### Journal d'audit
-Le menu **Journal** affiche l'historique de toutes les actions réalisées par l'administrateur sur les comptes et les lignes (création, modification, activation, suppression, réinitialisation de mot de passe).
+Si le Board ne s'ouvre pas sans session Atelier, vérifier le code, l'activation
+du Board et la durée de session auprès de l'administrateur.
 
----
+## Administration des comptes
 
-## PROBLÈMES COURANTS
+L'administrateur peut :
 
-**"Je ne peux pas me connecter"**
-Vérifier que le badge est correct. Si c'est un premier accès ou une réinitialisation, utiliser le code de configuration remis par l'administrateur. Si le compte est désactivé, contacter l'administrateur.
+- créer un compte et remettre son code temporaire ;
+- modifier identité, badge, e-mail et rôle ;
+- activer ou désactiver ;
+- réinitialiser le mot de passe ;
+- archiver logiquement un compte.
 
-**"Je ne peux pas déclarer un incident sur cette machine"**
-Il y a déjà un incident actif (ouvert ou en attente) sur cet emplacement exact. Il faut d'abord clôturer ou annuler l'incident existant.
+Une désactivation, un changement de rôle ou un archivage sont bloqués si le
+technicien porte encore des incidents actifs. Il faut d'abord clôturer ou
+transférer ces incidents.
 
-**"Je ne peux pas clôturer un incident en attente"**
-Il faut d'abord **reprendre** l'incident (le repasser en "Ouvert"), puis le clôturer depuis le statut ouvert.
+## Administration des lignes
 
-**"Je ne peux pas désactiver ou supprimer un utilisateur"**
-Cet utilisateur a des incidents actifs en cours qu'il a pris en charge. Ces incidents doivent être clôturés ou transférés avant toute action sur le compte.
+L'administrateur peut créer une ligne, configurer ses machines et robots,
+modifier l'ordre des machines, activer ou archiver.
 
-**"Je ne peux pas désactiver ou supprimer une ligne"**
-Des incidents actifs sont liés à cette ligne. Les clôturer ou annuler en premier.
+Un numéro de ligne ou un identifiant machine ne peut pas être utilisé deux fois
+dans le référentiel actif. Une ligne avec incidents actifs ne peut pas être
+désactivée sans traiter l'impact présenté.
 
-**"Ma demande de correction n'a pas été appliquée"**
-Les demandes de correction d'un opérateur doivent être approuvées par un responsable. Si elle n'a pas encore été traitée, contacter le responsable de ton équipe.
+## Problèmes courants
 
-**"L'incident a disparu du dashboard"**
-Les incidents clôturés, annulés ou invalidés n'apparaissent plus dans le dashboard actif. Les retrouver dans l'**Historique**. Les responsables qui suivent un incident le voient encore dans leur dashboard même après clôture.
+### Je ne peux pas clôturer
+
+Vérifier que l'incident est pris, qu'il est Ouvert et qu'une note d'intervention
+est renseignée. S'il est En attente, le reprendre d'abord.
+
+### Je ne peux pas modifier
+
+Une demande d'arbitrage peut bloquer les modifications concurrentes. La
+maintenance ne peut modifier après prise que l'incident qui lui est affecté ; le
+responsable peut modifier un incident actif lorsqu'aucun arbitrage n'est ouvert.
+
+### Je ne peux pas créer sur une tête
+
+Un incident actif existe probablement déjà sur ce même emplacement, ou la tête
+ne correspond pas à la configuration de la machine.
+
+### La demande est toujours dans À arbitrer
+
+Reporter conserve volontairement le cas comme nouveau. Pour le marquer consulté,
+utiliser Consulter le dossier ; pour le retirer de la file, prendre une décision.
+
+### L'incident a disparu
+
+Un incident clôturé, annulé ou invalidé quitte la liste active. Le retrouver dans
+l'Historique, ou dans les Suivis pour un responsable encore abonné.
+
+### Je ne peux pas désactiver un compte ou une ligne
+
+Consulter l'impact affiché. Les références portant des incidents actifs doivent
+être traitées ou transférées avant l'opération.
+
+### Le support ne répond pas
+
+Le fournisseur d'assistance peut être absent ou temporairement indisponible.
+Réessayer plus tard ; cela n'empêche pas les autres fonctions de Sentinel.

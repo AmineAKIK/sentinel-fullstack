@@ -6,7 +6,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import logger from './logger';
-import { assertProductionConfig } from './config/production';
+import { assertProductionConfig, parsePort, parseTrustProxy } from './config/production';
 import pool from './db/pool';
 import runMigrations from './db/migrate';
 import seedAdminAccount from './db/seed';
@@ -29,14 +29,14 @@ import { FIELD_LIMITS } from './domain/constants';
 import { startNotificationOutboxWorker } from './modules/notifications/notificationOutbox.worker';
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parsePort(process.env.PORT, 'PORT', 3000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-const TRUST_PROXY = process.env.TRUST_PROXY;
 
 assertProductionConfig();
 
-if (TRUST_PROXY) {
-  app.set('trust proxy', TRUST_PROXY === 'true' ? 1 : TRUST_PROXY);
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+if (trustProxy !== false) {
+  app.set('trust proxy', trustProxy);
 }
 
 app.use(

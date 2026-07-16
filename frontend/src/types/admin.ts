@@ -26,9 +26,18 @@ export interface ReferenceDashboard {
 }
 
 export interface ReferenceQuality {
-  users_without_password: Array<Pick<SentinelUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>>;
-  inactive_users: Array<Pick<SentinelUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>>;
+  users_without_password: Array<
+    Pick<SentinelUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>
+  >;
+  inactive_users: Array<
+    Pick<SentinelUser, 'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'>
+  >;
   inactive_lines: Array<{ id: number; line_number: string; machine_count: number }>;
-  malformed_machines: Array<{ line_id: number; line_number: string; machine_id: string; issue: string }>;
+  malformed_machines: Array<{
+    line_id: number;
+    line_number: string;
+    machine_id: string;
+    issue: string;
+  }>;
   duplicate_machines: Array<{ machine_id: string; line_numbers: string[] }>;
 }

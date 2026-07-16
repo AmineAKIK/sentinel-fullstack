@@ -13,11 +13,7 @@ export default function TakeChargeConfirmModal({
   onConfirm,
 }: TakeChargeConfirmModalProps) {
   return (
-    <ConfirmModal
-      title="Confirmer la prise en charge"
-      onClose={onClose}
-      onConfirm={onConfirm}
-    >
+    <ConfirmModal title="Confirmer la prise en charge" onClose={onClose} onConfirm={onConfirm}>
       <div className="notice">
         Vous allez prendre en charge l'incident {incident.line_number} · {incident.machine_id}.
       </div>

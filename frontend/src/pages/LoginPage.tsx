@@ -22,7 +22,11 @@ export default function LoginPage() {
           <p>Votre espace de travail.</p>
         </header>
 
-        {reason && <div className="notice" style={{ marginBottom: 24 }}>{reason}</div>}
+        {reason && (
+          <div className="notice" style={{ marginBottom: 24 }}>
+            {reason}
+          </div>
+        )}
 
         <div className="login-space-grid" aria-label="Espaces Sentinel">
           <Link to="/board" className="login-space-card login-space-board">

@@ -86,9 +86,7 @@ export default function WorkshopPilotagePage() {
 
   const backlogDelta = trendSummary.created - trendSummary.closed;
   const closureRate =
-    trendSummary.created > 0
-      ? Math.round((trendSummary.closed / trendSummary.created) * 100)
-      : 0;
+    trendSummary.created > 0 ? Math.round((trendSummary.closed / trendSummary.created) * 100) : 0;
   const hasAnalyticsData = analytics !== null && analytics.total > 0;
 
   const statusLabel =
@@ -227,7 +225,9 @@ export default function WorkshopPilotagePage() {
             <button
               type="button"
               className={`pilotage-hero-stat${notTaken.length > 0 ? ' pilotage-hero-stat-watch' : ''}`}
-              onClick={notTaken.length > 0 ? () => goToDashboard({ taken: 'not_taken' }) : undefined}
+              onClick={
+                notTaken.length > 0 ? () => goToDashboard({ taken: 'not_taken' }) : undefined
+              }
               disabled={notTaken.length === 0}
             >
               <span className="pilotage-hero-stat-label">Sans technicien</span>
@@ -329,7 +329,9 @@ export default function WorkshopPilotagePage() {
             <div className="card-body">
               <div className="history-grid">
                 <div className="form-group">
-                  <label className="form-label" aria-hidden="true">Période</label>
+                  <label className="form-label" aria-hidden="true">
+                    Période
+                  </label>
                   <SelectField
                     value={period}
                     ariaLabel="Période"
@@ -344,7 +346,9 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="pilotage-date-start">Début</label>
+                  <label className="form-label" htmlFor="pilotage-date-start">
+                    Début
+                  </label>
                   <input
                     id="pilotage-date-start"
                     type="date"
@@ -355,7 +359,9 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="pilotage-date-end">Fin</label>
+                  <label className="form-label" htmlFor="pilotage-date-end">
+                    Fin
+                  </label>
                   <input
                     id="pilotage-date-end"
                     type="date"
@@ -366,7 +372,9 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" aria-hidden="true">Ligne</label>
+                  <label className="form-label" aria-hidden="true">
+                    Ligne
+                  </label>
                   <SelectField
                     value={lineFilter}
                     ariaLabel="Ligne"
@@ -378,7 +386,9 @@ export default function WorkshopPilotagePage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" aria-hidden="true">Machine</label>
+                  <label className="form-label" aria-hidden="true">
+                    Machine
+                  </label>
                   <div title={lineFilter === 'all' ? "Sélectionnez d'abord une ligne" : undefined}>
                     <SelectField
                       value={machineFilter}

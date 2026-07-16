@@ -77,9 +77,10 @@ export default function SelectField({
     if (enabled.length === 0) return;
 
     const current = enabled.findIndex(({ index }) => index === activeIndex);
-    const next = current === -1
-      ? enabled[direction === 1 ? 0 : enabled.length - 1]
-      : enabled[(current + direction + enabled.length) % enabled.length];
+    const next =
+      current === -1
+        ? enabled[direction === 1 ? 0 : enabled.length - 1]
+        : enabled[(current + direction + enabled.length) % enabled.length];
     setActiveIndex(next.index);
   }
 
@@ -97,7 +98,9 @@ export default function SelectField({
         type="button"
         role="combobox"
         aria-controls={listboxId}
-        aria-activedescendant={open && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+        aria-activedescendant={
+          open && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+        }
         aria-expanded={open}
         aria-label={ariaLabel}
         disabled={disabled}
@@ -137,7 +140,9 @@ export default function SelectField({
                 'select-option',
                 index === activeIndex ? 'active' : '',
                 option.value === value ? 'selected' : '',
-              ].filter(Boolean).join(' ')}
+              ]
+                .filter(Boolean)
+                .join(' ')}
               type="button"
               role="option"
               aria-selected={option.value === value}

@@ -82,7 +82,9 @@ export default function AdminPasswordConfirmModal({
     >
       {children}
       <div className="form-group" style={{ marginTop: 16 }}>
-        <label className="form-label" htmlFor="adminPassword">Mot de passe administrateur</label>
+        <label className="form-label" htmlFor="adminPassword">
+          Mot de passe administrateur
+        </label>
         <input
           id="adminPassword"
           className="form-input"

@@ -64,9 +64,7 @@ test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut',
   const navigationBox = await page.getByRole('navigation').boundingBox();
   expect(dossierBox).not.toBeNull();
   expect(navigationBox).not.toBeNull();
-  expect(dossierBox!.y).toBeLessThanOrEqual(
-    navigationBox!.y + navigationBox!.height + 36
-  );
+  expect(dossierBox!.y).toBeLessThanOrEqual(navigationBox!.y + navigationBox!.height + 36);
   expect(await dossier.evaluate((element) => element.scrollTop)).toBe(0);
   expect(page.url()).toContain('incident=');
 

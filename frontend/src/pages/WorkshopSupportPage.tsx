@@ -13,7 +13,6 @@ async function handleSend(
   return res.reply;
 }
 
-
 export default function WorkshopSupportPage() {
   usePageTitle('Assistance atelier');
   return (

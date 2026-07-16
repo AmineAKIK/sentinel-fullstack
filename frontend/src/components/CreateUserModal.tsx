@@ -14,7 +14,19 @@ interface CreateUserModalProps {
 }
 
 export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalProps) {
-  const { form, setForm, error: formError, badgeError, setBadgeError, loading: formLoading, step, setStep, handlePreview, handleBack, isDirty } = useUserForm();
+  const {
+    form,
+    setForm,
+    error: formError,
+    badgeError,
+    setBadgeError,
+    loading: formLoading,
+    step,
+    setStep,
+    handlePreview,
+    handleBack,
+    isDirty,
+  } = useUserForm();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<SentinelUser | null>(null);
@@ -62,7 +74,13 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
 
   return (
     <Modal
-      title={step === 'created' ? 'Code temporaire' : step === 'preview' ? 'Aperçu utilisateur' : 'Ajouter un utilisateur'}
+      title={
+        step === 'created'
+          ? 'Code temporaire'
+          : step === 'preview'
+            ? 'Aperçu utilisateur'
+            : 'Ajouter un utilisateur'
+      }
       onClose={isLoading ? undefined : handleClose}
       closeOnOverlay={false}
       isDirty={isDirty}
@@ -78,7 +96,13 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? <><span className="spinner" aria-hidden="true" /> Création…</> : 'Confirmer la création'}
+              {isLoading ? (
+                <>
+                  <span className="spinner" aria-hidden="true" /> Création…
+                </>
+              ) : (
+                'Confirmer la création'
+              )}
             </button>
           </>
         ) : (
@@ -86,7 +110,11 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
             <button className="btn btn-secondary" onClick={onClose} disabled={isLoading}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={() => void handlePreview()} disabled={isLoading}>
+            <button
+              className="btn btn-primary"
+              onClick={() => void handlePreview()}
+              disabled={isLoading}
+            >
               Aperçu
             </button>
           </>
@@ -96,16 +124,24 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
       {step === 'created' && createdUser ? (
         <div>
           <SuccessBanner style={{ marginBottom: 16 }}>
-            Utilisateur créé. Communiquez ce code temporaire à {createdUser.first_name} {createdUser.last_name}.
+            Utilisateur créé. Communiquez ce code temporaire à {createdUser.first_name}{' '}
+            {createdUser.last_name}.
           </SuccessBanner>
           <div className="detail-field" style={{ marginBottom: 14 }}>
             <span className="detail-field-label">Code temporaire</span>
-            <span className="detail-field-value" style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}>
+            <span
+              className="detail-field-value"
+              style={{ fontSize: 24, letterSpacing: 1, fontWeight: 700 }}
+            >
               {createdUser.password_setup_code}
             </span>
           </div>
           <div className="notice">
-            Ce code est affiché une seule fois. Il expire le {createdUser.password_setup_expires_at ? formatDateTime(createdUser.password_setup_expires_at) : 'prochainement'}.
+            Ce code est affiché une seule fois. Il expire le{' '}
+            {createdUser.password_setup_expires_at
+              ? formatDateTime(createdUser.password_setup_expires_at)
+              : 'prochainement'}
+            .
           </div>
         </div>
       ) : step === 'preview' ? (
@@ -146,10 +182,18 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
             disabled={isLoading}
             badgeError={badgeError}
           />
-          {displayError && <div id="create-user-error" className="error-message" role="alert">{displayError}</div>}
+          {displayError && (
+            <div id="create-user-error" className="error-message" role="alert">
+              {displayError}
+            </div>
+          )}
         </>
       )}
-      {displayError && step === 'preview' && <div id="create-user-error-preview" className="error-message" role="alert">{displayError}</div>}
+      {displayError && step === 'preview' && (
+        <div id="create-user-error-preview" className="error-message" role="alert">
+          {displayError}
+        </div>
+      )}
     </Modal>
   );
 }

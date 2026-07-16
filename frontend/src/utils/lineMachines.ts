@@ -108,8 +108,8 @@ export function validateMachineAgainstLine(
 ): string[] {
   const issues = validateMachine(machine, 'Machine');
   const normalizedId = machine.machineId.trim().toLowerCase();
-  const duplicate = machines.some((item, index) =>
-    index !== machineIndex && item.machineId.trim().toLowerCase() === normalizedId
+  const duplicate = machines.some(
+    (item, index) => index !== machineIndex && item.machineId.trim().toLowerCase() === normalizedId
   );
   if (duplicate) issues.push("L'ID machine existe déjà sur cette ligne.");
   return issues.map((issue) => issue.replace(/^Machine : /, ''));

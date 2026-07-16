@@ -122,7 +122,7 @@ npm run test:e2e
 - [ ] demande, report, consultation et décision d'arbitrage vérifiés
 - [ ] changement de rôle en session pris en compte côté serveur
 - [ ] historique, journal, pilotage et connaissance cohérents
-- [ ] Board inaccessible sans code puis fonctionnel avec sa session dédiée
+- [ ] Board refusé sans session, puis fonctionnel par code dédié et par session Atelier
 - [ ] affichage mobile 393 x 851 et desktop 1920 x 1080 contrôlé
 - [ ] navigation clavier et libellés accessibles contrôlés
 

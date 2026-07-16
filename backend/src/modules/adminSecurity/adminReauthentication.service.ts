@@ -10,8 +10,7 @@ const REAUTH_WINDOW_MS = 30 * 60 * 1000;
 const failures = createRateLimit(REAUTH_MAX_FAILURES, REAUTH_WINDOW_MS);
 
 export type AdminReauthenticationResult =
-  | { ok: true }
-  | { ok: false; reason: 'ACCOUNT_MISSING' | 'INVALID_PASSWORD' | 'SESSION_REVOKED' };
+  { ok: true } | { ok: false; reason: 'ACCOUNT_MISSING' | 'INVALID_PASSWORD' | 'SESSION_REVOKED' };
 
 export async function reauthenticateAdmin(
   adminId: number,

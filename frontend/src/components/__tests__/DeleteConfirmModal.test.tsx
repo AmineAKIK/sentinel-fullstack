@@ -66,13 +66,13 @@ beforeEach(() => {
 // ─── rendering ────────────────────────────────────────────────────────────────
 
 describe('DeleteConfirmModal – rendu', () => {
-  it('affiche le nom et prénom de l\'utilisateur', () => {
+  it("affiche le nom et prénom de l'utilisateur", () => {
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
     renderModal();
     expect(screen.getByText(/Jean Dupont/)).toBeDefined();
   });
 
-  it('affiche le panneau d\'impact quand l\'utilisateur a des incidents signalés', async () => {
+  it("affiche le panneau d'impact quand l'utilisateur a des incidents signalés", async () => {
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(
       mockImpact({ reported_incidents: 3, taken_incidents: 1 })
     );
@@ -140,7 +140,7 @@ describe('DeleteConfirmModal – suppression réussie', () => {
 // ─── bouton annuler ───────────────────────────────────────────────────────────
 
 describe('DeleteConfirmModal – bouton annuler', () => {
-  it('appelle onClose quand l\'utilisateur clique Annuler', async () => {
+  it("appelle onClose quand l'utilisateur clique Annuler", async () => {
     const onClose = vi.fn();
     vi.mocked(accountsApi.getAccountImpact).mockResolvedValue(mockImpact());
     renderModal(mockUser(), onClose);

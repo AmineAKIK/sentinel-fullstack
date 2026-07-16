@@ -56,7 +56,9 @@ export default function WorkshopFilterCard({
       <div className="card-body">
         <div className="history-grid">
           <div className="form-group">
-            <label className="form-label" htmlFor={searchInputId}>Recherche</label>
+            <label className="form-label" htmlFor={searchInputId}>
+              Recherche
+            </label>
             <input
               id={searchInputId}
               className="form-input"
@@ -67,7 +69,9 @@ export default function WorkshopFilterCard({
           </div>
           {status && (
             <div className="form-group">
-              <label className="form-label" aria-hidden="true">Statut</label>
+              <label className="form-label" aria-hidden="true">
+                Statut
+              </label>
               <SelectField
                 value={status.value}
                 ariaLabel="Statut"
@@ -80,7 +84,9 @@ export default function WorkshopFilterCard({
             </div>
           )}
           <div className="form-group">
-            <label className="form-label" aria-hidden="true">Ligne</label>
+            <label className="form-label" aria-hidden="true">
+              Ligne
+            </label>
             <SelectField
               value={lineFilter}
               ariaLabel="Ligne"
@@ -92,7 +98,9 @@ export default function WorkshopFilterCard({
             />
           </div>
           <div className="form-group">
-            <label className="form-label" aria-hidden="true">Machine</label>
+            <label className="form-label" aria-hidden="true">
+              Machine
+            </label>
             <SelectField
               value={machineFilter}
               ariaLabel="Machine"
@@ -105,7 +113,9 @@ export default function WorkshopFilterCard({
             />
           </div>
           <div className="form-group">
-            <label className="form-label" aria-hidden="true">Type d'anomalie</label>
+            <label className="form-label" aria-hidden="true">
+              Type d'anomalie
+            </label>
             <SelectField
               value={stateFilter}
               ariaLabel="Type d'anomalie"

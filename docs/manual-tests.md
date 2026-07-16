@@ -1,119 +1,191 @@
-# Tests manuels essentiels – Sentinel
+# Recette manuelle Sentinel
 
-Checklist à valider à chaque livraison ou pull-request importante.
-Cocher chaque point **dans l'ordre** ; les dépendances sont indiquées.
+Cette recette complète les tests automatisés. Elle s'exécute sur une base dédiée,
+jamais sur les données de production. Consigner date, SHA, navigateur, viewport et
+résultat de chaque scénario.
 
----
+## 1. Préparation
 
-## 1. Board non connecté
+- [ ] CI verte sur le SHA testé
+- [ ] environnement local/staging sain via `/api/health`
+- [ ] un admin, un opérateur, une maintenance et un responsable disponibles
+- [ ] une ligne active avec machine simple et une avec double robot
+- [ ] DevTools sans erreur console au chargement initial
+- [ ] navigateur desktop et viewport mobile 393 x 851 préparés
 
-| # | Action | Résultat attendu |
-|---|--------|-----------------|
-| 1.1 | Ouvrir `/board` sans session board | La page demande le code board et n'expose aucune donnee atelier |
-| 1.2 | Vérifier l'absence de tout bouton « Prendre en charge », « Clore », etc. | Aucun bouton d'action visible |
-| 1.3 | Saisir le code board puis vérifier les métriques (total, open, pending, en retard) | Chiffres cohérents avec la base |
-| 1.4 | Filtrer par ligne (si filtre disponible en public) | Liste filtrée sans erreur |
-| 1.5 | Appeler `/api/workshop/incidents` directement sans cookie | Retour `401 UNAUTHORIZED` |
+Pour une recette automatisable et jetable, utiliser `backend/scripts/seedE2E.ts`.
+Ne jamais réinitialiser un environnement partagé avec `docker compose down -v`.
 
----
-
-## 2. Login / Logout admin
-
-| # | Action | Résultat attendu |
-|---|--------|-----------------|
-| 2.1 | Aller sur `/login` puis choisir Administration | Formulaire admin affiché sur `/admin/login` |
-| 2.2 | Soumettre des identifiants incorrects | Message d'erreur, aucun cookie posé |
-| 2.3 | Soumettre les bons identifiants | Redirection vers `/admin/accueil`, cookie admin HTTP-only posé |
-| 2.4 | Rafraîchir la page | Toujours connecté (cookie valide) |
-| 2.5 | Cliquer sur « Déconnexion » | Redirection vers `/login`, cookie supprimé |
-| 2.6 | Accéder à `/admin/accueil` sans cookie | Redirection automatique vers `/login` |
-| 2.7 | Appeler `/api/auth/me` sans cookie | `401 UNAUTHORIZED` |
-
----
-
-## 3. Login / Logout workshop
+## 2. Portail et sessions
 
 | # | Action | Résultat attendu |
-|---|--------|-----------------|
-| 3.1 | Ouvrir `/login` puis choisir Workshop | Formulaire badge affiché sur `/workshop/login` |
-| 3.2 | Saisir un badge inexistant | Message d'erreur approprié |
-| 3.3 | Saisir un badge sans mot de passe défini | Réponse `requiresPasswordSetup: true` → étape de création de mot de passe |
-| 3.4 | Créer un nouveau mot de passe et valider | Connecté, cookie workshop HTTP-only posé |
-| 3.5 | Se déconnecter | Cookie supprimé, retour sur `/login` |
-| 3.6 | Se reconnecter avec le mot de passe créé | Connexion réussie |
-| 3.7 | Saisir un mauvais mot de passe | `requiresPassword: true` + message d'erreur |
-| 3.8 | Acceder a `/workshop/pilotage` sans cookie | Redirection vers `/login` |
+| --- | --- | --- |
+| 2.1 | Ouvrir `/login` | trois entrées Board, Administration, Atelier |
+| 2.2 | Choisir Administration | `/admin/login`, focus dans le formulaire |
+| 2.3 | Identifiants admin faux | erreur générique, aucun accès |
+| 2.4 | Connexion admin valide | `/admin/accueil`, session persistante au refresh |
+| 2.5 | Déconnexion admin | retour portail, route admin ensuite refusée |
+| 2.6 | Choisir Atelier | `/workshop/login` |
+| 2.7 | Badge inexistant / mot de passe faux | erreur sans révéler le compte |
+| 2.8 | Compte à initialiser | code temporaire puis choix d'un mot de passe |
+| 2.9 | Rejouer le code temporaire | refus |
+| 2.10 | Connexion Atelier valide | dashboard et rôle corrects |
+| 2.11 | Déconnexion Atelier | cookie supprimé, route workshop refusée |
 
----
+Vérifier dans DevTools que les cookies de production sont `HttpOnly`, `Secure` et
+`SameSite=Strict`.
 
-## 4. Création de ligne
+## 3. Isolation des audiences
+
+- [ ] avec uniquement une session Atelier, `/api/admin/dashboard` répond 401
+- [ ] cette même session Atelier peut lire la projection Board, sans action métier
+- [ ] avec uniquement une session Admin, `/api/workshop/incidents` répond 401
+- [ ] avec uniquement une session Board, les API Admin/Atelier répondent 401
+- [ ] `/api/board/data` sans session Board ni Atelier répond 401
+- [ ] une désactivation Atelier invalide sa session existante
+- [ ] une rotation du mot de passe invalide les anciennes sessions
+- [ ] un changement de rôle est visible au prochain appel protégé
+
+## 4. Administration des comptes
 
 | # | Action | Résultat attendu |
-|---|--------|-----------------|
-| 4.1 | En admin, aller sur « Lignes » | Liste des lignes existantes |
-| 4.2 | Cliquer « Nouvelle ligne » | Modal de création ouvert |
-| 4.3 | Laisser le numéro de ligne vide et valider | Erreur « Le numéro de ligne est obligatoire » |
-| 4.4 | Entrer un numéro de ligne déjà existant | Erreur de conflit (LINE_ALREADY_EXISTS) |
-| 4.5 | Ajouter une machine sans machineId → valider | Erreur « ID machine est obligatoire » |
-| 4.6 | Ajouter deux machines avec le même ID → valider | Erreur de doublon |
-| 4.7 | Remplir toutes les infos valides et valider | Ligne créée, apparaît dans la liste |
-| 4.8 | Vérifier que la ligne est visible dans le board workshop | Ligne listée |
+| --- | --- | --- |
+| 4.1 | Créer un compte valide | fiche créée, code setup affiché une fois |
+| 4.2 | Badge identique avec casse/espaces différents | conflit explicite |
+| 4.3 | Modifier sans changer de valeur | aucun faux événement d'audit |
+| 4.4 | Changer nom, e-mail et rôle | valeurs et audit cohérents |
+| 4.5 | Réinitialiser le mot de passe | nouveau code, ancienne session invalidée |
+| 4.6 | Désactiver sans incident affecté | compte refusé au login |
+| 4.7 | Réactiver | connexion possible avec setup/secret attendu |
+| 4.8 | Désactiver un technicien affecté | opération bloquée avec impact |
+| 4.9 | Archiver un compte admissible | données anonymisées, historique lisible |
+| 4.10 | Réauthentification admin fausse | action sensible refusée |
 
----
-
-## 5. Édition machine
+## 5. Lignes et machines
 
 | # | Action | Résultat attendu |
-|---|--------|-----------------|
-| 5.1 | Depuis la page Lignes, cliquer sur une ligne puis « Modifier » | Modal d'édition ouvert avec les données pré-remplies |
-| 5.2 | Vider le champ machineId d'une machine et valider | Erreur de validation |
-| 5.3 | Passer une machine en mode double robot | Les champs gauche/droite apparaissent, les anciens champs disparaissent |
-| 5.4 | Remplir un double robot correctement et sauvegarder | Modification persistée |
-| 5.5 | Modifier le numéro de robot d'une machine → sauvegarder | Mis à jour en base |
-| 5.6 | Essayer de sauvegarder avec `robotHeads = 0` | Erreur « nombre de têtes doit être positif » |
-| 5.7 | Annuler sans sauvegarder | Aucune modification persistée |
+| --- | --- | --- |
+| 5.1 | Créer une ligne + machine simple | ligne visible et sélectionnable Atelier |
+| 5.2 | Numéro de ligne doublon normalisé | conflit |
+| 5.3 | ID machine doublon sur autre ligne | conflit global |
+| 5.4 | Machine sans marque/ID ou tête à 0 | validation avant écriture |
+| 5.5 | Passer simple vers double robot | champs cohérents, sauvegarde persistée |
+| 5.6 | Revenir double vers simple | anciens champs non réutilisés |
+| 5.7 | Fermer une modale sale | confirmation séparée, Annuler conserve le formulaire |
+| 5.8 | Sauvegarder deux fois rapidement | une seule mutation |
+| 5.9 | Désactiver une ligne avec incident actif | blocage et impact exact |
+| 5.10 | Archiver une ligne admissible | disparition du référentiel actif, audit conservé |
 
----
+## 6. Cycle incident
 
-## 6. Cycle complet incident
-
-> Pré-requis : être connecté en tant que **OPERATOR**, **MAINTENANCE**, et **RESPONSABLE** (3 sessions distinctes ou scénario séquentiel).
+Utiliser des sessions distinctes ou se reconnecter entre rôles.
 
 | # | Rôle | Action | Résultat attendu |
-|---|------|--------|-----------------|
-| 6.1 | OPERATOR | Créer un incident (ligne, machine, robot, tête, état, produit en cours) | Incident OPEN créé, visible sur le board |
-| 6.2 | RESPONSABLE | Vérifier la visibilité de l'incident | Incident présent avec les bons champs |
-| 6.3 | MAINTENANCE | Prendre en charge | `is_taken = true`, statut reste OPEN |
-| 6.4 | OPERATOR | Tenter de REQUEST_CANCEL sur un incident pris | **Interdit** (bouton absent ou erreur 403) |
-| 6.5 | MAINTENANCE | Mettre en attente (SET_PENDING) | Statut passe à PENDING |
-| 6.6 | MAINTENANCE | Reprendre (RESUME) | Statut repasse à OPEN |
-| 6.7 | MAINTENANCE | Clore (CLOSE) avec note d'intervention | Statut CLOSED, `intervention_note` enregistrée |
-| 6.8 | Tous | Vérifier l'incident dans l'historique | Incident visible dans `/workshop/history` |
-| 6.9 | RESPONSABLE | Invalider un incident clôturé | Statut passe à INVALIDATED, événement INCIDENT_INVALIDATED journalisé |
-| 6.10 | OPERATOR | Créer un second incident non pris puis demander son annulation (REQUEST_CANCEL) + motif | `cancel_request = true`, motif enregistré |
-| 6.11 | RESPONSABLE | Approuver l'annulation | Incident CANCELED |
-| 6.12 | Tous | Vérifier que l'incident annulé n'est plus sur le board actif | Absent du board |
+| --- | --- | --- | --- |
+| 6.1 | Opérateur | créer un incident complet | `OPEN`, non pris, événement créé |
+| 6.2 | Opérateur | recréer le même emplacement | conflit, aucun doublon |
+| 6.3 | Maintenance | prendre en charge | affectation et date renseignées |
+| 6.4 | Même maintenance | reprendre immédiatement | action absente/refusée, aucun no-op |
+| 6.5 | Autre maintenance | utiliser TAKE | transfert tracé |
+| 6.6 | Maintenance | mettre en attente sans diagnostic | refus |
+| 6.7 | Maintenance | mettre en attente avec diagnostic | `PENDING` |
+| 6.8 | Maintenance | clôturer depuis `PENDING` | refus |
+| 6.9 | Maintenance | reprendre puis clôturer avec note | `CLOSED` |
+| 6.10 | Responsable | invalider sans motif puis avec motif | refus puis `INVALIDATED` |
+| 6.11 | Tous | consulter historique | acteurs, snapshots et ordre cohérents |
 
----
+## 7. Arbitrage d'annulation
 
-## 7. Historique et connaissance
+Créer une déclaration opérateur non prise puis demander son annulation avec motif.
 
-| # | Action | Résultat attendu |
-|---|--------|-----------------|
-| 7.1 | Aller sur `/workshop/history` | Liste des incidents clôturés/annulés |
-| 7.2 | Filtrer par ligne | Liste filtrée |
-| 7.3 | Filtrer par état d'anomalie (DEGRADEE, etc.) | Liste filtrée |
-| 7.4 | Rechercher un texte libre | Incidents contenant le terme affichés |
-| 7.5 | Cliquer sur un incident historique | Détail complet (diagnostic, note, acteurs) |
-| 7.6 | Aller sur `/workshop/knowledge` | Seuls les incidents CLOSED avec `intervention_note` non vide apparaissent |
-| 7.7 | Vérifier qu'un incident annulé n'est pas dans la base de connaissance | Absent |
-| 7.8 | Copier ou ouvrir une URL `/workshop/knowledge?incident=<id>` valide | La fiche ciblée est sélectionnée |
-| 7.9 | Vérifier la trace d'événements d'un incident | Événements dans l'ordre chronologique (créé → pris → mis en attente → clôturé…) |
+### Cas actif
 
----
+- [ ] tuile Responsable « À arbitrer » incrémentée
+- [ ] pastille rouge incrémentée pour le nouveau cas `ACTIVE`
+- [ ] clic incident ouvre une seule modale d'arbitrage
+- [ ] contexte suffisant pour décider sans ouvrir le dossier
+- [ ] fond sous-jacent flouté sans voile noir opaque
+- [ ] body non scrollable, Tab contenu dans la modale, Escape ferme la couche
 
-## Notes d'exécution
+### Reporter
 
-- Exécuter les tests sur un environnement **staging** ou **local avec Docker Compose**.
-- Réinitialiser la base entre scénarios si nécessaire (`docker compose down -v && docker compose up`).
-- Valider également sur **mobile / petit écran** les modals et le board.
+- [ ] Reporter ferme la modale et ouvre le dossier
+- [ ] dossier mobile positionné à son début
+- [ ] cas et pastille restent actifs/non lus
+- [ ] fermer puis rouvrir l'incident fait réapparaître la modale
+
+### Consulter
+
+- [ ] Consulter le dossier ouvre le dossier et marque `CONSULTED`
+- [ ] compteur total « À arbitrer » conserve le cas ouvert
+- [ ] pastille de nouveaux cas diminue
+- [ ] ouvrir le dossier par un autre chemin ne change jamais l'état du cas
+
+### Décision
+
+- [ ] Refuser garde l'incident actif et clôt le cas `REJECTED`
+- [ ] sur une nouvelle demande, Annuler l'incident passe `CANCELED` et le cas
+      `APPROVED`
+- [ ] double clic ne crée qu'une décision et qu'une trace
+
+## 8. Arbitrage de correction
+
+Créer une demande qui modifie plusieurs champs.
+
+- [ ] valeurs Actuel/Demandé exactes et texte long sans rupture de mot isolée
+- [ ] incident inchangé avant décision
+- [ ] Reporter et Consulter suivent exactement les règles de la section 7
+- [ ] Refuser conserve les valeurs actuelles
+- [ ] Appliquer modifie seulement les champs demandés
+- [ ] retrait opérateur clôt le cas `WITHDRAWN`
+- [ ] aucun arbitrage ouvert concurrent sur le même incident
+
+## 9. Dashboard et responsive
+
+### Desktop 1920 x 1080
+
+- [ ] zone haute alignée et stable lors de l'ouverture d'un dossier
+- [ ] liste et panneau restent dans la même largeur de contenu
+- [ ] panneau centré verticalement dans la zone utile lorsque possible
+- [ ] scroll du panneau fonctionne sans focus préalable
+- [ ] molette au-dessus de la liste fait défiler la liste/page attendue
+- [ ] aucune double scrollbar incohérente
+- [ ] navigation incident précédent/suivant conserve un contexte lisible
+
+### Mobile 393 x 851
+
+- [ ] tuiles ordonnées selon le rôle et sans overflow horizontal
+- [ ] dossier ouvert placé à son en-tête, pas au milieu de son contenu
+- [ ] fermeture restaure une position utile dans la liste
+- [ ] modales d'arbitrage entièrement visibles sans scroll interne
+- [ ] boutons d'action entre 32 et 52 px de haut, libellés complets
+- [ ] menu, clavier virtuel et rotation portrait/paysage restent utilisables
+
+## 10. Vues transverses
+
+- [ ] Board : code requis hors session Atelier, lecture seule, rotation et préférences par écran
+- [ ] Board : aucune action métier ni appel API Atelier détaillé
+- [ ] Historique : filtres, URL incident et trace complète
+- [ ] Journal Responsable : filtres et navigation vers le dossier
+- [ ] Pilotage : période, ligne, machine, KPI, tendances et classements
+- [ ] Connaissance : seulement `CLOSED` avec intervention exploitable
+- [ ] navigation croisée Historique/Connaissance conserve l'incident ciblé
+- [ ] Support sans clé IA : message gracieux, reste de l'application intact
+
+## 11. Dégradation et accessibilité
+
+- [ ] couper le backend pendant un chargement : erreur claire, pas d'écran blanc
+- [ ] ralentir le réseau : loading stable, aucune ancienne réponse ne remplace la nouvelle
+- [ ] double soumission : une seule requête
+- [ ] navigation uniquement clavier sur les parcours critiques
+- [ ] zoom 200 % sans perte d'information/action
+- [ ] `prefers-reduced-motion` supprime les animations non essentielles
+- [ ] lecteur d'écran : titres, erreurs, compteurs et modales annoncés utilement
+
+## 12. Clôture de recette
+
+- [ ] données de test supprimées chirurgicalement ou environnement jeté
+- [ ] aucun volume partagé/production supprimé
+- [ ] captures et logs ne contiennent aucun secret
+- [ ] anomalies enregistrées avec étapes, attendu, obtenu, viewport et SHA
+- [ ] résultat rattaché à la checklist de publication

@@ -84,11 +84,11 @@
     border-right: none;
   }
 
-  .kb-meta-item:nth-child(n+3) {
+  .kb-meta-item:nth-child(n + 3) {
     border-bottom: none;
   }
 
-  .kb-meta-item:nth-child(n+5) {
+  .kb-meta-item:nth-child(n + 5) {
     border-bottom: none;
   }
 
@@ -142,7 +142,7 @@
     border-right: none;
   }
 
-  .pilotage-analytics-kpi:nth-child(n+4) {
+  .pilotage-analytics-kpi:nth-child(n + 4) {
     border-top: 1px solid var(--color-border);
   }
 
@@ -186,11 +186,11 @@
     border-right: none;
   }
 
-  .pilotage-analytics-kpi:nth-child(n+3) {
+  .pilotage-analytics-kpi:nth-child(n + 3) {
     border-top: 1px solid var(--color-border);
   }
 
-  .pilotage-analytics-kpi:nth-child(n+4) {
+  .pilotage-analytics-kpi:nth-child(n + 4) {
     border-top: 1px solid var(--color-border);
   }
 }
@@ -228,7 +228,7 @@
     border-bottom: none;
   }
 
-  .pilotage-analytics-kpi:nth-child(n+3) {
+  .pilotage-analytics-kpi:nth-child(n + 3) {
     border-top: none;
   }
 
@@ -357,7 +357,10 @@
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  box-shadow: 0 24px 56px rgba(11, 18, 32, 0.28), 0 6px 16px rgba(11, 18, 32, 0.14), 0 1px 3px rgba(11, 18, 32, 0.08);
+  box-shadow:
+    0 24px 56px rgba(11, 18, 32, 0.28),
+    0 6px 16px rgba(11, 18, 32, 0.14),
+    0 1px 3px rgba(11, 18, 32, 0.08);
   padding: 20px 22px 18px;
   display: flex;
   flex-direction: column;
@@ -480,8 +483,8 @@ th {
 }
 
 .table-sort-button:hover .table-sort-indicator,
-th[aria-sort="ascending"] .table-sort-indicator,
-th[aria-sort="descending"] .table-sort-indicator {
+th[aria-sort='ascending'] .table-sort-indicator,
+th[aria-sort='descending'] .table-sort-indicator {
   color: var(--color-primary);
 }
 
@@ -505,7 +508,7 @@ tbody tr:hover {
   background-color: var(--color-primary-soft);
 }
 
-tbody tr[role="button"]:focus-visible {
+tbody tr[role='button']:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: -3px;
   background-color: var(--color-primary-soft);
@@ -516,7 +519,9 @@ tbody tr[role="button"]:focus-visible {
   color: var(--color-text-muted);
   opacity: 0;
   transform: translateX(-2px);
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-base);
   white-space: nowrap;
 }
 
@@ -610,7 +615,6 @@ tbody tr:hover .row-action {
   font-weight: 500;
   color: var(--color-text-muted);
 }
-
 
 .detail-grid {
   display: grid;
@@ -923,10 +927,18 @@ tbody tr:hover .row-action {
     column-gap: 0;
   }
 
-  .pilotage-heatmap-row:last-child { border-bottom: none; }
-  .pilotage-heatmap-row-tension { border-left-color: var(--color-danger); }
-  .pilotage-heatmap-row-watch   { border-left-color: var(--color-watch); }
-  .pilotage-heatmap-row-stable  { border-left-color: var(--color-success); }
+  .pilotage-heatmap-row:last-child {
+    border-bottom: none;
+  }
+  .pilotage-heatmap-row-tension {
+    border-left-color: var(--color-danger);
+  }
+  .pilotage-heatmap-row-watch {
+    border-left-color: var(--color-watch);
+  }
+  .pilotage-heatmap-row-stable {
+    border-left-color: var(--color-success);
+  }
 
   /* Ligne 1 : dot + numéro sur toute la largeur */
   .pilotage-heatmap-state {
@@ -946,7 +958,9 @@ tbody tr:hover .row-action {
     gap: 0;
   }
 
-  .pilotage-heatmap-linename::before { display: none; }
+  .pilotage-heatmap-linename::before {
+    display: none;
+  }
 
   /* Ligne 2 : 4 métriques réparties */
   .pilotage-heatmap-cell {
@@ -965,10 +979,19 @@ tbody tr:hover .row-action {
     padding: 0 4px;
   }
 
-  .pilotage-heatmap-cell:nth-child(3) { grid-column: 3; }
-  .pilotage-heatmap-cell:nth-child(4) { grid-column: 4; }
-  .pilotage-heatmap-cell:nth-child(5) { grid-column: 5; }
-  .pilotage-heatmap-cell:nth-child(6) { grid-column: 6; border-right: none; }
+  .pilotage-heatmap-cell:nth-child(3) {
+    grid-column: 3;
+  }
+  .pilotage-heatmap-cell:nth-child(4) {
+    grid-column: 4;
+  }
+  .pilotage-heatmap-cell:nth-child(5) {
+    grid-column: 5;
+  }
+  .pilotage-heatmap-cell:nth-child(6) {
+    grid-column: 6;
+    border-right: none;
+  }
 
   .pilotage-heatmap-cell::before {
     content: attr(data-label);
@@ -1204,7 +1227,6 @@ tbody tr:hover .row-action {
   color: var(--color-primary);
 }
 
-
 .change-table td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--color-border);
@@ -1243,7 +1265,9 @@ tbody tr:hover .row-action {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Skeleton de chargement (doctrine §5.4) : préserve la structure sans agresser. */
@@ -1268,8 +1292,12 @@ tbody tr:hover .row-action {
 }
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: 0 0; }
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
 }
 
 .empty-state {

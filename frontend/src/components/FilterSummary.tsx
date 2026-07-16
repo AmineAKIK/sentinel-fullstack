@@ -26,7 +26,9 @@ export default function FilterSummary({
   return (
     <div className={`filter-summary ${className}`.trim()}>
       <div className="filter-summary-main">
-        <span className="filter-result-count">{count} {countLabel}</span>
+        <span className="filter-result-count">
+          {count} {countLabel}
+        </span>
         {hasFilters ? (
           <div className="filter-chip-list">
             {chips.map((chip) => (
@@ -47,7 +49,12 @@ export default function FilterSummary({
         )}
       </div>
       {onClear && (
-        <button className="btn btn-secondary btn-sm" type="button" onClick={onClear} disabled={!hasFilters}>
+        <button
+          className="btn btn-secondary btn-sm"
+          type="button"
+          onClick={onClear}
+          disabled={!hasFilters}
+        >
           Effacer les filtres
         </button>
       )}

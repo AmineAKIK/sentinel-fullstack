@@ -13,7 +13,6 @@ async function handleSend(
   return res.reply;
 }
 
-
 export default function AdminSupportPage() {
   usePageTitle('Assistance administration');
   return (

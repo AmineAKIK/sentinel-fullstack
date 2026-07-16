@@ -39,7 +39,9 @@ export default function UserForm({
   return (
     <>
       <div className="form-group">
-        <label className="form-label" htmlFor="lastName">Nom *</label>
+        <label className="form-label" htmlFor="lastName">
+          Nom *
+        </label>
         <input
           id="lastName"
           className="form-input"
@@ -53,7 +55,9 @@ export default function UserForm({
         />
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor="firstName">Prénom *</label>
+        <label className="form-label" htmlFor="firstName">
+          Prénom *
+        </label>
         <input
           id="firstName"
           className="form-input"
@@ -67,7 +71,9 @@ export default function UserForm({
         />
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor="badgeNumber">Numéro de badge *</label>
+        <label className="form-label" htmlFor="badgeNumber">
+          Numéro de badge *
+        </label>
         <input
           id="badgeNumber"
           className="form-input"
@@ -83,7 +89,9 @@ export default function UserForm({
         {badgeError && <div className="field-error">{badgeError}</div>}
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor="email">Email professionnel (notifications)</label>
+        <label className="form-label" htmlFor="email">
+          Email professionnel (notifications)
+        </label>
         <input
           id="email"
           className="form-input"
@@ -101,7 +109,9 @@ export default function UserForm({
         </span>
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor="role">Rôle *</label>
+        <label className="form-label" htmlFor="role">
+          Rôle *
+        </label>
         <SelectField
           id="role"
           value={data.role}

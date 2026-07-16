@@ -4,15 +4,21 @@ import { renderMarkdown } from '../markdownParser';
 
 describe('renderMarkdown', () => {
   it('renders the supported block and inline formats', () => {
-    render(<>{renderMarkdown([
-      '# Titre',
-      'Paragraphe **fort** et *italique* avec `code`.',
-      '- premier',
-      '- second',
-      '1. étape une',
-      '2. étape deux',
-      '> rappel',
-    ].join('\n'))}</>);
+    render(
+      <>
+        {renderMarkdown(
+          [
+            '# Titre',
+            'Paragraphe **fort** et *italique* avec `code`.',
+            '- premier',
+            '- second',
+            '1. étape une',
+            '2. étape deux',
+            '> rappel',
+          ].join('\n')
+        )}
+      </>
+    );
 
     expect(screen.getByRole('heading', { name: 'Titre' })).toBeInTheDocument();
     expect(screen.getByText('fort', { selector: 'strong' })).toBeInTheDocument();

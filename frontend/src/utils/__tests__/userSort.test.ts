@@ -32,8 +32,23 @@ describe('userName', () => {
 });
 
 describe('compareUsers', () => {
-  const alice = user({ first_name: 'Alice', last_name: 'Martin', badge_number: 'B001', role: 'OPERATOR', is_active: true, created_at: '2024-01-01T00:00:00Z' });
-  const bernard = user({ id: 2, first_name: 'Bernard', last_name: 'Durand', badge_number: 'B002', role: 'MAINTENANCE', is_active: false, created_at: '2024-06-01T00:00:00Z' });
+  const alice = user({
+    first_name: 'Alice',
+    last_name: 'Martin',
+    badge_number: 'B001',
+    role: 'OPERATOR',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+  });
+  const bernard = user({
+    id: 2,
+    first_name: 'Bernard',
+    last_name: 'Durand',
+    badge_number: 'B002',
+    role: 'MAINTENANCE',
+    is_active: false,
+    created_at: '2024-06-01T00:00:00Z',
+  });
 
   describe('tri par nom', () => {
     it('asc : alice avant bernard (M < D en FR? non, "Durand Martin" → D < M)', () => {

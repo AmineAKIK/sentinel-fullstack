@@ -55,7 +55,9 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
       }
       setStep('preview');
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
@@ -74,7 +76,9 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
       });
       onSuccess(line);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
@@ -86,11 +90,11 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
     setStep('form');
   }
 
-  const isDirty = step === 'form' && (
-    form.lineNumber.trim() !== '' ||
-    form.machines.length !== EMPTY_LINE_FORM.machines.length ||
-    JSON.stringify(form.machines) !== JSON.stringify(EMPTY_LINE_FORM.machines)
-  );
+  const isDirty =
+    step === 'form' &&
+    (form.lineNumber.trim() !== '' ||
+      form.machines.length !== EMPTY_LINE_FORM.machines.length ||
+      JSON.stringify(form.machines) !== JSON.stringify(EMPTY_LINE_FORM.machines));
 
   return (
     <Modal
@@ -107,7 +111,13 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? <><Spinner /> Création…</> : 'Confirmer la création'}
+              {loading ? (
+                <>
+                  <Spinner /> Création…
+                </>
+              ) : (
+                'Confirmer la création'
+              )}
             </button>
           </>
         ) : (
@@ -127,7 +137,7 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
           <DetailField label="Numéro de ligne">{form.lineNumber}</DetailField>
           <DetailField label="Machines">{form.machines.length}</DetailField>
           <DetailField label="Liste des machines" style={{ gridColumn: '1 / -1' }}>
-              {form.machines.map((machine) => machine.machineId || '-').join(', ')}
+            {form.machines.map((machine) => machine.machineId || '-').join(', ')}
           </DetailField>
         </div>
       ) : (

@@ -1,6 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import logger from '../../logger';
 import pool from '../../db/pool';
+import { parseBooleanEnv, parsePort } from '../../config/production';
 
 let transporter: Transporter | null = null;
 
@@ -14,8 +15,8 @@ export function getMailer(): Transporter | null {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
+      port: parsePort(process.env.SMTP_PORT, 'SMTP_PORT', 587),
+      secure: parseBooleanEnv(process.env.SMTP_SECURE, 'SMTP_SECURE', false),
       auth: process.env.SMTP_USER
         ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
         : undefined,

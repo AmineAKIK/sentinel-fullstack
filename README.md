@@ -172,7 +172,13 @@ frontend/
 - [Doctrine UX](docs/doctrine-ux.md)
 - [Jeu d'essai](docs/jeu-essai.md)
 - [Tests manuels](docs/manual-tests.md)
+- [Déploiement VPS](docs/deploiement-vps.md)
+- [Runbook d'exploitation](docs/runbook.md)
 - [Checklist de publication](docs/release-checklist.md)
+- [Protocole d'audit production](docs/audit-prod.md)
+- [Derniers résultats d'audit](docs/audit-prod-resultats.md)
+- [Politique de sécurité](SECURITY.md)
+- [Guide de contribution](CONTRIBUTING.md)
 
 ## Licence
 

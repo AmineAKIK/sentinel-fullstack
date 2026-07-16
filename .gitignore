@@ -46,6 +46,8 @@ Thumbs.db
 PLAN-EXAMEN.md
 docs/Sentinel_cadrage_conceptuel.docx
 docs/phase-0-stabilisation.md
+/*.docx
+/*.pdf
 
 # Local databases, backups and private certificates
 *.sqlite

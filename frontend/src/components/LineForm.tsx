@@ -88,14 +88,18 @@ export default function LineForm({
       ...prev,
       keys: prev.keys.filter((_, currentIndex) => currentIndex !== index),
     }));
-    onChange({ ...data, machines: data.machines.filter((_, currentIndex) => currentIndex !== index) });
+    onChange({
+      ...data,
+      machines: data.machines.filter((_, currentIndex) => currentIndex !== index),
+    });
   }
-
 
   return (
     <>
       <div className="form-group">
-        <label className="form-label" htmlFor="lineNumber">Numéro de la ligne *</label>
+        <label className="form-label" htmlFor="lineNumber">
+          Numéro de la ligne *
+        </label>
         <input
           id="lineNumber"
           className="form-input"
@@ -112,7 +116,9 @@ export default function LineForm({
       </div>
 
       <div className="line-machines-header">
-        <span className="form-label">Consigne machines : dans l'ordre de la SPI vers le four *</span>
+        <span className="form-label">
+          Consigne machines : dans l'ordre de la SPI vers le four *
+        </span>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
@@ -170,7 +176,9 @@ export default function LineForm({
 
             <div className="line-machine-grid">
               <div className="form-group">
-                <label className="form-label" htmlFor={`machineId-${index}`}>ID machine *</label>
+                <label className="form-label" htmlFor={`machineId-${index}`}>
+                  ID machine *
+                </label>
                 <input
                   id={`machineId-${index}`}
                   className="form-input"
@@ -184,7 +192,9 @@ export default function LineForm({
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor={`brand-${index}`}>Marque *</label>
+                <label className="form-label" htmlFor={`brand-${index}`}>
+                  Marque *
+                </label>
                 <input
                   id={`brand-${index}`}
                   className="form-input"

@@ -61,7 +61,9 @@ export default function BoardIncidentGrid({
             <div className="board-incident-top">
               <strong>Ligne {incident.line_number}</strong>
               <div className="board-incident-top-status">
-                <span className="board-incident-state">{STATE_LABELS[incident.state] ?? incident.state}</span>
+                <span className="board-incident-state">
+                  {STATE_LABELS[incident.state] ?? incident.state}
+                </span>
                 {incident.is_priority && (
                   <span className="board-chip board-chip-priority">Urgent</span>
                 )}

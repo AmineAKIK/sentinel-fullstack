@@ -17,6 +17,36 @@ const REQUIRED_PRODUCTION_ENV = [
 const MIN_SECRET_LENGTH = 24;
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 
+export function parsePort(value: string | undefined, name: string, fallback: number): number {
+  const normalized = value?.trim();
+  if (!normalized) return fallback;
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error(`${name} must be an integer between 1 and 65535.`);
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 65_535) {
+    throw new Error(`${name} must be an integer between 1 and 65535.`);
+  }
+  return parsed;
+}
+
+export function parseBooleanEnv(
+  value: string | undefined,
+  name: string,
+  fallback: boolean
+): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === 'true' || normalized === '1') return true;
+  if (normalized === 'false' || normalized === '0') return false;
+  throw new Error(`${name} must be true/1 or false/0.`);
+}
+
+export function parseTrustProxy(value: string | undefined): false | 1 {
+  return parseBooleanEnv(value, 'TRUST_PROXY', false) ? 1 : false;
+}
+
 function isWeakSecret(value: string | undefined): boolean {
   if (!value) return true;
   if (DEFAULT_SECRET_VALUES.has(value)) return true;
@@ -60,6 +90,23 @@ export function assertProductionConfig(): void {
 
   if (!BCRYPT_HASH_PATTERN.test(process.env.BOARD_ACCESS_CODE_HASH || '')) {
     throw new Error('BOARD_ACCESS_CODE_HASH must be a valid bcrypt digest in production.');
+  }
+
+  if (parseTrustProxy(process.env.TRUST_PROXY) !== 1) {
+    throw new Error('TRUST_PROXY must be true in production behind the configured reverse proxy.');
+  }
+
+  parsePort(process.env.PORT, 'PORT', 3000);
+
+  if (process.env.SMTP_HOST) {
+    parsePort(process.env.SMTP_PORT, 'SMTP_PORT', 587);
+    parseBooleanEnv(process.env.SMTP_SECURE, 'SMTP_SECURE', false);
+    if (!process.env.SMTP_FROM) {
+      throw new Error('SMTP_FROM is required when SMTP_HOST is configured in production.');
+    }
+    if (Boolean(process.env.SMTP_USER) !== Boolean(process.env.SMTP_PASS)) {
+      throw new Error('SMTP_USER and SMTP_PASS must be configured together.');
+    }
   }
 
   // DEEPSEEK_API_KEY is optional — the support chat degrades gracefully when absent.

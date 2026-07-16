@@ -37,7 +37,11 @@ export default function EditLineModal({ line, onClose, onSuccess }: EditLineModa
     }
     const validationIssues = validateLineForm(form);
     if (validationIssues.length > 0) {
-      setError(validationIssues.length > 1 ? 'Merci de compléter les champs obligatoires.' : validationIssues[0]);
+      setError(
+        validationIssues.length > 1
+          ? 'Merci de compléter les champs obligatoires.'
+          : validationIssues[0]
+      );
       return;
     }
 

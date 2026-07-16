@@ -16,7 +16,12 @@ export default function InvalidateIncidentModal({
     <TextConfirmModal
       title="Invalider l’incident clôturé"
       variant="danger"
-      notice={<>L’incident {incident.line_number} · {incident.machine_id} restera dans le journal, mais il sera exclu des statistiques et de la base de connaissance.</>}
+      notice={
+        <>
+          L’incident {incident.line_number} · {incident.machine_id} restera dans le journal, mais il
+          sera exclu des statistiques et de la base de connaissance.
+        </>
+      }
       label="Motif d’invalidation *"
       placeholder="Doublon, erreur de saisie, clôture non exploitable..."
       confirmLabel="Confirmer l’invalidation"

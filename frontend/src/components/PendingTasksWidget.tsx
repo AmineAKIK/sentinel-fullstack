@@ -51,17 +51,16 @@ export default function PendingTasksWidget({ requests, onHandled }: PendingTasks
                 >
                   <div className="pending-task-type">Réinitialisation mot de passe</div>
                   <div className="pending-task-user">
-                    <strong>{req.last_name} {req.first_name}</strong>
+                    <strong>
+                      {req.last_name} {req.first_name}
+                    </strong>
                     <span>Badge {req.badge_number}</span>
                   </div>
                   <div className="pending-task-time">il y a {formatElapsed(req.requested_at)}</div>
                 </button>
 
                 <div className="pending-task-actions">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() => setConfirming(req)}
-                  >
+                  <button className="btn btn-sm btn-outline" onClick={() => setConfirming(req)}>
                     Marquer traité
                   </button>
                 </div>
@@ -80,11 +79,19 @@ export default function PendingTasksWidget({ requests, onHandled }: PendingTasks
           loadingLabel="En cours…"
           loading={loading}
         >
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+          <p
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
             La demande de réinitialisation de{' '}
-            <strong>{confirming.first_name} {confirming.last_name}</strong> (badge {confirming.badge_number})
-            sera retirée de la liste des actions à traiter. Assurez-vous d'avoir communiqué un nouveau
-            code temporaire avant de confirmer.
+            <strong>
+              {confirming.first_name} {confirming.last_name}
+            </strong>{' '}
+            (badge {confirming.badge_number}) sera retirée de la liste des actions à traiter.
+            Assurez-vous d'avoir communiqué un nouveau code temporaire avant de confirmer.
           </p>
         </ConfirmModal>
       )}

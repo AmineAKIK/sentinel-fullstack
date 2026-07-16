@@ -21,19 +21,22 @@ import { useKnowledgeData } from '../hooks/useKnowledgeData';
 
 // ── Couleurs par type d'anomalie ───────────────────────────────────
 const STATE_TONE: Record<string, string> = {
-  SKIPEE_PAR_MACHINE:    'kb-state-machine',
+  SKIPEE_PAR_MACHINE: 'kb-state-machine',
   SKIPEE_PAR_CONDUCTEUR: 'kb-state-conducteur',
-  DEGRADEE:              'kb-state-degradee',
-  INDISPONIBLE:          'kb-state-indisponible',
+  DEGRADEE: 'kb-state-degradee',
+  INDISPONIBLE: 'kb-state-indisponible',
 };
 
 function stateToneClass(state: string): string {
   return STATE_TONE[state] ?? 'kb-state-default';
 }
 
-
 function shortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  return new Date(iso).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  });
 }
 
 // ── Composant carte liste ──────────────────────────────────────────
@@ -46,11 +49,7 @@ type KnowledgeCardProps = {
 function KnowledgeCard({ incident, active, onClick }: KnowledgeCardProps) {
   const preview = incident.intervention_note || incident.diagnostic || incident.comment;
   return (
-    <button
-      type="button"
-      className={`kb-card${active ? ' kb-card-active' : ''}`}
-      onClick={onClick}
-    >
+    <button type="button" className={`kb-card${active ? ' kb-card-active' : ''}`} onClick={onClick}>
       <div className="kb-card-top">
         <span className={`kb-state-badge ${stateToneClass(incident.state)}`}>
           {STATE_LABELS[incident.state] || incident.state}
@@ -64,9 +63,7 @@ function KnowledgeCard({ incident, active, onClick }: KnowledgeCardProps) {
         {incident.robot_label} · Tête {incident.head_number}
         {incident.current_product ? ` · ${incident.current_product}` : ''}
       </span>
-      {preview && (
-        <span className="kb-card-preview">{preview}</span>
-      )}
+      {preview && <span className="kb-card-preview">{preview}</span>}
     </button>
   );
 }
@@ -81,7 +78,14 @@ type KnowledgeDetailProps = {
   copied: boolean;
 };
 
-function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, onCopyLink, copied }: KnowledgeDetailProps) {
+function KnowledgeDetail({
+  incident,
+  related,
+  onSelectRelated,
+  onViewHistory,
+  onCopyLink,
+  copied,
+}: KnowledgeDetailProps) {
   const resTime = formatElapsed(incident.created_at, incident.updated_at);
   const technician = incident.taken_by_first_name
     ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
@@ -106,7 +110,9 @@ function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, on
       <div className="kb-meta-grid">
         <div className="kb-meta-item">
           <span className="detail-field-label">Équipement</span>
-          <strong>{incident.robot_label} · Tête {incident.head_number}</strong>
+          <strong>
+            {incident.robot_label} · Tête {incident.head_number}
+          </strong>
           <span className="kb-meta-sub">{incident.machine_brand}</span>
         </div>
         <div className="kb-meta-item">
@@ -166,12 +172,20 @@ function KnowledgeDetail({ incident, related, onSelectRelated, onViewHistory, on
           <ul className="kb-related-list">
             {related.map((r) => (
               <li key={r.id}>
-                <button type="button" className="kb-related-item" onClick={() => onSelectRelated(r.id)}>
+                <button
+                  type="button"
+                  className="kb-related-item"
+                  onClick={() => onSelectRelated(r.id)}
+                >
                   <span className={`kb-state-badge ${stateToneClass(r.state)}`}>
                     {STATE_LABELS[r.state] || r.state}
                   </span>
-                  <span className="kb-related-where">Ligne {r.line_number} · {r.machine_id}</span>
-                  {r.intervention_note && <span className="kb-related-preview">{r.intervention_note}</span>}
+                  <span className="kb-related-where">
+                    Ligne {r.line_number} · {r.machine_id}
+                  </span>
+                  {r.intervention_note && (
+                    <span className="kb-related-preview">{r.intervention_note}</span>
+                  )}
                   <span className="kb-related-date">{shortDate(r.updated_at)}</span>
                 </button>
               </li>
@@ -225,18 +239,28 @@ export default function WorkshopKnowledgePage() {
 
   // Chips de filtres actifs
   const filterChips: FilterChip[] = [
-    ...searchFilterChip(query, () => { setQuery(''); updateSearchFilter('q', '', ''); }),
+    ...searchFilterChip(query, () => {
+      setQuery('');
+      updateSearchFilter('q', '', '');
+    }),
     ...lineFilterChip(lines, lineFilter, () => updateLineFilter('all')),
-    ...machineFilterChip(machineFilter, () => { setMachineFilter('all'); updateSearchFilter('machine', 'all'); }),
-    ...stateFilterChip(stateFilter, () => { setStateFilter('all'); updateSearchFilter('state', 'all'); }),
+    ...machineFilterChip(machineFilter, () => {
+      setMachineFilter('all');
+      updateSearchFilter('machine', 'all');
+    }),
+    ...stateFilterChip(stateFilter, () => {
+      setStateFilter('all');
+      updateSearchFilter('state', 'all');
+    }),
   ];
 
   // Suggestion de filtre à supprimer pour état vide
-  const emptyHint = !loading && incidents.length === 0
-    ? filterChips.length > 0
-      ? 'Essayez de supprimer un filtre actif.'
-      : 'Aucune intervention documentée pour le moment.'
-    : null;
+  const emptyHint =
+    !loading && incidents.length === 0
+      ? filterChips.length > 0
+        ? 'Essayez de supprimer un filtre actif.'
+        : 'Aucune intervention documentée pour le moment.'
+      : null;
 
   function selectIncident(id: number): void {
     selectIncidentData(id);
@@ -267,8 +291,9 @@ export default function WorkshopKnowledgePage() {
             <h1>Base de connaissance</h1>
             {!loading && incidents.length > 0 && (
               <p className="kb-memory-line">
-                {incidents.length} intervention{incidents.length !== 1 ? 's' : ''} documentée{incidents.length !== 1 ? 's' : ''}
-                {' '}sur {machineCount} machine{machineCount !== 1 ? 's' : ''} — la mémoire de l'atelier.
+                {incidents.length} intervention{incidents.length !== 1 ? 's' : ''} documentée
+                {incidents.length !== 1 ? 's' : ''} sur {machineCount} machine
+                {machineCount !== 1 ? 's' : ''} — la mémoire de l'atelier.
               </p>
             )}
           </div>
@@ -280,14 +305,23 @@ export default function WorkshopKnowledgePage() {
           searchInputId="knowledge-search"
           searchPlaceholder="Symptôme, solution, machine, produit..."
           query={query}
-          onQueryChange={(v) => { setQuery(v); updateSearchFilter('q', v, ''); }}
+          onQueryChange={(v) => {
+            setQuery(v);
+            updateSearchFilter('q', v, '');
+          }}
           lines={lines}
           lineFilter={lineFilter}
           onLineFilterChange={updateLineFilter}
           machineFilter={machineFilter}
-          onMachineFilterChange={(v) => { setMachineFilter(v); updateSearchFilter('machine', v); }}
+          onMachineFilterChange={(v) => {
+            setMachineFilter(v);
+            updateSearchFilter('machine', v);
+          }}
           stateFilter={stateFilter}
-          onStateFilterChange={(v) => { setStateFilter(v); updateSearchFilter('state', v); }}
+          onStateFilterChange={(v) => {
+            setStateFilter(v);
+            updateSearchFilter('state', v);
+          }}
           count={incidents.length}
           countLabel="fiche(s) affichée(s)"
           chips={filterChips}
@@ -297,17 +331,20 @@ export default function WorkshopKnowledgePage() {
 
         {/* ── Layout master-detail ── */}
         <div className="kb-layout">
-
           {/* Colonne liste */}
           <div className="kb-list-col">
             <div className="kb-list-header">
               <span className="detail-field-label">
-                {loading ? 'Chargement…' : `${incidents.length} fiche${incidents.length !== 1 ? 's' : ''}`}
+                {loading
+                  ? 'Chargement…'
+                  : `${incidents.length} fiche${incidents.length !== 1 ? 's' : ''}`}
               </span>
               <div className="kb-list-meta">
                 {!loading && incidents.length > 0 && (
                   <>
-                    <span>{machineCount} machine{machineCount !== 1 ? 's' : ''}</span>
+                    <span>
+                      {machineCount} machine{machineCount !== 1 ? 's' : ''}
+                    </span>
                     {lastItem && <span>Dernière : {shortDate(lastItem.updated_at)}</span>}
                   </>
                 )}
@@ -316,7 +353,11 @@ export default function WorkshopKnowledgePage() {
 
             <div className="kb-list">
               {loading ? (
-                <div className="kb-list-skeleton" aria-busy="true" aria-label="Chargement des fiches">
+                <div
+                  className="kb-list-skeleton"
+                  aria-busy="true"
+                  aria-label="Chargement des fiches"
+                >
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="kb-card kb-card-skeleton">
                       <Skeleton width="40%" height={12} />
@@ -352,7 +393,9 @@ export default function WorkshopKnowledgePage() {
                     incident={selectedIncident}
                     related={relatedIncidents}
                     onSelectRelated={selectIncident}
-                    onViewHistory={() => navigate(`/workshop/history?incident=${selectedIncident.id}`)}
+                    onViewHistory={() =>
+                      navigate(`/workshop/history?incident=${selectedIncident.id}`)
+                    }
                     onCopyLink={copyLink}
                     copied={copied}
                   />
@@ -366,7 +409,6 @@ export default function WorkshopKnowledgePage() {
               </div>
             )}
           </div>
-
         </div>
       </main>
     </>

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatShortDate, formatDateTime, formatSeconds, formatElapsed } from '../../utils/date';
+import {
+  formatDate,
+  formatShortDate,
+  formatDateTime,
+  formatSeconds,
+  formatElapsed,
+} from '../../utils/date';
 
 // Use a fixed ISO string that is unambiguous in fr-FR locale
 // 2024-06-15T14:30:00.000Z → 15/06/2024 in fr-FR
@@ -59,7 +65,7 @@ describe('formatSeconds', () => {
 });
 
 describe('formatElapsed', () => {
-  it('moins d\'une heure → minutes', () => {
+  it("moins d'une heure → minutes", () => {
     const from = new Date(Date.now() - 1000 * 60 * 30).toISOString();
     expect(formatElapsed(from)).toBe('30 min');
   });

@@ -21,7 +21,9 @@ export default function Skeleton({ width, height, block, className }: SkeletonPr
       aria-hidden="true"
       style={{
         ...(width !== undefined ? { width: typeof width === 'number' ? `${width}px` : width } : {}),
-        ...(height !== undefined ? { height: typeof height === 'number' ? `${height}px` : height } : {}),
+        ...(height !== undefined
+          ? { height: typeof height === 'number' ? `${height}px` : height }
+          : {}),
       }}
     />
   );

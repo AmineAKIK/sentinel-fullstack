@@ -1,10 +1,7 @@
 import type { Role } from './common';
 
 export type IncidentState =
-  | 'SKIPEE_PAR_MACHINE'
-  | 'SKIPEE_PAR_CONDUCTEUR'
-  | 'DEGRADEE'
-  | 'INDISPONIBLE';
+  'SKIPEE_PAR_MACHINE' | 'SKIPEE_PAR_CONDUCTEUR' | 'DEGRADEE' | 'INDISPONIBLE';
 export type IncidentStatus = 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
 
 export interface WorkshopIncident {

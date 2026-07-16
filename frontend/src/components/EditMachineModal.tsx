@@ -80,7 +80,9 @@ export default function EditMachineModal({
 
       setStep('preview');
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
     } finally {
       setLoading(false);
     }
@@ -107,7 +109,9 @@ export default function EditMachineModal({
       });
       onSuccess(updated);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
+      );
       setLoading(false);
     }
   }
@@ -131,7 +135,11 @@ export default function EditMachineModal({
   const originalNorm = normalizeLineMachine(original);
   const formNorm = normalizeLineMachine(form);
   if (originalNorm.machineId !== formNorm.machineId) {
-    changes.push({ label: 'ID machine', before: originalNorm.machineId, after: formNorm.machineId });
+    changes.push({
+      label: 'ID machine',
+      before: originalNorm.machineId,
+      after: formNorm.machineId,
+    });
   }
   if (originalNorm.brand !== formNorm.brand) {
     changes.push({ label: 'Marque', before: originalNorm.brand, after: formNorm.brand });
@@ -159,7 +167,13 @@ export default function EditMachineModal({
               Retour
             </button>
             <button className="btn btn-primary" onClick={handleSave} disabled={loading || !isDirty}>
-              {loading ? <><Spinner /> Enregistrement…</> : 'Confirmer'}
+              {loading ? (
+                <>
+                  <Spinner /> Enregistrement…
+                </>
+              ) : (
+                'Confirmer'
+              )}
             </button>
           </>
         ) : (
@@ -167,7 +181,11 @@ export default function EditMachineModal({
             <button className="btn btn-secondary" onClick={handleClose} disabled={loading}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={handlePreview} disabled={loading || !isDirty}>
+            <button
+              className="btn btn-primary"
+              onClick={handlePreview}
+              disabled={loading || !isDirty}
+            >
               Aperçu
             </button>
           </>
@@ -201,7 +219,9 @@ export default function EditMachineModal({
       ) : (
         <>
           <div className="form-group">
-            <label className="form-label" htmlFor="machineId">ID machine *</label>
+            <label className="form-label" htmlFor="machineId">
+              ID machine *
+            </label>
             <input
               id="machineId"
               className="form-input"
@@ -213,7 +233,9 @@ export default function EditMachineModal({
             />
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="brand">Marque *</label>
+            <label className="form-label" htmlFor="brand">
+              Marque *
+            </label>
             <input
               id="brand"
               className="form-input"
@@ -236,7 +258,9 @@ export default function EditMachineModal({
           {form.hasDoubleRobot ? (
             <div className="line-machine-grid">
               <div className="form-group">
-                <label className="form-label" htmlFor="leftRobotNumber">Robot gauche *</label>
+                <label className="form-label" htmlFor="leftRobotNumber">
+                  Robot gauche *
+                </label>
                 <input
                   id="leftRobotNumber"
                   className="form-input"
@@ -245,12 +269,16 @@ export default function EditMachineModal({
                   pattern="[0-9]*"
                   maxLength={2}
                   value={form.leftRobotNumber}
-                  onChange={(e) => updateField('leftRobotNumber', e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onChange={(e) =>
+                    updateField('leftRobotNumber', e.target.value.replace(/\D/g, '').slice(0, 2))
+                  }
                   disabled={loading}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="leftRobotHeads">Nombre de têtes *</label>
+                <label className="form-label" htmlFor="leftRobotHeads">
+                  Nombre de têtes *
+                </label>
                 <input
                   id="leftRobotHeads"
                   className="form-input"
@@ -267,7 +295,9 @@ export default function EditMachineModal({
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="rightRobotNumber">Robot droit *</label>
+                <label className="form-label" htmlFor="rightRobotNumber">
+                  Robot droit *
+                </label>
                 <input
                   id="rightRobotNumber"
                   className="form-input"
@@ -276,12 +306,16 @@ export default function EditMachineModal({
                   pattern="[0-9]*"
                   maxLength={2}
                   value={form.rightRobotNumber}
-                  onChange={(e) => updateField('rightRobotNumber', e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onChange={(e) =>
+                    updateField('rightRobotNumber', e.target.value.replace(/\D/g, '').slice(0, 2))
+                  }
                   disabled={loading}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="rightRobotHeads">Nombre de têtes *</label>
+                <label className="form-label" htmlFor="rightRobotHeads">
+                  Nombre de têtes *
+                </label>
                 <input
                   id="rightRobotHeads"
                   className="form-input"
@@ -301,7 +335,9 @@ export default function EditMachineModal({
           ) : (
             <div className="line-machine-grid">
               <div className="form-group">
-                <label className="form-label" htmlFor="robotNumber">Numéro de robot *</label>
+                <label className="form-label" htmlFor="robotNumber">
+                  Numéro de robot *
+                </label>
                 <input
                   id="robotNumber"
                   className="form-input"
@@ -310,12 +346,16 @@ export default function EditMachineModal({
                   pattern="[0-9]*"
                   maxLength={2}
                   value={form.robotNumber}
-                  onChange={(e) => updateField('robotNumber', e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onChange={(e) =>
+                    updateField('robotNumber', e.target.value.replace(/\D/g, '').slice(0, 2))
+                  }
                   disabled={loading}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="robotHeads">Nombre de têtes *</label>
+                <label className="form-label" htmlFor="robotHeads">
+                  Nombre de têtes *
+                </label>
                 <input
                   id="robotHeads"
                   className="form-input"

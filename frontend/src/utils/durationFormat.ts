@@ -8,7 +8,11 @@ const TERMINAL_STATUSES = new Set(['CLOSED', 'CANCELED', 'INVALIDATED']);
  * et clôture. Le formatage de la durée est délégué à formatElapsed (source
  * unique, §5.6) — cette fonction ne porte que la logique métier du statut.
  */
-export function formatIncidentDuration(startIso?: string, endIso?: string, status?: string): string {
+export function formatIncidentDuration(
+  startIso?: string,
+  endIso?: string,
+  status?: string
+): string {
   if (!startIso) return '—';
   if (!TERMINAL_STATUSES.has(status ?? '')) return 'En cours';
   if (!endIso) return '—';

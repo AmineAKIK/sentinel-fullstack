@@ -5,7 +5,12 @@ import ErrorBanner from '../components/ui/ErrorBanner';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import WorkshopFilterCard from '../components/WorkshopFilterCard';
 import { STATUS_LABELS } from '../utils/labels';
-import { EVENT_LABELS, formatDateTime, formatEventActor, formatEventDetail } from '../utils/workshopHistory';
+import {
+  EVENT_LABELS,
+  formatDateTime,
+  formatEventActor,
+  formatEventDetail,
+} from '../utils/workshopHistory';
 import {
   lineFilterChip,
   machineFilterChip,
@@ -112,7 +117,9 @@ export default function WorkshopJournalPage() {
         <div className="page-header">
           <div>
             <h1>Journal atelier</h1>
-            <p className="journal-intro">Qui a fait quoi, quand — traçabilité complète de l'atelier.</p>
+            <p className="journal-intro">
+              Qui a fait quoi, quand — traçabilité complète de l'atelier.
+            </p>
           </div>
         </div>
 
@@ -218,7 +225,9 @@ export default function WorkshopJournalPage() {
                         <th
                           key={col}
                           scope="col"
-                          aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          aria-sort={
+                            active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+                          }
                         >
                           <button
                             type="button"
@@ -259,7 +268,11 @@ export default function WorkshopJournalPage() {
                             <button
                               type="button"
                               className="inline-link-button"
-                              onClick={() => navigate(`/workshop/history?incident=${event.incident_id}&event=${event.id}`)}
+                              onClick={() =>
+                                navigate(
+                                  `/workshop/history?incident=${event.incident_id}&event=${event.id}`
+                                )
+                              }
                             >
                               Ligne {event.line_number} · {event.machine_id}
                             </button>
@@ -296,7 +309,11 @@ export default function WorkshopJournalPage() {
                         <button
                           type="button"
                           className="inline-link-button"
-                          onClick={() => navigate(`/workshop/history?incident=${event.incident_id}&event=${event.id}`)}
+                          onClick={() =>
+                            navigate(
+                              `/workshop/history?incident=${event.incident_id}&event=${event.id}`
+                            )
+                          }
                         >
                           Ligne {event.line_number} · {event.machine_id}
                         </button>

@@ -1,150 +1,153 @@
-# Résultats d'audit de mise en production — Sentinel
+# Résultats de l'audit de publication Sentinel
 
-Exécution du plan [audit-prod.md](audit-prod.md). Daté du 2026-06-25.
+Audit exécuté le **16 juillet 2026** sur le candidat local destiné à `main`,
+selon [audit-prod.md](audit-prod.md) et
+[release-checklist.md](release-checklist.md).
 
-**Environnement d'audit :** poste de développement. PostgreSQL local désormais
-accessible (les tests d'intégration et la suite E2E sont rejoués localement).
-Seul Docker reste indisponible sur ce poste (WSL sans Docker Desktop) ; les
-contrôles purement conteneur sont donc couverts par la CI. C'est signalé
-explicitement, jamais masqué.
+## Périmètre et environnement
 
-Légende : ✅ vérifié OK · 🟡 partiel / couvert ailleurs · ⏭️ reporté · ❌ bloquant.
+- Node local : `24.13.0` ; npm : `11.6.2` ;
+- cible déclarée et CI : Node `24.14.1`, npm `>=10` ;
+- PostgreSQL temporaire réel sur `127.0.0.1:55432` ;
+- Chromium piloté par Playwright ;
+- Docker et ShellCheck indisponibles dans cette distribution WSL : leur contrat
+  est exécuté par le job CI `Containers / Production contract` ;
+- aucune donnée de production utilisée.
 
----
+Ce rapport distingue les preuves réellement exécutées des campagnes qui exigent
+un environnement iso-production. Une case non exécutée n'est pas présentée comme
+verte.
 
 ## Synthèse
 
-| Domaine | Verdict |
-|---------|---------|
-| 1. Fondations qualité | ✅ |
-| 2. Couverture de test | ✅ (backend) / 🟡 (frontend, normal) |
-| 3. Parcours E2E | ✅ socle Playwright en place / 🟡 couverture à étendre |
-| 4. Performance & volume | ✅ (audit statique) / 🟡 (charge réelle à faire) |
-| 5. Sécurité | ✅ aucun point bloquant |
-| 6. Accessibilité | ✅ (statique + contraste) / 🟡 (audit DOM à faire) |
-| 7. Robustesse | ✅ |
-| 8. Compatibilité | 🟡 (à confirmer au déploiement) |
-| 9. Exploitation | 🟡 (restauration backup à éprouver) |
+| Contrat | Résultat local |
+| --- | --- |
+| Installation reproductible | OK, `npm ci` backend et frontend |
+| Format, lint, types, builds | OK |
+| Backend unitaire | **30 suites, 327 tests** |
+| Frontend unitaire | **34 fichiers, 346 tests** |
+| Fiabilité structurelle | **20 contrôles sur 20** |
+| Intégration PostgreSQL | **4 suites, 37 tests** |
+| E2E Chromium | **4 parcours sur 4** |
+| Audit npm | **0 vulnérabilité** sur les deux projets |
+| Contrat conteneurs | À confirmer par la CI distante |
 
-**Aucun point ❌ bloquant détecté.** Les réserves sont des vérifications à mener
-dans un environnement avec l'app lancée, pas des défauts du produit.
+## Qualité et couverture
 
----
+### Backend
 
-## 1. Fondations qualité — ✅
+Commandes validées :
 
-| Contrôle | Résultat |
-|----------|----------|
-| Lint backend | ✅ 0 erreur |
-| Lint frontend | ✅ 0 erreur |
-| Build backend (tsc) | ✅ |
-| Build frontend (vite) | ✅ |
-| Tests unitaires backend | ✅ **212 tests passent** (13 suites) |
-| Tests frontend | ✅ **276 tests passent** (23 fichiers) |
-| Reliability checks | ✅ **20/20** (`verifyReliability.js`, rejoué localement) |
-| Tests d'intégration backend | ✅ **29 tests passent** (3 suites) sur base réelle — suites isolées, exécution parallèle déterministe |
+```bash
+npm ci
+npm run format:check
+npm run lint
+npm run typecheck:scripts
+npm run build
+npm run test:coverage -- --selectProjects unit
+npm run verify:reliability
+npm audit --audit-level=high
+```
 
-## 2. Couverture de test — ✅ / 🟡
+Couverture du périmètre critique configuré dans Jest :
 
-- **Backend : 81 % statements, 86 % lignes** sur le cœur métier (accounts, lines,
-  workshop services + policies). Au-dessus du seuil visé (70 %). ✅
-- **Frontend : 22 % global** — attendu et non préoccupant : la couverture cible
-  `utils` + composants ; l'essentiel du frontend est du JSX d'affichage, dont la
-  validation relève de l'E2E (§3), pas du test unitaire. La logique métier front
-  (utils, permissions, formatage) est testée.
+| Mesure | Résultat | Seuil |
+| --- | ---: | ---: |
+| Statements | 82,15 % | 80 % |
+| Branches | 77,38 % | 75 % |
+| Fonctions | 74,73 % | 70 % |
+| Lignes | 87,57 % | 85 % |
 
-## 3. Parcours E2E — ✅ socle / 🟡 couverture
+### Frontend
 
-Socle Playwright opérationnel (`frontend/e2e/`, `npm run test:e2e`), avec un
-jeu de données dédié recréé à chaque exécution (`seed:e2e`). Le parcours
-d'édition machine (déclencheur de régression « confirmer une non-action ») est
-couvert bout en bout et **vu vert** dans un vrai navigateur.
-🟡 La couverture reste à étendre aux autres parcours (login atelier, création
-de ligne…) ; en complément, la recette manuelle reste documentée
-([manual-tests.md](manual-tests.md)).
+Commandes validées :
 
-## 4. Performance & volume — ✅ (statique)
+```bash
+npm ci
+npm run format:check
+npm run lint
+npm run build
+npm run test:coverage
+npm audit --audit-level=high
+```
 
-- **Indexation : 20 index** couvrant les patterns réels (status+created,
-  status+updated, line+status, taken_active, board_order, events type/actor…).
-  Excellent pour les filtres/tris du dashboard, board et historique à fort volume. ✅
-- **Requêtes bornées :** les listes paginées utilisent `boundedInt(limit, 200, 1, 500)`.
-  Aucune requête ne ramène l'historique complet sans borne. ✅
-- **Bundle frontend : 107 KB JS gzippé + 18 KB CSS gzippé** (516 KB non
-  compressé). Léger pour une SPA complète ; chargement rapide. ✅
-- 🟡 **Risque théorique noté :** la liste board des incidents *actifs* n'a pas de
-  LIMIT explicite. Non bloquant (un atelier n'a pas des milliers d'incidents
-  actifs simultanés), mais à garder en tête.
-- 🟡 **Charge réelle (k6) et volume amplifié :** à exécuter sur l'environnement de
-  staging avec la base — non réalisable ici.
+Couverture du périmètre critique configuré dans Vitest :
 
-## 5. Sécurité — ✅ aucun point bloquant
+| Mesure | Résultat | Seuil |
+| --- | ---: | ---: |
+| Statements | 88,74 % | 85 % |
+| Branches | 80,73 % | 80 % |
+| Fonctions | 91,28 % | 90 % |
+| Lignes | 91,04 % | 90 % |
 
-| Contrôle | Résultat |
-|----------|----------|
-| `npm audit` backend & frontend | ✅ **0 vulnérabilité** |
-| Cookies | ✅ `httpOnly`, `secure` en prod, `sameSite: strict` en prod |
-| CORS | ✅ `origin: CLIENT_ORIGIN` (pas de wildcard), `credentials: true` |
-| Rate-limiting | ✅ login borné (10 échecs / 5 min) + global configurable |
-| Limite payload | ✅ `express.json({ limit: '50kb' })` |
-| Bornes de champs | ✅ `FIELD_LIMITS` + Zod (audité) |
-| Autorisation par route | ✅ middleware appliqué avant chaque route |
-| **Isolation cross-rôle** | ✅ cookies séparés : `adminAuth` lit seulement le cookie admin, `workshopAuth` seulement le cookie atelier — un token ne franchit pas l'autre barrière |
-| Session admin invalidable | ✅ `session_version` vérifié |
-| Secrets jamais loggés | ✅ redaction cookie/authorization |
-| Refus de démarrer si secrets faibles (prod) | ✅ `config/production.ts` |
-| Headers sécurité | ✅ en place — à reconfirmer en prod réelle via securityheaders.com |
+Le build Vite est découpé par route. Le plus gros chunk partagé produit mesure
+164,28 Ko brut / 54,13 Ko gzip ; le dashboard Atelier mesure 71,11 Ko brut /
+17,91 Ko gzip. La feuille globale mesure 141,18 Ko brut / 21,92 Ko gzip.
 
-## 6. Accessibilité — ✅ (statique) / 🟡 (DOM)
+## Base réelle et navigateur
 
-- `lang="fr"` ✅
-- **77 labels pour 50 inputs**, 31 `aria-label`, 33 `role`/`aria-live`/`aria-busy`. ✅
-- **Contraste WCAG AA (4.5:1) : toutes les paires passent.** Mesuré :
-  texte principal 17.75, secondaire 7.79, muted 5.32, primary 6.84, danger 5.98,
-  success 6.77, ambre/watch 4.84. ✅
-- `prefers-reduced-motion` respecté ✅
-- 🟡 **Audit DOM (Lighthouse/axe)** : à exécuter avec l'app lancée pour le score
-  a11y par page.
+Les quatre suites PostgreSQL couvrent l'authentification, les comptes, les
+lignes et l'Atelier. Elles repartent d'un schéma migré, vérifient notamment les
+contraintes, les collisions et les invalidations de session, puis nettoient leur
+jeu de données.
 
-## 7. Robustesse — ✅
+Les quatre parcours Playwright valident :
 
-- ErrorBoundary global (pas d'écran blanc).
-- `/api/health` renvoie 503 si DB injoignable.
-- Chat IA se désactive proprement si indisponible.
-- États vides et données nulles gérés (`?? '—'`, « Non renseigné »).
-- Boutons désactivés pendant `loading` (anti double-soumission).
+1. aucune confirmation lorsqu'une machine n'a pas réellement changé ;
+2. aperçu puis confirmation lorsqu'une machine change ;
+3. `Reporter` conserve l'arbitrage actif et positionne le dossier mobile en haut ;
+4. décision de correction directement dans la modale mobile.
 
-## 8. Compatibilité — 🟡
+Les scénarios sont séquentiels, utilisent des ports réservés et recréent leur
+jeu E2E avant exécution.
 
-Responsive et breakpoints en place (audités). Tests multi-navigateurs et
-board grand écran à confirmer visuellement au déploiement.
+## Sécurité et intégrité
 
-## 9. Exploitation — 🟡
+Vérifications obtenues :
 
-Backup/restore, migrations rejouables, rollback, rotation des secrets,
-monitoring : **documentés** ([runbook.md](runbook.md)). La **restauration de
-backup doit être éprouvée réellement** sur un environnement temporaire avant la
-prod (§9.1 du plan).
+- sessions Admin, Atelier et Board cloisonnées par audience, scope et cookie ;
+- rôle et état actif Atelier relus en base ;
+- version de session Admin invalidable ;
+- secrets faibles, origine non HTTPS, proxy ambigu, ports invalides et SMTP
+  incohérent refusés au démarrage de production ;
+- payload JSON limité, validations Zod et contraintes SQL ;
+- migrations sérialisées, checksums vérifiés et migrations publiées immuables ;
+- mutations critiques transactionnelles et conflits SQL traduits ;
+- journal d'audit actor-aware et snapshots de ligne ;
+- outbox durable, retry borné et arrêt gracieux ;
+- recherche statique sans secret réel, test exclusif ni artefact généré suivi ;
+- fichiers YAML parsés et scripts backup/restore valides avec `bash -n`.
 
----
+La livraison SMTP est volontairement **au moins une fois**. La source d'outbox
+est dédupliquée, mais un crash après acceptation par le fournisseur et avant
+l'acquittement local peut entraîner un nouvel envoi. Cette limite est désormais
+documentée et doit être supervisée.
 
-## Verdict Go / No-Go
+## Dépendances
 
-**Verdict : GO conditionnel.**
+Les correctifs et versions mineures compatibles avec les plages déclarées ont
+été appliqués, puis toute la matrice a été rejouée. Les types backend sont alignés
+sur Node 24. `npm outdated` ne laisse que des migrations majeures indépendantes
+du lot de stabilisation, notamment Express 5, React 19, React Router 7, Zod 4 et
+TypeScript 7. Elles exigent chacune une campagne dédiée et ne sont pas introduites
+à la veille d'une soutenance.
 
-Le produit est **sain, sécurisé et performant** sur tout ce qui a pu être audité :
-fondations vertes, sécurité sans faille bloquante, performance maîtrisée,
-accessibilité conforme au contraste AA. **Aucun défaut bloquant.**
+## Contrôles restant externes
 
-Les conditions restantes ne sont pas des défauts mais des **vérifications à mener
-sur un environnement avec l'application lancée** :
+Ces points ne constituent pas une preuve locale et restent obligatoires avant un
+GO de production :
 
-1. 🟡 Étendre la couverture E2E aux parcours 3.1–3.3 (socle Playwright déjà en place).
-2. 🟡 Éprouver une **restauration de backup** réelle (§9.1).
-3. 🟡 Lancer un **test de charge** et un **volume amplifié** sur staging (§4).
-4. 🟡 Audit **Lighthouse a11y** par page avec l'app lancée (§6.1).
-5. 🟡 Reconfirmer headers/CORS/cookies en **prod réelle** derrière HTTPS.
+1. CI GitHub verte sur le SHA publié, notamment images non-root, Compose, Nginx,
+   Caddy et ShellCheck ;
+2. restauration réelle d'un backup sur un environnement isolé avec mesure RTO ;
+3. charge et endurance sur un volume représentatif ;
+4. audit axe/Lighthouse, clavier et lecteur d'écran ;
+5. recette Chrome, Edge, Firefox, Safari et écran Board cible ;
+6. vérification HTTPS réelle des cookies, headers, CORS, SMTP et logs.
 
-Pour un contexte d'examen, l'état actuel est **largement défendable** : la base
-technique est de niveau professionnel et les réserves sont explicites et
-documentées, ce qui est en soi une marque de maturité.
+## Verdict
+
+**GO local pour publication vers la CI.** Aucun défaut bloquant n'est connu dans
+les contrats exécutables sur ce poste. Le **GO production reste conditionnel** à
+la CI distante puis aux six campagnes iso-production ci-dessus. Cette réserve est
+une limite de preuve, pas une validation implicite.

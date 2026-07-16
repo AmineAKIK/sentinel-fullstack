@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import EmptyState from './ui/EmptyState';
 import { WorkshopIncident, WorkshopIncidentEvent } from '../types';
 import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
-import { EVENT_LABELS, formatDateTime, formatEventActor, formatEventDetail } from '../utils/workshopHistory';
+import {
+  EVENT_LABELS,
+  formatDateTime,
+  formatEventActor,
+  formatEventDetail,
+} from '../utils/workshopHistory';
 import { formatIncidentDuration } from '../utils/durationFormat';
 
 const TEXT_COLLAPSE_THRESHOLD = 300;
@@ -68,9 +73,7 @@ export default function IncidentDossier({
               Ligne {incident.line_number} · {incident.machine_id}
             </h2>
           </div>
-          <span className="status-pill">
-            {STATUS_LABELS[incident.status] ?? incident.status}
-          </span>
+          <span className="status-pill">{STATUS_LABELS[incident.status] ?? incident.status}</span>
         </div>
         <div className="action-bar history-knowledge-actions">
           {hasKnowledge && (
@@ -136,7 +139,11 @@ export default function IncidentDossier({
       <div className="history-texts">
         <IncidentTextSection label="Commentaire opérateur" value={incident.comment} />
         <IncidentTextSection label="Diagnostic" value={incident.diagnostic} />
-        <IncidentTextSection label="Note d'intervention" value={incident.intervention_note} primary />
+        <IncidentTextSection
+          label="Note d'intervention"
+          value={incident.intervention_note}
+          primary
+        />
         <IncidentTextSection label="Consigne responsable" value={incident.responsible_comment} />
       </div>
 

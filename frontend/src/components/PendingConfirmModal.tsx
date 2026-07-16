@@ -8,11 +8,19 @@ interface PendingConfirmModalProps {
   onConfirm: (reason: string) => Promise<void>;
 }
 
-export default function PendingConfirmModal({ incident, onClose, onConfirm }: PendingConfirmModalProps) {
+export default function PendingConfirmModal({
+  incident,
+  onClose,
+  onConfirm,
+}: PendingConfirmModalProps) {
   return (
     <TextConfirmModal
       title="Suspendre l'incident"
-      notice={<>Vous allez suspendre l'incident {incident.line_number} · {incident.machine_id}.</>}
+      notice={
+        <>
+          Vous allez suspendre l'incident {incident.line_number} · {incident.machine_id}.
+        </>
+      }
       label="Justification *"
       placeholder="Expliquez la raison de la suspension"
       confirmLabel="Suspendre"

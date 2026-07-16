@@ -30,7 +30,9 @@ export default function RobotFieldsGroup({
   return (
     <>
       <div className="form-group">
-        <label className="form-label" htmlFor={numberId}>{labels.number}</label>
+        <label className="form-label" htmlFor={numberId}>
+          {labels.number}
+        </label>
         <input
           id={numberId}
           className="form-input"
@@ -45,7 +47,9 @@ export default function RobotFieldsGroup({
         />
       </div>
       <div className="form-group">
-        <label className="form-label" htmlFor={headsId}>{labels.heads}</label>
+        <label className="form-label" htmlFor={headsId}>
+          {labels.heads}
+        </label>
         <input
           id={headsId}
           className="form-input"
