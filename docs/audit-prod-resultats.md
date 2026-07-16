@@ -7,7 +7,7 @@ selon [audit-prod.md](audit-prod.md) et
 ## Périmètre et environnement
 
 - Node local : `24.13.0` ; npm : `11.6.2` ;
-- cible déclarée et CI : Node `24.14.1`, npm `>=10` ;
+- cible déclarée, CI et images : Node `24.18.0` LTS, npm `>=10` ;
 - PostgreSQL temporaire réel sur `127.0.0.1:55432`, puis reproduction sur une
   seconde base vierge isolée sur le port `55433` ;
 - Chromium piloté par Playwright ;
@@ -142,9 +142,13 @@ TypeScript 7. Elles exigent chacune une campagne dédiée et ne sont pas introdu
 Dependabot regroupe les mises à jour mineures et correctives, tandis que les
 versions majeures restent réservées à ces campagnes de migration. Les mises à
 jour de sécurité ne sont pas désactivées. Pour l'image frontend, la branche
-Nginx `1.31.x` mainline est exclue afin de rester sur la branche stable `1.30.x`.
+Nginx `1.31.x` mainline est exclue avec la syntaxe de plage propre à Docker afin
+de rester sur la branche stable `1.30.x`. L'entrée Docker racine sans manifeste
+a été retirée pour que chaque exécution Dependabot corresponde à un périmètre réel.
 L'image de production utilise `nginx:1.30.4-alpine3.24`, dernière publication
-stable disponible au moment de l'audit.
+stable disponible au moment de l'audit. Les images de construction et d'exécution
+utilisent Node `24.18.0-alpine3.23`, version LTS publiée et disponible sur le
+registre officiel.
 
 ## Validation distante
 

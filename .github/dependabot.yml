@@ -45,16 +45,8 @@ updates:
         update-types: ['version-update:semver-major']
       # Sentinel deploys the stable Nginx branch; 1.31.x is mainline.
       - dependency-name: nginx
-        versions: ['1.31.x']
-
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
+        # Docker ignore ranges follow Bundler version syntax.
+        versions: ['~> 1.31.0']
 
   - package-ecosystem: github-actions
     directory: /
