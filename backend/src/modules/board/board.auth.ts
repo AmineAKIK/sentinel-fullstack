@@ -1,34 +1,31 @@
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 import { NextFunction, Request, Response, Router } from 'express';
 import { WORKSHOP_AUTH_COOKIE, authCookieOptions, clearAuthCookie } from '../../auth/authCookies';
-import { sendInvalidServerConfig, sendInvalidSession, sendMissingAuth } from '../../auth/authResponses';
-import { getJwtSecret, isJwtSessionError, verifyAuthToken } from '../../auth/jwt';
+import {
+  sendInvalidServerConfig,
+  sendInvalidSession,
+  sendMissingAuth,
+} from '../../auth/authResponses';
+import { getJwtSecret, isJwtSessionError, signAuthToken, verifyAuthToken } from '../../auth/jwt';
+import { isBoardSessionPayload, isWorkshopSessionPayload } from '../../auth/sessionPayloads';
+import { BCRYPT_ROUNDS_WORKSHOP, verifyPassword } from '../../auth/bcrypt';
+import bcrypt from 'bcrypt';
 import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
 import { getBoardData } from '../workshop/workshop.controller';
 import { FIELD_LIMITS } from '../../domain/constants';
 import { loginLimiter } from '../../middlewares/loginRateLimit';
 import logger from '../../logger';
-import { getBoardSettingsGlobal, getAppSettings } from '../adminCredentials/adminCredentials.repository';
+import {
+  getBoardSettingsGlobal,
+  getAppSettings,
+  upgradeBoardCodeHash,
+} from '../adminCredentials/adminCredentials.repository';
 
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
 
-interface BoardPayload {
-  scope: 'board';
-  label: string;
-  boardSessionVersion: number;
-}
-
-interface WorkshopPayload {
-  userId: number;
-  badgeNumber: string;
-  role: string;
-  sessionVersion: number;
-}
-
-export function hashBoardCode(code: string): string {
-  return crypto.createHash('sha256').update(code.trim(), 'utf8').digest('hex');
+export function hashBoardCode(code: string): Promise<string> {
+  return bcrypt.hash(code.trim(), BCRYPT_ROUNDS_WORKSHOP);
 }
 
 function timingSafeHashEquals(left: string, right: string): boolean {
@@ -37,6 +34,16 @@ function timingSafeHashEquals(left: string, right: string): boolean {
   const rightBuffer = Buffer.from(right, 'hex');
   if (leftBuffer.length !== rightBuffer.length) return false;
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+export async function verifyBoardCode(code: string, storedHash: string): Promise<boolean> {
+  if (storedHash.startsWith('$2')) {
+    return verifyPassword(code.trim(), storedHash);
+  }
+  return timingSafeHashEquals(
+    crypto.createHash('sha256').update(code.trim(), 'utf8').digest('hex'),
+    storedHash
+  );
 }
 
 function setBoardCookie(res: Response, token: string, ttlMs: number | 'unlimited'): void {
@@ -54,8 +61,8 @@ async function hasValidWorkshopSession(req: Request, res: Response): Promise<boo
   const token = req.cookies?.[WORKSHOP_AUTH_COOKIE];
   if (!token) return false;
 
-  const payload = verifyAuthToken<WorkshopPayload>(token);
-  if (!payload) return false;
+  const payload = verifyAuthToken(token, 'workshop');
+  if (!isWorkshopSessionPayload(payload)) return false;
 
   const { rows } = await pool.query<{ id: number; session_version: number }>(
     `SELECT id, session_version
@@ -87,8 +94,8 @@ async function hasValidBoardSession(req: Request, res: Response): Promise<boolea
   const token = req.cookies?.[BOARD_AUTH_COOKIE];
   if (!token) return false;
 
-  const payload = verifyAuthToken<BoardPayload>(token);
-  if (payload?.scope !== 'board') {
+  const payload = verifyAuthToken(token, 'board');
+  if (!isBoardSessionPayload(payload)) {
     clearBoardCookie(res);
     return false;
   }
@@ -107,14 +114,18 @@ async function hasValidBoardSession(req: Request, res: Response): Promise<boolea
   return true;
 }
 
-export async function boardReadAuthMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function boardReadAuthMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   if (!getJwtSecret()) {
     sendInvalidServerConfig(res);
     return;
   }
 
   try {
-    if (await hasValidBoardSession(req, res) || await hasValidWorkshopSession(req, res)) {
+    if ((await hasValidBoardSession(req, res)) || (await hasValidWorkshopSession(req, res))) {
       next();
       return;
     }
@@ -146,7 +157,8 @@ boardRouter.get('/me', async (req, res) => {
   }
 
   try {
-    const hasAccess = await hasValidBoardSession(req, res) || await hasValidWorkshopSession(req, res);
+    const hasAccess =
+      (await hasValidBoardSession(req, res)) || (await hasValidWorkshopSession(req, res));
     if (!hasAccess) {
       sendMissingAuth(res);
       return;
@@ -177,13 +189,18 @@ boardRouter.post('/session', async (req, res) => {
     ]);
 
     if (boardSettings && !boardSettings.board_enabled) {
-      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Le tableau n\'est pas disponible pour le moment.');
+      sendError(res, 503, 'SERVICE_UNAVAILABLE', "Le tableau n'est pas disponible pour le moment.");
       return;
     }
 
     const activeHash = boardSettings?.board_code_hash || process.env.BOARD_ACCESS_CODE_HASH || '';
     if (!activeHash) {
-      sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Le tableau d\'atelier n\'est pas encore configuré.');
+      sendError(
+        res,
+        503,
+        'SERVICE_UNAVAILABLE',
+        "Le tableau d'atelier n'est pas encore configuré."
+      );
       return;
     }
 
@@ -193,13 +210,21 @@ boardRouter.post('/session', async (req, res) => {
       return;
     }
 
-    if (!timingSafeHashEquals(hashBoardCode(code), activeHash)) {
+    if (!(await verifyBoardCode(code, activeHash))) {
       loginLimiter.recordFailure(req);
       sendError(res, 401, 'UNAUTHORIZED', 'Code board incorrect.');
       return;
     }
 
     loginLimiter.clear(req);
+
+    if (
+      boardSettings?.id &&
+      boardSettings.board_code_hash === activeHash &&
+      !activeHash.startsWith('$2')
+    ) {
+      await upgradeBoardCodeHash(boardSettings.id, await hashBoardCode(code));
+    }
 
     const secret = getJwtSecret();
     if (!secret) {
@@ -209,17 +234,17 @@ boardRouter.post('/session', async (req, res) => {
 
     const { board_label, board_session_ttl_hours } = appSettings;
     const boardSessionVersion = boardSettings?.board_session_version ?? 0;
-    const unlimited = board_session_ttl_hours === 0;
+    const token = signAuthToken(
+      { label: board_label, boardSessionVersion },
+      board_session_ttl_hours,
+      'board'
+    );
+    if (!token) {
+      sendInvalidServerConfig(res);
+      return;
+    }
 
-    const token = unlimited
-      ? jwt.sign({ scope: 'board', label: board_label, boardSessionVersion }, secret)
-      : jwt.sign(
-          { scope: 'board', label: board_label, boardSessionVersion },
-          secret,
-          { expiresIn: `${board_session_ttl_hours}h` }
-        );
-
-    setBoardCookie(res, token, unlimited ? 'unlimited' : board_session_ttl_hours * 60 * 60 * 1000);
+    setBoardCookie(res, token, board_session_ttl_hours * 60 * 60 * 1000);
     res.json({ access: true, label: board_label, expiresInHours: board_session_ttl_hours });
   } catch (err) {
     logger.error({ err }, 'Board session error');

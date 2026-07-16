@@ -32,6 +32,10 @@ jest.mock('../../workshop/workshop.events', () => ({
   logIncidentEvent: jest.fn(),
 }));
 
+jest.mock('../../workshop/workshop.arbitration.repository', () => ({
+  supersedeOpenArbitrationCases: jest.fn(),
+}));
+
 jest.mock('../lines.policy', () => ({
   getLineEventType: jest.fn().mockReturnValue('LINE_UPDATED'),
 }));
@@ -42,6 +46,8 @@ jest.mock('../../../db/transaction', () => ({
 
 import * as repo from '../lines.repository';
 import * as events from '../lines.events';
+import * as workshopEvents from '../../workshop/workshop.events';
+import * as arbitrationRepo from '../../workshop/workshop.arbitration.repository';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,7 +74,15 @@ function mockLineForUpdate(overrides: Record<string, unknown> = {}) {
 
 const validCreateInput = {
   lineNumber: 'L01',
-  machines: [{ machineId: 'M01', brand: 'Fanuc', hasDoubleRobot: false as const, robotNumber: 'R01', robotHeads: 4 }],
+  machines: [
+    {
+      machineId: 'M01',
+      brand: 'Fanuc',
+      hasDoubleRobot: false as const,
+      robotNumber: 'R01',
+      robotHeads: 4,
+    },
+  ],
 };
 
 beforeEach(() => {
@@ -94,7 +108,7 @@ describe('checkLineAvailabilityService', () => {
 // ─── checkLineConflictsService ────────────────────────────────────────────────
 
 describe('checkLineConflictsService', () => {
-  it('retourne les conflits d\'ID machine', async () => {
+  it("retourne les conflits d'ID machine", async () => {
     jest.mocked(repo.findMachineConflicts).mockResolvedValue(['M01']);
     jest.mocked(repo.lineNumberExists).mockResolvedValue(false);
 
@@ -103,7 +117,7 @@ describe('checkLineConflictsService', () => {
     expect(result.lineExists).toBe(false);
   });
 
-  it('retourne un tableau vide quand il n\'y a pas de conflit machine', async () => {
+  it("retourne un tableau vide quand il n'y a pas de conflit machine", async () => {
     jest.mocked(repo.findMachineConflicts).mockResolvedValue([]);
     jest.mocked(repo.lineNumberExists).mockResolvedValue(false);
 
@@ -157,14 +171,40 @@ describe('createLineService', () => {
     const result = await createLineService(validCreateInput, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(line);
-    expect(events.createLineAuditEvent).toHaveBeenCalledWith(line.id, 1, 'LINE_CREATED', expect.any(Object), null);
+    expect(events.createLineAuditEvent).toHaveBeenCalledWith(
+      line.id,
+      1,
+      'LINE_CREATED',
+      expect.any(Object),
+      null
+    );
+    expect(repo.lineNumberExists).toHaveBeenCalledWith('L01', undefined, null);
+    expect(repo.findMachineConflicts).toHaveBeenCalledWith(['M01'], undefined, null);
+  });
+
+  it('traduit une collision PostgreSQL concurrente en erreur métier', async () => {
+    jest.mocked(repo.lineNumberExists).mockResolvedValue(false);
+    jest.mocked(repo.findMachineConflicts).mockResolvedValue([]);
+    jest.mocked(repo.createLineData).mockRejectedValue({
+      code: '23505',
+      constraint: 'idx_production_line_machines_global_id',
+    });
+
+    const result = await createLineService(validCreateInput, 1);
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      code: 'MACHINE_ALREADY_EXISTS',
+      message: 'Un ou plusieurs IDs machine existent déjà.',
+    });
   });
 });
 
 // ─── getLineService ───────────────────────────────────────────────────────────
 
 describe('getLineService', () => {
-  it('retourne NOT_FOUND quand la ligne n\'existe pas', async () => {
+  it("retourne NOT_FOUND quand la ligne n'existe pas", async () => {
     jest.mocked(repo.getLineData).mockResolvedValue(null);
 
     const result = await getLineService(999);
@@ -188,7 +228,7 @@ describe('getLineService', () => {
 // ─── updateLineService ────────────────────────────────────────────────────────
 
 describe('updateLineService', () => {
-  it('retourne NOT_FOUND si la ligne n\'existe pas', async () => {
+  it("retourne NOT_FOUND si la ligne n'existe pas", async () => {
     jest.mocked(repo.lineNumberExists).mockResolvedValue(false);
     jest.mocked(repo.getLineForUpdate).mockResolvedValue(null);
 
@@ -225,6 +265,34 @@ describe('updateLineService', () => {
     const result = await updateLineService(1, { lineNumber: 'L02' }, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(updated);
+    expect(repo.getLineForUpdate).toHaveBeenCalledWith(1, null);
+    expect(repo.lineNumberExists).toHaveBeenCalledWith('L02', 1, null);
+    expect(repo.updateLineData).toHaveBeenCalledWith(1, { lineNumber: 'L02' }, null);
+  });
+
+  it('ne modifie ni ne journalise une mise à jour sans changement réel', async () => {
+    const current = mockLineForUpdate({
+      machine_sequence: validCreateInput.machines,
+    });
+    const line = mockLine({ machines: validCreateInput.machines });
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(current);
+    jest.mocked(repo.getLineData).mockResolvedValue(line);
+
+    const result = await updateLineService(
+      1,
+      {
+        lineNumber: 'L01',
+        isActive: true,
+        machines: validCreateInput.machines,
+      },
+      1
+    );
+
+    expect(result).toEqual({ ok: true, data: line });
+    expect(repo.updateLineData).not.toHaveBeenCalled();
+    expect(events.createLineAuditEvent).not.toHaveBeenCalled();
+    expect(repo.lineNumberExists).not.toHaveBeenCalled();
+    expect(repo.findMachineConflicts).not.toHaveBeenCalled();
   });
 });
 
@@ -232,6 +300,7 @@ describe('updateLineService', () => {
 
 describe('archiveLineService', () => {
   it('retourne LINE_HAS_ACTIVE_INCIDENTS si la ligne a des incidents actifs sans force', async () => {
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(mockLineForUpdate());
     jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(2);
 
     const result = await archiveLineService(1, 1, false);
@@ -242,9 +311,8 @@ describe('archiveLineService', () => {
     }
   });
 
-  it('retourne NOT_FOUND si la ligne n\'existe pas', async () => {
-    jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(0);
-    jest.mocked(repo.softDeleteLine).mockResolvedValue(false);
+  it("retourne NOT_FOUND si la ligne n'existe pas", async () => {
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(null);
 
     const result = await archiveLineService(999, 1);
     expect(result.ok).toBe(false);
@@ -254,7 +322,8 @@ describe('archiveLineService', () => {
     }
   });
 
-  it('archive la ligne avec succès quand pas d\'incidents actifs', async () => {
+  it("archive la ligne avec succès quand pas d'incidents actifs", async () => {
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(mockLineForUpdate());
     jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(0);
     jest.mocked(repo.softDeleteLine).mockResolvedValue(true);
     jest.mocked(events.createLineAuditEvent).mockResolvedValue(undefined);
@@ -263,11 +332,16 @@ describe('archiveLineService', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.message).toBe('Ligne archivée.');
     expect(events.createLineAuditEvent).toHaveBeenCalledWith(
-      1, 1, 'LINE_SOFT_DELETED', { forcedCanceledIncidents: 0 }, null
+      1,
+      1,
+      'LINE_SOFT_DELETED',
+      { forcedCanceledIncidents: 0 },
+      null
     );
   });
 
   it('annule les incidents actifs et archive la ligne avec force=true', async () => {
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(mockLineForUpdate());
     jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(3);
     jest.mocked(repo.cancelActiveIncidentsByLine).mockResolvedValue([10, 11, 12]);
     jest.mocked(repo.softDeleteLine).mockResolvedValue(true);
@@ -279,13 +353,27 @@ describe('archiveLineService', () => {
       expect(result.data.message).toContain('3 incident(s) actif(s) annulé(s)');
       expect(result.data.canceledIncidents).toBe(3);
     }
+    const logIncidentEvent = jest.mocked(workshopEvents.logIncidentEvent);
+    expect(logIncidentEvent).toHaveBeenCalledTimes(3);
+    expect(arbitrationRepo.supersedeOpenArbitrationCases).toHaveBeenCalledWith(
+      [10, 11, 12],
+      'Archivage forcé de la ligne',
+      null
+    );
+    expect(logIncidentEvent).toHaveBeenCalledWith(
+      10,
+      { kind: 'ADMIN', adminId: 1 },
+      'INCIDENT_CANCELED',
+      { reason: 'line_archived', lineNumber: 'L01' },
+      null
+    );
   });
 });
 
 // ─── getLineImpactService ─────────────────────────────────────────────────────
 
 describe('getLineImpactService', () => {
-  it('retourne les compteurs d\'impact de la ligne', async () => {
+  it("retourne les compteurs d'impact de la ligne", async () => {
     const impact = { incidents: 12, open_or_pending_incidents: 0 };
     jest.mocked(repo.getLineImpactData).mockResolvedValue(impact);
 

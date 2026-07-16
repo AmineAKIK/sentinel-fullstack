@@ -157,6 +157,7 @@ describe('IncidentDetailPanel', () => {
       edit_request: { state: 'DEGRADEE' },
       arbitration: {
         edit: {
+          caseId: 21,
           requestEventId: 42,
           requestedAt: '2026-06-28T11:00:00.000Z',
           state: 'WAITING',

@@ -1,356 +1,293 @@
-# Runbook opérationnel — Sentinel
+# Runbook d'exploitation Sentinel
 
-Ce document décrit les procédures d'exploitation à connaître avant de mettre Sentinel en production.
-Il complète la checklist `release-checklist.md` qui couvre la validation avant déploiement.
+Ce runbook couvre les opérations courantes de la stack Docker Compose fournie
+par le dépôt. Toutes les commandes sont lancées depuis la racine du déploiement,
+par exemple `/opt/sentinel`.
 
-> Pour un déploiement détaillé sur VPS — notamment le cas d'un **reverse proxy
-> déjà présent** sur les ports 80/443 — voir [deploiement-vps.md](deploiement-vps.md).
-> La section ci-dessous couvre le cas par défaut (VPS dédié, Caddy intégré).
-
----
-
-## 1. Premier déploiement
-
-### Prérequis sur le serveur
-- Docker Engine >= 24 et Docker Compose v2
-- Ports 80 et 443 ouverts en entrée **et libres** (si un reverse proxy occupe déjà ces ports, voir [deploiement-vps.md](deploiement-vps.md) sections 4 et 7)
-- Un nom de domaine DNS pointant sur l'IP du serveur
-
-### Étapes
+## 1. Contrôles rapides
 
 ```bash
-# 1. Cloner le dépôt
-git clone <url-du-depot> sentinel
-cd sentinel
-
-# 2. Préparer la configuration
-cp .env.release.example .env
-# Éditer .env et remplacer TOUS les placeholders (voir section 2 ci-dessous)
-
-# 3. Générer les secrets
-openssl rand -hex 32  # → COOKIE_SECRET
-openssl rand -hex 32  # → JWT_SECRET
-openssl rand -hex 32  # → POSTGRES_PASSWORD (copier aussi dans DATABASE_URL)
-openssl rand -hex 16  # → code board en clair, puis hacher :
-echo -n "votre_code_board" | sha256sum  # → BOARD_ACCESS_CODE_HASH
-
-# 4. Lancer la stack
-docker compose up -d --build
-
-# 5. Vérifier que tout est sain
+docker compose config --quiet
 docker compose ps
-curl -sf https://sentinel.example.com/api/health
+curl --fail --show-error https://sentinel.example.com/api/health
+docker compose logs --since=15m backend frontend caddy postgres
 ```
 
-Caddy obtient automatiquement un certificat Let's Encrypt au premier démarrage.
-Ce processus peut prendre 30 à 60 secondes.
+État nominal :
 
----
+- `postgres`, `backend` et `frontend` sont `healthy` ;
+- `caddy` est `running` ;
+- `/api/health` répond HTTP 200 avec `{"status":"ok","db":"ok"}` ;
+- aucune boucle de redémarrage n'apparaît dans `docker compose ps`.
 
-## 2. Variables d'environnement critiques
+## 2. Variables critiques
 
-| Variable | Obligatoire | Description |
-|----------|-------------|-------------|
-| `NODE_ENV` | oui | Doit être `production` |
-| `CADDY_DOMAIN` | oui | Domaine public sans `https://` ni `/` |
-| `CLIENT_ORIGIN` | oui | URL publique complète du frontend |
-| `VITE_API_URL` | oui | Même valeur que `CLIENT_ORIGIN` |
-| `POSTGRES_PASSWORD` | oui | Mot de passe DB (≥ 24 chars) |
-| `DATABASE_URL` | oui | URL de connexion complète à PostgreSQL |
-| `ADMIN_USERNAME` | oui | Identifiant du compte admin |
-| `ADMIN_PASSWORD` | oui | Mot de passe admin (≥ 24 chars) |
-| `COOKIE_SECRET` | oui | 64 chars hex (`openssl rand -hex 32`) |
-| `JWT_SECRET` | oui | 64 chars hex (`openssl rand -hex 32`) |
-| `BOARD_ACCESS_CODE_HASH` | oui | SHA-256 hex du code d'accès board |
-| `TRUST_PROXY` | oui | `true` derrière Caddy |
-| `DEEPSEEK_API_KEY` | non | Désactive le support IA si absent |
-| `LOG_LEVEL` | non | `info` par défaut |
-| `GLOBAL_API_RATE_LIMIT_MAX` | non | Plafond global de requêtes/IP (défaut 3000) |
-| `GLOBAL_API_RATE_LIMIT_WINDOW_MS` | non | Fenêtre du plafond global en ms (défaut 900000 = 15 min) |
+| Variable | Obligatoire | Rôle |
+| --- | --- | --- |
+| `CADDY_DOMAIN` | oui | domaine public servi par Caddy |
+| `CLIENT_ORIGIN` | oui | origine HTTPS exacte autorisée par CORS |
+| `TRUST_PROXY` | oui | prise en compte sûre de l'IP via Caddy |
+| `POSTGRES_PASSWORD` | oui | mot de passe du service PostgreSQL |
+| `DATABASE_URL` | oui | connexion interne du backend à PostgreSQL |
+| `COOKIE_SECRET` | oui | signature des cookies Express |
+| `JWT_SECRET` | oui | signature des sessions JWT |
+| `BOARD_ACCESS_CODE_HASH` | oui | hash bcrypt du code Board initial |
+| `ADMIN_USERNAME` | base vide | identifiant de bootstrap du premier admin |
+| `ADMIN_PASSWORD` | base vide | mot de passe temporaire du premier admin |
+| `VITE_API_URL` | vide derrière Caddy | surcharge de l'origine API au build |
 
-Le backend refuse de démarrer en production si une valeur critique manque ou est faible.
+Les variables SMTP, DeepSeek et d'outbox sont documentées dans
+`.env.release.example`. Ne jamais mettre un secret dans une commande versionnée,
+un ticket public ou une capture d'écran.
 
-> **Rate-limit.** Le plafond *global* d'API (par IP) est ajustable via les deux
-> variables ci-dessus — utile si plusieurs postes partagent une IP publique et
-> déclenchent des 429 en usage normal. Le rate-limit *de connexion* (10 échecs
-> par identité / 5 min, remis à zéro après un login réussi) n'est pas
-> configurable. Un `429` ponctuel sur `/api/auth/login` est attendu après
-> plusieurs échecs ; il se résorbe seul à la fin de la fenêtre.
+## 3. Sauvegarde
 
----
-
-## 3. Backup de la base de données
-
-### Backup manuel
+### Manuelle
 
 ```bash
 ./scripts/backup.sh
-# Le fichier est créé dans ./backups/sentinel_backup_YYYY-MM-DD_HH-MM-SS.sql.gz
 ```
 
-Options disponibles :
-```bash
-./scripts/backup.sh --dir /mnt/nas/sentinel-backups --keep 60
-```
-
-### Backup automatique (cron recommandé)
-
-Ajouter dans `crontab -e` sur le serveur :
-```
-# Backup quotidien à 3h00, rétention 30 jours
-0 3 * * * cd /srv/sentinel && ./scripts/backup.sh >> /var/log/sentinel-backup.log 2>&1
-```
-
-Vérifier que les backups sont bien créés le lendemain :
-```bash
-ls -lh backups/
-```
-
-### Copier les backups hors site
-
-Les backups sur le même serveur que les données ne protègent pas contre une panne disque.
-Mettre en place une copie vers un stockage externe (NAS, S3, rclone, rsync) :
+Options :
 
 ```bash
-# Exemple avec rsync vers un NAS
-rsync -az --delete backups/ user@nas:/srv/sentinel-backups/
-
-# Exemple avec rclone vers S3/Backblaze/etc.
-rclone sync backups/ remote:sentinel-backups/
+./scripts/backup.sh --dir /srv/backups/sentinel --keep 30
 ```
 
----
+Le script :
 
-## 4. Restauration de la base de données
+- verrouille le répertoire pour éviter deux dumps concurrents ;
+- vérifie que le service Compose `postgres` tourne ;
+- produit un dump SQL sans propriétaire ni privilèges ;
+- compresse dans un fichier temporaire ;
+- vérifie l'archive, applique le mode `600` et crée un `.sha256` ;
+- supprime les sauvegardes plus anciennes que la rétention configurée.
 
-**Tester la restauration sur un environnement temporaire avant d'en avoir besoin.**
+Validation manuelle :
 
 ```bash
-# Lister les backups disponibles
-ls -lht backups/
-
-# Restaurer depuis un backup spécifique
-./scripts/restore.sh backups/sentinel_backup_2026-06-09_03-00-00.sql.gz
+gzip -t backups/sentinel_backup_*.sql.gz
+cd backups
+sha256sum -c sentinel_backup_YYYY-MM-DD_HH-MM-SS.sql.gz.sha256
+cd ..
 ```
 
-Le script demande une confirmation explicite (`oui`) avant d'écraser la base.
+### Planifiée
 
-Après restauration, les migrations sont rejouées automatiquement au prochain démarrage du backend.
-Si le backend est déjà lancé, le redémarrer :
-```bash
-docker compose restart backend
+Exemple de cron quotidien à 03:00 :
+
+```cron
+0 3 * * * cd /opt/sentinel && ./scripts/backup.sh >> /var/log/sentinel-backup.log 2>&1
 ```
 
----
+Le compte cron doit pouvoir exécuter Docker et lire `/opt/sentinel/.env`.
+Protéger le fichier de log et surveiller explicitement les codes de sortie.
 
-## 5. Mise à jour de l'application
+### Hors site
+
+Copier les couples `.sql.gz` / `.sha256` vers un stockage distinct, chiffré et
+versionné. Une sauvegarde présente uniquement dans le volume du VPS ne constitue
+pas un plan de reprise.
+
+Politique minimale recommandée :
+
+- 7 sauvegardes quotidiennes ;
+- 4 sauvegardes hebdomadaires ;
+- 3 sauvegardes mensuelles ;
+- un test de restauration trimestriel sur une base isolée.
+
+## 4. Restauration
+
+### Préconditions
+
+1. identifier l'heure exacte du point de reprise ;
+2. conserver une copie du backup actuel avant toute action ;
+3. prévenir les utilisateurs d'une courte indisponibilité ;
+4. vérifier l'espace disque disponible ;
+5. ne pas interrompre le script pendant la bascule.
 
 ```bash
-# 1. Sauvegarder avant toute mise à jour
-./scripts/backup.sh
+./scripts/restore.sh backups/sentinel_backup_YYYY-MM-DD_HH-MM-SS.sql.gz
+```
 
-# 2. Récupérer les nouvelles sources
-git pull
+Pour confirmer, saisir exactement le nom de base affiché. Le script importe dans
+une base temporaire, contrôle le schéma, arrête le backend, bascule les bases puis
+redémarre le service. En cas d'échec avant la fin de la bascule, son trap tente de
+restaurer le nom de la base initiale.
 
-# 3. Rebuilder et relancer
-docker compose up -d --build
+Après restauration :
 
-# 4. Vérifier la santé
+```bash
 docker compose ps
-curl -sf https://sentinel.example.com/api/health
+curl --fail --show-error https://sentinel.example.com/api/health
+docker compose logs --since=10m backend postgres
 ```
 
-Les migrations de schéma s'appliquent automatiquement au démarrage du backend.
-En cas de problème, restaurer le backup pris en étape 1 et revenir au commit précédent :
+Faire ensuite une recette fonctionnelle : connexion, ouverture d'un incident,
+historique, Board et dernier événement d'audit attendu.
+
+## 5. Mise à jour applicative
+
 ```bash
-git checkout <commit-precedent>
-./scripts/restore.sh backups/<dernier-backup>.sql.gz
-docker compose up -d --build
+./scripts/backup.sh
+git fetch origin
+git status --short
+git pull --ff-only origin main
+docker compose config --quiet
+docker compose build backend frontend
+docker compose up -d --remove-orphans
+docker compose ps
+curl --fail --show-error https://sentinel.example.com/api/health
+docker compose logs --since=10m backend frontend caddy
 ```
 
----
+Ne pas déployer depuis un arbre Git sale. Vérifier la CI du commit cible avant la
+mise à jour. Les migrations sont appliquées automatiquement au démarrage du
+backend, sous verrou exclusif et avec vérification de checksum.
 
 ## 6. Rotation des secrets
 
-La rotation des secrets JWT/COOKIE invalide toutes les sessions actives.
-Prévenir les utilisateurs si possible.
+### Cookie et JWT
 
 ```bash
-# 1. Générer les nouveaux secrets
-NEW_COOKIE=$(openssl rand -hex 32)
-NEW_JWT=$(openssl rand -hex 32)
-
-# 2. Mettre à jour .env
-# Remplacer COOKIE_SECRET et JWT_SECRET par les nouvelles valeurs
-
-# 3. Redémarrer le backend (les sessions existantes seront invalidées)
-docker compose restart backend
-
-# 4. Vérifier
-curl -sf https://sentinel.example.com/api/health
+openssl rand -hex 32
+openssl rand -hex 32
 ```
 
----
+Remplacer les deux valeurs dans `.env`, puis :
 
-## 7. Rotation du mot de passe admin
-
-Le mot de passe admin peut être changé depuis l'interface :
-`Interface admin → Menu → Changer le mot de passe`
-
-Cela nécessite de connaître le mot de passe actuel.
-
-Si le mot de passe actuel est perdu (urgence) :
 ```bash
-# 1. Générer un nouveau hash bcrypt (nécessite node)
-node -e "
-const bcrypt = require('bcrypt');
-bcrypt.hash('nouveau_mot_de_passe', 12).then(h => console.log(h));
-"
-
-# 2. Mettre à jour directement en base
-docker exec -it sentinel_postgres psql -U sentinel -d sentinel \
-  -c "UPDATE admin_accounts SET password_hash = '\$hash_genere' WHERE username = 'admin';"
-
-# 3. Se reconnecter avec le nouveau mot de passe
+docker compose up -d --force-recreate backend
 ```
 
----
+La rotation de `JWT_SECRET` invalide toutes les sessions. Planifier l'opération
+et prévenir les utilisateurs.
 
-## 8. Consulter les logs
+### Code Board
+
+La voie normale est Administration > Paramètres. En procédure de secours :
 
 ```bash
-# Logs en temps réel de tous les services
-docker compose logs -f
-
-# Logs du backend uniquement
-docker compose logs -f backend
-
-# Logs des 500 dernières lignes du backend
-docker compose logs --tail=500 backend
-
-# Filtrer les erreurs
-docker compose logs backend 2>&1 | grep '"level":50'  # level 50 = error en Pino
-
-# Logs formatés lisiblement (nécessite pino-pretty installé localement)
-docker compose logs backend 2>&1 | npx pino-pretty
+cd backend
+BOARD_ACCESS_CODE='nouveau-code-temporaire' npm run hash:board
+cd ..
 ```
 
-Les logs sont en JSON structuré (format Pino). Chaque ligne contient :
-- `level` : 10=trace, 20=debug, 30=info, 40=warn, 50=error, 60=fatal
-- `time` : timestamp ISO
-- `msg` : message
-- `req` / `res` : détails de la requête HTTP (pour les request logs)
-- `err` : stack trace en cas d'erreur
+Mettre le hash bcrypt obtenu dans `.env`, recréer le backend, puis vérifier une
+nouvelle connexion Board. Les sessions Board antérieures peuvent rester valides
+jusqu'à leur expiration ; une rotation du `JWT_SECRET` les invalide toutes.
 
----
+### Mot de passe admin
 
-## 9. Surveillance du service
-
-### Vérification manuelle
+La voie normale est Administration > Sécurité. Si l'accès est perdu :
 
 ```bash
-# Health check complet (vérifie aussi la DB)
-curl -sf https://sentinel.example.com/api/health
-# Réponse attendue : {"status":"ok","db":"ok"}
+docker compose exec -T backend node dist/scripts/reset-admin-password.js
+```
 
-# État des conteneurs
+La commande choisit l'admin unique, remplace son mot de passe dans une transaction
+et incrémente `session_version`. Le mot de passe temporaire est affiché une seule
+fois dans le terminal ; le transmettre par un canal interne sûr puis le changer
+immédiatement dans l'interface.
+
+### PostgreSQL
+
+La rotation exige une fenêtre de maintenance : backup, arrêt de l'application,
+modification du rôle PostgreSQL, mise à jour simultanée de `POSTGRES_PASSWORD` et
+`DATABASE_URL`, puis redémarrage et test de santé. Tester la procédure sur un
+environnement de préproduction avant la production.
+
+## 7. Logs et diagnostic
+
+```bash
+docker compose logs --follow --tail=200
+docker compose logs --follow --tail=200 backend
+docker compose logs --since=1h backend | grep -Ei 'error|fatal|migration|shutdown'
+docker compose stats --no-stream
+docker system df
+df -h
+```
+
+Les logs Docker sont limités à cinq fichiers de 10 Mo par service. Le backend
+masque les cookies et en-têtes d'autorisation dans les requêtes journalisées.
+Ne pas augmenter le niveau de log en production sans surveiller le volume.
+
+## 8. Procédures d'incident
+
+### Site inaccessible
+
+```bash
 docker compose ps
-
-# Utilisation des ressources
-docker stats --no-stream
+docker compose logs --since=15m caddy frontend backend
+curl --verbose https://sentinel.example.com/api/health
 ```
 
-### Monitoring externe (recommandé)
+- échec TLS : contrôler DNS, ports 80/443, horloge et logs Caddy ;
+- frontend sain mais API 502/503 : contrôler backend et PostgreSQL ;
+- service arrêté : lire ses logs avant de le relancer ;
+- boucle de redémarrage : ne pas masquer l'erreur avec des redémarrages répétés.
 
-Configurer un service de monitoring externe (UptimeRobot, Better Uptime, etc.)
-pour pinger `https://sentinel.example.com/api/health` toutes les 5 minutes
-et envoyer une alerte email/SMS si le service ne répond pas.
-
----
-
-## 10. Procédure d'incident
-
-### Service inaccessible
+### PostgreSQL indisponible
 
 ```bash
-# 1. Vérifier l'état des conteneurs
-docker compose ps
-
-# 2. Si un conteneur est arrêté, le relancer
-docker compose start backend   # ou frontend, postgres, caddy
-
-# 3. Inspecter les logs du conteneur défaillant
-docker compose logs --tail=100 backend
-
-# 4. Si le problème persiste, redémarrer la stack complète
-docker compose restart
-
-# 5. En dernier recours : arrêt propre et redémarrage complet
-docker compose down
-docker compose up -d
+docker compose ps postgres
+docker compose logs --tail=200 postgres
+docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-sentinel}" -d "${POSTGRES_DB:-sentinel}"
 ```
 
-### Base de données corrompue ou inaccessible
+Vérifier l'espace disque et les permissions du volume. Ne restaurer qu'après
+avoir distingué une indisponibilité transitoire d'une corruption réelle.
 
-```bash
-# 1. Vérifier l'état du conteneur PostgreSQL
-docker compose logs --tail=50 postgres
+### Migration refusée
 
-# 2. Tenter une reconnexion du pool
-docker compose restart backend
+Le backend s'arrête si le ledger contient une migration absente ou si le checksum
+d'une migration appliquée ne correspond plus au fichier. Ne jamais modifier une
+migration publiée. Restaurer le fichier d'origine ou ajouter une nouvelle
+migration corrective.
 
-# 3. Si la base est corrompue, restaurer depuis le dernier backup
-./scripts/restore.sh backups/<dernier-backup>.sql.gz
-docker compose restart backend
-```
+### Notifications en échec
+
+Vérifier SMTP et les logs du worker. L'outbox conserve les tentatives, applique
+un backoff et marque les messages définitivement échoués après la limite
+configurée. Corriger la configuration avant de relancer le backend ; ne pas
+supprimer l'outbox sans analyse.
 
 ### Espace disque saturé
 
 ```bash
-# Vérifier l'espace disponible
 df -h
-
-# Identifier les gros fichiers
-du -sh /var/lib/docker/volumes/sentinel_*/
-du -sh backups/
-
-# Nettoyer les vieux backups manuellement si nécessaire
-find backups/ -name "sentinel_backup_*.sql.gz" -mtime +7 -delete
-
-# Nettoyer les images Docker inutilisées
-docker image prune -f
+docker system df
+du -sh backups/* 2>/dev/null | sort -h
 ```
 
----
+Exporter les backups avant suppression. Ne jamais exécuter
+`docker compose down -v` : l'option `-v` supprimerait les données PostgreSQL et
+les données de certificat Caddy.
 
-## 11. Plan de retour arrière
+## 9. Retour arrière
 
-En cas de mise à jour qui se passe mal :
+Un rollback du code n'implique pas automatiquement un rollback du schéma. Avant
+la mise en production, vérifier si les nouvelles migrations restent compatibles
+avec le commit précédent.
 
 ```bash
-# 1. Arrêter la stack
-docker compose down
-
-# 2. Revenir au commit précédent
-git log --oneline -5   # identifier le commit stable
-git checkout <commit-stable>
-
-# 3. Restaurer la base si des migrations avaient été appliquées
-./scripts/restore.sh backups/<backup-avant-mise-a-jour>.sql.gz
-
-# 4. Relancer
-docker compose up -d --build
+docker compose stop backend frontend
+git checkout <commit_precedent_valide>
+docker compose build backend frontend
+docker compose up -d
+curl --fail --show-error https://sentinel.example.com/api/health
 ```
 
----
+Si le schéma n'est pas rétrocompatible, restaurer le backup pris juste avant le
+déploiement avec `scripts/restore.sh`, puis relancer le commit précédent.
 
-## 12. Contacts et accès
+## 10. Trace d'intervention
 
-> Compléter cette section avec les informations propres au déploiement.
+Pour chaque opération sensible, consigner hors du dépôt :
 
-| Rôle | Contact |
-|------|---------|
-| Responsable technique | — |
-| Accès serveur | — |
-| Accès DNS | — |
-| Monitoring (UptimeRobot, etc.) | — |
+- date, intervenant et motif ;
+- commit déployé avant/après ;
+- backup utilisé et checksum ;
+- commandes structurantes exécutées ;
+- résultat des contrôles de santé et de recette ;
+- décision de clôture ou d'escalade.

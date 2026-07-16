@@ -40,6 +40,7 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
     role: 'OPERATOR',
     arbitration: {
       edit: {
+        caseId: 21,
         requestEventId: 42,
         requestedAt: '2026-06-28T11:00:00.000Z',
         state: 'ACTIVE',
@@ -87,6 +88,7 @@ describe('ReviewIncidentRequestModal', () => {
         incident={mockIncident({
           arbitration: {
             edit: {
+              caseId: 21,
               requestEventId: 42,
               requestedAt: '2026-06-28T11:00:00.000Z',
               state: 'WAITING',
@@ -144,6 +146,7 @@ describe('ReviewIncidentRequestModal', () => {
           cancel_request_reason: 'doublon',
           arbitration: {
             cancel: {
+              caseId: 22,
               requestEventId: 43,
               requestedAt: '2026-06-28T11:10:00.000Z',
               state: 'ACTIVE',
@@ -177,11 +180,13 @@ describe('ReviewIncidentRequestModal', () => {
           cancel_request_reason: 'doublon',
           arbitration: {
             edit: {
+              caseId: 21,
               requestEventId: 42,
               requestedAt: '2026-06-28T11:00:00.000Z',
               state: 'ACTIVE',
             },
             cancel: {
+              caseId: 22,
               requestEventId: 43,
               requestedAt: '2026-06-28T11:10:00.000Z',
               state: 'ACTIVE',
@@ -206,7 +211,7 @@ describe('ReviewIncidentRequestModal', () => {
   });
 
   it('structure les actions d’arbitrage en groupes de décision distincts', () => {
-    const { container } = render(
+    render(
       <ReviewIncidentRequestModal
         incident={mockIncident()}
         lines={[]}
@@ -219,7 +224,7 @@ describe('ReviewIncidentRequestModal', () => {
       />
     );
 
-    const actionGroups = container.querySelectorAll('.arbitration-footer-group');
+    const actionGroups = document.querySelectorAll('.arbitration-footer-group');
 
     expect(actionGroups).toHaveLength(2);
     expect(actionGroups[0].textContent).toContain('Reporter');

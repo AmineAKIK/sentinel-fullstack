@@ -1,203 +1,178 @@
 # Sentinel
 
-Application full-stack de pilotage Sentinel organisee autour de trois espaces : Board, Administration et Workshop.
+Sentinel est une application full-stack de suivi des incidents industriels. Elle
+réunit trois points d'entrée dans un même portail :
+
+- **Board** : affichage atelier en lecture seule, protégé par un code local ;
+- **Administration** : comptes, lignes, paramètres, sécurité et audit ;
+- **Atelier** : déclaration, traitement, arbitrage, pilotage et capitalisation.
 
 ## Stack
 
-- Frontend : React 18, TypeScript, Vite, React Router
-- Backend : Node.js, Express, TypeScript
-- Base de données : PostgreSQL
-- Authentification : JWT en cookie HTTP-only
+- Frontend : React 18, TypeScript, Vite 8, React Router, Vitest et Playwright
+- Backend : Node.js 24, Express, TypeScript, Jest et Zod
+- Données : PostgreSQL 15, SQL paramétré et migrations versionnées
+- Production : Docker Compose, Nginx non-root et Caddy avec TLS automatique
+- Sessions : JWT signés en cookies HTTP-only, séparés par audience
 
-## Démarrage Docker
+## Démarrage local
 
-Le `docker-compose.yml` démarre un environnement complet derrière un reverse
-proxy Caddy. **Seul Caddy est exposé** (ports 80/443) ; le frontend et le
-backend restent sur le réseau interne et ne sont pas joignables directement.
+Prérequis : Node.js 24+, npm 10+ et PostgreSQL 15+.
 
 ```bash
-docker compose up --build
+# Terminal 1 : API
+cd backend
+cp .env.example .env
+# Adapter DATABASE_URL, ADMIN_PASSWORD et les secrets locaux.
+npm ci
+npm run migrate
+npm run dev
+
+# Terminal 2 : interface
+cd frontend
+cp .env.example .env
+npm ci
+npm run dev
 ```
 
-Tout passe par Caddy (`CADDY_DOMAIN`, par défaut `localhost`) :
+L'application est alors disponible sur `http://localhost:5173` et l'API sur
+`http://localhost:3000/api`.
 
-- Application : http://localhost
-- Portail : http://localhost/login
-- Board : http://localhost/board
-- API : http://localhost/api
+Le premier démarrage d'une **base vide** utilise `ADMIN_USERNAME` et
+`ADMIN_PASSWORD` pour créer l'unique compte administrateur. Ces deux variables
+sont des paramètres d'amorçage : elles peuvent être retirées après création du
+compte. Aucun identifiant de démonstration n'est fourni par le Compose de
+production.
 
-Au premier démarrage, le backend amorce un compte administrateur unique à
-partir de `ADMIN_USERNAME` / `ADMIN_PASSWORD` (valeurs de bootstrap local
-`admin` / `admin123` par défaut). **À changer impérativement avant toute mise
-en production** : ces identifiants ne servent qu'à démarrer un environnement de
-développement local et ne peuvent pas être modifiés à chaud ensuite.
+## Déploiement Docker
 
-Pour une publication, copier `.env.release.example` vers `.env` sur l'hôte de déploiement et remplacer toutes les valeurs sensibles avant de lancer Docker Compose. En `NODE_ENV=production`, le backend refuse de démarrer si les secrets ou l'origine client restent sur des valeurs de démonstration.
+Le Compose racine décrit la topologie de production. Seul Caddy publie les ports
+`80` et `443`; PostgreSQL, l'API et Nginx restent sur des réseaux internes.
 
-## Développement Local
+```bash
+cp .env.release.example .env
+# Remplacer chaque placeholder et générer le hash bcrypt du code Board.
+cd backend
+BOARD_ACCESS_CODE='code-board-temporaire' npm run hash:board
+cd ..
+
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+curl --fail https://votre-domaine.example/api/health
+```
+
+Le frontend appelle `/api` sur sa propre origine ; `VITE_API_URL` reste vide
+derrière Caddy. Le backend refuse de démarrer en production si un secret requis,
+l'origine HTTPS, le proxy de confiance ou le hash bcrypt Board sont invalides.
+
+La procédure complète se trouve dans
+[docs/deploiement-vps.md](docs/deploiement-vps.md) et l'exploitation quotidienne
+dans [docs/runbook.md](docs/runbook.md).
+
+## Qualité
 
 ### Backend
 
 ```bash
 cd backend
-cp .env.example .env
-npm install
-npm run migrate
-npm run dev
-```
-
-### Frontend
-
-```bash
-cd frontend
-cp .env.example .env
-npm install
-npm run dev
-```
-
-## Scripts
-
-Backend :
-
-- `npm run dev` : API en mode watch
-- `npm run build` : compilation TypeScript vers `dist/`
-- `npm run start` : démarre `dist/server.js`
-- `npm run migrate` : exécute les migrations SQL
-- `npm run lint` : analyse statique ESLint
-- `npm test` : tests unitaires et d'intégration (Jest)
-- `npm run verify:reliability` : vérifications de fiabilité atelier
-- `npm run seed:demo` : jeu de données de démonstration atelier
-- `npm run seed:e2e` : jeu de données dédié aux tests end-to-end
-
-Frontend :
-
-- `npm run dev` : serveur Vite
-- `npm run build` : typecheck puis build Vite
-- `npm run preview` : prévisualisation du build
-- `npm run lint` : analyse statique ESLint
-- `npm test` : tests unitaires et composants (Vitest)
-- `npm run test:e2e` : tests end-to-end (Playwright) — re-seed puis exécution
-
-## Tests End-to-End
-
-Les parcours critiques sont couverts par Playwright (dossier `frontend/e2e/`).
-La suite démarre les serveurs au besoin (réutilise ceux déjà lancés) et
-s'appuie sur un jeu de données dédié recréé à chaque exécution.
-
-```bash
-cd frontend
-npm run test:e2e        # re-seed (backend) puis exécution Playwright
-```
-
-Pré-requis : une base PostgreSQL accessible (cf. `backend/.env`) et les
-bibliothèques système du navigateur. Sous Debian/Ubuntu :
-
-```bash
-sudo npx playwright install-deps chromium
-# ou, si la commande sudo n'a pas npx dans son PATH :
-sudo apt-get install -y libnss3 libnspr4 libasound2
-```
-
-## Publication
-
-Avant de déclarer une version publiable :
-
-```bash
-cd backend
+npm ci
+npm run format:check
+npm run lint
+npm run typecheck:scripts
 npm run build
-npm test
+npm run test:coverage -- --selectProjects unit
 npm run verify:reliability
+```
 
-cd ../frontend
+Les tests d'intégration nécessitent une base PostgreSQL dédiée :
+
+```bash
+DATABASE_URL=postgres://sentinel:mot_de_passe@localhost:5432/sentinel_test \
+  npm test -- --selectProjects integration
+```
+
+### Frontend et parcours navigateur
+
+```bash
+cd frontend
+npm ci
+npm run format:check
+npm run lint
 npm run build
-npm test
+npm run test:coverage
+npx playwright install chromium
 npm run test:e2e
 ```
 
-Puis exécuter la recette manuelle et les contrôles de configuration décrits dans [docs/release-checklist.md](docs/release-checklist.md).
+`test:e2e` applique les migrations, recrée un jeu de données isolé, puis démarre
+deux serveurs sur les ports réservés `3100` et `5174`. Il ne réutilise jamais un
+serveur de développement existant.
+
+GitHub Actions rejoue ces contrôles dans des jobs indépendants, ajoute les tests
+PostgreSQL réels, les parcours Playwright mobiles, ShellCheck, la validation du
+Compose et la construction des images non-root.
+
+## Scripts utiles
+
+Backend :
+
+- `npm run migrate` : applique les migrations sous verrou PostgreSQL et vérifie leurs checksums ;
+- `npm run reset:admin` : régénère le mot de passe de l'admin unique et invalide ses sessions ;
+- `npm run hash:board` : produit le hash bcrypt d'un code Board ;
+- `npm run seed:demo` : charge le jeu de démonstration atelier ;
+- `npm run seed:e2e` : recrée les fixtures Playwright déterministes.
+
+Exploitation :
+
+- `./scripts/backup.sh` : dump PostgreSQL compressé, atomique et accompagné d'un checksum ;
+- `./scripts/restore.sh backups/<fichier>.sql.gz` : restauration validée dans une base temporaire avant bascule.
 
 ## Structure
 
 ```text
 backend/
-  migrations/      Migrations SQL PostgreSQL
-  scripts/         Scripts de seed/vérification
+  migrations/       migrations PostgreSQL immuables
+  scripts/          seeds et contrôles structurels
   src/
-    db/            Pool, migrations, seed admin
-    middlewares/   Auth admin et atelier
-    modules/       Auth, comptes, lignes, atelier, audit admin
-    utils/         Gestion d'erreurs
+    auth/            JWT, cookies, mots de passe et payloads de session
+    db/              pool, runner de migrations et bootstrap admin
+    middlewares/     authentification, sécurité et rate limiting
+    modules/         cas d'usage métier et accès aux données
 
 frontend/
+  e2e/               parcours Playwright
   src/
-    api/           Clients HTTP
-    components/    Modals, formulaires, navigations, filtres
-    pages/         Pages admin et atelier
-    routes/        Contextes/protections d'authentification
-    utils/         Labels, permissions, helpers historique
+    api/              client HTTP typé et annulable
+    components/       composants et modales accessibles
+    hooks/            orchestration des données et mutations
+    pages/            espaces Administration, Board et Atelier
+    routes/           sessions et gardes de navigation
 ```
 
-## Routes Principales
+## Routes principales
 
-Portail :
-
-- `/login` — entree unique en trois blocs : Board, Administration, Workshop
-- `/admin/login` — connexion administration depuis le portail
-- `/workshop/login` — connexion atelier depuis le portail
-
-Board :
-
-- `/board` — affichage atelier lecture seule protege par code local
-
-Administration :
-
-- `/admin/accueil`
-- `/admin/users`
-- `/admin/users/:id`
-- `/admin/lines`
-- `/admin/audit`
-- `/admin/support`
-
-Workshop :
-
-- `/workshop/dashboard`
-- `/workshop/pilotage`
-- `/workshop/history`
-- `/workshop/knowledge`
-- `/workshop/support`
-
-API :
-
-- `/api/auth` — session unifiee admin/workshop
-- `/api/board` — session board et donnees lecture seule
-- `/api/admin` — administration protegee
-- `/api/workshop` — atelier protege
-
-## Variables D'environnement
-
-Backend : voir [backend/.env.example](backend/.env.example).
-
-Frontend : voir [frontend/.env.example](frontend/.env.example).
+- `/login` : portail des trois espaces
+- `/board` : Board atelier lecture seule
+- `/admin/*` : administration protégée
+- `/workshop/dashboard` : traitement opérationnel
+- `/workshop/pilotage` : indicateurs et tendances
+- `/workshop/history` : dossiers clôturés et traces
+- `/workshop/journal` : événements transverses
+- `/workshop/knowledge` : interventions capitalisées
+- `/workshop/support` : assistance contextuelle
+- `/api/auth`, `/api/admin`, `/api/board`, `/api/workshop` : API correspondantes
 
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md)
-- [Doctrine d'expérience (UX)](docs/doctrine-ux.md)
-- [Analyse & plan d'application UX](docs/plan-ux.md)
 - [Cycle de vie des incidents](INCIDENT_LIFECYCLE.md)
 - [Cadrage fonctionnel](docs/cadrage-fonctionnel.md)
 - [Documentation technique](docs/documentation-technique.md)
+- [Doctrine UX](docs/doctrine-ux.md)
 - [Jeu d'essai](docs/jeu-essai.md)
 - [Tests manuels](docs/manual-tests.md)
-- [Déploiement sur VPS](docs/deploiement-vps.md)
-- [Runbook d'exploitation](docs/runbook.md)
 - [Checklist de publication](docs/release-checklist.md)
-- [Audit & stress-test de mise en production](docs/audit-prod.md)
-- [Résultats d'audit de mise en production](docs/audit-prod-resultats.md)
-
-## Notes De Dépôt
-
-Les dossiers `node_modules/`, `dist/` et les fichiers `.env` sont ignorés. Les dépendances se restaurent avec `npm install`, et les builds se régénèrent avec `npm run build`.
 
 ## Licence
 

@@ -18,11 +18,15 @@ import accountsRoutes from './modules/accounts/accounts.routes';
 import linesRoutes from './modules/lines/lines.routes';
 import workshopRoutes from './modules/workshop/workshop.routes';
 import adminRoutes from './modules/admin/admin.routes';
-import { adminRouter as adminSupportRoutes, workshopRouter as workshopSupportRoutes } from './modules/support/support.routes';
+import {
+  adminRouter as adminSupportRoutes,
+  workshopRouter as workshopSupportRoutes,
+} from './modules/support/support.routes';
 import { securityHeaders } from './middlewares/securityHeaders';
 import { loginRateLimit, globalApiRateLimit } from './middlewares/loginRateLimit';
 import { boardRouter } from './modules/board/board.auth';
 import { FIELD_LIMITS } from './domain/constants';
+import { startNotificationOutboxWorker } from './modules/notifications/notificationOutbox.worker';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -96,23 +100,41 @@ async function start(): Promise<void> {
     const server = app.listen(PORT, () => {
       logger.info({ port: PORT }, 'Sentinel backend listening');
     });
+    const notificationWorker = startNotificationOutboxWorker();
+    let shuttingDown = false;
 
-    function shutdown(signal: string): void {
+    async function shutdown(signal: string): Promise<void> {
+      if (shuttingDown) return;
+      shuttingDown = true;
       logger.info({ signal }, 'Shutting down gracefully');
-      server.close(async () => {
-        try {
-          await pool.end();
-          logger.info('Database pool closed');
-          process.exit(0);
-        } catch (err) {
-          logger.error({ err }, 'Error closing database pool');
-          process.exit(1);
-        }
+      const closeServer = new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
       });
+      const forceCloseTimer = setTimeout(() => {
+        logger.warn('HTTP shutdown deadline reached; closing remaining connections');
+        server.closeAllConnections();
+      }, 10_000);
+      forceCloseTimer.unref();
+
+      try {
+        await Promise.all([notificationWorker.stop(), closeServer]);
+        clearTimeout(forceCloseTimer);
+        await pool.end();
+        logger.info('Database pool closed');
+        process.exit(0);
+      } catch (err) {
+        clearTimeout(forceCloseTimer);
+        logger.error({ err }, 'Graceful shutdown failed');
+        process.exit(1);
+      }
     }
 
-    process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
-    process.on('SIGINT', () => { void shutdown('SIGINT'); });
+    process.once('SIGTERM', () => {
+      void shutdown('SIGTERM');
+    });
+    process.once('SIGINT', () => {
+      void shutdown('SIGINT');
+    });
   } catch (err) {
     logger.error({ err }, 'Startup error');
     process.exit(1);

@@ -1,23 +1,16 @@
-import { badRequest, forbidden, notFound, ServiceResult } from '../../utils/serviceResult';
+import {
+  badRequest,
+  conflict,
+  forbidden,
+  notFound,
+  ServiceResult,
+} from '../../utils/serviceResult';
 import { withTransaction } from '../../db/transaction';
 import { logIncidentEvent } from './workshop.events';
-import { canPerform, hasCancelRequest } from './workshop.policy';
+import { canPerform, hasCancelRequest, hasPendingArbitration } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
+import * as arbitrationRepository from './workshop.arbitration.repository';
 import type { WorkshopIncidentRow } from './workshop.repository';
-import {
-  notifyFollowersIncidentTaken,
-  notifyFollowersIncidentSetPending,
-  notifyFollowersIncidentClosed,
-  notifyFollowersIncidentCanceled,
-  notifyMaintenanceIncidentUrgent,
-  notifyTechnicianResponsibleComment,
-  notifyTechnicianIncidentCanceled,
-  notifyTechnicianIncidentInvalidated,
-  notifyDeclarantIncidentTaken,
-  notifyDeclarantCancelApproved,
-  notifyDeclarantCancelRejected,
-  notifyResponsablesCancelRequested,
-} from '../notifications/notifications.service';
 
 // La plupart des mutations de workflow (TAKE, SET_PENDING, RESUME, CLOSE,
 // SET_PRIORITY, RESPONSIBLE_COMMENT) ne changent aucun champ de sélection
@@ -54,6 +47,10 @@ export async function takeIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (openArbitration || hasPendingArbitration(current)) {
+      return { kind: 'arbitration_required' as const };
+    }
     if (!canPerform(actorRole, 'TAKE', current, actorUserId)) {
       return { kind: 'forbidden' as const };
     }
@@ -83,10 +80,9 @@ export async function takeIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'arbitration_required') return arbitrationRequiredResult();
   if (result.kind === 'forbidden')
     return forbidden('Prise en charge non autorisée pour ce rôle ou ce statut.');
-  void notifyFollowersIncidentTaken(result.id, actorUserId);
-  void notifyDeclarantIncidentTaken(result.id, actorUserId);
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -104,6 +100,10 @@ export async function setPendingIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (openArbitration || hasPendingArbitration(current)) {
+      return { kind: 'arbitration_required' as const };
+    }
     if (!canPerform(actorRole, 'SET_PENDING', current)) return { kind: 'forbidden' as const };
     if (!diagnostic?.trim() && !current.diagnostic)
       return { kind: 'bad_request' as const, msg: 'Diagnostic obligatoire avant suspension.' };
@@ -135,10 +135,10 @@ export async function setPendingIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'arbitration_required') return arbitrationRequiredResult();
   if (result.kind === 'forbidden')
     return forbidden('Suspension non autorisée pour ce rôle ou ce statut.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
-  void notifyFollowersIncidentSetPending(result.id, actorUserId, diagnostic ?? '');
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -155,6 +155,10 @@ export async function resumeIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (openArbitration || hasPendingArbitration(current)) {
+      return { kind: 'arbitration_required' as const };
+    }
     if (!canPerform(actorRole, 'RESUME', current)) return { kind: 'forbidden' as const };
 
     const id = await workshopRepository.updateIncidentData(
@@ -183,6 +187,7 @@ export async function resumeIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'arbitration_required') return arbitrationRequiredResult();
   if (result.kind === 'forbidden')
     return forbidden('Reprise non autorisée pour ce rôle ou ce statut.');
   return {
@@ -202,6 +207,10 @@ export async function closeIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (openArbitration || hasPendingArbitration(current)) {
+      return { kind: 'arbitration_required' as const };
+    }
     if (!canPerform(actorRole, 'CLOSE', current)) return { kind: 'forbidden' as const };
     if (current.status === 'PENDING')
       return {
@@ -226,10 +235,6 @@ export async function closeIncidentService(
       client
     );
     if (!id) return { kind: 'not_found' as const };
-    // Clear any pending edit request — incident is now closed.
-    if (current.edit_request != null) {
-      await workshopRepository.rejectEditIncident(incidentId, client);
-    }
     await logIncidentEvent(
       incidentId,
       actorUserId,
@@ -245,10 +250,10 @@ export async function closeIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'arbitration_required') return arbitrationRequiredResult();
   if (result.kind === 'forbidden')
     return forbidden('Clôture non autorisée pour ce rôle ou ce statut.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
-  void notifyFollowersIncidentClosed(result.id, actorUserId);
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -290,7 +295,6 @@ export async function invalidateIncidentService(
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden')
     return forbidden('Seul le responsable peut invalider un incident clôturé.');
-  void notifyTechnicianIncidentInvalidated(result.id, actorUserId, invalidationReason.trim());
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -309,6 +313,9 @@ export async function setPriorityIncidentService(
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
     if (!canPerform(actorRole, 'SET_PRIORITY', current)) return { kind: 'forbidden' as const };
+    if (current.is_priority === isPriority) {
+      return { kind: 'ok' as const, id: incidentId, changed: false };
+    }
 
     const id = await workshopRepository.updateIncidentData(
       {
@@ -333,13 +340,12 @@ export async function setPriorityIncidentService(
       client
     );
     await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
-    return { kind: 'ok' as const, id };
+    return { kind: 'ok' as const, id, changed: true };
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden')
     return forbidden("Seul le responsable peut modifier la priorité d'un incident actif.");
-  if (isPriority) void notifyMaintenanceIncidentUrgent(result.id, actorUserId);
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -354,17 +360,21 @@ export async function setResponsibleCommentService(
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
+  const normalizedComment = responsibleComment.trim();
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
     if (!canPerform(actorRole, 'RESPONSIBLE_COMMENT', current))
       return { kind: 'forbidden' as const };
+    if ((current.responsible_comment ?? '') === normalizedComment) {
+      return { kind: 'ok' as const, id: incidentId, changed: false };
+    }
 
     const id = await workshopRepository.updateIncidentData(
       {
         incidentId,
         current,
-        updates: { responsibleComment },
+        updates: { responsibleComment: normalizedComment },
         role: actorRole,
         actorUserId,
         ...unchangedSelectionFields(current),
@@ -378,17 +388,16 @@ export async function setResponsibleCommentService(
       'RESPONSIBLE_COMMENT_UPDATED',
       {
         from: current.responsible_comment,
-        to: responsibleComment,
+        to: normalizedComment || null,
       },
       client
     );
     await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
-    return { kind: 'ok' as const, id };
+    return { kind: 'ok' as const, id, changed: true };
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
   if (result.kind === 'forbidden') return forbidden('Seul le responsable peut gérer la consigne.');
-  void notifyTechnicianResponsibleComment(result.id, actorUserId, responsibleComment);
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -408,12 +417,16 @@ export async function requestCancelIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (openArbitration || hasPendingArbitration(current)) {
+      return { kind: 'arbitration_pending' as const };
+    }
     if (!canPerform(actorRole, 'REQUEST_CANCEL', current, actorUserId))
       return { kind: 'forbidden' as const };
 
     const id = await workshopRepository.requestCancelIncident(incidentId, reason.trim(), client);
     if (!id) return { kind: 'not_found' as const };
-    await logIncidentEvent(
+    const requestEventId = await logIncidentEvent(
       incidentId,
       actorUserId,
       'CANCEL_REQUESTED',
@@ -423,13 +436,28 @@ export async function requestCancelIncidentService(
       },
       client
     );
+    await arbitrationRepository.createArbitrationCase(
+      {
+        incidentId,
+        requestEventId,
+        requestType: 'CANCEL',
+        reason: reason.trim(),
+        requestedByUserId: actorUserId,
+      },
+      client
+    );
     return { kind: 'ok' as const, id };
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'arbitration_pending') {
+    return conflict(
+      'ARBITRATION_ALREADY_PENDING',
+      "Une demande d'arbitrage est déjà ouverte pour cet incident."
+    );
+  }
   if (result.kind === 'forbidden')
     return forbidden("Demande d'annulation non autorisée pour ce rôle ou ce statut.");
-  void notifyResponsablesCancelRequested(result.id, actorUserId, reason.trim());
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -446,6 +474,10 @@ export async function rejectCancelIncidentService(
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    const arbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (!arbitration || arbitration.request_type !== 'CANCEL') {
+      return { kind: 'bad_request' as const, msg: "Aucune demande d'annulation à refuser." };
+    }
     if (!canPerform(actorRole, 'REJECT_CANCEL', current)) return { kind: 'forbidden' as const };
     if (!hasCancelRequest(current)) {
       return { kind: 'bad_request' as const, msg: "Aucune demande d'annulation à refuser." };
@@ -453,6 +485,14 @@ export async function rejectCancelIncidentService(
 
     const id = await workshopRepository.rejectCancelIncident(incidentId, client);
     if (!id) return { kind: 'not_found' as const };
+    await arbitrationRepository.resolveArbitrationCase(
+      incidentId,
+      'CANCEL',
+      'REJECTED',
+      actorUserId,
+      null,
+      client
+    );
     await logIncidentEvent(
       incidentId,
       actorUserId,
@@ -470,7 +510,6 @@ export async function rejectCancelIncidentService(
   if (result.kind === 'forbidden')
     return forbidden('Seul le responsable peut refuser une annulation.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
-  void notifyDeclarantCancelRejected(result.id, actorUserId);
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -487,15 +526,36 @@ export async function cancelIncidentService(
   const result = await withTransaction(async (client) => {
     const incident = await workshopRepository.getIncidentCancelSnapshot(incidentId, client);
     if (!incident) return { kind: 'not_found' as const };
+    const arbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+
+    if (arbitration && arbitration.request_type !== 'CANCEL') {
+      return { kind: 'arbitration_required' as const };
+    }
 
     const action =
-      actorRole === 'RESPONSABLE' && canPerform(actorRole, 'APPROVE_CANCEL', incident)
+      actorRole === 'RESPONSABLE' &&
+      arbitration?.request_type === 'CANCEL' &&
+      canPerform(actorRole, 'APPROVE_CANCEL', incident)
         ? 'APPROVE_CANCEL'
         : 'CANCEL';
+    if (arbitration && action !== 'APPROVE_CANCEL') {
+      return { kind: 'arbitration_required' as const };
+    }
     if (!canPerform(actorRole, action, incident)) return { kind: 'forbidden' as const };
 
     const ok = await workshopRepository.cancelIncidentData(incidentId, client);
     if (!ok) return { kind: 'not_found' as const };
+
+    if (action === 'APPROVE_CANCEL') {
+      await arbitrationRepository.resolveArbitrationCase(
+        incidentId,
+        'CANCEL',
+        'APPROVED',
+        actorUserId,
+        null,
+        client
+      );
+    }
 
     await logIncidentEvent(
       incidentId,
@@ -513,12 +573,17 @@ export async function cancelIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'arbitration_required') return arbitrationRequiredResult();
   if (result.kind === 'forbidden')
     return forbidden('Annulation non autorisée pour ce rôle ou ce statut.');
-  void notifyFollowersIncidentCanceled(incidentId, actorUserId);
-  if (result.takenByUserId) void notifyTechnicianIncidentCanceled(incidentId, actorUserId);
-  if (result.mode === 'APPROVE_CANCEL') void notifyDeclarantCancelApproved(incidentId, actorUserId);
   return { ok: true, data: { message: 'Incident annulé.' } };
+}
+
+function arbitrationRequiredResult(): ServiceResult<never> {
+  return conflict(
+    'ARBITRATION_REQUIRED',
+    "Une demande d'arbitrage doit être décidée avant de poursuivre le traitement."
+  );
 }
 
 // ─── Suivi (FOLLOW / UNFOLLOW) ────────────────────────────────────────────────
@@ -541,8 +606,10 @@ export async function followIncidentService(
       return { kind: 'forbidden' as const };
     }
 
-    await workshopRepository.followIncidentData(incidentId, actorUserId, client);
-    await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client);
+    const changed = await workshopRepository.followIncidentData(incidentId, actorUserId, client);
+    if (changed) {
+      await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client);
+    }
     return { kind: 'ok' as const };
   });
 
@@ -566,8 +633,10 @@ export async function unfollowIncidentService(
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
 
-    await workshopRepository.unfollowIncidentData(incidentId, actorUserId, client);
-    await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_UNFOLLOWED', {}, client);
+    const changed = await workshopRepository.unfollowIncidentData(incidentId, actorUserId, client);
+    if (changed) {
+      await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_UNFOLLOWED', {}, client);
+    }
     return { kind: 'ok' as const };
   });
 

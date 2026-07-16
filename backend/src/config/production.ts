@@ -7,16 +7,15 @@ const DEFAULT_SECRET_VALUES = new Set([
 
 const REQUIRED_PRODUCTION_ENV = [
   'DATABASE_URL',
-  'ADMIN_USERNAME',
-  'ADMIN_PASSWORD',
   'COOKIE_SECRET',
   'JWT_SECRET',
   'CLIENT_ORIGIN',
+  'TRUST_PROXY',
   'BOARD_ACCESS_CODE_HASH',
 ] as const;
 
 const MIN_SECRET_LENGTH = 24;
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 
 function isWeakSecret(value: string | undefined): boolean {
   if (!value) return true;
@@ -32,33 +31,35 @@ export function assertProductionConfig(): void {
     throw new Error(`Missing production environment variables: ${missing.join(', ')}`);
   }
 
-  const weakSecrets = ['ADMIN_PASSWORD', 'COOKIE_SECRET', 'JWT_SECRET'].filter((name) =>
+  const weakSecrets = ['COOKIE_SECRET', 'JWT_SECRET'].filter((name) =>
     isWeakSecret(process.env[name])
   );
+  if (process.env.ADMIN_PASSWORD && isWeakSecret(process.env.ADMIN_PASSWORD)) {
+    weakSecrets.push('ADMIN_PASSWORD');
+  }
   if (weakSecrets.length > 0) {
     throw new Error(`Unsafe production secret values: ${weakSecrets.join(', ')}`);
   }
 
-  if (process.env.CLIENT_ORIGIN?.includes('localhost')) {
-    throw new Error('CLIENT_ORIGIN must not point to localhost in production.');
+  let clientOrigin: URL;
+  try {
+    clientOrigin = new URL(process.env.CLIENT_ORIGIN!);
+  } catch {
+    throw new Error('CLIENT_ORIGIN must be a valid absolute URL in production.');
+  }
+  if (clientOrigin.protocol !== 'https:' || clientOrigin.username || clientOrigin.password) {
+    throw new Error('CLIENT_ORIGIN must be an HTTPS origin without embedded credentials.');
+  }
+  if (clientOrigin.pathname !== '/' || clientOrigin.search || clientOrigin.hash) {
+    throw new Error('CLIENT_ORIGIN must contain only the HTTPS origin, without path or query.');
   }
 
   if (process.env.DATABASE_URL?.includes('sentinel_password')) {
     throw new Error('DATABASE_URL must not use the default demo database password in production.');
   }
 
-  if (!SHA256_HEX_PATTERN.test(process.env.BOARD_ACCESS_CODE_HASH || '')) {
-    throw new Error('BOARD_ACCESS_CODE_HASH must be a valid SHA-256 hex digest in production.');
-  }
-
-  // TRUST_PROXY is required when running behind a reverse proxy (Caddy, nginx, etc.)
-  // so that req.ip reflects the real client IP for rate limiting.
-  if (!process.env.TRUST_PROXY) {
-    console.warn(
-      '[config] WARNING: TRUST_PROXY is not set. If the app runs behind a reverse proxy, ' +
-      'rate limiting will key on the proxy IP instead of the real client IP. ' +
-      'Set TRUST_PROXY=true in your .env to fix this.'
-    );
+  if (!BCRYPT_HASH_PATTERN.test(process.env.BOARD_ACCESS_CODE_HASH || '')) {
+    throw new Error('BOARD_ACCESS_CODE_HASH must be a valid bcrypt digest in production.');
   }
 
   // DEEPSEEK_API_KEY is optional — the support chat degrades gracefully when absent.

@@ -53,7 +53,10 @@ export async function getWorkshopAnalytics(query: QueryParams) {
   ] = await Promise.all([
     pool.query(
       `SELECT
-         COUNT(*) FILTER (WHERE ${statusInSql('status', INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED'))})::int AS total,
+         COUNT(*) FILTER (WHERE ${statusInSql(
+           'status',
+           INCIDENT_STATUSES.filter((status) => status !== 'CANCELED' && status !== 'INVALIDATED')
+         )})::int AS total,
          COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,
          COUNT(*) FILTER (WHERE ${pendingStatusSql})::int AS pending_count,
          COUNT(*) FILTER (WHERE ${closedStatusSql})::int AS closed_count,
@@ -131,7 +134,7 @@ export async function getWorkshopAnalytics(query: QueryParams) {
       params
     ),
     pool.query(
-    `WITH filtered_incidents AS (
+      `WITH filtered_incidents AS (
        SELECT wi.id, wi.created_at, wi.taken_at, wi.is_priority
        FROM workshop_incidents wi
        ${whereClause}
@@ -191,10 +194,14 @@ export async function getWorkshopAnalytics(query: QueryParams) {
     taken: totals.taken_count ?? 0,
     open_over_24h: totals.open_over_24h_count ?? 0,
     open_over_7d: totals.open_over_7d_count ?? 0,
-    oldest_active_seconds: totals.oldest_active_seconds ? Number(totals.oldest_active_seconds) : null,
+    oldest_active_seconds: totals.oldest_active_seconds
+      ? Number(totals.oldest_active_seconds)
+      : null,
     median_take_seconds: totals.median_take_seconds ? Number(totals.median_take_seconds) : null,
     avg_take_seconds: totals.avg_take_seconds ? Number(totals.avg_take_seconds) : null,
-    median_close_seconds: closeStats.median_close_seconds ? Number(closeStats.median_close_seconds) : null,
+    median_close_seconds: closeStats.median_close_seconds
+      ? Number(closeStats.median_close_seconds)
+      : null,
     avg_close_seconds: closeStats.avg_close_seconds ? Number(closeStats.avg_close_seconds) : null,
     by_state: stateRows.map((row) => ({ state: row.state, count: row.count })),
     by_line: lineRows.map((row) => ({ line_number: row.line_number, count: row.count })),

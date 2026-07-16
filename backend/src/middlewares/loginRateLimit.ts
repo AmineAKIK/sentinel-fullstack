@@ -6,14 +6,16 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-interface RateLimitOptions {
+export interface RateLimitOptions {
   windowMs: number;
   maxAttempts: number;
   // When true, key is IP-only (no identity). Used for global API limiting.
   ipOnly?: boolean;
+  keyGenerator?: (req: Request) => string;
+  maxEntries?: number;
 }
 
-interface RateLimiter {
+export interface RateLimiter {
   middleware: (req: Request, res: Response, next: NextFunction) => void;
   // Vérifie puis consomme une tentative. Utilisé pour les quotas qui comptent
   // toutes les requêtes, pas seulement les échecs.
@@ -34,8 +36,8 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function createRateLimit(options: RateLimitOptions): RateLimiter {
-  const { windowMs, maxAttempts, ipOnly = false } = options;
+export function createRateLimit(options: RateLimitOptions): RateLimiter {
+  const { windowMs, maxAttempts, ipOnly = false, keyGenerator, maxEntries = 10_000 } = options;
   const attempts = new Map<string, RateLimitEntry>();
   let lastCleanupAt = 0;
 
@@ -48,6 +50,7 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
   }
 
   function getKey(req: Request): string {
+    if (keyGenerator) return keyGenerator(req);
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     if (ipOnly) return ip;
 
@@ -102,6 +105,10 @@ function createRateLimit(options: RateLimitOptions): RateLimiter {
     const key = getKey(req);
     const entry = attempts.get(key);
     if (!entry || now > entry.resetAt) {
+      if (!entry && attempts.size >= maxEntries) {
+        const oldestKey = attempts.keys().next().value;
+        if (oldestKey) attempts.delete(oldestKey);
+      }
       attempts.set(key, { count: 1, resetAt: now + windowMs });
       return;
     }

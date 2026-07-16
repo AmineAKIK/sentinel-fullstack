@@ -20,12 +20,12 @@ export interface CreateIncidentPayload {
   currentProduct: string;
 }
 
-export async function listWorkshopLines(): Promise<ProductionLine[]> {
-  return api.get<ProductionLine[]>('/api/workshop/lines');
+export async function listWorkshopLines(signal?: AbortSignal): Promise<ProductionLine[]> {
+  return api.get<ProductionLine[]>('/api/workshop/lines', signal);
 }
 
-export async function listWorkshopIncidents(): Promise<WorkshopIncident[]> {
-  return api.get<WorkshopIncident[]>('/api/workshop/incidents');
+export async function listWorkshopIncidents(signal?: AbortSignal): Promise<WorkshopIncident[]> {
+  return api.get<WorkshopIncident[]>('/api/workshop/incidents', signal);
 }
 
 export type IncidentWorkspaceParams = {
@@ -48,15 +48,21 @@ export async function listWorkshopHistoryIncidents(
   );
 }
 
-export async function getWorkshopHistoryIncident(id: number): Promise<WorkshopIncident> {
-  return api.get<WorkshopIncident>(`/api/workshop/history/incidents/${id}`);
+export async function getWorkshopHistoryIncident(
+  id: number,
+  signal?: AbortSignal
+): Promise<WorkshopIncident> {
+  return api.get<WorkshopIncident>(`/api/workshop/history/incidents/${id}`, signal);
 }
 
 export async function listWorkshopHistoryEvents(
   params: IncidentWorkspaceParams = {},
   signal?: AbortSignal
 ): Promise<WorkshopHistoryEvent[]> {
-  return api.get<WorkshopHistoryEvent[]>(`/api/workshop/history/events${buildQuery(params)}`, signal);
+  return api.get<WorkshopHistoryEvent[]>(
+    `/api/workshop/history/events${buildQuery(params)}`,
+    signal
+  );
 }
 
 export async function listWorkshopKnowledgeIncidents(
@@ -69,8 +75,11 @@ export async function listWorkshopKnowledgeIncidents(
   );
 }
 
-export async function getWorkshopKnowledgeIncident(id: number): Promise<WorkshopIncident> {
-  return api.get<WorkshopIncident>(`/api/workshop/knowledge/incidents/${id}`);
+export async function getWorkshopKnowledgeIncident(
+  id: number,
+  signal?: AbortSignal
+): Promise<WorkshopIncident> {
+  return api.get<WorkshopIncident>(`/api/workshop/knowledge/incidents/${id}`, signal);
 }
 
 export async function createWorkshopIncident(
@@ -113,11 +122,11 @@ export async function unfollowWorkshopIncident(id: number): Promise<WorkshopInci
   return api.delete<WorkshopIncident>(`/api/workshop/incidents/${id}/follow`);
 }
 
-export type ArbitrationConsultationRequestType = 'EDIT' | 'CANCEL' | 'ALL';
+export type ArbitrationConsultationRequestType = 'EDIT' | 'CANCEL';
 
 export async function consultWorkshopArbitration(
   id: number,
-  requestType: ArbitrationConsultationRequestType = 'ALL'
+  requestType: ArbitrationConsultationRequestType
 ): Promise<{ consulted: number; incident: WorkshopIncident }> {
   return api.post<{ consulted: number; incident: WorkshopIncident }>(
     `/api/workshop/incidents/${id}/arbitration-consultation`,
@@ -129,12 +138,15 @@ export async function cancelWorkshopIncident(id: number): Promise<void> {
   return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {});
 }
 
-export async function listIncidentEvents(id: number): Promise<WorkshopIncidentEvent[]> {
-  return api.get<WorkshopIncidentEvent[]>(`/api/workshop/incidents/${id}/events`);
+export async function listIncidentEvents(
+  id: number,
+  signal?: AbortSignal
+): Promise<WorkshopIncidentEvent[]> {
+  return api.get<WorkshopIncidentEvent[]>(`/api/workshop/incidents/${id}/events`, signal);
 }
 
-export async function getIncidentMetrics(): Promise<WorkshopIncidentMetrics> {
-  return api.get<WorkshopIncidentMetrics>('/api/workshop/metrics');
+export async function getIncidentMetrics(signal?: AbortSignal): Promise<WorkshopIncidentMetrics> {
+  return api.get<WorkshopIncidentMetrics>('/api/workshop/metrics', signal);
 }
 
 export type AnalyticsParams = {

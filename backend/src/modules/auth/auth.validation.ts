@@ -16,7 +16,11 @@ export const loginSchema = z.object({
     .max(FIELD_LIMITS.IDENTIFIER, 'Identifiant trop long.'),
   password: z.string().max(MAX_PASSWORD_LENGTH, 'Mot de passe trop long.').optional(),
   newPassword: z.string().max(MAX_PASSWORD_LENGTH, 'Mot de passe trop long.').optional(),
-  setupCode: z.string().trim().max(FIELD_LIMITS.CODE, 'Code de configuration trop long.').optional(),
+  setupCode: z
+    .string()
+    .trim()
+    .max(FIELD_LIMITS.CODE, 'Code de configuration trop long.')
+    .optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

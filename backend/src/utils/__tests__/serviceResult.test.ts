@@ -1,4 +1,11 @@
-import { ok, serviceError, badRequest, forbidden, notFound, conflict } from '../../utils/serviceResult';
+import {
+  ok,
+  serviceError,
+  badRequest,
+  forbidden,
+  notFound,
+  conflict,
+} from '../../utils/serviceResult';
 
 describe('ok', () => {
   it('returns { ok: true, data: value }', () => {

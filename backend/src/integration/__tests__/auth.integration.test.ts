@@ -20,7 +20,11 @@ import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 import { hashAdminPassword, hashWorkshopPassword } from '../../auth/bcrypt';
 import { unifiedLoginService } from '../../modules/auth/auth.service';
-import { generateWorkshopPasswordSetupCode, hashWorkshopPasswordSetupCode, getWorkshopPasswordSetupExpiry } from '../../auth/setupCode';
+import {
+  generateWorkshopPasswordSetupCode,
+  hashWorkshopPasswordSetupCode,
+  getWorkshopPasswordSetupExpiry,
+} from '../../auth/setupCode';
 
 const DB_URL = process.env.DATABASE_URL;
 const RUN = Boolean(DB_URL);
@@ -34,18 +38,28 @@ let pool: Pool;
 // qu'à nos propres lignes), pour que la suite reste sûre même si d'autres
 // fichiers d'intégration s'exécutent en parallèle sur la même base. Pas de
 // TRUNCATE — qui détruirait les données des autres suites.
-const ADMIN_PREFIX = 'int-auth-';
 const BADGE_PREFIX = 'IA-';
+
+// Sentinel n'autorise qu'un seul compte admin (uq_admin_singleton_key) : les tests
+// de login admin ne peuvent pas insérer un second compte, ils réécrivent
+// temporairement l'unique ligne existante puis restaurent son état d'origine.
+let originalAdmin: { id: number; username: string; password_hash: string | null };
 
 beforeAll(async () => {
   if (!RUN) return;
   pool = new Pool({ connectionString: DB_URL });
   // Run all migrations against the real DB
   await runMigrations();
+
+  const { rows } = await pool.query(
+    `SELECT id, username, password_hash FROM admin_accounts LIMIT 1`
+  );
+  originalAdmin = rows[0];
 }, 30_000);
 
 afterAll(async () => {
   if (!RUN) return;
+  await restoreAdminFixture();
   await cleanAuthFixtures();
   await pool.end();
 });
@@ -53,19 +67,25 @@ afterAll(async () => {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function cleanAuthFixtures() {
-  await pool.query('DELETE FROM admin_accounts WHERE username LIKE $1', [`${ADMIN_PREFIX}%`]);
   await pool.query('DELETE FROM sentinel_users WHERE badge_number LIKE $1', [`${BADGE_PREFIX}%`]);
+}
+
+async function restoreAdminFixture() {
+  await pool.query('UPDATE admin_accounts SET username = $2, password_hash = $3 WHERE id = $1', [
+    originalAdmin.id,
+    originalAdmin.username,
+    originalAdmin.password_hash,
+  ]);
 }
 
 async function insertAdmin(username: string, password: string): Promise<number> {
   const hash = await hashAdminPassword(password);
-  const { rows } = await pool.query<{ id: number }>(
-    `INSERT INTO admin_accounts (username, password_hash) VALUES ($1, $2)
-     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
-     RETURNING id`,
-    [username, hash]
-  );
-  return rows[0].id;
+  await pool.query(`UPDATE admin_accounts SET username = $2, password_hash = $3 WHERE id = $1`, [
+    originalAdmin.id,
+    username,
+    hash,
+  ]);
+  return originalAdmin.id;
 }
 
 async function insertWorkshopUser(opts: {
@@ -76,7 +96,9 @@ async function insertWorkshopUser(opts: {
 }): Promise<number> {
   const { badge, role = 'OPERATOR', withPassword, active = true } = opts;
   const passwordHash = withPassword ? await hashWorkshopPassword(withPassword) : null;
-  const setupTokenHash = withPassword ? null : await hashWorkshopPasswordSetupCode(generateWorkshopPasswordSetupCode());
+  const setupTokenHash = withPassword
+    ? null
+    : await hashWorkshopPasswordSetupCode(generateWorkshopPasswordSetupCode());
   const setupExpiry = withPassword ? null : getWorkshopPasswordSetupExpiry(24);
 
   const { rows } = await pool.query<{ id: number }>(
@@ -93,8 +115,10 @@ async function insertWorkshopUser(opts: {
 // ── Admin login ────────────────────────────────────────────────────────────────
 
 describeIntegration('Admin login (real DB)', () => {
-  const ADMIN = `${ADMIN_PREFIX}admin`;
-  beforeEach(cleanAuthFixtures);
+  const ADMIN = 'int-auth-admin';
+  // Chaque test réécrit l'unique compte admin (voir insertAdmin) : on repart
+  // toujours de son état d'origine plutôt que d'un état laissé par le test précédent.
+  beforeEach(restoreAdminFixture);
 
   it('returns admin_success with correct credentials', async () => {
     await insertAdmin(ADMIN, 'correct_password_123');
@@ -113,7 +137,7 @@ describeIntegration('Admin login (real DB)', () => {
   });
 
   it('returns invalid_credentials for unknown username', async () => {
-    const result = await unifiedLoginService(`${ADMIN_PREFIX}nobody`, 'any_password', undefined, undefined);
+    const result = await unifiedLoginService('int-auth-nobody', 'any_password', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
   });
 
@@ -149,7 +173,12 @@ describeIntegration('Workshop login (real DB)', () => {
 
   it('returns workshop_success with correct credentials', async () => {
     await insertWorkshopUser({ badge: `${BADGE_PREFIX}003`, withPassword: 'correct_pass_99' });
-    const result = await unifiedLoginService(`${BADGE_PREFIX}003`, 'correct_pass_99', undefined, undefined);
+    const result = await unifiedLoginService(
+      `${BADGE_PREFIX}003`,
+      'correct_pass_99',
+      undefined,
+      undefined
+    );
     expect(result.kind).toBe('workshop_success');
     if (result.kind === 'workshop_success') {
       expect(result.user.badge_number).toBe(`${BADGE_PREFIX}003`);
@@ -159,13 +188,27 @@ describeIntegration('Workshop login (real DB)', () => {
 
   it('returns invalid_credentials with wrong password', async () => {
     await insertWorkshopUser({ badge: `${BADGE_PREFIX}004`, withPassword: 'correct_pass_99' });
-    const result = await unifiedLoginService(`${BADGE_PREFIX}004`, 'wrong_pass', undefined, undefined);
+    const result = await unifiedLoginService(
+      `${BADGE_PREFIX}004`,
+      'wrong_pass',
+      undefined,
+      undefined
+    );
     expect(result.kind).toBe('invalid_credentials');
   });
 
   it('returns workshop_account_disabled for inactive user', async () => {
-    await insertWorkshopUser({ badge: `${BADGE_PREFIX}005`, withPassword: 'correct_pass_99', active: false });
-    const result = await unifiedLoginService(`${BADGE_PREFIX}005`, 'correct_pass_99', undefined, undefined);
+    await insertWorkshopUser({
+      badge: `${BADGE_PREFIX}005`,
+      withPassword: 'correct_pass_99',
+      active: false,
+    });
+    const result = await unifiedLoginService(
+      `${BADGE_PREFIX}005`,
+      'correct_pass_99',
+      undefined,
+      undefined
+    );
     expect(result.kind).toBe('workshop_account_disabled');
   });
 
@@ -180,6 +223,12 @@ describeIntegration('Workshop login (real DB)', () => {
 describeIntegration('Migrations (real DB)', () => {
   it('can run migrations twice without error (idempotent)', async () => {
     await expect(runMigrations()).resolves.not.toThrow();
+  });
+
+  it('serializes concurrent runners with an advisory lock', async () => {
+    await expect(Promise.all([runMigrations(), runMigrations(), runMigrations()])).resolves.toEqual(
+      [undefined, undefined, undefined]
+    );
   });
 
   it('schema_migrations table exists after migrations', async () => {
@@ -199,6 +248,9 @@ describeIntegration('Migrations (real DB)', () => {
       'workshop_incident_followers',
       'account_audit_events',
       'line_audit_events',
+      'workshop_arbitration_cases',
+      'production_line_machines',
+      'notification_outbox',
     ];
     const { rows } = await pool.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
@@ -206,6 +258,54 @@ describeIntegration('Migrations (real DB)', () => {
     const existingTables = rows.map((r) => r.tablename);
     for (const table of expectedTables) {
       expect(existingTables).toContain(table);
+    }
+  });
+
+  it('stores a non-null checksum for every applied migration', async () => {
+    const { rows } = await pool.query<{ total: number; checksummed: number }>(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(checksum)::int AS checksummed
+       FROM schema_migrations`
+    );
+    expect(rows[0].checksummed).toBe(rows[0].total);
+    expect(rows[0].total).toBeGreaterThanOrEqual(45);
+  });
+
+  it('refuses a modified migration ledger entry', async () => {
+    const filename = '001_create_admin_accounts.sql';
+    const { rows } = await pool.query<{ checksum: string }>(
+      'SELECT checksum FROM schema_migrations WHERE filename = $1',
+      [filename]
+    );
+    const originalChecksum = rows[0].checksum;
+    await pool.query('UPDATE schema_migrations SET checksum = $1 WHERE filename = $2', [
+      '0'.repeat(64),
+      filename,
+    ]);
+
+    try {
+      await expect(runMigrations()).rejects.toThrow('checksum mismatch');
+    } finally {
+      await pool.query('UPDATE schema_migrations SET checksum = $1 WHERE filename = $2', [
+        originalChecksum,
+        filename,
+      ]);
+    }
+  });
+
+  it('enforces the single administrator invariant in PostgreSQL', async () => {
+    // Un admin existe déjà (compte réel ou seed) : la contrainte doit refuser
+    // d'en insérer un second, pas seulement un troisième.
+    await pool.query('BEGIN');
+    try {
+      await expect(
+        pool.query(
+          `INSERT INTO admin_accounts (username, password_hash)
+           VALUES ('singleton-two', 'hash')`
+        )
+      ).rejects.toMatchObject({ code: '23505' });
+    } finally {
+      await pool.query('ROLLBACK');
     }
   });
 });

@@ -1,135 +1,190 @@
 # Cycle de vie d'un incident Sentinel
 
-## Statuts possibles
+Ce document décrit les transitions réellement autorisées par la policy backend
+et protégées par les contraintes PostgreSQL.
 
-| Statut | Description |
-|---|---|
-| `OPEN` | Incident actif, en cours de traitement |
-| `PENDING` | MAINTENANCE a mis en pause (en attente de pièces, d'informations, etc.) |
-| `CLOSED` | Incident résolu par MAINTENANCE |
-| `CANCELED` | Incident annulé (erreur de déclaration, etc.) |
-| `INVALIDATED` | Clôture invalidée par RESPONSABLE ; état terminal conservé dans l'historique |
+## 1. Statuts
 
----
+| Statut | Nature | Description |
+| --- | --- | --- |
+| `OPEN` | actif | incident à prendre ou en cours de traitement |
+| `PENDING` | actif | traitement suspendu avec diagnostic |
+| `CLOSED` | terminal | intervention clôturée avec une note |
+| `CANCELED` | terminal | déclaration annulée, conservée dans l'historique |
+| `INVALIDATED` | terminal | clôture invalidée par un responsable |
 
-## Diagramme des transitions
+`OPEN` est complété par l'affectation :
+
+- non pris : `is_taken=false`, technicien et date nuls ;
+- pris : `is_taken=true`, `taken_by_user_id` et `taken_at` renseignés.
+
+La base interdit les combinaisons incohérentes de ces trois champs.
+
+## 2. Graphe principal
 
 ```mermaid
 stateDiagram-v2
-    [*] --> OPEN_NON_PRIS : création
-    OPEN_NON_PRIS --> OPEN_PRIS : TAKE
-    OPEN_PRIS --> OPEN_PRIS : TAKE par une autre maintenance
-    OPEN_PRIS --> PENDING : SET_PENDING + diagnostic
-    PENDING --> OPEN_PRIS : RESUME
-    OPEN_PRIS --> CLOSED : CLOSE + note d'intervention
-    OPEN_NON_PRIS --> CANCELED : CANCEL direct ou APPROVE_CANCEL
-    PENDING --> CANCELED : CANCEL par RESPONSABLE
-    CLOSED --> INVALIDATED : INVALIDATE_CLOSED + motif
+    [*] --> OPEN_NON_PRIS: CREATE
+    OPEN_NON_PRIS --> OPEN_PRIS: TAKE
+    OPEN_PRIS --> OPEN_PRIS: TAKE par un autre technicien
+    OPEN_PRIS --> PENDING: SET_PENDING + diagnostic
+    PENDING --> OPEN_PRIS: RESUME
+    OPEN_PRIS --> CLOSED: CLOSE + intervention
+    OPEN_NON_PRIS --> CANCELED: CANCEL ou APPROVE_CANCEL
+    PENDING --> CANCELED: CANCEL responsable
+    CLOSED --> INVALIDATED: INVALIDATE_CLOSED + motif
 ```
 
-`OPEN_NON_PRIS` et `OPEN_PRIS` représentent le même statut SQL `OPEN`, distingué ici par
-la valeur de `is_taken`. `CLOSED`, `CANCELED` et `INVALIDATED` sont des états terminaux.
+Une demande d'arbitrage ouverte bloque les mutations concurrentes qui rendraient
+la décision ambiguë.
 
----
+## 3. Transitions de traitement
 
-## Détail des transitions
+### Création
 
-### OPEN → OPEN (pris ou repris)
-- **Qui** : MAINTENANCE uniquement
-- **Action** : `TAKE`
-- **Condition** : statut OPEN ; l'incident peut être non pris ou déjà pris par un autre technicien. Le technicien actuellement affecté ne peut pas répéter une prise en charge sans effet.
-- **Effet** : `is_taken = true`, `taken_by_user_id = actorId`, avec journalisation du technicien précédent en cas de reprise
+- acteurs : `OPERATOR`, `MAINTENANCE` ou `RESPONSABLE` ;
+- données : ligne, machine, robot, tête, état et produit, avec commentaire
+  optionnel ;
+- effets : statut `OPEN`, non pris, snapshot du déclarant et événement `CREATED` ;
+- un responsable créateur est automatiquement abonné au suivi ;
+- intégrité : une seule anomalie active par emplacement machine.
 
-### OPEN (pris) → PENDING
-- **Qui** : tout utilisateur MAINTENANCE
-- **Action** : `SET_PENDING`
-- **Condition** : statut OPEN, `is_taken = true`
-- **Requis** : un diagnostic doit exister (saisi maintenant ou précédemment)
-- **Effet** : statut passe à PENDING
+### `TAKE`
 
-### PENDING → OPEN (pris)
-- **Qui** : tout utilisateur MAINTENANCE
-- **Action** : `RESUME`
-- **Condition** : statut PENDING, `is_taken = true`
-- **Effet** : statut repasse à OPEN
+- acteur : `MAINTENANCE` ;
+- condition : incident `OPEN` sans arbitrage ouvert ;
+- comportement : revendique un incident non pris ou transfère un incident pris
+  par un autre technicien ;
+- no-op interdit : le technicien déjà affecté ne peut pas se réaffecter ;
+- effets : technicien/date mis à jour et ancien technicien tracé en cas de transfert.
 
-### OPEN (pris) → CLOSED
-- **Qui** : tout utilisateur MAINTENANCE
-- **Action** : `CLOSE`
-- **Condition** : statut OPEN, `is_taken = true` (pas depuis PENDING)
-- **Requis** : une note d'intervention doit exister
-- **Effet** : statut passe à CLOSED, incident archivé
+### `SET_PENDING`
 
-### OPEN → CANCELED (direct)
-- **Qui** : RESPONSABLE ou MAINTENANCE
-- **Action** : `CANCEL`
-- **Condition** : incident actif, `is_taken = false`
-- **Effet** : statut passe à CANCELED
+- acteur : `MAINTENANCE` ;
+- condition : incident `OPEN`, pris, sans arbitrage ouvert ;
+- donnée requise : diagnostic présent ou fourni par l'action ;
+- effet : statut `PENDING`, affectation conservée.
 
-### OPEN → CANCELED (via demande)
-- **Étape 1** : l'OPERATOR déclarant fait `REQUEST_CANCEL` avec un motif obligatoire, tant que l'incident est actif et non pris
-- **Étape 2** : RESPONSABLE fait `APPROVE_CANCEL` → statut CANCELED
-- **Alternative** : RESPONSABLE fait `REJECT_CANCEL` → incident reste OPEN
+La policy autorise un technicien de maintenance remplaçant à suspendre un
+incident déjà pris. Pour matérialiser aussi le transfert d'affectation, il doit
+d'abord utiliser `TAKE`.
 
-### PENDING → CANCELED (reprise de contrôle superviseur)
-- **Qui** : RESPONSABLE uniquement (pas MAINTENANCE)
-- **Action** : `CANCEL`
-- **Condition** : statut PENDING (donc `is_taken = true` par construction)
-- **Effet** : statut passe à CANCELED
-- **Pourquoi MAINTENANCE en est exclu** : un incident PENDING a déjà été pris
-  en charge par un technicien qui s'est engagé sur le diagnostic — l'annuler
-  à ce stade est une décision de supervision, pas une opération technique.
+### `RESUME`
 
-### CLOSED → INVALIDATED
-- **Qui** : RESPONSABLE uniquement
-- **Action** : `INVALIDATE_CLOSED`
-- **Condition** : statut CLOSED
-- **Requis** : motif d'invalidation obligatoire
-- **Effet** : statut passe à INVALIDATED ; l'incident reste historisé et n'est pas rouvert
+- acteur : `MAINTENANCE` ;
+- condition : incident `PENDING`, pris, sans arbitrage ouvert ;
+- effet : retour à `OPEN`, affectation conservée.
 
----
+Tout technicien de maintenance peut reprendre afin de ne pas bloquer une équipe
+en cas d'absence. Un transfert explicite peut ensuite être réalisé par `TAKE`.
 
-## Workflow d'édition (demande de correction)
+### `CLOSE`
 
-Quand un OPERATOR veut corriger un incident qu'il a déclaré :
+- acteur : `MAINTENANCE` ;
+- condition : incident `OPEN`, pris, sans arbitrage ouvert ;
+- donnée requise : note d'intervention présente ou fournie ;
+- effet : statut `CLOSED`, date et acteur de clôture, événement historisé.
 
-```
-OPERATOR : REQUEST_EDIT (envoie les champs modifiés)
-                │
-                ▼
-       [edit_request stocké en base]
-                │
-         ┌──────┴──────┐
-         │             │
-         ▼             ▼
-RESPONSABLE :   RESPONSABLE :
-APPROVE_EDIT    REJECT_EDIT
-         │             │
-         ▼             ▼
-  corrections      edit_request
-  appliquées         effacé
-```
+Un incident `PENDING` doit d'abord être repris. Comme pour `RESUME`, la policy
+autorise une maintenance remplaçante à clôturer ; l'identité de l'acteur de
+clôture reste distincte du technicien affecté.
 
----
+### `CANCEL` direct
 
-## États de la machine (anomalies déclarées)
+- acteurs : `RESPONSABLE` ou `MAINTENANCE` ;
+- cas `OPEN` : uniquement si l'incident n'est pas pris et n'a pas d'arbitrage ;
+- cas `PENDING` : uniquement `RESPONSABLE`, comme décision de supervision ;
+- effet : statut `CANCELED`, conservation intégrale dans l'historique.
 
-Ce sont les types d'anomalie qu'un OPERATOR peut déclarer, indépendamment du statut de l'incident :
+### `INVALIDATE_CLOSED`
+
+- acteur : `RESPONSABLE` ;
+- condition : incident `CLOSED` ;
+- donnée requise : motif ;
+- effet : statut `INVALIDATED`, sans réouverture de l'incident.
+
+## 4. Demande d'annulation
+
+### Ouverture
+
+`REQUEST_CANCEL` est autorisé à l'opérateur déclarant si :
+
+- l'incident est actif ;
+- il n'est pas pris ;
+- aucune autre demande d'arbitrage n'est ouverte ;
+- un motif non vide est fourni.
+
+La transaction met le marqueur de demande sur l'incident, écrit l'événement et
+crée un cas `CANCEL/ACTIVE` avec demandeur, motif et date.
+
+### Navigation du responsable
+
+- ouverture de l'incident : la modale présente le contexte suffisant pour décider ;
+- **Reporter** : ferme la modale, ne change pas le cas, puis montre le dossier ;
+- **Consulter le dossier** : passe explicitement `ACTIVE` vers `CONSULTED` et
+  montre le dossier ;
+- fermeture par la croix/Escape : aucun changement métier.
+
+Seul `ACTIVE` compte dans la pastille rouge « À arbitrer ». Une consultation du
+dossier déclenchée en dehors du bouton d'arbitrage ne marque jamais le cas lu.
+
+### Décision
+
+- `APPROVE_CANCEL` : cas `APPROVED`, incident `CANCELED` ;
+- `REJECT_CANCEL` : cas `REJECTED`, incident reste actif, demande effacée ;
+- archivage/annulation globale rendant la demande obsolète : cas `SUPERSEDED`.
+
+La décision et la transition de l'incident partagent la même transaction.
+
+## 5. Demande de correction
+
+### Ouverture
+
+`REQUEST_EDIT` est autorisé à l'opérateur déclarant sur un incident actif sans
+autre arbitrage. Seuls les champs explicitement demandés sont stockés dans le
+payload du cas `EDIT/ACTIVE`; l'incident courant n'est pas modifié.
+
+### Décision
+
+- `APPROVE_EDIT` applique atomiquement les champs validés et clôt le cas en
+  `APPROVED` ;
+- `REJECT_EDIT` ne modifie pas l'incident et clôt le cas en `REJECTED` ;
+- `WITHDRAW_EDIT` retire la demande du déclarant et clôt le cas en `WITHDRAWN`.
+
+Le responsable voit côte à côte la valeur actuelle et la valeur demandée. Les
+règles Reporter/Consulter/pastille sont identiques à l'annulation.
+
+## 6. Modifications directes
+
+- `RESPONSABLE_EDIT` : champs descriptifs d'un incident actif, même pris, en
+  l'absence d'arbitrage ;
+- `EDIT_AFTER_TAKE` : maintenance affectée uniquement, incident actif et pris ;
+- `DIRECT_EDIT` : responsable ou maintenance sur un incident actif non pris ;
+- `SET_PRIORITY` et `RESPONSIBLE_COMMENT` : responsable sur incident actif.
+
+Une mise à jour qui ne change aucune valeur ne génère ni écriture ni événement
+d'audit trompeur.
+
+## 7. États de machine
+
+Les états décrivent l'anomalie, indépendamment du statut de traitement :
 
 | État | Description |
-|---|---|
-| `SKIPEE_PAR_MACHINE` | La machine skippe des pièces automatiquement |
-| `SKIPEE_PAR_CONDUCTEUR` | Le conducteur skippe des pièces manuellement |
-| `DEGRADEE` | La machine fonctionne en mode dégradé |
-| `INDISPONIBLE` | La machine est complètement arrêtée |
+| --- | --- |
+| `SKIPEE_PAR_MACHINE` | rejet automatique par la machine |
+| `SKIPEE_PAR_CONDUCTEUR` | rejet manuel par le conducteur |
+| `DEGRADEE` | production maintenue en mode dégradé |
+| `INDISPONIBLE` | machine arrêtée |
 
----
+## 8. Invariants
 
-## Règles importantes à retenir
-
-1. **On ne peut pas clôturer un incident PENDING** — il faut d'abord le reprendre (RESUME) pour repasser en OPEN, puis clôturer.
-2. **Seul MAINTENANCE peut prendre en charge** — RESPONSABLE supervise mais n'intervient pas techniquement.
-3. **OPERATOR ne peut demander l'annulation que si l'incident n'est pas encore pris** — un incident OPEN déjà pris ne peut pas être annulé directement ; lorsqu'il est PENDING, seul RESPONSABLE peut l'annuler.
-4. **Diagnostic obligatoire avant PENDING** — on ne peut pas mettre en attente sans avoir documenté le problème.
-5. **Note d'intervention obligatoire avant CLOSE** — on ne peut pas clôturer sans avoir documenté ce qui a été fait.
-6. **Toutes les transitions réussies génèrent un événement d'audit** — journal append-only au niveau applicatif, avec l'acteur et l'horodatage de l'action.
+1. un incident terminal ne redevient jamais actif ;
+2. un incident `PENDING` est toujours pris ;
+3. une clôture exige une note d'intervention ;
+4. une mise en attente exige un diagnostic ;
+5. une demande opérateur concerne uniquement sa propre déclaration ;
+6. un seul cas d'arbitrage ouvert existe par incident ;
+7. toute mutation réussie écrit son acteur et son contexte historique ;
+8. annulations et invalidations sont conservées mais exclues des indicateurs actifs ;
+9. les services verrouillent les lignes avant décision pour empêcher les courses ;
+10. le frontend reflète la policy, mais seule la vérification backend autorise l'action.

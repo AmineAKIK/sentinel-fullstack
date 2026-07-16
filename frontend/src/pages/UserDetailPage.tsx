@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import EditUserModal from '../components/EditUserModal';
@@ -21,6 +21,7 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const successTimerRef = useRef<number | null>(null);
 
   const [modal, setModal] = useState<'edit' | 'delete' | null>(null);
 
@@ -28,21 +29,39 @@ export default function UserDetailPage() {
     const numId = parseInt(id || '', 10);
     if (isNaN(numId)) {
       navigate('/admin/users', { replace: true });
-      return;
+      return undefined;
     }
 
+    const controller = new AbortController();
     setLoading(true);
-    getAccount(numId)
+    setError('');
+    void getAccount(numId, controller.signal)
       .then(setUser)
       .catch(() => {
-        setError("Utilisateur introuvable ou accès refusé.");
+        if (!controller.signal.aborted) {
+          setError('Utilisateur introuvable ou accès refusé.');
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [id, navigate]);
 
+  useEffect(
+    () => () => {
+      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
+    },
+    []
+  );
+
   function showSuccess(msg: string) {
+    if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
     setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(''), 5000);
+    successTimerRef.current = window.setTimeout(() => {
+      setSuccessMsg('');
+      successTimerRef.current = null;
+    }, 5000);
   }
 
   function passwordStatusLabel(account: SentinelUser): string {
@@ -86,7 +105,10 @@ export default function UserDetailPage() {
           <h1>
             {user.last_name} {user.first_name}
           </h1>
-          <span className={`badge-status ${user.is_active ? 'active' : 'inactive'}`} style={{ fontSize: 14 }}>
+          <span
+            className={`badge-status ${user.is_active ? 'active' : 'inactive'}`}
+            style={{ fontSize: 14 }}
+          >
             {user.is_active ? 'Actif' : 'Inactif'}
           </span>
         </div>
@@ -103,11 +125,11 @@ export default function UserDetailPage() {
                 <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
               </DetailField>
               <DetailField label="Email">{user.email || '—'}</DetailField>
-              <DetailField label="Mot de passe workshop">
-                {passwordStatusLabel(user)}
-              </DetailField>
+              <DetailField label="Mot de passe workshop">{passwordStatusLabel(user)}</DetailField>
               <DetailField label="Date de création">{formatDateTime(user.created_at)}</DetailField>
-              <DetailField label="Dernière modification">{formatDateTime(user.updated_at)}</DetailField>
+              <DetailField label="Dernière modification">
+                {formatDateTime(user.updated_at)}
+              </DetailField>
             </div>
           </div>
         </div>
@@ -143,7 +165,6 @@ export default function UserDetailPage() {
           }}
         />
       )}
-
     </>
   );
 }

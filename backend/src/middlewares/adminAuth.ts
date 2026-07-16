@@ -7,13 +7,10 @@ import {
   sendMissingAuth,
 } from '../auth/authResponses';
 import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
+import { AdminSessionPayload, isAdminSessionPayload } from '../auth/sessionPayloads';
 import { getAdminSessionVersion } from '../modules/adminCredentials/adminCredentials.repository';
 
-export interface AdminPayload {
-  adminId: number;
-  username: string;
-  sessionVersion?: number;
-}
+export type AdminPayload = AdminSessionPayload;
 
 declare global {
   namespace Express {
@@ -23,11 +20,7 @@ declare global {
   }
 }
 
-export function adminAuthMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+export function adminAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   void authenticateAdminRequest(req, res, next);
 }
 
@@ -49,9 +42,9 @@ async function authenticateAdminRequest(
   }
 
   try {
-    const payload = verifyAuthToken<AdminPayload>(token);
-    if (!payload) {
-      sendInvalidServerConfig(res);
+    const payload = verifyAuthToken(token, 'admin');
+    if (!isAdminSessionPayload(payload)) {
+      sendInvalidSession(res);
       return;
     }
 
@@ -61,10 +54,7 @@ async function authenticateAdminRequest(
       return;
     }
 
-    // If the token carries a version, reject it if it doesn't match the current one.
-    // Tokens without sessionVersion (issued before migration 022) are still accepted
-    // until they naturally expire.
-    if (payload.sessionVersion !== undefined && payload.sessionVersion !== currentVersion) {
+    if (payload.sessionVersion !== currentVersion) {
       sendInvalidSession(res);
       return;
     }

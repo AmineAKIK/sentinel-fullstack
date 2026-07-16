@@ -5,6 +5,8 @@ coverage/
 .vite/
 .cache/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Playwright (artefacts générés ; les tests sources e2e/ restent versionnés)
 playwright-report/

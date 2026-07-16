@@ -28,7 +28,15 @@ export async function createAccountAuditEvent(
          (target_user_id, admin_id, event_type, changes,
           target_first_name, target_last_name, target_badge_number)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [targetUserId, adminId, eventType, changesJson, identity.firstName, identity.lastName, identity.badgeNumber]
+      [
+        targetUserId,
+        adminId,
+        eventType,
+        changesJson,
+        identity.firstName,
+        identity.lastName,
+        identity.badgeNumber,
+      ]
     );
     return;
   }

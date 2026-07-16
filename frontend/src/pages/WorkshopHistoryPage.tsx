@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
@@ -22,8 +21,6 @@ import { useHistoryData } from '../hooks/useHistoryData';
 export default function WorkshopHistoryPage() {
   usePageTitle('Historique');
   const navigate = useNavigate();
-  const isInitialDeepLinkRef = useRef(false);
-
   const {
     incidents,
     lines,
@@ -50,8 +47,6 @@ export default function WorkshopHistoryPage() {
     selectIncident,
     clearFilters,
   } = useHistoryData();
-
-  void isInitialDeepLinkRef;
 
   const filterChips: FilterChip[] = [
     ...searchFilterChip(query, () => {
@@ -140,7 +135,11 @@ export default function WorkshopHistoryPage() {
               </div>
               <div className="history-incident-list">
                 {loading ? (
-                  <div aria-busy="true" aria-label="Chargement des incidents" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <div
+                    aria-busy="true"
+                    aria-label="Chargement des incidents"
+                    style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}
+                  >
                     {Array.from({ length: 5 }).map((_, i) => (
                       <Skeleton key={i} height={40} block />
                     ))}

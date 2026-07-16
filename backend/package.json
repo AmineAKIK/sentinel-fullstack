@@ -3,20 +3,27 @@
   "version": "1.0.0",
   "description": "Sentinel backend API",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "build": "tsc",
+    "typecheck:scripts": "tsc --project tsconfig.scripts.json --noEmit",
     "start": "node dist/server.js",
     "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "reset:admin": "ts-node src/scripts/reset-admin-password.ts",
+    "hash:board": "ts-node src/scripts/hash-board-code.ts",
     "verify:reliability": "node scripts/verifyReliability.js",
     "seed:demo": "node scripts/seedWorkshopProductionDemo.js",
     "seed:e2e": "ts-node scripts/seedE2E.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write src"
+    "lint": "eslint src scripts/seedE2E.ts",
+    "lint:fix": "eslint src scripts/seedE2E.ts --fix",
+    "format:check": "prettier --check src scripts/seedE2E.ts scripts/verifyReliability.js scripts/seedWorkshopProductionDemo.js",
+    "format": "prettier --write src scripts/seedE2E.ts scripts/verifyReliability.js scripts/seedWorkshopProductionDemo.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

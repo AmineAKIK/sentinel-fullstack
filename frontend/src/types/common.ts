@@ -17,12 +17,12 @@ export interface WorkshopUser {
 
 export interface WorkshopPasswordSetupRequired {
   requiresPasswordSetup: true;
-  badge_number: string;
+  badge_number?: string;
 }
 
 export interface WorkshopPasswordRequired {
   requiresPassword: true;
-  badge_number: string;
+  badge_number?: string;
 }
 
 export interface SentinelUser {

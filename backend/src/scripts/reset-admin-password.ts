@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import path from 'path';
-import { Pool } from 'pg';
+import crypto from 'crypto';
+import { Pool, PoolClient } from 'pg';
 import { hashAdminPassword } from '../auth/bcrypt';
 
 config({ path: path.resolve(__dirname, '../../.env') });
@@ -17,38 +18,45 @@ const LENGTH = 20;
 function generatePassword(): string {
   const chars: string[] = [];
   for (let i = 0; i < LENGTH; i++) {
-    chars.push(CHARSET[Math.floor(Math.random() * CHARSET.length)]);
+    chars.push(CHARSET[crypto.randomInt(CHARSET.length)]);
   }
   return chars.join('');
 }
 
 async function main(): Promise<void> {
   const pool = new Pool({ connectionString: DB_URL });
+  let client: PoolClient | null = null;
 
   try {
-    const { rows } = await pool.query<{ id: number; username: string }>(
-      'SELECT id, username FROM admin_accounts LIMIT 1'
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const configuredUsername = process.env.ADMIN_USERNAME?.trim();
+    const { rows } = await client.query<{ id: number; username: string }>(
+      configuredUsername
+        ? 'SELECT id, username FROM admin_accounts WHERE username = $1 FOR UPDATE'
+        : 'SELECT id, username FROM admin_accounts ORDER BY id ASC LIMIT 1 FOR UPDATE',
+      configuredUsername ? [configuredUsername] : []
     );
 
     if (rows.length === 0) {
-      console.error('[reset-admin] Aucun compte administrateur trouvé en base.');
-      process.exit(1);
+      throw new Error(
+        configuredUsername
+          ? `Compte administrateur ${configuredUsername} introuvable.`
+          : 'Aucun compte administrateur trouvé en base.'
+      );
     }
 
     const admin = rows[0];
     const newPassword = generatePassword();
     const hash = await hashAdminPassword(newPassword);
 
-    await pool.query('BEGIN');
-    await pool.query(
-      'UPDATE admin_accounts SET password_hash = $1 WHERE id = $2',
+    await client.query(
+      `UPDATE admin_accounts
+       SET password_hash = $1, session_version = session_version + 1, updated_at = NOW()
+       WHERE id = $2`,
       [hash, admin.id]
     );
-    await pool.query(
-      'UPDATE admin_accounts SET session_version = session_version + 1 WHERE id = $1',
-      [admin.id]
-    );
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
 
     console.log('\n═══════════════════════════════════════════════════');
     console.log('  SENTINEL — RÉINITIALISATION MOT DE PASSE ADMIN');
@@ -61,10 +69,11 @@ async function main(): Promise<void> {
     console.log('  Toutes les sessions actives ont été invalidées.');
     console.log('═══════════════════════════════════════════════════\n');
   } catch (err) {
-    await pool.query('ROLLBACK').catch(() => undefined);
+    if (client) await client.query('ROLLBACK').catch(() => undefined);
     console.error('[reset-admin] Erreur :', err);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
+    client?.release();
     await pool.end();
   }
 }

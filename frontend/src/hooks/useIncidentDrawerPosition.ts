@@ -19,14 +19,14 @@ function getFocusViewport() {
 function prefersReducedMotion(): boolean {
   return Boolean(
     typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
 
 function usesStackedDetailLayout(): boolean {
   return Boolean(
     typeof window.matchMedia === 'function' &&
-      window.matchMedia(STACKED_DETAIL_LAYOUT_QUERY).matches
+    window.matchMedia(STACKED_DETAIL_LAYOUT_QUERY).matches
   );
 }
 
@@ -107,8 +107,15 @@ export function useIncidentDrawerPosition({
       window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', updateDetailOffset);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIncidentId, selectedIncidentUpdatedAt, sortedIncidentPositionKey, loading, sortOrder]);
+  }, [
+    workbenchRef,
+    detailDrawerRef,
+    selectedIncidentId,
+    selectedIncidentUpdatedAt,
+    sortedIncidentPositionKey,
+    loading,
+    sortOrder,
+  ]);
 
   useLayoutEffect(() => {
     if (selectedIncidentId === null || loading) {
@@ -167,8 +174,14 @@ export function useIncidentDrawerPosition({
       window.cancelAnimationFrame(frameId);
       if (settleTimer !== undefined) window.clearTimeout(settleTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIncidentId, loading, sortedIncidentPositionKey]);
+  }, [
+    workbenchRef,
+    detailDrawerRef,
+    selectedIncidentId,
+    loading,
+    sortedIncidentPositionKey,
+    setFocusedIncidentId,
+  ]);
 
   return { detailOffsetTop };
 }

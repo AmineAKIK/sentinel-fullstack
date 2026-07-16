@@ -91,6 +91,11 @@ describe('paginate', () => {
   it('tout tient dans une page', () => {
     expect(paginate([1, 2], 10)).toEqual([[1, 2]]);
   });
+
+  it('neutralise une taille nulle ou non finie issue du stockage local', () => {
+    expect(paginate([1, 2], 0)).toEqual([[1], [2]]);
+    expect(paginate([1, 2], Number.NaN)).toEqual([[1], [2]]);
+  });
 });
 
 describe('normalizeScreenId', () => {
@@ -108,6 +113,10 @@ describe('normalizeScreenId', () => {
 
   it('caractères spéciaux remplacés par tirets', () => {
     expect(normalizeScreenId('écran@1!')).toBe('-cran-1-');
+  });
+
+  it('borne la longueur utilisée dans les clés de stockage', () => {
+    expect(normalizeScreenId('a'.repeat(100))).toHaveLength(64);
   });
 });
 

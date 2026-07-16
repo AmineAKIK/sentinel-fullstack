@@ -19,8 +19,8 @@ export interface AdminEmailStatus {
   hint: string | null;
 }
 
-export async function getAdminEmail(): Promise<AdminEmailStatus> {
-  return api.get<AdminEmailStatus>('/api/admin/security/email');
+export async function getAdminEmail(signal?: AbortSignal): Promise<AdminEmailStatus> {
+  return api.get<AdminEmailStatus>('/api/admin/security/email', signal);
 }
 
 export async function updateAdminEmail(payload: {

@@ -1,9 +1,29 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import logger from '../../logger';
+import { z } from 'zod';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
+const DEFAULT_TIMEOUT_MS = 12_000;
+const MAX_RESPONSE_BYTES = 1_000_000;
+
+const deepSeekResponseSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        message: z.object({ content: z.string().min(1).max(12_000) }),
+      })
+    )
+    .min(1),
+});
+
+function supportTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.SUPPORT_API_TIMEOUT_MS ?? '', 10);
+  return Number.isInteger(parsed) && parsed >= 1_000 && parsed <= 30_000
+    ? parsed
+    : DEFAULT_TIMEOUT_MS;
+}
 
 // Loaded once at startup — never re-read from DB or any live source
 let cachedDoc: string | null = null;
@@ -75,30 +95,56 @@ export async function askSupport(
     { role: 'user', content: userMessage },
   ];
 
-  const response = await fetch(DEEPSEEK_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages,
-      max_tokens: 1024,
-      temperature: 0.3,
-    }),
-  });
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), supportTimeoutMs());
+  timeout.unref();
+  let response: Response;
+  try {
+    response = await fetch(DEEPSEEK_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages,
+        max_tokens: 768,
+        temperature: 0.3,
+      }),
+      signal: abortController.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
-    await response.text();
+    await response.body?.cancel().catch(() => undefined);
     logger.error({ status: response.status }, 'DeepSeek API error');
     throw new Error('DeepSeek API error');
   }
 
-  const data = (await response.json()) as {
-    choices: { message: { content: string } }[];
-  };
+  const responseLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
+  if (Number.isFinite(responseLength) && responseLength > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error('DeepSeek response too large');
+  }
 
-  const reply = data.choices?.[0]?.message?.content?.trim() ?? '';
+  const rawBody = await response.text();
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_RESPONSE_BYTES) {
+    throw new Error('DeepSeek response too large');
+  }
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(rawBody);
+  } catch {
+    throw new Error('DeepSeek response is not valid JSON');
+  }
+  const parsed = deepSeekResponseSchema.safeParse(decoded);
+  if (!parsed.success) throw new Error('DeepSeek response schema is invalid');
+
+  const reply = parsed.data.choices[0].message.content.trim();
+  if (!reply) throw new Error('DeepSeek response is empty');
   return { reply };
 }

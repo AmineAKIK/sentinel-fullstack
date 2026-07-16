@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NavBar from '../components/NavBar';
 import CreateLineModal from '../components/CreateLineModal';
 import LineDetailView from '../components/LineDetailView';
@@ -16,12 +16,12 @@ import { makeSortCodec } from '../utils/sortCodec';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const lineSortCodec = makeSortCodec([
-  { key: 'line_asc',     sort: 'line_number', order: 'asc'  },
-  { key: 'line_desc',    sort: 'line_number', order: 'desc' },
-  { key: 'status_asc',   sort: 'status',      order: 'asc'  },
-  { key: 'status_desc',  sort: 'status',      order: 'desc' },
-  { key: 'created_asc',  sort: 'created_at',  order: 'asc'  },
-  { key: 'created_desc', sort: 'created_at',  order: 'desc' },
+  { key: 'line_asc', sort: 'line_number', order: 'asc' },
+  { key: 'line_desc', sort: 'line_number', order: 'desc' },
+  { key: 'status_asc', sort: 'status', order: 'asc' },
+  { key: 'status_desc', sort: 'status', order: 'desc' },
+  { key: 'created_asc', sort: 'created_at', order: 'asc' },
+  { key: 'created_desc', sort: 'created_at', order: 'desc' },
 ]);
 
 type LineSortField = 'line_number' | 'machines' | 'status' | 'created_at';
@@ -42,15 +42,40 @@ export default function LinesPage() {
   const [order, setOrder] = useState<SortOrder>('desc');
   const [draftStatus, setDraftStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [draftSortValue, setDraftSortValue] = useState('created_desc');
+  const successTimerRef = useRef<number | null>(null);
+
+  const showSuccess = useCallback((message: string): void => {
+    if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
+    setSuccessMsg(message);
+    successTimerRef.current = window.setTimeout(() => {
+      setSuccessMsg('');
+      successTimerRef.current = null;
+    }, 5000);
+  }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     setError('');
-    listLines()
+    void listLines(controller.signal)
       .then(setLines)
-      .catch(() => setError('Impossible de charger la liste des lignes.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setError('Impossible de charger la liste des lignes.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
+
+  useEffect(
+    () => () => {
+      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
+    },
+    []
+  );
 
   function getSortValue(): string {
     return lineSortCodec.encode({ sort, order });
@@ -132,9 +157,30 @@ export default function LinesPage() {
   }, [lines, search, statusFilter, sort, order]);
 
   const filterChips: FilterChip[] = [
-    ...(search.trim() ? [{ key: 'search', label: `Recherche: ${search.trim()}`, onRemove: () => setSearch('') }] : []),
-    ...(statusFilter !== 'all' ? [{ key: 'status', label: `Statut: ${statusFilter === 'active' ? 'Actif' : 'Inactif'}`, onRemove: () => setStatusFilter('all') }] : []),
-    ...(sort !== 'created_at' || order !== 'desc' ? [{ key: 'sort', label: 'Tri personnalisé', onRemove: () => { setSort('created_at'); setOrder('desc'); } }] : []),
+    ...(search.trim()
+      ? [{ key: 'search', label: `Recherche: ${search.trim()}`, onRemove: () => setSearch('') }]
+      : []),
+    ...(statusFilter !== 'all'
+      ? [
+          {
+            key: 'status',
+            label: `Statut: ${statusFilter === 'active' ? 'Actif' : 'Inactif'}`,
+            onRemove: () => setStatusFilter('all'),
+          },
+        ]
+      : []),
+    ...(sort !== 'created_at' || order !== 'desc'
+      ? [
+          {
+            key: 'sort',
+            label: 'Tri personnalisé',
+            onRemove: () => {
+              setSort('created_at');
+              setOrder('desc');
+            },
+          },
+        ]
+      : []),
   ];
 
   // ── Detail view ────────────────────────────────────────────────────────────
@@ -148,14 +194,12 @@ export default function LinesPage() {
         onLineUpdated={(updated, message) => {
           setSelected(updated);
           setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-          setSuccessMsg(message);
-          setTimeout(() => setSuccessMsg(''), 5000);
+          showSuccess(message);
         }}
         onLineDeleted={(line) => {
           setLines((prev) => prev.filter((l) => l.id !== line.id));
           setSelected(null);
-          setSuccessMsg(`Ligne ${line.line_number} archivée avec succès.`);
-          setTimeout(() => setSuccessMsg(''), 5000);
+          showSuccess(`Ligne ${line.line_number} archivée avec succès.`);
         }}
       />
     );
@@ -226,7 +270,11 @@ export default function LinesPage() {
                   <thead>
                     <tr>
                       <th scope="col" aria-sort={headerAriaSort('line_number')}>
-                        <button className="table-sort-button" type="button" onClick={() => toggleTableSort('line_number')}>
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => toggleTableSort('line_number')}
+                        >
                           Numéro de ligne
                           <span className="sr-only">{headerSortLabel('line_number')}</span>
                         </button>
@@ -235,13 +283,21 @@ export default function LinesPage() {
                       <th scope="col">Première machine</th>
                       <th scope="col">Dernière machine</th>
                       <th scope="col" aria-sort={headerAriaSort('status')}>
-                        <button className="table-sort-button" type="button" onClick={() => toggleTableSort('status')}>
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => toggleTableSort('status')}
+                        >
                           Statut
                           <span className="sr-only">{headerSortLabel('status')}</span>
                         </button>
                       </th>
                       <th scope="col" aria-sort={headerAriaSort('created_at')}>
-                        <button className="table-sort-button" type="button" onClick={() => toggleTableSort('created_at')}>
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => toggleTableSort('created_at')}
+                        >
                           Date création
                           <span className="sr-only">{headerSortLabel('created_at')}</span>
                         </button>
@@ -254,24 +310,41 @@ export default function LinesPage() {
                       <tr
                         key={line.id}
                         onClick={() => setSelected(line)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(line); } }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelected(line);
+                          }
+                        }}
                         role="button"
                         tabIndex={0}
                         aria-label={`Voir la ligne ${line.line_number}`}
                       >
-                        <td><strong>{line.line_number}</strong></td>
+                        <td>
+                          <strong>{line.line_number}</strong>
+                        </td>
                         <td>{line.machines.length}</td>
                         <td>{line.machines[0]?.machineId || '-'}</td>
                         <td>{line.machines[line.machines.length - 1]?.machineId || '-'}</td>
                         <td>
-                          <span className={`badge-status ${line.is_active ? 'active' : 'inactive'}`}>
+                          <span
+                            className={`badge-status ${line.is_active ? 'active' : 'inactive'}`}
+                          >
                             {line.is_active ? 'Actif' : 'Inactif'}
                           </span>
                         </td>
                         <td>{formatDate(line.created_at)}</td>
                         <td className="row-action" aria-hidden="true">
-                          <svg className="row-action-icon" viewBox="0 0 24 24" role="img" aria-label="Voir">
-                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41L18.37 3.29c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
+                          <svg
+                            className="row-action-icon"
+                            viewBox="0 0 24 24"
+                            role="img"
+                            aria-label="Voir"
+                          >
+                            <path
+                              d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41L18.37 3.29c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                              fill="currentColor"
+                            />
                           </svg>
                         </td>
                       </tr>
@@ -295,7 +368,9 @@ export default function LinesPage() {
                       </span>
                       <span className="user-card-badge">
                         {line.machines.length} machine{line.machines.length > 1 ? 's' : ''}
-                        {line.machines[0] ? ` · ${line.machines[0].machineId} → ${line.machines[line.machines.length - 1].machineId}` : ''}
+                        {line.machines[0]
+                          ? ` · ${line.machines[0].machineId} → ${line.machines[line.machines.length - 1].machineId}`
+                          : ''}
                       </span>
                     </span>
                     <span className="user-card-meta">
@@ -320,8 +395,7 @@ export default function LinesPage() {
           onSuccess={(line) => {
             setShowCreate(false);
             setLines((prev) => [line, ...prev]);
-            setSuccessMsg(`Ligne ${line.line_number} créée avec succès.`);
-            setTimeout(() => setSuccessMsg(''), 5000);
+            showSuccess(`Ligne ${line.line_number} créée avec succès.`);
           }}
         />
       )}
@@ -331,12 +405,16 @@ export default function LinesPage() {
           title="Filtrer les lignes"
           onClose={() => setShowFilters(false)}
           size="sm"
-          footer={(
+          footer={
             <>
-              <button className="btn btn-secondary" onClick={resetFilters}>Réinitialiser</button>
-              <button className="btn btn-primary" onClick={applyFilters}>Appliquer</button>
+              <button className="btn btn-secondary" onClick={resetFilters}>
+                Réinitialiser
+              </button>
+              <button className="btn btn-primary" onClick={applyFilters}>
+                Appliquer
+              </button>
             </>
-          )}
+          }
         >
           <div className="form-group">
             <label className="form-label">Statut</label>

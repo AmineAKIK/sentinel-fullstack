@@ -1,18 +1,15 @@
 import { findActiveUserByBadge, insertPasswordResetRequest } from './passwordReset.repository';
-import { notifyAdminPasswordResetRequested } from '../notifications/notifications.service';
+import { withTransaction } from '../../db/transaction';
+import { enqueuePasswordResetNotification } from '../notifications/notificationOutbox.repository';
 
 export async function requestPasswordResetService(badgeNumber: string): Promise<void> {
-  const user = await findActiveUserByBadge(badgeNumber);
+  await withTransaction(async (client) => {
+    const user = await findActiveUserByBadge(badgeNumber, client, true);
 
-  // Réponse identique que le badge existe ou non — pas de fuite d'info.
-  if (!user) return;
+    // Réponse identique que le badge existe ou non — pas de fuite d'info.
+    if (!user) return;
 
-  await insertPasswordResetRequest(user.id, user.badge_number);
-
-  notifyAdminPasswordResetRequested({
-    firstName: user.first_name,
-    lastName: user.last_name,
-    badgeNumber: user.badge_number,
-    requestedAt: new Date(),
+    const requestId = await insertPasswordResetRequest(user.id, user.badge_number, client);
+    await enqueuePasswordResetNotification(requestId, client);
   });
 }

@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:24.14.1-alpine3.23 AS builder
 
 WORKDIR /app
 
@@ -7,16 +7,19 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_API_URL=http://localhost:3000
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-FROM nginx:alpine AS production
+FROM nginx:1.30.3-alpine3.23 AS production
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx-main.conf /etc/nginx/nginx.conf
 
-EXPOSE 80
+EXPOSE 8080
 
+USER nginx
+ENTRYPOINT []
 CMD ["nginx", "-g", "daemon off;"]

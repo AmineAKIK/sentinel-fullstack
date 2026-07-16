@@ -1,4 +1,7 @@
 import jwt from 'jsonwebtoken';
+import type { AuthScope } from './sessionPayloads';
+
+const JWT_ISSUER = 'sentinel';
 
 export function getJwtSecret(): string | null {
   const secret = process.env.JWT_SECRET || null;
@@ -6,19 +9,35 @@ export function getJwtSecret(): string | null {
   return secret;
 }
 
-export function signAuthToken(payload: object, durationHours: number | 'unlimited'): string | null {
+export function signAuthToken(
+  payload: object,
+  durationHours: number | 'unlimited',
+  scope: AuthScope
+): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
+  const options: jwt.SignOptions = {
+    algorithm: 'HS256',
+    issuer: JWT_ISSUER,
+    audience: scope,
+  };
   if (durationHours === 'unlimited') {
-    return jwt.sign(payload, secret);
+    return jwt.sign({ ...payload, scope }, secret, options);
   }
-  return jwt.sign(payload, secret, { expiresIn: durationHours * 3600 });
+  return jwt.sign({ ...payload, scope }, secret, {
+    ...options,
+    expiresIn: durationHours * 3600,
+  });
 }
 
-export function verifyAuthToken<TPayload>(token: string): TPayload | null {
+export function verifyAuthToken(token: string, scope: AuthScope): unknown | null {
   const secret = getJwtSecret();
   if (!secret) return null;
-  return jwt.verify(token, secret) as TPayload;
+  return jwt.verify(token, secret, {
+    algorithms: ['HS256'],
+    issuer: JWT_ISSUER,
+    audience: scope,
+  });
 }
 
 export function isJwtSessionError(err: unknown): boolean {

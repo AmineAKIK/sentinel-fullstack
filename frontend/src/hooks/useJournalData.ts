@@ -3,7 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import { listWorkshopHistoryEvents, listWorkshopLines } from '../api/workshop';
 import { ProductionLine, WorkshopHistoryEvent } from '../types';
 import { EVENT_LABELS, formatEventActor } from '../utils/workshopHistory';
-import { buildIncidentWorkspaceParams, withWorkshopLineFilter, withWorkshopUrlFilter } from '../utils/workshopFilters';
+import {
+  buildIncidentWorkspaceParams,
+  withWorkshopLineFilter,
+  withWorkshopUrlFilter,
+} from '../utils/workshopFilters';
 import { readHistoryStatusFilter, HistoryStatusFilter } from './useHistoryData';
 import { useDebouncedValue } from './useDebouncedValue';
 
@@ -33,9 +37,15 @@ export function useJournalData() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   useEffect(() => {
-    listWorkshopLines()
+    const controller = new AbortController();
+    void listWorkshopLines(controller.signal)
       .then(setLines)
-      .catch(() => setError('Impossible de charger les référentiels atelier.'));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setError('Impossible de charger les référentiels atelier.');
+        }
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -50,13 +60,18 @@ export function useJournalData() {
       limit: JOURNAL_EVENTS_LIMIT,
     });
     setHistoryEventsLoading(true);
-    listWorkshopHistoryEvents(params, controller.signal)
-      .then(setHistoryEvents)
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+    setError('');
+    void listWorkshopHistoryEvents(params, controller.signal)
+      .then((eventData) => {
+        if (!controller.signal.aborted) setHistoryEvents(eventData);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
         setError('Impossible de charger le journal atelier.');
       })
-      .finally(() => setHistoryEventsLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setHistoryEventsLoading(false);
+      });
     return () => controller.abort();
   }, [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter, eventTypeFilter]);
 

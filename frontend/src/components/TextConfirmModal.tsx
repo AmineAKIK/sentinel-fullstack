@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
 import CharCounter from './ui/CharCounter';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { apiErrorMessage } from '../api/client';
 
 type TextConfirmModalProps = {
   title: string;
@@ -38,22 +39,26 @@ export default function TextConfirmModal({
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const submittingRef = useRef(false);
   const buttonClassName = variant === 'danger' ? 'btn btn-danger' : 'btn btn-primary';
 
   async function handleConfirm() {
+    if (submittingRef.current) return;
     const trimmed = value.trim();
     if (!trimmed) {
       setError(requiredMessage);
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setError('');
     try {
       await onConfirm(trimmed);
-    } catch {
-      setError(failureMessage);
+    } catch (requestError) {
+      setError(apiErrorMessage(requestError, failureMessage));
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -68,10 +73,15 @@ export default function TextConfirmModal({
       variant={variant}
       footer={
         <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={loading}>
             Annuler
           </button>
-          <button className={buttonClassName} onClick={handleConfirm} disabled={loading}>
+          <button
+            className={buttonClassName}
+            type="button"
+            onClick={() => void handleConfirm()}
+            disabled={loading}
+          >
             {loading ? loadingLabel : confirmLabel}
           </button>
         </>
@@ -79,7 +89,9 @@ export default function TextConfirmModal({
     >
       <div className="notice">{notice}</div>
       <div className="form-group">
-        <label className="form-label" htmlFor={textareaId}>{label}</label>
+        <label className="form-label" htmlFor={textareaId}>
+          {label}
+        </label>
         <textarea
           id={textareaId}
           className="form-input"

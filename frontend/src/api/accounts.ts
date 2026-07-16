@@ -24,12 +24,15 @@ export interface UpdateAccountPayload {
   email?: string | null;
 }
 
-export async function listAccounts(params: ListAccountsParams = {}): Promise<SentinelUser[]> {
-  return api.get<SentinelUser[]>(`/api/admin/accounts${buildQuery(params)}`);
+export async function listAccounts(
+  params: ListAccountsParams = {},
+  signal?: AbortSignal
+): Promise<SentinelUser[]> {
+  return api.get<SentinelUser[]>(`/api/admin/accounts${buildQuery(params)}`, signal);
 }
 
-export async function getAccount(id: number): Promise<SentinelUser> {
-  return api.get<SentinelUser>(`/api/admin/accounts/${id}`);
+export async function getAccount(id: number, signal?: AbortSignal): Promise<SentinelUser> {
+  return api.get<SentinelUser>(`/api/admin/accounts/${id}`, signal);
 }
 
 export async function createAccount(payload: CreateAccountPayload): Promise<SentinelUser> {
@@ -64,10 +67,13 @@ export async function deleteAccount(id: number): Promise<void> {
   return api.delete<void>(`/api/admin/accounts/${id}`);
 }
 
-export async function getAccountImpact(id: number): Promise<{
+export async function getAccountImpact(
+  id: number,
+  signal?: AbortSignal
+): Promise<{
   reported_incidents: number;
   taken_incidents: number;
   active_taken_incidents: number;
 }> {
-  return api.get(`/api/admin/accounts/${id}/impact`);
+  return api.get(`/api/admin/accounts/${id}/impact`, signal);
 }

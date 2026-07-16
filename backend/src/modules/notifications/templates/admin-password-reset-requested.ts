@@ -13,11 +13,16 @@ export function subject(): string {
 }
 
 export function html(data: PasswordResetRequestedData): string {
-  const date = escapeHtml(data.requestedAt.toLocaleString('fr-FR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-    timeZone: 'Europe/Paris',
-  }));
+  const date = escapeHtml(
+    data.requestedAt.toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Paris',
+    })
+  );
   const firstName = escapeHtml(data.firstName);
   const lastName = escapeHtml(data.lastName);
   const badgeNumber = escapeHtml(data.badgeNumber);

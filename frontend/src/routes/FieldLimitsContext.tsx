@@ -10,16 +10,15 @@ export function FieldLimitsProvider({ children }: { children: React.ReactNode })
   const [limits, setLimits] = useState<FieldLimits>(STATIC_LIMITS);
 
   useEffect(() => {
-    api.get<{ fieldLimits: FieldLimits }>('/api/config')
+    const controller = new AbortController();
+    void api
+      .get<{ fieldLimits: FieldLimits }>('/api/config', controller.signal)
       .then((data) => setLimits(data.fieldLimits))
-      .catch(() => {});
+      .catch(() => undefined);
+    return () => controller.abort();
   }, []);
 
-  return (
-    <FieldLimitsContext.Provider value={limits}>
-      {children}
-    </FieldLimitsContext.Provider>
-  );
+  return <FieldLimitsContext.Provider value={limits}>{children}</FieldLimitsContext.Provider>;
 }
 
 export function useFieldLimits(): FieldLimits {

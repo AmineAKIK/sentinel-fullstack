@@ -12,7 +12,12 @@ export const authCookieOptions: CookieOptions = {
   secure: isProduction,
 };
 
-export function setAuthCookie(res: Response, name: string, token: string, durationHours: number): void {
+export function setAuthCookie(
+  res: Response,
+  name: string,
+  token: string,
+  durationHours: number
+): void {
   res.cookie(name, token, {
     ...authCookieOptions,
     maxAge: sessionDurationMs(durationHours),

@@ -17,9 +17,15 @@ export default function BoardAccessPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getBoardAccess()
-      .then(() => setState('ready'))
-      .catch(() => setState('locked'));
+    const controller = new AbortController();
+    void getBoardAccess(controller.signal)
+      .then(() => {
+        if (!controller.signal.aborted) setState('ready');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState('locked');
+      });
+    return () => controller.abort();
   }, []);
 
   async function handleSubmit(event: FormEvent) {
@@ -27,7 +33,7 @@ export default function BoardAccessPage() {
     setError('');
 
     if (!code.trim()) {
-      setError('Le code d\'accès est requis.');
+      setError("Le code d'accès est requis.");
       return;
     }
 
@@ -37,7 +43,9 @@ export default function BoardAccessPage() {
       setCode('');
       setState('ready');
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.message : 'Accès impossible. Vérifiez votre code.');
+      setError(
+        err instanceof ApiResponseError ? err.message : 'Accès impossible. Vérifiez votre code.'
+      );
     } finally {
       setLoading(false);
     }
@@ -70,7 +78,9 @@ export default function BoardAccessPage() {
 
         <form className="board-access-form" onSubmit={handleSubmit} noValidate>
           <div className="form-group">
-            <label className="form-label" htmlFor="board-code">Code d'accès</label>
+            <label className="form-label" htmlFor="board-code">
+              Code d'accès
+            </label>
             <input
               id="board-code"
               className="form-input"
@@ -87,10 +97,20 @@ export default function BoardAccessPage() {
             />
           </div>
 
-          {error && <div id="board-access-error" className="error-message" role="alert">{error}</div>}
+          {error && (
+            <div id="board-access-error" className="error-message" role="alert">
+              {error}
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? <><span className="spinner" aria-hidden="true" /> Connexion…</> : 'Accéder au tableau'}
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Connexion…
+              </>
+            ) : (
+              'Accéder au tableau'
+            )}
           </button>
         </form>
       </section>

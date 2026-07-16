@@ -5,10 +5,7 @@ import {
   verifyPassword,
 } from '../../auth/bcrypt';
 import { verifyWorkshopPasswordSetupCode } from '../../auth/setupCode';
-import {
-  findWorkshopUserByBadge,
-  setWorkshopUserPassword,
-} from './workshopCredentials.repository';
+import { findWorkshopUserByBadge, setWorkshopUserPassword } from './workshopCredentials.repository';
 
 export type LoginResult =
   | { kind: 'invalid_badge' }
@@ -18,7 +15,17 @@ export type LoginResult =
   | { kind: 'expired_setup_code' }
   | { kind: 'requires_password'; badgeNumber: string }
   | { kind: 'invalid_password' }
-  | { kind: 'success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string; sessionVersion: number } };
+  | {
+      kind: 'success';
+      user: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        badge_number: string;
+        role: string;
+        sessionVersion: number;
+      };
+    };
 
 export async function loginWorkshopUserService(
   badgeNumber: string,
@@ -27,8 +34,16 @@ export async function loginWorkshopUserService(
   setupCode: string | undefined
 ): Promise<LoginResult> {
   const user = await findWorkshopUserByBadge(badgeNumber);
-  if (!user) return { kind: 'invalid_badge' };
-  if (!user.is_active) return { kind: 'account_disabled' };
+  if (!user) {
+    return !password && !newPassword && !setupCode
+      ? { kind: 'requires_password', badgeNumber }
+      : { kind: 'invalid_badge' };
+  }
+  if (!user.is_active) {
+    return !password && !newPassword && !setupCode
+      ? { kind: 'requires_password', badgeNumber }
+      : { kind: 'account_disabled' };
+  }
 
   if (!user.password_hash) {
     if (
@@ -48,7 +63,10 @@ export async function loginWorkshopUserService(
     if (user.password_setup_expires_at.getTime() <= Date.now()) {
       return { kind: 'expired_setup_code' };
     }
-    const validSetupCode = await verifyWorkshopPasswordSetupCode(setupCode, user.password_setup_token_hash);
+    const validSetupCode = await verifyWorkshopPasswordSetupCode(
+      setupCode,
+      user.password_setup_token_hash
+    );
     if (!validSetupCode) return { kind: 'invalid_setup_code' };
 
     const passwordHash = await hashWorkshopPassword(newPassword);

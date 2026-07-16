@@ -1,4 +1,5 @@
 import pool from '../../db/pool';
+import type { PoolClient } from 'pg';
 
 type AuditOrder = 'ASC' | 'DESC';
 
@@ -86,7 +87,13 @@ export interface ListReferenceAuditFilters {
 
 const taskGroups: Record<string, string[]> = {
   creation: ['USER_CREATED', 'LINE_CREATED'],
-  modification: ['USER_UPDATED', 'LINE_UPDATED', 'LINE_SUMMARY_UPDATED', 'LINE_MACHINE_UPDATED', 'LINE_PLAN_UPDATED'],
+  modification: [
+    'USER_UPDATED',
+    'LINE_UPDATED',
+    'LINE_SUMMARY_UPDATED',
+    'LINE_MACHINE_UPDATED',
+    'LINE_PLAN_UPDATED',
+  ],
   status: ['USER_ACTIVATED', 'USER_DEACTIVATED'],
   deletion: ['USER_SOFT_DELETED', 'LINE_SOFT_DELETED'],
   access: ['USER_PASSWORD_RESET'],
@@ -131,30 +138,35 @@ const systemAuditSql = `
   FROM admin_system_audit_events se`;
 
 export async function getReferenceDashboardData(): Promise<ReferenceDashboardDto> {
-  const [userStats, lineStats, recentAccountEvents, recentLineEvents, recentSystemEvents] = await Promise.all([
-    pool.query<UserStatsDto>(
-      `SELECT
+  const [userStats, lineStats, recentAccountEvents, recentLineEvents, recentSystemEvents] =
+    await Promise.all([
+      pool.query<UserStatsDto>(
+        `SELECT
          COUNT(*) FILTER (WHERE is_deleted = FALSE)::int AS users_total,
          COUNT(*) FILTER (WHERE is_deleted = FALSE AND is_active = TRUE)::int AS users_active,
          COUNT(*) FILTER (WHERE is_deleted = FALSE AND is_active = FALSE)::int AS users_inactive,
          COUNT(*) FILTER (WHERE is_deleted = FALSE AND is_active = TRUE AND password_hash IS NULL)::int AS users_without_password
        FROM sentinel_users`
-    ),
-    pool.query<LineStatsDto>(
-      `SELECT
+      ),
+      pool.query<LineStatsDto>(
+        `SELECT
          COUNT(*) FILTER (WHERE is_deleted = FALSE)::int AS lines_total,
          COUNT(*) FILTER (WHERE is_deleted = FALSE AND is_active = TRUE)::int AS lines_active,
          COUNT(*) FILTER (WHERE is_deleted = FALSE AND is_active = FALSE)::int AS lines_inactive,
          COALESCE(SUM(jsonb_array_length(machine_sequence)) FILTER (WHERE is_deleted = FALSE), 0)::int AS machines_total,
          COUNT(*) FILTER (WHERE is_deleted = FALSE AND is_active = TRUE AND jsonb_array_length(machine_sequence) = 0)::int AS active_lines_without_machines
        FROM production_lines`
-    ),
-    pool.query<ReferenceAuditEventDto>(`${accountAuditSql} ORDER BY ae.created_at DESC LIMIT 5`),
-    pool.query<ReferenceAuditEventDto>(`${lineAuditSql} ORDER BY le.created_at DESC LIMIT 5`),
-    pool.query<ReferenceAuditEventDto>(`${systemAuditSql} ORDER BY se.created_at DESC LIMIT 5`),
-  ]);
+      ),
+      pool.query<ReferenceAuditEventDto>(`${accountAuditSql} ORDER BY ae.created_at DESC LIMIT 5`),
+      pool.query<ReferenceAuditEventDto>(`${lineAuditSql} ORDER BY le.created_at DESC LIMIT 5`),
+      pool.query<ReferenceAuditEventDto>(`${systemAuditSql} ORDER BY se.created_at DESC LIMIT 5`),
+    ]);
 
-  const recentEvents = [...recentAccountEvents.rows, ...recentLineEvents.rows, ...recentSystemEvents.rows]
+  const recentEvents = [
+    ...recentAccountEvents.rows,
+    ...recentLineEvents.rows,
+    ...recentSystemEvents.rows,
+  ]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 8);
 
@@ -228,8 +240,12 @@ export async function listPendingPasswordResetRequestsData(): Promise<PasswordRe
   return rows;
 }
 
-export async function markPasswordResetRequestHandledData(id: number): Promise<boolean> {
-  const { rows } = await pool.query<{ id: number }>(
+export async function markPasswordResetRequestHandledData(
+  id: number,
+  client?: PoolClient
+): Promise<boolean> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ id: number }>(
     `UPDATE password_reset_requests SET handled_at = NOW()
      WHERE id = $1 AND handled_at IS NULL
      RETURNING id`,
@@ -238,7 +254,9 @@ export async function markPasswordResetRequestHandledData(id: number): Promise<b
   return rows.length > 0;
 }
 
-export async function listReferenceAuditData(filters: ListReferenceAuditFilters): Promise<ReferenceAuditEventDto[]> {
+export async function listReferenceAuditData(
+  filters: ListReferenceAuditFilters
+): Promise<ReferenceAuditEventDto[]> {
   const params: unknown[] = [];
   const conditions: string[] = [];
 
@@ -267,13 +285,14 @@ export async function listReferenceAuditData(filters: ListReferenceAuditFilters)
     )`);
   }
 
-  const scopedSql = filters.scope === 'account'
-    ? accountAuditSql
-    : filters.scope === 'line'
-      ? lineAuditSql
-      : filters.scope === 'system'
-        ? systemAuditSql
-        : `${accountAuditSql} UNION ALL ${lineAuditSql} UNION ALL ${systemAuditSql}`;
+  const scopedSql =
+    filters.scope === 'account'
+      ? accountAuditSql
+      : filters.scope === 'line'
+        ? lineAuditSql
+        : filters.scope === 'system'
+          ? systemAuditSql
+          : `${accountAuditSql} UNION ALL ${lineAuditSql} UNION ALL ${systemAuditSql}`;
   const baseSql = `SELECT * FROM (${scopedSql}) events`;
 
   params.push(filters.limit);

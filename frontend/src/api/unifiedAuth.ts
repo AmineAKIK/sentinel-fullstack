@@ -36,8 +36,8 @@ export async function unifiedLogin(
 
 export type MeResponse = AdminLoginSuccess | WorkshopLoginSuccess;
 
-export async function getUnifiedMe(): Promise<MeResponse> {
-  return api.get<MeResponse>('/api/auth/me');
+export async function getUnifiedMe(signal?: AbortSignal): Promise<MeResponse> {
+  return api.get<MeResponse>('/api/auth/me', signal);
 }
 
 export async function unifiedLogout(): Promise<void> {

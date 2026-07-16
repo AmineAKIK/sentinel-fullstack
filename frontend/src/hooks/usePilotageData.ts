@@ -5,7 +5,12 @@ import {
   listWorkshopIncidents,
   listWorkshopLines,
 } from '../api/workshop';
-import { ProductionLine, WorkshopAnalytics, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
+import {
+  ProductionLine,
+  WorkshopAnalytics,
+  WorkshopIncident,
+  WorkshopIncidentMetrics,
+} from '../types';
 import { isOlderThanDays } from '../utils/date';
 import { buildAnalyticsParams } from '../utils/workshopAnalytics';
 import { HistoryPeriod } from '../utils/workshopHistory';
@@ -41,67 +46,91 @@ export function usePilotageData() {
   const [machineFilter, setMachineFilter] = useState('all');
   const [rankingLimit, setRankingLimit] = useState<RankingLimit>('10');
 
-  function loadRealtime(cancelled?: { current: boolean }) {
-    return Promise.all([listWorkshopIncidents(), getIncidentMetrics()])
-      .then(([inc, met]) => {
-        if (cancelled?.current) return;
-        setIncidents(inc);
-        setMetrics(met);
+  useEffect(() => {
+    let active = true;
+    let refreshing = false;
+    let controller: AbortController | null = null;
+
+    async function refreshRealtime(initial = false): Promise<void> {
+      if (refreshing || document.visibilityState === 'hidden') return;
+      refreshing = true;
+      controller = new AbortController();
+      if (initial) setRealtimeLoading(true);
+      try {
+        const signal = controller.signal;
+        if (initial) {
+          const [lineData, incidentData, metricData] = await Promise.all([
+            listWorkshopLines(signal),
+            listWorkshopIncidents(signal),
+            getIncidentMetrics(signal),
+          ]);
+          if (!active || signal.aborted) return;
+          setLines(lineData);
+          setIncidents(incidentData);
+          setMetrics(metricData);
+        } else {
+          const [incidentData, metricData] = await Promise.all([
+            listWorkshopIncidents(signal),
+            getIncidentMetrics(signal),
+          ]);
+          if (!active || signal.aborted) return;
+          setIncidents(incidentData);
+          setMetrics(metricData);
+        }
         setLastRefresh(new Date());
         setError('');
-      })
-      .catch(() => {
-        if (cancelled?.current) return;
-        setError('Impossible de charger la situation temps réel.');
-      });
-  }
+      } catch {
+        if (active && !controller.signal.aborted) {
+          setError('Impossible de charger la situation temps réel.');
+        }
+      } finally {
+        if (active) {
+          refreshing = false;
+          if (initial) setRealtimeLoading(false);
+        }
+      }
+    }
 
-  useEffect(() => {
-    const cancelled = { current: false };
-    setRealtimeLoading(true);
-    Promise.all([listWorkshopLines(), loadRealtime(cancelled)])
-      .then(([linesData]) => {
-        if (cancelled.current) return;
-        setLines(linesData);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (cancelled.current) return;
-        setRealtimeLoading(false);
-      });
-    return () => {
-      cancelled.current = true;
+    void refreshRealtime(true);
+    const refreshWhenVisible = (): void => {
+      if (document.visibilityState === 'visible') void refreshRealtime();
     };
-  }, []);
+    const intervalId = window.setInterval(refreshWhenVisible, 60_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
-  useEffect(() => {
-    const cancelled = { current: false };
-    const id = setInterval(() => loadRealtime(cancelled), 60_000);
     return () => {
-      cancelled.current = true;
-      clearInterval(id);
+      active = false;
+      controller?.abort();
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, []);
 
   useEffect(() => {
     if (period === 'custom' && customStart && customEnd && customStart > customEnd) {
+      setAnalyticsLoading(false);
       setAnalyticsError('La date de début doit être antérieure à la date de fin.');
-      return;
+      return undefined;
     }
     const controller = new AbortController();
     setAnalyticsLoading(true);
     setAnalyticsError('');
-    getWorkshopAnalytics(
+    void getWorkshopAnalytics(
       buildAnalyticsParams(period, customStart, customEnd, lineFilter, machineFilter),
       controller.signal
     )
-      .then(setAnalytics)
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setAnalytics(null);
+      .then((analyticsData) => {
+        if (!controller.signal.aborted) setAnalytics(analyticsData);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
         setAnalyticsError('Impossible de charger les indicateurs.');
       })
-      .finally(() => setAnalyticsLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setAnalyticsLoading(false);
+      });
     return () => controller.abort();
   }, [period, customStart, customEnd, lineFilter, machineFilter]);
 

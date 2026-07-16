@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:24.14.1-alpine3.23 AS builder
 
 WORKDIR /app
 
@@ -11,17 +11,19 @@ COPY migrations ./migrations
 
 RUN npm run build
 
-FROM node:20-alpine AS production
+FROM node:24.14.1-alpine3.23 AS production
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm cache clean --force
 
-COPY --from=builder /app/dist ./dist
-COPY migrations ./migrations
-COPY docs ./docs
+COPY --chown=node:node --from=builder /app/dist ./dist
+COPY --chown=node:node migrations ./migrations
+COPY --chown=node:node docs ./docs
 
 EXPOSE 3000
+
+USER node
 
 CMD ["node", "dist/server.js"]

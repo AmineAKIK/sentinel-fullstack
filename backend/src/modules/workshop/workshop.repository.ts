@@ -11,6 +11,7 @@ import {
 } from '../../domain/constants';
 import { CurrentIncident } from './workshop.policy';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
+import { countActiveArbitrationIncidents } from './workshop.arbitration.repository';
 
 export type IncidentListMode = 'history' | 'knowledge';
 type QueryParams = Record<string, unknown>;
@@ -41,63 +42,32 @@ const INCIDENT_FOLLOWER_COLS = `(wif.id IS NOT NULL) AS is_followed,
 const INCIDENT_USER_JOINS = `JOIN sentinel_users su ON su.id = wi.user_id
      LEFT JOIN sentinel_users tu ON tu.id = wi.taken_by_user_id`;
 
-const INCIDENT_ARBITRATION_COLS = `jsonb_strip_nulls(jsonb_build_object(
-            'edit',
-              CASE
-                WHEN wi.edit_request IS NOT NULL AND edit_arbitration.request_event_id IS NOT NULL
-                THEN jsonb_build_object(
-                  'requestEventId', edit_arbitration.request_event_id,
-                  'requestedAt', edit_arbitration.requested_at,
-                  'state', CASE
-                    WHEN edit_arbitration.consulted_at IS NULL THEN 'ACTIVE'
-                    ELSE 'WAITING'
-                  END,
-                  'consultedAt', edit_arbitration.consulted_at,
-                  'consultedByUserId', edit_arbitration.consulted_by_user_id
-                )
-              END,
-            'cancel',
-              CASE
-                WHEN wi.cancel_request = TRUE AND cancel_arbitration.request_event_id IS NOT NULL
-                THEN jsonb_build_object(
-                  'requestEventId', cancel_arbitration.request_event_id,
-                  'requestedAt', cancel_arbitration.requested_at,
-                  'state', CASE
-                    WHEN cancel_arbitration.consulted_at IS NULL THEN 'ACTIVE'
-                    ELSE 'WAITING'
-                  END,
-                  'consultedAt', cancel_arbitration.consulted_at,
-                  'consultedByUserId', cancel_arbitration.consulted_by_user_id
-                )
-              END
-          )) AS arbitration`;
+const INCIDENT_ARBITRATION_COLS = `CASE
+            WHEN arbitration_case.id IS NULL THEN NULL
+            ELSE jsonb_build_object(
+              lower(arbitration_case.request_type),
+              jsonb_build_object(
+                'caseId', arbitration_case.id,
+                'requestEventId', arbitration_case.request_event_id,
+                'requestedAt', arbitration_case.requested_at,
+                'state', CASE arbitration_case.status
+                  WHEN 'ACTIVE' THEN 'ACTIVE'
+                  ELSE 'WAITING'
+                END,
+                'consultedAt', arbitration_case.consulted_at,
+                'consultedByUserId', arbitration_case.consulted_by_user_id
+              )
+            )
+          END AS arbitration`;
 
 const INCIDENT_ARBITRATION_JOINS = `LEFT JOIN LATERAL (
-       SELECT we.id AS request_event_id,
-              we.created_at AS requested_at,
-              wac.consulted_at,
-              wac.consulted_by_user_id
-       FROM workshop_incident_events we
-       LEFT JOIN workshop_arbitration_consultations wac
-         ON wac.request_event_id = we.id
-       WHERE we.incident_id = wi.id
-         AND we.event_type = 'EDIT_REQUESTED'
-       ORDER BY we.id DESC
+       SELECT id::int AS id, request_event_id, request_type, status, requested_at,
+              consulted_at, consulted_by_user_id
+       FROM workshop_arbitration_cases
+       WHERE incident_id = wi.id AND status IN ('ACTIVE', 'CONSULTED')
+       ORDER BY requested_at DESC, id DESC
        LIMIT 1
-     ) edit_arbitration ON TRUE
-     LEFT JOIN LATERAL (
-       SELECT we.id AS request_event_id,
-              we.created_at AS requested_at,
-              wac.consulted_at,
-              wac.consulted_by_user_id
-       FROM workshop_incident_events we
-       LEFT JOIN workshop_arbitration_consultations wac
-         ON wac.request_event_id = we.id
-       WHERE we.incident_id = wi.id
-         AND we.event_type = 'CANCEL_REQUESTED'
-       ORDER BY we.id DESC
-       LIMIT 1
-     ) cancel_arbitration ON TRUE`;
+     ) arbitration_case ON TRUE`;
 
 // ─── SQL time interval constants ──────────────────────────────────────────────
 
@@ -172,8 +142,6 @@ export interface IncidentSelection {
   lineNumber: string;
   machineBrand: string;
 }
-
-export type ArbitrationRequestType = 'EDIT' | 'CANCEL' | 'ALL';
 
 export interface WorkshopIncidentMetricsResult {
   global?: {
@@ -258,11 +226,7 @@ export function isKnowledgeEligible(incident: {
  * le fragment SQL. `columns` doit être une liste de colonnes qualifiées
  * (ex. `wi.comment`), différente selon la requête appelante.
  */
-function buildFullTextFilter(
-  q: string,
-  params: Array<string | number>,
-  columns: string[]
-): string {
+function buildFullTextFilter(q: string, params: Array<string | number>, columns: string[]): string {
   params.push(`%${q}%`);
   const placeholder = `$${params.length}`;
   return `(${columns.map((col) => `${col} ILIKE ${placeholder}`).join('\n      OR ')})`;
@@ -718,13 +682,6 @@ export async function invalidateIncident(
   return rows[0]?.id ?? null;
 }
 
-// Dette connue : le UPDATE ci-dessous réécrit systématiquement les 18
-// colonnes (via updates.X ?? current.X), même quand une mutation ne change
-// qu'un seul champ (ex. SET_PRIORITY ne touche que is_priority). Un UPDATE
-// dynamique (clause SET construite selon les champs réellement fournis)
-// réduirait l'écriture, mais c'est une fonction appelée par toutes les
-// mutations de workflow — la retoucher pour un gain de perf marginal sur
-// ce volume de données n'est pas justifié à ce stade.
 export async function updateIncidentData(
   input: {
     incidentId: number;
@@ -742,48 +699,57 @@ export async function updateIncidentData(
 ): Promise<number | null> {
   const db = client ?? pool;
   const { current, updates } = input;
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+  const setIfChanged = (column: string, next: unknown, previous: unknown): void => {
+    if (next === previous) return;
+    params.push(next);
+    setClauses.push(`${column} = $${params.length}`);
+  };
+
+  setIfChanged('line_id', input.lineId, current.line_id);
+  setIfChanged('line_number', input.selection.lineNumber, current.line_number);
+  setIfChanged('machine_id', input.machineId, current.machine_id);
+  setIfChanged('machine_brand', input.selection.machineBrand, current.machine_brand);
+  setIfChanged('robot_label', input.robotLabel, current.robot_label);
+  setIfChanged('head_number', input.headNumber, current.head_number);
+  if (updates.state !== undefined) setIfChanged('state', updates.state, current.state);
+  if (updates.comment !== undefined) setIfChanged('comment', updates.comment, current.comment);
+  if (updates.currentProduct !== undefined)
+    setIfChanged('current_product', updates.currentProduct, current.current_product);
+  if (updates.isTaken !== undefined) setIfChanged('is_taken', updates.isTaken, current.is_taken);
+  if (updates.isPriority !== undefined)
+    setIfChanged('is_priority', updates.isPriority, current.is_priority);
+  if (updates.status !== undefined) setIfChanged('status', updates.status, current.status);
+  if (updates.diagnostic !== undefined)
+    setIfChanged('diagnostic', updates.diagnostic, current.diagnostic);
+  if (updates.interventionNote !== undefined)
+    setIfChanged('intervention_note', updates.interventionNote, current.intervention_note);
+  if (input.role === 'RESPONSABLE' && updates.responsibleComment !== undefined) {
+    const normalizedComment = updates.responsibleComment.trim() || null;
+    setIfChanged('responsible_comment', normalizedComment, current.responsible_comment);
+  }
+
   const tookOwnership =
     updates.isTaken === true &&
     (!current.is_taken || current.taken_by_user_id !== input.actorUserId);
-  const nextTakenByUserId = tookOwnership ? input.actorUserId : current.taken_by_user_id;
-  const nextTakenAt = tookOwnership ? new Date() : current.taken_at;
+  if (tookOwnership) {
+    params.push(input.actorUserId);
+    setClauses.push(`taken_by_user_id = $${params.length}`);
+    params.push(new Date());
+    setClauses.push(`taken_at = $${params.length}`);
+  }
+
+  if (setClauses.length === 0) return current.id;
+
+  params.push(input.incidentId);
 
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents
-     SET line_id = $1, line_number = $2, machine_id = $3, machine_brand = $4,
-         robot_label = $5, head_number = $6, state = $7, comment = $8, current_product = $9,
-         is_taken = $10, is_priority = $11, status = $12, diagnostic = $13,
-         intervention_note = $14, responsible_comment = $15,
-         taken_by_user_id = $16, taken_at = $17, display_order = $18, updated_at = NOW()
-     WHERE id = $19
+     SET ${setClauses.join(', ')}, updated_at = NOW()
+     WHERE id = $${params.length}
      RETURNING id`,
-    [
-      input.lineId,
-      input.selection.lineNumber,
-      input.machineId,
-      input.selection.machineBrand,
-      input.robotLabel,
-      input.headNumber,
-      updates.state ?? current.state,
-      updates.comment ?? current.comment,
-      updates.currentProduct ?? current.current_product,
-      updates.isTaken ?? current.is_taken,
-      updates.isPriority ?? current.is_priority,
-      updates.status ?? current.status,
-      updates.diagnostic ?? current.diagnostic,
-      updates.interventionNote ?? current.intervention_note,
-      input.role === 'RESPONSABLE'
-        ? updates.responsibleComment !== undefined
-          ? updates.responsibleComment.trim() === ''
-            ? null
-            : updates.responsibleComment
-          : current.responsible_comment
-        : current.responsible_comment,
-      nextTakenByUserId,
-      nextTakenAt,
-      current.display_order,
-      input.incidentId,
-    ]
+    params
   );
 
   if (tookOwnership && rows[0]?.id) {
@@ -870,7 +836,7 @@ export async function getIncidentMetrics(
      WHERE wif.user_id = $1 AND wif.deleted_at IS NULL`,
       [userId]
     ),
-    role === 'RESPONSABLE' ? countUnconsultedArbitrationIncidents() : Promise.resolve(0),
+    role === 'RESPONSABLE' ? countActiveArbitrationIncidents() : Promise.resolve(0),
   ]);
 
   const metrics = rows[0];
@@ -907,104 +873,6 @@ export async function getIncidentMetrics(
   };
 }
 
-// Dette connue : cette requête et consultArbitrationRequest ci-dessous
-// (ainsi que INCIDENT_ARBITRATION_COLS/JOINS plus haut) réimplémentent
-// chacune la même logique "dernière demande EDIT/CANCEL active par
-// incident" en SQL brut, à 4 endroits. Elles ne sont pas identiques (COUNT
-// vs INSERT, filtrage par incident vs global, projection différente) : les
-// factoriser proprement demanderait une vue ou fonction SQL PostgreSQL
-// partagée, donc une migration de schéma — hors scope d'un nettoyage
-// cosmétique. Si la logique d'arbitrage évolue, modifier les 4 endroits.
-export async function countUnconsultedArbitrationIncidents(): Promise<number> {
-  const { rows } = await pool.query<{ unread_count: number }>(
-    `WITH active_requests AS (
-       SELECT wi.id AS incident_id, edit_request.request_event_id
-       FROM workshop_incidents wi
-       JOIN LATERAL (
-         SELECT we.id AS request_event_id
-         FROM workshop_incident_events we
-         WHERE we.incident_id = wi.id
-           AND we.event_type = 'EDIT_REQUESTED'
-         ORDER BY we.id DESC
-         LIMIT 1
-       ) edit_request ON TRUE
-       WHERE wi.status IN ('OPEN', 'PENDING')
-         AND wi.edit_request IS NOT NULL
-       UNION ALL
-       SELECT wi.id AS incident_id, cancel_request.request_event_id
-       FROM workshop_incidents wi
-       JOIN LATERAL (
-         SELECT we.id AS request_event_id
-         FROM workshop_incident_events we
-         WHERE we.incident_id = wi.id
-           AND we.event_type = 'CANCEL_REQUESTED'
-         ORDER BY we.id DESC
-         LIMIT 1
-       ) cancel_request ON TRUE
-       WHERE wi.status IN ('OPEN', 'PENDING')
-         AND wi.cancel_request = TRUE
-     )
-     SELECT COUNT(*)::int AS unread_count
-     FROM (
-       SELECT DISTINCT ar.incident_id
-       FROM active_requests ar
-       LEFT JOIN workshop_arbitration_consultations wac
-         ON wac.request_event_id = ar.request_event_id
-       WHERE wac.request_event_id IS NULL
-     ) unconsulted`
-  );
-
-  return rows[0]?.unread_count ?? 0;
-}
-
-export async function consultArbitrationRequest(
-  incidentId: number,
-  userId: number,
-  requestType: ArbitrationRequestType
-): Promise<number> {
-  const { rowCount } = await pool.query(
-    `WITH active_requests AS (
-       SELECT wi.id AS incident_id, 'EDIT'::text AS request_type, edit_request.request_event_id
-       FROM workshop_incidents wi
-       JOIN LATERAL (
-         SELECT we.id AS request_event_id
-         FROM workshop_incident_events we
-         WHERE we.incident_id = wi.id
-           AND we.event_type = 'EDIT_REQUESTED'
-         ORDER BY we.id DESC
-         LIMIT 1
-       ) edit_request ON TRUE
-       WHERE wi.id = $1
-         AND wi.status IN ('OPEN', 'PENDING')
-         AND wi.edit_request IS NOT NULL
-         AND $3 IN ('EDIT', 'ALL')
-       UNION ALL
-       SELECT wi.id AS incident_id, 'CANCEL'::text AS request_type, cancel_request.request_event_id
-       FROM workshop_incidents wi
-       JOIN LATERAL (
-         SELECT we.id AS request_event_id
-         FROM workshop_incident_events we
-         WHERE we.incident_id = wi.id
-           AND we.event_type = 'CANCEL_REQUESTED'
-         ORDER BY we.id DESC
-         LIMIT 1
-       ) cancel_request ON TRUE
-       WHERE wi.id = $1
-         AND wi.status IN ('OPEN', 'PENDING')
-         AND wi.cancel_request = TRUE
-         AND $3 IN ('CANCEL', 'ALL')
-     )
-     INSERT INTO workshop_arbitration_consultations
-       (request_event_id, incident_id, request_type, consulted_by_user_id)
-     SELECT request_event_id, incident_id, request_type, $2
-     FROM active_requests
-     ON CONFLICT (request_event_id) DO NOTHING`,
-    [incidentId, userId, requestType]
-  );
-
-  return rowCount ?? 0;
-}
-
 export async function incidentExists(incidentId: number): Promise<boolean> {
   const { rowCount } = await pool.query('SELECT 1 FROM workshop_incidents WHERE id = $1', [
     incidentId,
@@ -1026,28 +894,30 @@ export async function followIncidentData(
   incidentId: number,
   userId: number,
   client?: PoolClient
-): Promise<void> {
+): Promise<boolean> {
   const db = client ?? pool;
-  await db.query(
+  const result = await db.query(
     `INSERT INTO workshop_incident_followers (incident_id, user_id)
      VALUES ($1, $2)
      ON CONFLICT (incident_id, user_id) WHERE deleted_at IS NULL DO NOTHING`,
     [incidentId, userId]
   );
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function unfollowIncidentData(
   incidentId: number,
   userId: number,
   client?: PoolClient
-): Promise<void> {
+): Promise<boolean> {
   const db = client ?? pool;
-  await db.query(
+  const result = await db.query(
     `UPDATE workshop_incident_followers
      SET deleted_at = NOW()
      WHERE incident_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
     [incidentId, userId]
   );
+  return (result.rowCount ?? 0) > 0;
 }
 
 export { getWorkshopAnalytics } from './workshop.repository.analytics';

@@ -104,6 +104,17 @@ describe('OPERATOR permissions', () => {
       expect(canPerform('OPERATOR', action, inc)).toBe(false);
     });
   });
+
+  it('can withdraw its own active edit request', () => {
+    expect(
+      canPerform(
+        'OPERATOR',
+        'withdrawEdit',
+        incident({ user_id: 1, edit_request: { comment: 'Correction' } }),
+        1
+      )
+    ).toBe(true);
+  });
 });
 
 // ─── MAINTENANCE ──────────────────────────────────────────────────────────────
@@ -153,6 +164,31 @@ describe('MAINTENANCE permissions', () => {
 
   it('can directEdit on active non-taken incident', () => {
     expect(canPerform('MAINTENANCE', 'directEdit', incident({ is_taken: false }))).toBe(true);
+  });
+
+  it('hides treatment actions while a normalized arbitration case is open', () => {
+    const arbitration = {
+      edit: {
+        caseId: 21,
+        requestEventId: 42,
+        requestedAt: '2026-07-01T08:00:00.000Z',
+        state: 'ACTIVE' as const,
+      },
+    };
+    expect(
+      canPerform(
+        'MAINTENANCE',
+        'take',
+        incident({ is_taken: false, arbitration }),
+        7
+      )
+    ).toBe(false);
+    expect(
+      canPerform('MAINTENANCE', 'close', incident({ is_taken: true, arbitration }))
+    ).toBe(false);
+    expect(
+      canPerform('MAINTENANCE', 'directEdit', incident({ is_taken: false, arbitration }))
+    ).toBe(false);
   });
 });
 

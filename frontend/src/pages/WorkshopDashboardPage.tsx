@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
@@ -98,9 +98,19 @@ export default function WorkshopDashboardPage() {
     error,
     setIncidents,
     refreshMetrics,
-    upsertIncident,
+    refreshData,
+    upsertIncident: upsertIncidentData,
   } = useIncidentsData();
+  const upsertIncident = useCallback(
+    (updated: WorkshopIncident) => {
+      upsertIncidentData(updated);
+      setSelectedIncident((current) => (current?.id === updated.id ? updated : current));
+    },
+    [upsertIncidentData]
+  );
   const modal = useModalState();
+  const { closeReview, openReview } = modal;
+  const { activeModal, reviewIncident } = modal.state;
   const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({
     filters,
     setFilters,
@@ -111,29 +121,35 @@ export default function WorkshopDashboardPage() {
   const isResponsable = user?.role === 'RESPONSABLE';
   const selectedIncidentParam = searchParams.get('incident');
 
-  function setIncidentUrlParam(id: number | null, replace = false) {
-    const nextParams = new URLSearchParams(searchParams);
-    if (id === null) {
-      nextParams.delete('incident');
-    } else {
-      nextParams.set('incident', String(id));
-    }
-    setSearchParams(nextParams, { replace });
-  }
+  const setIncidentUrlParam = useCallback(
+    (id: number | null, replace = false) => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (id === null) {
+        nextParams.delete('incident');
+      } else {
+        nextParams.set('incident', String(id));
+      }
+      setSearchParams(nextParams, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
 
-  function clearSelectedIncident(replace = true) {
-    setSelectedIncident(null);
-    setFocusedIncidentId(null);
-    setPendingReviewRequest(null);
-    setIncidentUrlParam(null, replace);
-  }
+  const clearSelectedIncident = useCallback(
+    (replace = true) => {
+      setSelectedIncident(null);
+      setFocusedIncidentId(null);
+      setPendingReviewRequest(null);
+      setIncidentUrlParam(null, replace);
+    },
+    [setIncidentUrlParam, setSelectedIncident, setFocusedIncidentId, setPendingReviewRequest]
+  );
 
   useEffect(() => {
     if (!selectedIncidentParam) {
       setSelectedIncident(null);
       setFocusedIncidentId(null);
       setPendingReviewRequest(null);
-      if (modal.state.reviewIncident) modal.closeReview();
+      if (reviewIncident) closeReview();
       return;
     }
     const found = incidents.find((inc) => String(inc.id) === selectedIncidentParam);
@@ -144,8 +160,7 @@ export default function WorkshopDashboardPage() {
     if (!loading && incidents.length > 0) {
       setIncidentUrlParam(null, true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIncidentParam, incidents, loading, modal.state.reviewIncident]);
+  }, [selectedIncidentParam, incidents, loading, reviewIncident, closeReview, setIncidentUrlParam]);
 
   useEffect(() => {
     setReportedArbitrationKey(null);
@@ -217,7 +232,8 @@ export default function WorkshopDashboardPage() {
   // Inbox d'arbitrage du responsable : demandes de correction/annulation en attente.
   const requestsCount = isResponsable
     ? incidents.filter(
-        (inc) => !isIncidentResolved(inc) && (Boolean(inc.edit_request) || Boolean(inc.cancel_request))
+        (inc) =>
+          !isIncidentResolved(inc) && (Boolean(inc.edit_request) || Boolean(inc.cancel_request))
       ).length
     : 0;
 
@@ -297,34 +313,26 @@ export default function WorkshopDashboardPage() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIncident, anyModalOpen]);
+  }, [selectedIncident, anyModalOpen, clearSelectedIncident]);
 
   useEffect(() => {
-    if (
-      !isResponsable ||
-      !selectedIncident ||
-      modal.state.reviewIncident ||
-      modal.state.activeModal
-    ) {
+    if (!isResponsable || !selectedIncident || reviewIncident || activeModal) {
       return;
     }
     if (focusedIncidentId !== selectedIncident.id || pendingReviewRequest) return;
     const reviewType = getAutoReviewType(selectedIncident);
     const arbitrationKey = getActiveArbitrationKey(selectedIncident);
     if (!reviewType || !arbitrationKey || arbitrationKey === reportedArbitrationKey) return;
-    modal.openReview(selectedIncident, reviewType);
-    // modal.openReview is intentionally omitted: useModalState returns stable behavior,
-    // but a fresh object each render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    openReview(selectedIncident, reviewType);
   }, [
     isResponsable,
     selectedIncident,
-    modal.state.reviewIncident,
-    modal.state.activeModal,
+    reviewIncident,
+    activeModal,
     reportedArbitrationKey,
     focusedIncidentId,
     pendingReviewRequest,
+    openReview,
   ]);
 
   useEffect(() => {
@@ -333,23 +341,21 @@ export default function WorkshopDashboardPage() {
       !pendingReviewRequest ||
       pendingReviewRequest.incidentId !== selectedIncident.id ||
       focusedIncidentId !== selectedIncident.id ||
-      modal.state.reviewIncident ||
-      modal.state.activeModal
+      reviewIncident ||
+      activeModal
     ) {
       return;
     }
 
-    modal.openReview(selectedIncident, pendingReviewRequest.type);
+    openReview(selectedIncident, pendingReviewRequest.type);
     setPendingReviewRequest(null);
-    // modal.openReview is intentionally omitted: useModalState returns stable behavior,
-    // but a fresh object each render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     selectedIncident,
     pendingReviewRequest,
     focusedIncidentId,
-    modal.state.reviewIncident,
-    modal.state.activeModal,
+    reviewIncident,
+    activeModal,
+    openReview,
   ]);
 
   function openReviewFromIncident(incident: WorkshopIncident, reviewType: ReviewType) {
@@ -367,11 +373,12 @@ export default function WorkshopDashboardPage() {
   }
 
   async function handleConsultArbitration(incident: WorkshopIncident | null) {
-    if (!incident) return;
+    if (!incident || !modal.state.reviewType) return;
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      const result = await consultWorkshopArbitration(incident.id, 'ALL');
+      const requestType = modal.state.reviewType === 'edit' ? 'EDIT' : 'CANCEL';
+      const result = await consultWorkshopArbitration(incident.id, requestType);
       upsertIncident(result.incident);
       if (selectedIncident?.id === incident.id) setSelectedIncident(result.incident);
       await refreshMetrics();
@@ -408,7 +415,14 @@ export default function WorkshopDashboardPage() {
           </div>
         </div>
 
-        {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
+        {error && (
+          <ErrorBanner style={{ marginBottom: 16 }}>
+            <span>{error}</span>{' '}
+            <button className="btn btn-secondary btn-sm" onClick={() => void refreshData()}>
+              Réessayer
+            </button>
+          </ErrorBanner>
+        )}
 
         <IncidentMetricsBar
           metricsLoading={metricsLoading}

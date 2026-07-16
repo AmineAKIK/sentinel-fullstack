@@ -1,5 +1,12 @@
-import { findAdminByUsername, getAdminPasswordHash, getAdminSessionVersion } from '../adminCredentials/adminCredentials.repository';
-import { loginWorkshopUserService, LoginResult as WorkshopLoginResult } from '../workshopCredentials/workshopCredentials.service';
+import {
+  findAdminByUsername,
+  getAdminPasswordHash,
+  getAdminSessionVersion,
+} from '../adminCredentials/adminCredentials.repository';
+import {
+  loginWorkshopUserService,
+  LoginResult as WorkshopLoginResult,
+} from '../workshopCredentials/workshopCredentials.service';
 import { verifyPassword } from '../../auth/bcrypt';
 import pool from '../../db/pool';
 
@@ -11,7 +18,17 @@ export type AuthLoginResult =
   | { kind: 'workshop_invalid_setup_code' }
   | { kind: 'workshop_expired_setup_code' }
   | { kind: 'workshop_account_disabled' }
-  | { kind: 'workshop_success'; user: { id: number; first_name: string; last_name: string; badge_number: string; role: string; sessionVersion: number } }
+  | {
+      kind: 'workshop_success';
+      user: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        badge_number: string;
+        role: string;
+        sessionVersion: number;
+      };
+    }
   | { kind: 'invalid_credentials' };
 
 export interface AdminSessionInfo {
@@ -30,15 +47,17 @@ export interface WorkshopSessionInfo {
 // Vérifie l'existence du compte ET la version de session : un token émis avant
 // une révocation (session_version incrémentée) est rejeté, comme dans les
 // middlewares. /me doit donner la même réponse que n'importe quelle route protégée.
-export async function verifyAdminSession(adminId: number, tokenSessionVersion?: number): Promise<AdminSessionInfo | null> {
+export async function verifyAdminSession(
+  adminId: number,
+  tokenSessionVersion: number
+): Promise<AdminSessionInfo | null> {
   const { rows } = await pool.query<AdminSessionInfo & { session_version: number }>(
     'SELECT id, username, session_version FROM admin_accounts WHERE id = $1',
     [adminId]
   );
   const admin = rows[0];
   if (!admin) return null;
-  // Tokens émis avant la migration 022 (sans version) : acceptés jusqu'à expiration.
-  if (tokenSessionVersion !== undefined && tokenSessionVersion !== admin.session_version) {
+  if (tokenSessionVersion !== admin.session_version) {
     return null;
   }
   return { id: admin.id, username: admin.username };
@@ -47,7 +66,7 @@ export async function verifyAdminSession(adminId: number, tokenSessionVersion?: 
 export async function verifyWorkshopSession(
   userId: number,
   badgeNumber: string,
-  tokenSessionVersion?: number
+  tokenSessionVersion: number
 ): Promise<WorkshopSessionInfo | null> {
   const { rows } = await pool.query<WorkshopSessionInfo & { session_version: number }>(
     `SELECT id, first_name, last_name, badge_number, role, session_version
@@ -57,7 +76,7 @@ export async function verifyWorkshopSession(
   );
   const user = rows[0];
   if (!user) return null;
-  if (tokenSessionVersion !== undefined && tokenSessionVersion !== user.session_version) {
+  if (tokenSessionVersion !== user.session_version) {
     return null;
   }
   return {
@@ -84,7 +103,10 @@ export async function unifiedLoginService(
     const valid = await verifyPassword(password, passwordHash);
     if (!valid) return { kind: 'invalid_credentials' };
     const sessionVersion = (await getAdminSessionVersion(admin.id)) ?? 1;
-    return { kind: 'admin_success', admin: { id: admin.id, username: admin.username, sessionVersion } };
+    return {
+      kind: 'admin_success',
+      admin: { id: admin.id, username: admin.username, sessionVersion },
+    };
   }
 
   // Not an admin — try workshop user by badge number

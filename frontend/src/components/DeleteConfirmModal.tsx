@@ -17,7 +17,13 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
   } | null>(null);
 
   useEffect(() => {
-    getAccountImpact(user.id).then(setImpact).catch(() => setImpact(null));
+    const controller = new AbortController();
+    void getAccountImpact(user.id, controller.signal)
+      .then(setImpact)
+      .catch(() => {
+        if (!controller.signal.aborted) setImpact(null);
+      });
+    return () => controller.abort();
   }, [user.id]);
 
   const hasActiveTakenIncidents = Boolean(impact && impact.active_taken_incidents > 0);
@@ -43,9 +49,14 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       </p>
       {impact && (impact.reported_incidents > 0 || impact.taken_incidents > 0) && (
         <div className="notice">
-          Impact historique : {impact.reported_incidents} incident(s) signalé(s), {impact.taken_incidents} incident(s) pris en charge.
+          Impact historique : {impact.reported_incidents} incident(s) signalé(s),{' '}
+          {impact.taken_incidents} incident(s) pris en charge.
           {hasActiveTakenIncidents && (
-            <> Suppression bloquée tant que {impact.active_taken_incidents} incident(s) actif(s) restent pris en charge.</>
+            <>
+              {' '}
+              Suppression bloquée tant que {impact.active_taken_incidents} incident(s) actif(s)
+              restent pris en charge.
+            </>
           )}
         </div>
       )}

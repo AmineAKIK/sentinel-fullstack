@@ -1,4 +1,8 @@
-import { createIncidentSchema, updateIncidentSchema } from '../workshop.validation';
+import {
+  arbitrationConsultationSchema,
+  createIncidentSchema,
+  updateIncidentSchema,
+} from '../workshop.validation';
 
 // ─── valid fixture ─────────────────────────────────────────────────────────────
 
@@ -36,7 +40,10 @@ describe('createIncidentSchema', () => {
   });
 
   it('rejects an empty currentProduct', () => {
-    const result = createIncidentSchema.safeParse({ ...validCreatePayload(), currentProduct: '   ' });
+    const result = createIncidentSchema.safeParse({
+      ...validCreatePayload(),
+      currentProduct: '   ',
+    });
     expect(result.success).toBe(false);
   });
 
@@ -88,7 +95,10 @@ describe('createIncidentSchema', () => {
   });
 
   it('trims whitespace from robotLabel', () => {
-    const result = createIncidentSchema.safeParse({ ...validCreatePayload(), robotLabel: '  R1  ' });
+    const result = createIncidentSchema.safeParse({
+      ...validCreatePayload(),
+      robotLabel: '  R1  ',
+    });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.robotLabel).toBe('R1');
   });
@@ -185,5 +195,16 @@ describe('updateIncidentSchema', () => {
     const result = updateIncidentSchema.safeParse({ headNumber: '3' });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.headNumber).toBe(3);
+  });
+});
+
+describe('arbitrationConsultationSchema', () => {
+  it.each(['EDIT', 'CANCEL'] as const)('accepts the exact %s case type', (requestType) => {
+    expect(arbitrationConsultationSchema.safeParse({ requestType }).success).toBe(true);
+  });
+
+  it('rejects bulk or implicit consultation', () => {
+    expect(arbitrationConsultationSchema.safeParse({ requestType: 'ALL' }).success).toBe(false);
+    expect(arbitrationConsultationSchema.safeParse({}).success).toBe(false);
   });
 });

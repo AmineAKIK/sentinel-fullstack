@@ -92,7 +92,7 @@ describe('DeleteConfirmModal – état bloqué', () => {
     );
     renderModal(mockUser({ id: 42 }));
     await waitFor(() => {
-      expect(accountsApi.getAccountImpact).toHaveBeenCalledWith(42);
+      expect(accountsApi.getAccountImpact).toHaveBeenCalledWith(42, expect.any(AbortSignal));
     });
   });
 
@@ -163,7 +163,7 @@ describe('DeleteConfirmModal – vérification admin password', () => {
     vi.mocked(accountsApi.deleteAccount).mockResolvedValue(undefined);
     renderModal(mockUser({ id: 5 }));
     await waitFor(() => {
-      expect(accountsApi.getAccountImpact).toHaveBeenCalledWith(5);
+      expect(accountsApi.getAccountImpact).toHaveBeenCalledWith(5, expect.any(AbortSignal));
     });
   });
 });

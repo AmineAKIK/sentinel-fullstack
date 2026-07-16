@@ -4,7 +4,14 @@ import { loginLimiter } from '../loginRateLimit';
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 function mockReq(identifier: string, ip = '10.0.0.1'): Request {
-  return { method: 'POST', path: '/api/auth/login', baseUrl: '', ip, socket: {}, body: { identifier } } as unknown as Request;
+  return {
+    method: 'POST',
+    path: '/api/auth/login',
+    baseUrl: '',
+    ip,
+    socket: {},
+    body: { identifier },
+  } as unknown as Request;
 }
 
 interface MockRes {
@@ -16,9 +23,15 @@ interface MockRes {
 function mockRes(): MockRes {
   const state: MockRes = { res: {} as Response, statusCode: null, headers: {} };
   const res: Record<string, unknown> = {};
-  res.status = (code: number) => { state.statusCode = code; return res; };
+  res.status = (code: number) => {
+    state.statusCode = code;
+    return res;
+  };
   res.json = () => res;
-  res.setHeader = (name: string, value: string) => { state.headers[name] = value; return res; };
+  res.setHeader = (name: string, value: string) => {
+    state.headers[name] = value;
+    return res;
+  };
   state.res = res as unknown as Response;
   return state;
 }
@@ -26,7 +39,9 @@ function mockRes(): MockRes {
 function attempt(req: Request): { blocked: boolean; status: number | null } {
   const m = mockRes();
   let passed = false;
-  const next: NextFunction = () => { passed = true; };
+  const next: NextFunction = () => {
+    passed = true;
+  };
   loginLimiter.middleware(req, m.res, next);
   return { blocked: !passed, status: m.statusCode };
 }
@@ -40,7 +55,7 @@ describe('loginLimiter', () => {
     // store en mémoire (singleton) entre les cas.
   });
 
-  it('laisse passer tant que le seuil d\'échecs n\'est pas atteint', () => {
+  it("laisse passer tant que le seuil d'échecs n'est pas atteint", () => {
     const req = mockReq('user-a');
     // Premier passage : autorisé.
     expect(attempt(req).blocked).toBe(false);
@@ -49,7 +64,7 @@ describe('loginLimiter', () => {
     expect(attempt(req).blocked).toBe(false);
   });
 
-  it('bloque (429) une fois le seuil d\'échecs dépassé', () => {
+  it("bloque (429) une fois le seuil d'échecs dépassé", () => {
     const req = mockReq('user-b');
     for (let i = 0; i < MAX; i++) loginLimiter.recordFailure(req);
     const r = attempt(req);

@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminInfo, WorkshopUser } from '../types';
 import { getUnifiedMe, unifiedLogout, MeResponse } from '../api/unifiedAuth';
@@ -17,10 +25,16 @@ interface AppAuthContextValue {
 }
 
 const AppAuthContext = createContext<AppAuthContextValue | null>(null);
-const PUBLIC_AUTHLESS_PATHS = ['/login', '/board', '/admin/login', '/workshop/login', '/confidentialite'];
+const PUBLIC_AUTHLESS_PATHS = new Set([
+  '/login',
+  '/board',
+  '/admin/login',
+  '/workshop/login',
+  '/confidentialite',
+]);
 
-function isPublic(pathname: string) {
-  return PUBLIC_AUTHLESS_PATHS.some((p) => pathname.startsWith(p));
+function isPublic(pathname: string): boolean {
+  return PUBLIC_AUTHLESS_PATHS.has(pathname);
 }
 
 export function AppAuthProvider({ children }: { children: React.ReactNode }) {
@@ -34,9 +48,12 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const markExpired = useCallback(() => {
     if (redirectingRef.current) return;
     redirectingRef.current = true;
-    unifiedLogout().catch(() => {});
+    void unifiedLogout().catch(() => undefined);
     setSession(null);
-    sessionStorage.setItem('sentinel.login.reason', 'Session expirée ou révoquée. Reconnectez-vous.');
+    sessionStorage.setItem(
+      'sentinel.login.reason',
+      'Session expirée ou révoquée. Reconnectez-vous.'
+    );
     navigate('/login', { replace: true });
   }, [navigate]);
 
@@ -48,25 +65,29 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   // Enregistre le handler 401 pour les appels API mid-session.
   useEffect(() => {
     if (isPublic(location.pathname)) {
-      setOn401Handler(() => {});
-      return;
+      setOn401Handler(null);
+      return () => setOn401Handler(null);
     }
     setOn401Handler(markExpired);
-    return () => setOn401Handler(() => {});
+    return () => setOn401Handler(null);
   }, [location.pathname, markExpired]);
 
   // Vérifie la session à chaque changement de route.
   useEffect(() => {
     if (isPublic(location.pathname)) {
       setLoading(false);
-      return;
+      return undefined;
     }
 
+    const controller = new AbortController();
     setLoading(true);
-    getUnifiedMe()
+    void getUnifiedMe(controller.signal)
       .then((response: MeResponse) => {
         if (response.accountType === 'admin') {
-          setSession({ accountType: 'admin', admin: { id: response.id, username: response.username } });
+          setSession({
+            accountType: 'admin',
+            admin: { id: response.id, username: response.username },
+          });
         } else {
           setSession({
             accountType: 'workshop',
@@ -81,25 +102,34 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
         if (err instanceof ApiResponseError && err.status === 401) {
           markExpired();
         } else {
           setSession(null);
+          sessionStorage.setItem(
+            'sentinel.login.reason',
+            'Impossible de vérifier la session. Vérifiez la connexion puis reconnectez-vous.'
+          );
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [location.pathname, markExpired]);
 
   const logout = useCallback(async () => {
-    await unifiedLogout().catch(() => {});
+    await unifiedLogout().catch(() => undefined);
     setSession(null);
   }, []);
 
-  return (
-    <AppAuthContext.Provider value={{ session, loading, setSession, logout }}>
-      {children}
-    </AppAuthContext.Provider>
+  const contextValue = useMemo(
+    () => ({ session, loading, setSession, logout }),
+    [session, loading, logout]
   );
+
+  return <AppAuthContext.Provider value={contextValue}>{children}</AppAuthContext.Provider>;
 }
 
 export function useAppAuth(): AppAuthContextValue {

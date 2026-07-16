@@ -7,7 +7,7 @@ import {
   listPendingPasswordResetRequestsService,
   markPasswordResetRequestHandledService,
 } from './admin.service';
-import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
+import { sendUnauthenticated } from '../../auth/authResponses';
 
 export async function getReferenceDashboard(_req: Request, res: Response): Promise<void> {
   try {
@@ -33,7 +33,10 @@ export async function listReferenceAudit(req: Request, res: Response): Promise<v
   }
 }
 
-export async function listPendingPasswordResetRequests(_req: Request, res: Response): Promise<void> {
+export async function listPendingPasswordResetRequests(
+  _req: Request,
+  res: Response
+): Promise<void> {
   try {
     res.json(await listPendingPasswordResetRequestsService());
   } catch (err) {
@@ -43,15 +46,16 @@ export async function listPendingPasswordResetRequests(_req: Request, res: Respo
 
 export async function markPasswordResetRequestHandled(req: Request, res: Response): Promise<void> {
   try {
+    if (!req.admin) {
+      sendUnauthenticated(res);
+      return;
+    }
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
 
-    const result = await markPasswordResetRequestHandledService(id.data);
+    const result = await markPasswordResetRequestHandledService(id.data, req.admin.adminId);
     if (sendServiceError(res, result)) return;
 
-    if (req.admin) {
-      await createAdminSystemAuditEvent(req.admin.adminId, 'PASSWORD_RESET_REQUEST_HANDLED', { requestId: id.data });
-    }
     res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'markPasswordResetRequestHandled', err);

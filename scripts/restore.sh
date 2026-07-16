@@ -1,21 +1,11 @@
 #!/usr/bin/env bash
-# restore.sh — Restauration de la base PostgreSQL Sentinel depuis un backup
-#
-# Usage:
-#   ./scripts/restore.sh <fichier_backup.sql.gz>
-#
-# Variables d'environnement (lues depuis .env si présent) :
-#   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
-#
-# ATTENTION : cette opération supprime et recrée la base de données.
-# Toutes les données existantes seront ÉCRASÉES.
+# Restauration PostgreSQL Sentinel avec validation avant bascule.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# ── Charger .env si présent ────────────────────────────────────────────────────
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -23,85 +13,120 @@ if [[ -f "$PROJECT_ROOT/.env" ]]; then
   set +a
 fi
 
-# ── Paramètres ────────────────────────────────────────────────────────────────
 DB_NAME="${POSTGRES_DB:-sentinel}"
 DB_USER="${POSTGRES_USER:-sentinel}"
-CONTAINER="${POSTGRES_CONTAINER:-sentinel_postgres}"
+COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.yml}"
 
-# ── Argument obligatoire ──────────────────────────────────────────────────────
-if [[ $# -lt 1 ]]; then
+compose() {
+  docker compose --project-directory "$PROJECT_ROOT" -f "$COMPOSE_FILE" "$@"
+}
+
+if [[ $# -ne 1 ]]; then
   echo "Usage : $0 <fichier_backup.sql.gz>" >&2
-  echo ""
-  echo "Fichiers disponibles dans ./backups :"
-  ls -lht "$PROJECT_ROOT/backups/"sentinel_backup_*.sql.gz 2>/dev/null || echo "  (aucun)"
-  exit 1
+  exit 2
 fi
 
 BACKUP_FILE="$1"
+[[ "$DB_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "[restore] Nom de base invalide." >&2; exit 2; }
+[[ "$DB_USER" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "[restore] Nom d'utilisateur PostgreSQL invalide." >&2; exit 2; }
+[[ -n "${POSTGRES_PASSWORD:-}" ]] || { echo "[restore] POSTGRES_PASSWORD est obligatoire." >&2; exit 2; }
+[[ -f "$BACKUP_FILE" && -r "$BACKUP_FILE" ]] || { echo "[restore] Backup introuvable ou illisible." >&2; exit 2; }
+[[ -f "$COMPOSE_FILE" && -r "$COMPOSE_FILE" ]] || { echo "[restore] Fichier Compose introuvable ou illisible." >&2; exit 2; }
+command -v docker >/dev/null 2>&1 || { echo "[restore] Docker est introuvable." >&2; exit 1; }
+docker compose version >/dev/null 2>&1 || { echo "[restore] Docker Compose v2 est requis." >&2; exit 1; }
+gzip -t "$BACKUP_FILE"
 
-# ── Vérifications préalables ──────────────────────────────────────────────────
-if [[ ! -f "$BACKUP_FILE" ]]; then
-  echo "[restore] ERREUR : fichier introuvable : $BACKUP_FILE" >&2
-  exit 1
-fi
-
-if [[ ! -r "$BACKUP_FILE" ]]; then
-  echo "[restore] ERREUR : fichier non lisible : $BACKUP_FILE" >&2
-  exit 1
-fi
-
-# Vérifier que c'est bien un gzip valide
-if ! gzip -t "$BACKUP_FILE" 2>/dev/null; then
-  echo "[restore] ERREUR : le fichier n'est pas un archive gzip valide." >&2
-  exit 1
-fi
-
-if ! docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q 'true'; then
-  echo "[restore] ERREUR : le conteneur '$CONTAINER' n'est pas en cours d'exécution." >&2
-  exit 1
-fi
-
-# ── Confirmation interactive ──────────────────────────────────────────────────
-echo ""
-echo "  ╔══════════════════════════════════════════════════════╗"
-echo "  ║           RESTAURATION SENTINEL — ATTENTION          ║"
-echo "  ╠══════════════════════════════════════════════════════╣"
-echo "  ║  Backup    : $(basename "$BACKUP_FILE")"
-echo "  ║  Base      : $DB_NAME"
-echo "  ║  Conteneur : $CONTAINER"
-echo "  ╠══════════════════════════════════════════════════════╣"
-echo "  ║  Toutes les données existantes seront ÉCRASÉES.      ║"
-echo "  ╚══════════════════════════════════════════════════════╝"
-echo ""
-read -r -p "  Confirmer la restauration ? [oui/NON] " CONFIRM
-
-if [[ "$CONFIRM" != "oui" ]]; then
-  echo "[restore] Annulé."
-  exit 0
-fi
-
-echo ""
-echo "[restore] Démarrage — $(date)"
-echo "[restore] Fichier : $BACKUP_FILE"
-
-# ── Drop & recréer la base ────────────────────────────────────────────────────
-echo "[restore] Suppression de la base existante..."
-docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "$CONTAINER" \
-  psql -U "$DB_USER" -d postgres --no-password \
-  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" \
-  -c "DROP DATABASE IF EXISTS $DB_NAME;" \
-  -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" \
-  -q
-
-echo "[restore] Base recréée. Import du dump en cours..."
-
-# ── Restauration ──────────────────────────────────────────────────────────────
-if gunzip -c "$BACKUP_FILE" \
-  | docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "$CONTAINER" \
-      psql -U "$DB_USER" -d "$DB_NAME" --no-password -q; then
-  echo "[restore] Succès — base '$DB_NAME' restaurée depuis $(basename "$BACKUP_FILE")"
-  echo "[restore] Terminé — $(date)"
+if [[ -f "${BACKUP_FILE}.sha256" ]]; then
+  (
+    cd "$(dirname "$BACKUP_FILE")"
+    sha256sum -c "$(basename "${BACKUP_FILE}.sha256")"
+  )
 else
-  echo "[restore] ERREUR : la restauration a échoué." >&2
+  echo "[restore] AVERTISSEMENT : aucun fichier SHA-256 associé." >&2
+fi
+
+if ! compose ps --status running --services 2>/dev/null | grep -qx 'postgres'; then
+  echo "[restore] Le service Compose 'postgres' n'est pas actif." >&2
   exit 1
 fi
+
+read -r -p "Saisissez le nom de la base '$DB_NAME' pour confirmer la restauration : " CONFIRM
+[[ "$CONFIRM" == "$DB_NAME" ]] || { echo "[restore] Annulé."; exit 0; }
+
+SUFFIX="$(date +%Y%m%d%H%M%S)_$$"
+TEMP_DB="${DB_NAME}_restore_${SUFFIX}"
+OLD_DB="${DB_NAME}_before_${SUFFIX}"
+BACKEND_WAS_RUNNING=false
+SWAP_STARTED=false
+SWAP_COMPLETED=false
+
+psql_admin() {
+  compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
+    psql -U "$DB_USER" -d postgres --no-password --set=ON_ERROR_STOP=1 "$@"
+}
+
+database_exists() {
+  local name="$1"
+  [[ "$(psql_admin -Atq -c "SELECT 1 FROM pg_database WHERE datname = '$name';")" == "1" ]]
+}
+
+cleanup() {
+  local exit_code=$?
+  set +e
+  if [[ "$SWAP_STARTED" == true && "$SWAP_COMPLETED" == false ]] \
+     && ! database_exists "$DB_NAME" && database_exists "$OLD_DB"; then
+    echo "[restore] Retour arrière du nom de base..." >&2
+    psql_admin -c "ALTER DATABASE \"$OLD_DB\" RENAME TO \"$DB_NAME\";"
+  fi
+  if database_exists "$TEMP_DB"; then
+    psql_admin \
+      -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$TEMP_DB' AND pid <> pg_backend_pid();" \
+      -c "DROP DATABASE \"$TEMP_DB\";"
+  fi
+  if [[ "$BACKEND_WAS_RUNNING" == true ]]; then
+    compose start backend >/dev/null
+  fi
+  exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+echo "[restore] Création de la base temporaire '$TEMP_DB'..."
+psql_admin -c "CREATE DATABASE \"$TEMP_DB\" OWNER \"$DB_USER\";"
+
+echo "[restore] Import transactionnel dans la base temporaire..."
+gunzip -c "$BACKUP_FILE" \
+  | compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
+      psql -U "$DB_USER" -d "$TEMP_DB" --no-password --set=ON_ERROR_STOP=1 \
+        --single-transaction --quiet
+
+VALIDATION="$(compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
+  psql -U "$DB_USER" -d "$TEMP_DB" --no-password --set=ON_ERROR_STOP=1 -Atq \
+  -c "SELECT to_regclass('public.schema_migrations') IS NOT NULL
+             AND to_regclass('public.workshop_incidents') IS NOT NULL
+             AND to_regclass('public.sentinel_users') IS NOT NULL;")"
+[[ "$VALIDATION" == "t" ]] || { echo "[restore] Le dump ne contient pas un schéma Sentinel valide." >&2; exit 1; }
+
+if compose ps --status running --services 2>/dev/null | grep -qx 'backend'; then
+  BACKEND_WAS_RUNNING=true
+  echo "[restore] Arrêt temporaire du backend..."
+  compose stop --timeout 20 backend >/dev/null
+fi
+
+SWAP_STARTED=true
+psql_admin \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();"
+psql_admin -c "ALTER DATABASE \"$DB_NAME\" RENAME TO \"$OLD_DB\";"
+psql_admin -c "ALTER DATABASE \"$TEMP_DB\" RENAME TO \"$DB_NAME\";"
+SWAP_COMPLETED=true
+
+psql_admin \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$OLD_DB' AND pid <> pg_backend_pid();" \
+  -c "DROP DATABASE \"$OLD_DB\";"
+
+if [[ "$BACKEND_WAS_RUNNING" == true ]]; then
+  compose start backend >/dev/null
+  BACKEND_WAS_RUNNING=false
+fi
+
+trap - EXIT INT TERM
+echo "[restore] Restauration validée et basculée avec succès."

@@ -1,4 +1,4 @@
-import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
 import { WorkshopIncident } from '../types';
 
 interface MaintenanceDeleteConfirmModalProps {
@@ -6,6 +6,7 @@ interface MaintenanceDeleteConfirmModalProps {
   title: string;
   message?: string;
   error?: string;
+  loading?: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }
@@ -15,30 +16,26 @@ export default function MaintenanceDeleteConfirmModal({
   title,
   message,
   error = '',
+  loading = false,
   onClose,
   onConfirm,
 }: MaintenanceDeleteConfirmModalProps) {
   return (
-    <Modal
+    <ConfirmModal
       title={title}
       onClose={onClose}
-      closeOnOverlay={false}
+      onConfirm={onConfirm}
+      confirmLabel="Confirmer l’annulation"
+      loadingLabel="Annulation…"
       variant="danger"
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose}>
-            Annuler
-          </button>
-          <button className="btn btn-danger" onClick={onConfirm}>
-            Confirmer l’annulation
-          </button>
-        </>
-      }
+      loading={loading}
+      error={error}
+      failureMessage="Impossible d’annuler l’incident."
     >
       <div className="notice">
-        {message || "Cette action annule l’incident et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon."}
+        {message ||
+          'Cette action annule l’incident et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon.'}
       </div>
-      {error && <div className="error-message" role="alert">{error}</div>}
       <div className="detail-grid" style={{ marginTop: 12 }}>
         <div className="detail-field">
           <span className="detail-field-label">Incident</span>
@@ -47,6 +44,6 @@ export default function MaintenanceDeleteConfirmModal({
           </span>
         </div>
       </div>
-    </Modal>
+    </ConfirmModal>
   );
 }

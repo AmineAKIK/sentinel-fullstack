@@ -1,7 +1,9 @@
 import { badRequest, forbidden, notFound, ok, ServiceResult } from '../../utils/serviceResult';
 import { ANALYTICS_DEFAULT_WINDOW_DAYS } from '../../domain/constants';
+import { withTransaction } from '../../db/transaction';
 import * as workshopRepository from './workshop.repository';
-import type { ArbitrationRequestType } from './workshop.repository';
+import * as arbitrationRepository from './workshop.arbitration.repository';
+import type { ArbitrationRequestType } from './workshop.arbitration.repository';
 import { logIncidentEvent } from './workshop.events';
 import { UpdateIncidentInput } from './workshop.validation';
 
@@ -111,6 +113,9 @@ export async function listHistoryEventsService(
 }
 
 export async function listIncidentEventsService(id: number): Promise<ServiceResult<unknown>> {
+  if (!(await workshopRepository.getIncidentStatus(id))) {
+    return notFound('Incident introuvable.');
+  }
   return ok(await workshopRepository.listIncidentEvents(id));
 }
 
@@ -131,21 +136,45 @@ export async function consultArbitrationRequestService(
     return forbidden("Seul le responsable peut consulter un dossier d'arbitrage.");
   }
 
-  const consulted = await workshopRepository.consultArbitrationRequest(
-    incidentId,
-    actorUserId,
-    requestType
-  );
-  if (consulted > 0) {
-    await logIncidentEvent(incidentId, actorUserId, 'ARBITRATION_CONSULTED', {
+  const result = await withTransaction(async (client) => {
+    const current = await workshopRepository.getIncidentById(incidentId, client);
+    if (!current) return { kind: 'not_found' as const };
+
+    const arbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (!arbitration || arbitration.request_type !== requestType) {
+      return { kind: 'bad_request' as const };
+    }
+    if (arbitration.status === 'CONSULTED') {
+      return { kind: 'ok' as const, consulted: 0 };
+    }
+
+    const consultedCase = await arbitrationRepository.consultArbitrationCase(
+      incidentId,
       requestType,
-      consulted,
-    });
+      actorUserId,
+      client
+    );
+    if (!consultedCase || consultedCase.status !== 'CONSULTED') {
+      throw new Error("Échec de la transition de consultation de l'arbitrage.");
+    }
+    await logIncidentEvent(
+      incidentId,
+      actorUserId,
+      'ARBITRATION_CONSULTED',
+      { requestType, arbitrationCaseId: consultedCase.id },
+      client
+    );
+    return { kind: 'ok' as const, consulted: 1 };
+  });
+
+  if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'bad_request') {
+    return badRequest("Aucun dossier d'arbitrage actif ne correspond à cette demande.");
   }
 
   const incident = await workshopRepository.fetchIncidentWithUsersForActor(incidentId, actorUserId);
   if (!incident) return notFound('Incident introuvable.');
-  return ok({ consulted, incident });
+  return ok({ consulted: result.consulted, incident });
 }
 
 export async function getWorkshopAnalyticsService(

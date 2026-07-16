@@ -1,17 +1,40 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { changeAdminPassword, getAdminEmail, updateAdminEmail } from '../api/adminSecurity';
-import { getAdminNotifPrefs, patchAdminNotifPrefs, AdminNotifPrefs, getBoardSettings, patchBoardEnabled, patchBoardCode, getAppSettings, patchAppSettings, AppSettings, AppSettingsPatch } from '../api/adminSettings';
+import {
+  getAdminNotifPrefs,
+  patchAdminNotifPrefs,
+  AdminNotifPrefs,
+  getBoardSettings,
+  patchBoardEnabled,
+  patchBoardCode,
+  getAppSettings,
+  patchAppSettings,
+  AppSettings,
+  AppSettingsPatch,
+} from '../api/adminSettings';
 import { ApiResponseError } from '../api/client';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
 import SuccessBanner from '../components/ui/SuccessBanner';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import BoardToggleConfirmModal from '../components/BoardToggleConfirmModal';
 import RevokeSessionsConfirmModal from '../components/RevokeSessionsConfirmModal';
 
 const MIN_PWD = 12;
 const MAX_PWD = 128;
+
+function normalizeAppSettings(raw: AppSettings): AppSettings {
+  return {
+    session_duration_hours: Number(raw.session_duration_hours),
+    workshop_session_hours: Number(raw.workshop_session_hours),
+    board_session_ttl_hours: Number(raw.board_session_ttl_hours),
+    login_max_attempts: Number(raw.login_max_attempts),
+    setup_code_ttl_hours: Number(raw.setup_code_ttl_hours),
+    board_label: raw.board_label,
+  };
+}
 
 interface NotifToggleProps {
   id: string;
@@ -77,6 +100,33 @@ export default function AdminSettingsPage() {
   usePageTitle('Paramètres — Administration');
   const navigate = useNavigate();
   const { logout } = useAppAuth();
+  const successTimersRef = useRef<Record<'email' | 'board' | 'app', number | null>>({
+    email: null,
+    board: null,
+    app: null,
+  });
+
+  function scheduleSuccessClear(
+    key: 'email' | 'board' | 'app',
+    clearMessage: () => void,
+    delayMs: number
+  ): void {
+    const existingTimer = successTimersRef.current[key];
+    if (existingTimer !== null) window.clearTimeout(existingTimer);
+    successTimersRef.current[key] = window.setTimeout(() => {
+      clearMessage();
+      successTimersRef.current[key] = null;
+    }, delayMs);
+  }
+
+  useEffect(
+    () => () => {
+      Object.values(successTimersRef.current).forEach((timer) => {
+        if (timer !== null) window.clearTimeout(timer);
+      });
+    },
+    []
+  );
 
   // ─── Mot de passe ─────────────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState('');
@@ -93,8 +143,7 @@ export default function AdminSettingsPage() {
       return `Le mot de passe ne peut pas dépasser ${MAX_PWD} caractères.`;
     if (newPassword === currentPassword)
       return "Le nouveau mot de passe doit être différent de l'actuel.";
-    if (newPassword !== confirmPassword)
-      return 'Les mots de passe ne correspondent pas.';
+    if (newPassword !== confirmPassword) return 'Les mots de passe ne correspondent pas.';
     return null;
   }
 
@@ -102,7 +151,10 @@ export default function AdminSettingsPage() {
     e.preventDefault();
     setPwdError('');
     const err = validatePassword();
-    if (err) { setPwdError(err); return; }
+    if (err) {
+      setPwdError(err);
+      return;
+    }
     setPwdLoading(true);
     try {
       await changeAdminPassword(currentPassword, newPassword);
@@ -127,12 +179,27 @@ export default function AdminSettingsPage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [emailSuccess, setEmailSuccess] = useState('');
+  const [emailInitialLoading, setEmailInitialLoading] = useState(true);
+  const [emailLoadError, setEmailLoadError] = useState('');
 
   useEffect(() => {
-    getAdminEmail().then(({ hasEmail: has, hint }) => {
-      setHasEmail(has);
-      setEmailHint(hint);
-    }).catch(() => {});
+    const controller = new AbortController();
+    void getAdminEmail(controller.signal)
+      .then(({ hasEmail: has, hint }) => {
+        if (controller.signal.aborted) return;
+        setHasEmail(has);
+        setEmailHint(hint);
+        setEmailLoadError('');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setEmailLoadError("Impossible de charger la configuration de l'email.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEmailInitialLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   function resetEmailForm() {
@@ -172,7 +239,7 @@ export default function AdminSettingsPage() {
       setEmailHint(updated.hint);
       resetEmailForm();
       setEmailSuccess('Email mis à jour.');
-      setTimeout(() => setEmailSuccess(''), 4000);
+      scheduleSuccessClear('email', () => setEmailSuccess(''), 4000);
     } catch (err) {
       setEmailError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
     } finally {
@@ -183,16 +250,32 @@ export default function AdminSettingsPage() {
   // ─── Préférences notifications ────────────────────────────────────────────
   const [prefs, setPrefs] = useState<AdminNotifPrefs>(DEFAULT_PREFS);
   const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsLoadError, setPrefsLoadError] = useState('');
+  const [prefsError, setPrefsError] = useState('');
   const [savingPref, setSavingPref] = useState<keyof AdminNotifPrefs | null>(null);
+  const savingPrefRef = useRef(false);
 
   useEffect(() => {
-    getAdminNotifPrefs()
-      .then(setPrefs)
-      .catch(() => {})
-      .finally(() => setPrefsLoading(false));
+    const controller = new AbortController();
+    void getAdminNotifPrefs(controller.signal)
+      .then((loadedPrefs) => {
+        if (!controller.signal.aborted) setPrefs(loadedPrefs);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPrefsLoadError('Impossible de charger les préférences de notification.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPrefsLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   async function handleToggle(key: keyof AdminNotifPrefs, value: boolean) {
+    if (savingPrefRef.current) return;
+    savingPrefRef.current = true;
+    setPrefsError('');
     setPrefs((p) => ({ ...p, [key]: value }));
     setSavingPref(key);
     try {
@@ -200,7 +283,9 @@ export default function AdminSettingsPage() {
       setPrefs(updated);
     } catch {
       setPrefs((p) => ({ ...p, [key]: !value }));
+      setPrefsError("Impossible d'enregistrer la préférence. Réessayez.");
     } finally {
+      savingPrefRef.current = false;
       setSavingPref(null);
     }
   }
@@ -209,6 +294,7 @@ export default function AdminSettingsPage() {
   const [boardEnabled, setBoardEnabled] = useState(true);
   const [boardHasCode, setBoardHasCode] = useState(false);
   const [boardLoading, setBoardLoading] = useState(true);
+  const [boardLoadError, setBoardLoadError] = useState('');
   const [boardNewCode, setBoardNewCode] = useState('');
   const [boardConfirmCode, setBoardConfirmCode] = useState('');
   const [boardPassword, setBoardPassword] = useState('');
@@ -218,13 +304,22 @@ export default function AdminSettingsPage() {
   const [boardTogglePending, setBoardTogglePending] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getBoardSettings()
+    const controller = new AbortController();
+    void getBoardSettings(controller.signal)
       .then(({ board_enabled, hasCode }) => {
+        if (controller.signal.aborted) return;
         setBoardEnabled(board_enabled);
         setBoardHasCode(hasCode);
       })
-      .catch(() => {})
-      .finally(() => setBoardLoading(false));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setBoardLoadError('Impossible de charger la configuration du board.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBoardLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   function handleBoardToggle(value: boolean) {
@@ -273,7 +368,7 @@ export default function AdminSettingsPage() {
       setBoardHasCode(true);
       resetBoardForm();
       setBoardSuccess('Code mis à jour. Sessions révoquées.');
-      setTimeout(() => setBoardSuccess(''), 5000);
+      scheduleSuccessClear('board', () => setBoardSuccess(''), 5000);
     } catch (err) {
       setBoardError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
     } finally {
@@ -291,6 +386,7 @@ export default function AdminSettingsPage() {
     board_label: 'Board atelier',
   });
   const [appSettingsLoading, setAppSettingsLoading] = useState(true);
+  const [appSettingsLoadError, setAppSettingsLoadError] = useState('');
   const [appSettingsDraft, setAppSettingsDraft] = useState<AppSettings | null>(null);
   const [appSettingsSaving, setAppSettingsSaving] = useState(false);
   const [appSettingsError, setAppSettingsError] = useState('');
@@ -301,22 +397,23 @@ export default function AdminSettingsPage() {
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
 
   useEffect(() => {
-    getAppSettings()
+    const controller = new AbortController();
+    void getAppSettings(controller.signal)
       .then((raw) => {
-        // Normalise les champs numériques — le driver pg peut retourner des strings
-        const s: AppSettings = {
-          session_duration_hours:  Number(raw.session_duration_hours),
-          workshop_session_hours:  Number(raw.workshop_session_hours),
-          board_session_ttl_hours: Number(raw.board_session_ttl_hours),
-          login_max_attempts:      Number(raw.login_max_attempts),
-          setup_code_ttl_hours:    Number(raw.setup_code_ttl_hours),
-          board_label:             raw.board_label,
-        };
-        setAppSettings(s);
-        setAppSettingsDraft(s);
+        if (controller.signal.aborted) return;
+        const normalized = normalizeAppSettings(raw);
+        setAppSettings(normalized);
+        setAppSettingsDraft(normalized);
       })
-      .catch(() => {})
-      .finally(() => setAppSettingsLoading(false));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setAppSettingsLoadError("Impossible de charger les paramètres de l'application.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setAppSettingsLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   function appSettingsDraftValue<K extends keyof AppSettings>(key: K): AppSettings[K] {
@@ -337,9 +434,12 @@ export default function AdminSettingsPage() {
     setAppSettingsSuccess('');
   }
 
-  const appSettingsDirty = (appSettingsDraft !== null &&
-    JSON.stringify(appSettingsDraft) !== JSON.stringify(appSettings)) ||
-    revokeAdmin || revokeWorkshop || revokeBoard;
+  const appSettingsDirty =
+    (appSettingsDraft !== null &&
+      JSON.stringify(appSettingsDraft) !== JSON.stringify(appSettings)) ||
+    revokeAdmin ||
+    revokeWorkshop ||
+    revokeBoard;
 
   async function handleAppSettingsSubmit(e: FormEvent, confirmPassword?: string) {
     e.preventDefault();
@@ -365,20 +465,13 @@ export default function AdminSettingsPage() {
           }
         });
       }
-      if (didRevokeAdmin)    patch.revokeAdminSessions    = true;
+      if (didRevokeAdmin) patch.revokeAdminSessions = true;
       if (didRevokeWorkshop) patch.revokeWorkshopSessions = true;
-      if (didRevokeBoard)    patch.revokeBoardSessions    = true;
+      if (didRevokeBoard) patch.revokeBoardSessions = true;
       // L'API exige le mot de passe pour toute révocation (fourni par le modal).
       if (confirmPassword) patch.currentPassword = confirmPassword;
       const raw = await patchAppSettings(patch);
-      const updated: AppSettings = {
-        session_duration_hours:  Number(raw.session_duration_hours),
-        workshop_session_hours:  Number(raw.workshop_session_hours),
-        board_session_ttl_hours: Number(raw.board_session_ttl_hours),
-        login_max_attempts:      Number(raw.login_max_attempts),
-        setup_code_ttl_hours:    Number(raw.setup_code_ttl_hours),
-        board_label:             raw.board_label,
-      };
+      const updated = normalizeAppSettings(raw);
       setAppSettings(updated);
       setAppSettingsDraft(updated);
       setRevokeAdmin(false);
@@ -397,11 +490,13 @@ export default function AdminSettingsPage() {
 
       const parts: string[] = ['Paramètres enregistrés.'];
       if (didRevokeWorkshop) parts.push('Sessions atelier révoquées.');
-      if (didRevokeBoard)    parts.push('Sessions board révoquées.');
+      if (didRevokeBoard) parts.push('Sessions board révoquées.');
       setAppSettingsSuccess(parts.join(' '));
-      setTimeout(() => setAppSettingsSuccess(''), 5000);
+      scheduleSuccessClear('app', () => setAppSettingsSuccess(''), 5000);
     } catch (err) {
-      setAppSettingsError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setAppSettingsError(
+        err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.'
+      );
     } finally {
       setAppSettingsSaving(false);
     }
@@ -416,23 +511,33 @@ export default function AdminSettingsPage() {
         </div>
 
         <div className="settings-grid">
-
           {/* ── Card 1 : Mot de passe ── */}
           <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Mot de passe</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
+              <p
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: 20,
+                }}
+              >
                 Minimum {MIN_PWD} caractères. Vous serez reconnecté après la modification.
               </p>
               <form onSubmit={handlePasswordSubmit} noValidate autoComplete="off">
                 <div className="form-group">
-                  <label className="form-label" htmlFor="currentPassword">Mot de passe actuel</label>
+                  <label className="form-label" htmlFor="currentPassword">
+                    Mot de passe actuel
+                  </label>
                   <input
                     id="currentPassword"
                     className="form-input"
                     type="password"
                     value={currentPassword}
-                    onChange={(e) => { setCurrentPassword(e.target.value); setPwdError(''); }}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      setPwdError('');
+                    }}
                     disabled={pwdLoading}
                     autoComplete="off"
                     readOnly={!currentPassword && !pwdLoading}
@@ -444,13 +549,18 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="newPassword">Nouveau mot de passe</label>
+                  <label className="form-label" htmlFor="newPassword">
+                    Nouveau mot de passe
+                  </label>
                   <input
                     id="newPassword"
                     className="form-input"
                     type="password"
                     value={newPassword}
-                    onChange={(e) => { setNewPassword(e.target.value); setPwdError(''); }}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPwdError('');
+                    }}
                     disabled={pwdLoading}
                     autoComplete="off"
                     readOnly={!newPassword && !pwdLoading}
@@ -462,13 +572,18 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="confirmPassword">Confirmer le nouveau mot de passe</label>
+                  <label className="form-label" htmlFor="confirmPassword">
+                    Confirmer le nouveau mot de passe
+                  </label>
                   <input
                     id="confirmPassword"
                     className="form-input"
                     type="password"
                     value={confirmPassword}
-                    onChange={(e) => { setConfirmPassword(e.target.value); setPwdError(''); }}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPwdError('');
+                    }}
                     disabled={pwdLoading}
                     autoComplete="off"
                     readOnly={!confirmPassword && !pwdLoading}
@@ -479,18 +594,33 @@ export default function AdminSettingsPage() {
                     aria-describedby={pwdError ? 'pwd-error' : undefined}
                   />
                 </div>
-                {pwdError && <div id="pwd-error" className="error-message" role="alert">{pwdError}</div>}
+                {pwdError && (
+                  <div id="pwd-error" className="error-message" role="alert">
+                    {pwdError}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPwdError(''); }}
+                    onClick={() => {
+                      setCurrentPassword('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                      setPwdError('');
+                    }}
                     disabled={pwdLoading || (!currentPassword && !newPassword && !confirmPassword)}
                   >
                     Annuler
                   </button>
                   <button type="submit" className="btn btn-primary btn-sm" disabled={pwdLoading}>
-                    {pwdLoading ? <><span className="spinner" aria-hidden="true" /> Modification…</> : 'Changer le mot de passe'}
+                    {pwdLoading ? (
+                      <>
+                        <span className="spinner" aria-hidden="true" /> Modification…
+                      </>
+                    ) : (
+                      'Changer le mot de passe'
+                    )}
                   </button>
                 </div>
               </form>
@@ -503,7 +633,11 @@ export default function AdminSettingsPage() {
               <p className="settings-section-title">Board atelier</p>
 
               {boardLoading ? (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                  Chargement…
+                </div>
+              ) : boardLoadError ? (
+                <ErrorBanner>{boardLoadError}</ErrorBanner>
               ) : (
                 <>
                   <div className="notif-toggle-item" style={{ paddingTop: 0 }}>
@@ -522,14 +656,30 @@ export default function AdminSettingsPage() {
                     </label>
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 20px' }} />
+                  <div
+                    style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 20px' }}
+                  />
 
-                  <p className="settings-section-title" style={{ marginBottom: 4 }}>Code d'accès</p>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
-                    {boardHasCode
-                      ? <>Modifier le code révoque immédiatement toutes les sessions board actives.</>
-                      : <><strong style={{ color: 'var(--color-warning, #b45309)' }}>Aucun code configuré.</strong> Le board est inaccessible sans code.</>
-                    }
+                  <p className="settings-section-title" style={{ marginBottom: 4 }}>
+                    Code d'accès
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      marginBottom: 16,
+                    }}
+                  >
+                    {boardHasCode ? (
+                      <>Modifier le code révoque immédiatement toutes les sessions board actives.</>
+                    ) : (
+                      <>
+                        <strong style={{ color: 'var(--color-warning, #b45309)' }}>
+                          Aucun code configuré.
+                        </strong>{' '}
+                        Le board est inaccessible sans code.
+                      </>
+                    )}
                   </p>
                   <form onSubmit={handleBoardCodeSubmit} noValidate autoComplete="off">
                     <div className="form-group">
@@ -541,7 +691,10 @@ export default function AdminSettingsPage() {
                         className="form-input"
                         type="password"
                         value={boardNewCode}
-                        onChange={(e) => { setBoardNewCode(e.target.value); setBoardError(''); }}
+                        onChange={(e) => {
+                          setBoardNewCode(e.target.value);
+                          setBoardError('');
+                        }}
                         disabled={boardSubmitting}
                         autoComplete="off"
                         readOnly={!boardNewCode && !boardSubmitting}
@@ -551,13 +704,18 @@ export default function AdminSettingsPage() {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="boardConfirmCode">Confirmer le code</label>
+                      <label className="form-label" htmlFor="boardConfirmCode">
+                        Confirmer le code
+                      </label>
                       <input
                         id="boardConfirmCode"
                         className="form-input"
                         type="password"
                         value={boardConfirmCode}
-                        onChange={(e) => { setBoardConfirmCode(e.target.value); setBoardError(''); }}
+                        onChange={(e) => {
+                          setBoardConfirmCode(e.target.value);
+                          setBoardError('');
+                        }}
                         disabled={boardSubmitting || !boardNewCode}
                         autoComplete="off"
                         readOnly={!boardConfirmCode && !boardSubmitting}
@@ -567,13 +725,18 @@ export default function AdminSettingsPage() {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="boardPassword">Mot de passe administrateur</label>
+                      <label className="form-label" htmlFor="boardPassword">
+                        Mot de passe administrateur
+                      </label>
                       <input
                         id="boardPassword"
                         className="form-input"
                         type="password"
                         value={boardPassword}
-                        onChange={(e) => { setBoardPassword(e.target.value); setBoardError(''); }}
+                        onChange={(e) => {
+                          setBoardPassword(e.target.value);
+                          setBoardError('');
+                        }}
                         disabled={boardSubmitting}
                         autoComplete="off"
                         readOnly={!boardPassword && !boardSubmitting}
@@ -582,21 +745,35 @@ export default function AdminSettingsPage() {
                         placeholder="••••••••••••"
                       />
                     </div>
-                    {boardError && <div className="error-message" role="alert">{boardError}</div>}
+                    {boardError && (
+                      <div className="error-message" role="alert">
+                        {boardError}
+                      </div>
+                    )}
                     {boardSuccess && <SuccessBanner>{boardSuccess}</SuccessBanner>}
                     <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={resetBoardForm}
-                        disabled={boardSubmitting || (!boardNewCode && !boardConfirmCode && !boardPassword)}
+                        disabled={
+                          boardSubmitting || (!boardNewCode && !boardConfirmCode && !boardPassword)
+                        }
                       >
                         Annuler
                       </button>
-                      <button type="submit" className="btn btn-primary btn-sm" disabled={boardSubmitting}>
-                        {boardSubmitting
-                          ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</>
-                          : 'Enregistrer'}
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-sm"
+                        disabled={boardSubmitting}
+                      >
+                        {boardSubmitting ? (
+                          <>
+                            <span className="spinner" aria-hidden="true" /> Enregistrement…
+                          </>
+                        ) : (
+                          'Enregistrer'
+                        )}
                       </button>
                     </div>
                   </form>
@@ -609,94 +786,140 @@ export default function AdminSettingsPage() {
           <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Email de notification</p>
-              {emailHint ? (
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                  Adresse configurée : <strong>{emailHint}</strong>. Laissez le champ "Nouvelle adresse" vide pour la supprimer.
-                </p>
+              {emailInitialLoading ? (
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                  Chargement…
+                </div>
+              ) : emailLoadError ? (
+                <ErrorBanner>{emailLoadError}</ErrorBanner>
               ) : (
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                  Aucune adresse configurée — les notifications par email sont désactivées.
-                </p>
+                <>
+                  {emailHint ? (
+                    <p
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        marginBottom: 20,
+                      }}
+                    >
+                      Adresse configurée : <strong>{emailHint}</strong>. Laissez le champ "Nouvelle
+                      adresse" vide pour la supprimer.
+                    </p>
+                  ) : (
+                    <p
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        marginBottom: 20,
+                      }}
+                    >
+                      Aucune adresse configurée — les notifications par email sont désactivées.
+                    </p>
+                  )}
+                  <form onSubmit={handleEmailSubmit} noValidate>
+                    {hasEmail && (
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="currentEmail">
+                          Confirmer l'adresse actuelle
+                        </label>
+                        <input
+                          id="currentEmail"
+                          className="form-input"
+                          type="text"
+                          value={currentEmail}
+                          onChange={(e) => {
+                            setCurrentEmail(e.target.value);
+                            setEmailError('');
+                          }}
+                          disabled={emailLoading}
+                          autoComplete="off"
+                          readOnly={!currentEmail && !emailLoading}
+                          onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                          maxLength={254}
+                          placeholder="Saisir l'adresse actuelle"
+                          aria-invalid={Boolean(emailError) || undefined}
+                          aria-describedby={emailError ? 'email-error' : undefined}
+                        />
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="newEmail">
+                        {hasEmail ? 'Nouvelle adresse' : 'Adresse email'}
+                      </label>
+                      <input
+                        id="newEmail"
+                        className="form-input"
+                        type="text"
+                        value={newEmail}
+                        onChange={(e) => {
+                          setNewEmail(e.target.value);
+                          setEmailError('');
+                        }}
+                        disabled={emailLoading}
+                        autoComplete="off"
+                        readOnly={!newEmail && !emailLoading}
+                        onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                        maxLength={254}
+                        placeholder="exemple@domaine.com"
+                        aria-invalid={Boolean(emailError) || undefined}
+                        aria-describedby={emailError ? 'email-error' : undefined}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="emailPassword">
+                        Mot de passe actuel
+                      </label>
+                      <input
+                        id="emailPassword"
+                        className="form-input"
+                        type="password"
+                        value={emailPassword}
+                        onChange={(e) => {
+                          setEmailPassword(e.target.value);
+                          setEmailError('');
+                        }}
+                        disabled={emailLoading}
+                        autoComplete="off"
+                        readOnly={!emailPassword && !emailLoading}
+                        onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                        maxLength={MAX_PWD}
+                        placeholder="••••••••••••"
+                        aria-invalid={Boolean(emailError) || undefined}
+                        aria-describedby={emailError ? 'email-error' : undefined}
+                      />
+                    </div>
+                    {emailError && (
+                      <div id="email-error" className="error-message" role="alert">
+                        {emailError}
+                      </div>
+                    )}
+                    {emailSuccess && <SuccessBanner>{emailSuccess}</SuccessBanner>}
+                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={resetEmailForm}
+                        disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-sm"
+                        disabled={emailLoading}
+                      >
+                        {emailLoading ? (
+                          <>
+                            <span className="spinner" aria-hidden="true" /> Enregistrement…
+                          </>
+                        ) : (
+                          'Enregistrer'
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </>
               )}
-              <form onSubmit={handleEmailSubmit} noValidate>
-                {hasEmail && (
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="currentEmail">Confirmer l'adresse actuelle</label>
-                    <input
-                      id="currentEmail"
-                      className="form-input"
-                      type="text"
-                      value={currentEmail}
-                      onChange={(e) => { setCurrentEmail(e.target.value); setEmailError(''); }}
-                      disabled={emailLoading}
-                      autoComplete="off"
-                      readOnly={!currentEmail && !emailLoading}
-                      onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                      maxLength={254}
-                      placeholder="Saisir l'adresse actuelle"
-                      aria-invalid={Boolean(emailError) || undefined}
-                      aria-describedby={emailError ? 'email-error' : undefined}
-                    />
-                  </div>
-                )}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="newEmail">
-                    {hasEmail ? 'Nouvelle adresse' : 'Adresse email'}
-                  </label>
-                  <input
-                    id="newEmail"
-                    className="form-input"
-                    type="text"
-                    value={newEmail}
-                    onChange={(e) => { setNewEmail(e.target.value); setEmailError(''); }}
-                    disabled={emailLoading}
-                    autoComplete="off"
-                    readOnly={!newEmail && !emailLoading}
-                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={254}
-                    placeholder="exemple@domaine.com"
-                    aria-invalid={Boolean(emailError) || undefined}
-                    aria-describedby={emailError ? 'email-error' : undefined}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="emailPassword">Mot de passe actuel</label>
-                  <input
-                    id="emailPassword"
-                    className="form-input"
-                    type="password"
-                    value={emailPassword}
-                    onChange={(e) => { setEmailPassword(e.target.value); setEmailError(''); }}
-                    disabled={emailLoading}
-                    autoComplete="off"
-                    readOnly={!emailPassword && !emailLoading}
-                    onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={MAX_PWD}
-                    placeholder="••••••••••••"
-                    aria-invalid={Boolean(emailError) || undefined}
-                    aria-describedby={emailError ? 'email-error' : undefined}
-                  />
-                </div>
-                {emailError && <div id="email-error" className="error-message" role="alert">{emailError}</div>}
-                {emailSuccess && <SuccessBanner>{emailSuccess}</SuccessBanner>}
-                <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={resetEmailForm}
-                    disabled={emailLoading || (!newEmail && !currentEmail && !emailPassword)}
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-sm"
-                    disabled={emailLoading}
-                  >
-                    {emailLoading ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
 
@@ -704,25 +927,39 @@ export default function AdminSettingsPage() {
           <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Notifications email</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Activez ou désactivez les envois d'emails par canal. Sauvegarde immédiate, sans bouton Enregistrer.
+              <p
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: 20,
+                }}
+              >
+                Activez ou désactivez les envois d'emails par canal. Sauvegarde immédiate, sans
+                bouton Enregistrer.
               </p>
               {prefsLoading ? (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
-              ) : (
-                <div className="notif-toggle-grid">
-                  {NOTIF_ITEMS.map(({ key, label, description }) => (
-                    <NotifToggle
-                      key={key}
-                      id={key}
-                      label={label}
-                      description={description}
-                      checked={prefs[key]}
-                      disabled={savingPref === key}
-                      onChange={(val) => handleToggle(key, val)}
-                    />
-                  ))}
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                  Chargement…
                 </div>
+              ) : prefsLoadError ? (
+                <ErrorBanner>{prefsLoadError}</ErrorBanner>
+              ) : (
+                <>
+                  {prefsError && <ErrorBanner>{prefsError}</ErrorBanner>}
+                  <div className="notif-toggle-grid">
+                    {NOTIF_ITEMS.map(({ key, label, description }) => (
+                      <NotifToggle
+                        key={key}
+                        id={key}
+                        label={label}
+                        description={description}
+                        checked={prefs[key]}
+                        disabled={savingPref !== null}
+                        onChange={(val) => void handleToggle(key, val)}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -731,45 +968,82 @@ export default function AdminSettingsPage() {
           <div className="card settings-full">
             <div className="card-body">
               <p className="settings-section-title">Comportement</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
-                Ces paramètres s'appliquent aux nouvelles sessions uniquement. Les sessions actives conservent leur configuration d'origine. Pour une application immédiate, utilisez la révocation ci-dessous.
+              <p
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: 20,
+                }}
+              >
+                Ces paramètres s'appliquent aux nouvelles sessions uniquement. Les sessions actives
+                conservent leur configuration d'origine. Pour une application immédiate, utilisez la
+                révocation ci-dessous.
               </p>
               {appSettingsLoading ? (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                  Chargement…
+                </div>
+              ) : appSettingsLoadError ? (
+                <ErrorBanner>{appSettingsLoadError}</ErrorBanner>
               ) : (
                 <form onSubmit={handleAppSettingsSubmit} noValidate>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
-
                     <div className="form-group">
-                      <label className="form-label" htmlFor="sessionDuration">Durée de session — Administration</label>
+                      <label className="form-label" htmlFor="sessionDuration">
+                        Durée de session — Administration
+                      </label>
                       <input
                         id="sessionDuration"
                         className="form-input"
                         type="number"
-                        min={1} max={168}
+                        min={1}
+                        max={168}
                         value={appSettingsDraftValue('session_duration_hours')}
-                        onChange={(e) => setAppSettingsDraftField('session_duration_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        onChange={(e) =>
+                          setAppSettingsDraftField(
+                            'session_duration_hours',
+                            Math.max(1, Math.min(168, parseInt(e.target.value) || 1))
+                          )
+                        }
                         disabled={appSettingsSaving}
                       />
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 168</span>
+                      <span
+                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+                      >
+                        En heures — entre 1 et 168
+                      </span>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="workshopSessionHours">Durée de session — Atelier</label>
+                      <label className="form-label" htmlFor="workshopSessionHours">
+                        Durée de session — Atelier
+                      </label>
                       <input
                         id="workshopSessionHours"
                         className="form-input"
                         type="number"
-                        min={1} max={168}
+                        min={1}
+                        max={168}
                         value={appSettingsDraftValue('workshop_session_hours')}
-                        onChange={(e) => setAppSettingsDraftField('workshop_session_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        onChange={(e) =>
+                          setAppSettingsDraftField(
+                            'workshop_session_hours',
+                            Math.max(1, Math.min(168, parseInt(e.target.value) || 1))
+                          )
+                        }
                         disabled={appSettingsSaving}
                       />
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 168</span>
+                      <span
+                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+                      >
+                        En heures — entre 1 et 168
+                      </span>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="boardSessionTtl">Durée de session — Board atelier</label>
+                      <label className="form-label" htmlFor="boardSessionTtl">
+                        Durée de session — Board atelier
+                      </label>
                       {appSettingsDraftValue('board_session_ttl_hours') === 0 ? (
                         <input
                           className="form-input"
@@ -784,45 +1058,81 @@ export default function AdminSettingsPage() {
                           id="boardSessionTtl"
                           className="form-input"
                           type="number"
-                          min={1} max={168}
+                          min={1}
+                          max={168}
                           value={appSettingsDraftValue('board_session_ttl_hours')}
-                          onChange={(e) => setAppSettingsDraftField('board_session_ttl_hours', Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                          onChange={(e) =>
+                            setAppSettingsDraftField(
+                              'board_session_ttl_hours',
+                              Math.max(1, Math.min(168, parseInt(e.target.value) || 1))
+                            )
+                          }
                           disabled={appSettingsSaving}
                         />
                       )}
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 168</span>
+                      <span
+                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+                      >
+                        En heures — entre 1 et 168
+                      </span>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="loginMaxAttempts">Tentatives de connexion avant blocage</label>
+                      <label className="form-label" htmlFor="loginMaxAttempts">
+                        Tentatives de connexion avant blocage
+                      </label>
                       <input
                         id="loginMaxAttempts"
                         className="form-input"
                         type="number"
-                        min={3} max={50}
+                        min={3}
+                        max={50}
                         value={appSettingsDraftValue('login_max_attempts')}
-                        onChange={(e) => setAppSettingsDraftField('login_max_attempts', Math.max(3, Math.min(50, parseInt(e.target.value) || 3)))}
+                        onChange={(e) =>
+                          setAppSettingsDraftField(
+                            'login_max_attempts',
+                            Math.max(3, Math.min(50, parseInt(e.target.value) || 3))
+                          )
+                        }
                         disabled={appSettingsSaving}
                       />
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Blocage temporaire de 5 minutes — entre 3 et 50</span>
+                      <span
+                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+                      >
+                        Blocage temporaire de 5 minutes — entre 3 et 50
+                      </span>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="setupCodeTtl">Validité des codes de création de mot de passe</label>
+                      <label className="form-label" htmlFor="setupCodeTtl">
+                        Validité des codes de création de mot de passe
+                      </label>
                       <input
                         id="setupCodeTtl"
                         className="form-input"
                         type="number"
-                        min={1} max={72}
+                        min={1}
+                        max={72}
                         value={appSettingsDraftValue('setup_code_ttl_hours')}
-                        onChange={(e) => setAppSettingsDraftField('setup_code_ttl_hours', Math.max(1, Math.min(72, parseInt(e.target.value) || 1)))}
+                        onChange={(e) =>
+                          setAppSettingsDraftField(
+                            'setup_code_ttl_hours',
+                            Math.max(1, Math.min(72, parseInt(e.target.value) || 1))
+                          )
+                        }
                         disabled={appSettingsSaving}
                       />
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>En heures — entre 1 et 72</span>
+                      <span
+                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+                      >
+                        En heures — entre 1 et 72
+                      </span>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="boardLabel">Nom affiché du board atelier</label>
+                      <label className="form-label" htmlFor="boardLabel">
+                        Nom affiché du board atelier
+                      </label>
                       <input
                         id="boardLabel"
                         className="form-input"
@@ -834,7 +1144,6 @@ export default function AdminSettingsPage() {
                         placeholder="Board atelier"
                       />
                     </div>
-
                   </div>
 
                   <div className="notif-toggle-item" style={{ margin: '8px 0 4px' }}>
@@ -851,7 +1160,10 @@ export default function AdminSettingsPage() {
                             setAppSettingsDraftField('board_session_ttl_hours', 0);
                           } else {
                             const prev = appSettings.board_session_ttl_hours;
-                            setAppSettingsDraftField('board_session_ttl_hours', prev > 0 ? prev : 12);
+                            setAppSettingsDraftField(
+                              'board_session_ttl_hours',
+                              prev > 0 ? prev : 12
+                            );
                           }
                         }}
                         disabled={appSettingsSaving}
@@ -860,13 +1172,35 @@ export default function AdminSettingsPage() {
                     </label>
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 16px' }} />
-                  <p className="settings-section-title" style={{ marginBottom: 4 }}>Révoquer des sessions</p>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 12 }}>
-                    Cochez les sessions à révoquer lors de l'enregistrement. Action irréversible — les utilisateurs concernés seront déconnectés immédiatement à leur prochaine requête.
+                  <div
+                    style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 16px' }}
+                  />
+                  <p className="settings-section-title" style={{ marginBottom: 4 }}>
+                    Révoquer des sessions
                   </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                  <p
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      marginBottom: 12,
+                    }}
+                  >
+                    Cochez les sessions à révoquer lors de l'enregistrement. Action irréversible —
+                    les utilisateurs concernés seront déconnectés immédiatement à leur prochaine
+                    requête.
+                  </p>
+                  <div
+                    style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }}
+                  >
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        fontSize: 'var(--text-sm)',
+                        cursor: 'pointer',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={revokeAdmin}
@@ -875,7 +1209,15 @@ export default function AdminSettingsPage() {
                       />
                       Sessions administrateur
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        fontSize: 'var(--text-sm)',
+                        cursor: 'pointer',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={revokeWorkshop}
@@ -884,7 +1226,15 @@ export default function AdminSettingsPage() {
                       />
                       Sessions atelier (tous les utilisateurs)
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        fontSize: 'var(--text-sm)',
+                        cursor: 'pointer',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={revokeBoard}
@@ -895,7 +1245,11 @@ export default function AdminSettingsPage() {
                     </label>
                   </div>
 
-                  {appSettingsError && <div className="error-message" role="alert">{appSettingsError}</div>}
+                  {appSettingsError && (
+                    <div className="error-message" role="alert">
+                      {appSettingsError}
+                    </div>
+                  )}
                   {appSettingsSuccess && <SuccessBanner>{appSettingsSuccess}</SuccessBanner>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                     <button
@@ -910,16 +1264,28 @@ export default function AdminSettingsPage() {
                       type="submit"
                       className="btn btn-primary btn-sm"
                       disabled={appSettingsSaving || !appSettingsDirty}
-                      onClick={(revokeAdmin || revokeWorkshop || revokeBoard) ? (e) => { e.preventDefault(); setShowRevokeConfirm(true); } : undefined}
+                      onClick={
+                        revokeAdmin || revokeWorkshop || revokeBoard
+                          ? (e) => {
+                              e.preventDefault();
+                              setShowRevokeConfirm(true);
+                            }
+                          : undefined
+                      }
                     >
-                      {appSettingsSaving ? <><span className="spinner" aria-hidden="true" /> Enregistrement…</> : 'Enregistrer'}
+                      {appSettingsSaving ? (
+                        <>
+                          <span className="spinner" aria-hidden="true" /> Enregistrement…
+                        </>
+                      ) : (
+                        'Enregistrer'
+                      )}
                     </button>
                   </div>
                 </form>
               )}
             </div>
           </div>
-
         </div>
       </main>
 

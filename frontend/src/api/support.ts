@@ -11,14 +11,16 @@ export interface ChatResponse {
 
 export function sendAdminSupportMessage(
   message: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  signal?: AbortSignal
 ): Promise<ChatResponse> {
-  return api.post<ChatResponse>('/api/admin/support/chat', { message, history });
+  return api.post<ChatResponse>('/api/admin/support/chat', { message, history }, signal);
 }
 
 export function sendWorkshopSupportMessage(
   message: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  signal?: AbortSignal
 ): Promise<ChatResponse> {
-  return api.post<ChatResponse>('/api/workshop/support/chat', { message, history });
+  return api.post<ChatResponse>('/api/workshop/support/chat', { message, history }, signal);
 }

@@ -10,12 +10,12 @@ export interface CreateLinePayload {
 
 export type UpdateLinePayload = Partial<CreateLinePayload>;
 
-export async function listLines(): Promise<ProductionLine[]> {
-  return api.get<ProductionLine[]>('/api/admin/lines');
+export async function listLines(signal?: AbortSignal): Promise<ProductionLine[]> {
+  return api.get<ProductionLine[]>('/api/admin/lines', signal);
 }
 
-export async function getLine(id: number): Promise<ProductionLine> {
-  return api.get<ProductionLine>(`/api/admin/lines/${id}`);
+export async function getLine(id: number, signal?: AbortSignal): Promise<ProductionLine> {
+  return api.get<ProductionLine>(`/api/admin/lines/${id}`, signal);
 }
 
 export async function createLine(payload: CreateLinePayload): Promise<ProductionLine> {
@@ -38,10 +38,7 @@ export async function checkLineConflicts(payload: {
   );
 }
 
-export async function updateLine(
-  id: number,
-  payload: UpdateLinePayload
-): Promise<ProductionLine> {
+export async function updateLine(id: number, payload: UpdateLinePayload): Promise<ProductionLine> {
   return api.patch<ProductionLine>(`/api/admin/lines/${id}`, payload);
 }
 
@@ -52,9 +49,12 @@ export async function archiveLine(
   return api.post(`/api/admin/lines/${id}/archive`, { force });
 }
 
-export async function getLineImpact(id: number): Promise<{
+export async function getLineImpact(
+  id: number,
+  signal?: AbortSignal
+): Promise<{
   incidents: number;
   open_or_pending_incidents: number;
 }> {
-  return api.get(`/api/admin/lines/${id}/impact`);
+  return api.get(`/api/admin/lines/${id}/impact`, signal);
 }

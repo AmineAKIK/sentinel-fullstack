@@ -33,6 +33,10 @@ export function hasCancelRequest(incident: CurrentIncident): boolean {
   return incident.cancel_request === true || incident.delete_request === true;
 }
 
+export function hasPendingArbitration(incident: CurrentIncident): boolean {
+  return incident.edit_request != null || hasCancelRequest(incident);
+}
+
 export function canPerform(
   role: string,
   action: IncidentAction,
@@ -48,6 +52,7 @@ export function canPerform(
       return (
         workshopRole === 'OPERATOR' &&
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         actorId !== undefined &&
         incident.user_id === actorId
       );
@@ -66,6 +71,7 @@ export function canPerform(
       return (
         workshopRole === 'OPERATOR' &&
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         !incident.is_taken &&
         actorId !== undefined &&
         incident.user_id === actorId
@@ -73,17 +79,23 @@ export function canPerform(
     case 'DIRECT_EDIT':
       return (
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         !incident.is_taken &&
         (workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE')
       );
     case 'RESPONSABLE_EDIT':
       // RESPONSABLE can edit descriptive fields even after a technician has taken the incident.
-      return workshopRole === 'RESPONSABLE' && isActiveIncident(incident);
+      return (
+        workshopRole === 'RESPONSABLE' &&
+        isActiveIncident(incident) &&
+        !hasPendingArbitration(incident)
+      );
     case 'EDIT_AFTER_TAKE':
       // MAINTENANCE can edit descriptive fields on incidents they personally took charge of.
       return (
         workshopRole === 'MAINTENANCE' &&
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         incident.is_taken &&
         actorId !== undefined &&
         incident.taken_by_user_id === actorId
@@ -92,10 +104,11 @@ export function canPerform(
       // PENDING incidents can be cancelled by RESPONSABLE (not MAINTENANCE) since
       // the technician has already engaged — a supervisor override is required.
       if (incident.status === 'PENDING') {
-        return workshopRole === 'RESPONSABLE';
+        return workshopRole === 'RESPONSABLE' && !hasPendingArbitration(incident);
       }
       return (
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         !incident.is_taken &&
         (workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE')
       );
@@ -118,19 +131,35 @@ export function canPerform(
       return (
         workshopRole === 'MAINTENANCE' &&
         incident.status === 'OPEN' &&
+        !hasPendingArbitration(incident) &&
         actorId !== undefined &&
         (!incident.is_taken || incident.taken_by_user_id !== actorId)
       );
     case 'SET_PENDING':
-      return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
+      return (
+        workshopRole === 'MAINTENANCE' &&
+        incident.status === 'OPEN' &&
+        incident.is_taken &&
+        !hasPendingArbitration(incident)
+      );
     case 'RESUME':
       // Any MAINTENANCE member can resume, not just the one who set it PENDING.
       // Intentional: allows a replacement technician to take over if needed.
-      return workshopRole === 'MAINTENANCE' && incident.status === 'PENDING' && incident.is_taken;
+      return (
+        workshopRole === 'MAINTENANCE' &&
+        incident.status === 'PENDING' &&
+        incident.is_taken &&
+        !hasPendingArbitration(incident)
+      );
     case 'CLOSE':
       // Any MAINTENANCE member can close, not just taken_by_user_id.
       // Intentional: allows a replacement technician to take over if needed.
-      return workshopRole === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
+      return (
+        workshopRole === 'MAINTENANCE' &&
+        incident.status === 'OPEN' &&
+        incident.is_taken &&
+        !hasPendingArbitration(incident)
+      );
     case 'SET_PRIORITY':
     case 'RESPONSIBLE_COMMENT':
       return workshopRole === 'RESPONSABLE' && isActiveIncident(incident);

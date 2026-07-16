@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
 import Spinner from './ui/Spinner';
+import { apiErrorMessage } from '../api/client';
 
 type ConfirmModalProps = {
   title: string;
@@ -15,6 +17,7 @@ type ConfirmModalProps = {
   disabled?: boolean;
   variant?: 'default' | 'danger';
   closeOnOverlay?: boolean;
+  failureMessage?: string;
 };
 
 export default function ConfirmModal({
@@ -30,31 +33,77 @@ export default function ConfirmModal({
   disabled = false,
   variant = 'default',
   closeOnOverlay = false,
+  failureMessage = 'Impossible de confirmer cette action.',
 }: ConfirmModalProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
+  const mountedRef = useRef(true);
+  const submittingRef = useRef(false);
   const buttonClassName = variant === 'danger' ? 'btn btn-danger' : 'btn btn-primary';
+  const effectiveLoading = loading || submitting;
+  const effectiveError = error || submissionError;
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  async function handleConfirm(): Promise<void> {
+    if (!onConfirm || effectiveLoading || disabled || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setSubmissionError('');
+    try {
+      await onConfirm();
+    } catch (requestError) {
+      if (mountedRef.current) {
+        setSubmissionError(apiErrorMessage(requestError, failureMessage));
+      }
+    } finally {
+      submittingRef.current = false;
+      if (mountedRef.current) setSubmitting(false);
+    }
+  }
 
   return (
     <Modal
       title={title}
-      onClose={loading ? undefined : onClose}
+      onClose={effectiveLoading ? undefined : onClose}
       closeOnOverlay={closeOnOverlay}
-      isLoading={loading}
+      isLoading={effectiveLoading}
       variant={variant}
       footer={
         <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={onClose}
+            disabled={effectiveLoading}
+          >
             {cancelLabel}
           </button>
           {onConfirm && (
-            <button className={buttonClassName} onClick={onConfirm} disabled={loading || disabled}>
-              {loading ? <><Spinner /> {loadingLabel}</> : confirmLabel}
+            <button
+              className={buttonClassName}
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={effectiveLoading || disabled}
+            >
+              {effectiveLoading ? (
+                <>
+                  <Spinner /> {loadingLabel}
+                </>
+              ) : (
+                confirmLabel
+              )}
             </button>
           )}
         </>
       }
     >
       {children}
-      {error && <ErrorBanner>{error}</ErrorBanner>}
+      {effectiveError && <ErrorBanner>{effectiveError}</ErrorBanner>}
     </Modal>
   );
 }

@@ -51,6 +51,7 @@ export interface WorkshopIncident {
 }
 
 export interface WorkshopArbitrationRequestState {
+  caseId: number;
   requestEventId: number;
   requestedAt: string;
   state: 'ACTIVE' | 'WAITING';

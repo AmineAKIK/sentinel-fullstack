@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CreateIncidentModal from './CreateIncidentModal';
 import DeleteRequestModal from './DeleteRequestModal';
@@ -29,6 +29,8 @@ import ChevronUpIcon from './icons/ChevronUpIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import CloseIcon from './icons/CloseIcon';
 import StarIcon from './icons/StarIcon';
+import ErrorBanner from './ui/ErrorBanner';
+import { apiErrorMessage } from '../api/client';
 
 interface IncidentDetailPanelProps {
   incident: WorkshopIncident;
@@ -244,10 +246,33 @@ export default function IncidentDetailPanel({
   const navigate = useNavigate();
   const FIELD_LIMITS = useFieldLimits();
   const [responsibleDraft, setResponsibleDraft] = useState(incident.responsible_comment ?? '');
+  const [actionError, setActionError] = useState('');
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const pendingActionRef = useRef(false);
 
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
+    setActionError('');
   }, [incident.id, incident.responsible_comment]);
+
+  async function runPanelAction(
+    actionName: string,
+    action: () => Promise<unknown>,
+    fallback: string
+  ): Promise<void> {
+    if (pendingActionRef.current) return;
+    pendingActionRef.current = true;
+    setPendingAction(actionName);
+    setActionError('');
+    try {
+      await action();
+    } catch (requestError) {
+      setActionError(apiErrorMessage(requestError, fallback));
+    } finally {
+      pendingActionRef.current = false;
+      setPendingAction(null);
+    }
+  }
 
   const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
 
@@ -333,7 +358,14 @@ export default function IncidentDetailPanel({
               className={`incident-detail-iconbtn incident-detail-followbtn${
                 incident.is_followed ? ' is-active' : ''
               }`}
-              onClick={() => void onToggleFollow(incident)}
+              onClick={() =>
+                void runPanelAction(
+                  'follow',
+                  () => onToggleFollow(incident),
+                  'Impossible de modifier le suivi.'
+                )
+              }
+              disabled={pendingAction !== null}
               aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
               title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
             >
@@ -353,6 +385,7 @@ export default function IncidentDetailPanel({
       </div>
 
       <div className="incident-detail-content">
+        {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
         <section className="incident-summary-strip" aria-label="Synthèse de l'incident">
           <SummaryItem label="État">
             <IncidentStateChip incident={incident} />
@@ -412,7 +445,14 @@ export default function IncidentDetailPanel({
               {canSetPriority && (
                 <button
                   className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-warning'}
-                  onClick={() => void onToggleUrgent(incident)}
+                  onClick={() =>
+                    void runPanelAction(
+                      'priority',
+                      () => onToggleUrgent(incident),
+                      "Impossible de modifier l'urgence."
+                    )
+                  }
+                  disabled={pendingAction !== null}
                 >
                   {incident.is_priority ? "Retirer l'urgence" : 'Déclarer urgent'}
                 </button>
@@ -432,7 +472,14 @@ export default function IncidentDetailPanel({
               {canWithdrawEdit && (
                 <button
                   className="btn btn-secondary"
-                  onClick={() => void patchIncident(incident.id, { withdrawEditRequest: true })}
+                  onClick={() =>
+                    void runPanelAction(
+                      'withdraw-edit',
+                      () => patchIncident(incident.id, { withdrawEditRequest: true }),
+                      'Impossible de retirer la demande de correction.'
+                    )
+                  }
+                  disabled={pendingAction !== null}
                 >
                   Retirer ma demande
                 </button>
@@ -509,11 +556,16 @@ export default function IncidentDetailPanel({
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() =>
-                      void patchIncident(incident.id, {
-                        responsibleComment: responsibleDraft.trim(),
-                      })
+                      void runPanelAction(
+                        'responsible-comment',
+                        () =>
+                          patchIncident(incident.id, {
+                            responsibleComment: responsibleDraft.trim(),
+                          }),
+                        "Impossible d'enregistrer la consigne."
+                      )
                     }
-                    disabled={!responsibleDraft.trim()}
+                    disabled={!responsibleDraft.trim() || pendingAction !== null}
                   >
                     {incident.responsible_comment ? 'Enregistrer' : 'Ajouter'}
                   </button>
@@ -650,6 +702,7 @@ export default function IncidentDetailPanel({
                 : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."
             }
             error={modal.state.reviewError}
+            loading={modal.state.reviewLoading}
             onClose={() => modal.closeModal()}
             onConfirm={() =>
               onMaintenanceDeleteConfirm(

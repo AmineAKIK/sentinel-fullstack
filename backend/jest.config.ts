@@ -15,11 +15,22 @@ const config: Config = {
     'src/modules/lines/lines.service.ts',
     'src/modules/workshop/workshop.service.ts',
   ],
+  coverageThreshold: {
+    global: {
+      statements: 80,
+      branches: 75,
+      functions: 70,
+      lines: 85,
+    },
+  },
   // Integration tests live under src/integration/ and require a real DB.
   // They are not excluded here — the test files skip themselves when DATABASE_URL
   // is absent, so `npm test` always works without a DB.
   // In CI, the integration job sets DATABASE_URL, which activates the suites.
   testTimeout: 30_000,
+  // Integration suites share one PostgreSQL schema and use surgical fixtures.
+  // Serial execution prevents cross-suite fixture races without destructive TRUNCATE calls.
+  maxWorkers: 1,
   projects: [
     {
       displayName: 'unit',

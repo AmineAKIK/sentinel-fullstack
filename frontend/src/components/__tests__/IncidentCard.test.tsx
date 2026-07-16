@@ -130,6 +130,7 @@ describe('IncidentCard – rendu', () => {
           edit_request: { state: 'ARRET' },
           arbitration: {
             edit: {
+              caseId: 21,
               requestEventId: 11,
               requestedAt: new Date().toISOString(),
               state: 'WAITING',

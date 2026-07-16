@@ -5,7 +5,12 @@ import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import KpiCard from '../components/ui/KpiCard';
 import PendingTasksWidget from '../components/PendingTasksWidget';
-import { getReferenceDashboard, getReferenceQuality, listPendingPasswordResetRequests, PasswordResetRequest } from '../api/admin';
+import {
+  getReferenceDashboard,
+  getReferenceQuality,
+  listPendingPasswordResetRequests,
+  PasswordResetRequest,
+} from '../api/admin';
 import { ReferenceDashboard, ReferenceQuality } from '../types';
 import { formatDateTime } from '../utils/date';
 import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
@@ -20,13 +25,23 @@ export default function AdminHomePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([getReferenceDashboard(), getReferenceQuality(), listPendingPasswordResetRequests()])
+    const controller = new AbortController();
+    const signal = controller.signal;
+    void Promise.all([
+      getReferenceDashboard(signal),
+      getReferenceQuality(signal),
+      listPendingPasswordResetRequests(signal),
+    ])
       .then(([dashboardData, qualityData, requestsData]) => {
+        if (signal.aborted) return;
         setDashboard(dashboardData);
         setQuality(qualityData);
         setPendingRequests(requestsData);
       })
-      .catch(() => setError("Impossible de charger l'accueil administration."));
+      .catch(() => {
+        if (!signal.aborted) setError("Impossible de charger l'accueil administration.");
+      });
+    return () => controller.abort();
   }, []);
 
   const qualityCount = quality
@@ -49,10 +64,26 @@ export default function AdminHomePage() {
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="kpi-grid kpi-grid--4">
-          <KpiCard label="Utilisateurs actifs" value={dashboard?.users_active ?? '-'} sub={`${dashboard?.users_inactive ?? '-'} inactifs`} />
-          <KpiCard label="Sans mot de passe" value={dashboard?.users_without_password ?? '-'} sub="Comptes à finaliser" />
-          <KpiCard label="Lignes actives" value={dashboard?.lines_active ?? '-'} sub={`${dashboard?.machines_total ?? '-'} machines référencées`} />
-          <KpiCard label="Points à vérifier" value={quality ? qualityCount : '-'} sub="Qualité des référentiels" />
+          <KpiCard
+            label="Utilisateurs actifs"
+            value={dashboard?.users_active ?? '-'}
+            sub={`${dashboard?.users_inactive ?? '-'} inactifs`}
+          />
+          <KpiCard
+            label="Sans mot de passe"
+            value={dashboard?.users_without_password ?? '-'}
+            sub="Comptes à finaliser"
+          />
+          <KpiCard
+            label="Lignes actives"
+            value={dashboard?.lines_active ?? '-'}
+            sub={`${dashboard?.machines_total ?? '-'} machines référencées`}
+          />
+          <KpiCard
+            label="Points à vérifier"
+            value={quality ? qualityCount : '-'}
+            sub="Qualité des référentiels"
+          />
         </div>
 
         <div className="admin-overview-grid">
@@ -68,7 +99,9 @@ export default function AdminHomePage() {
                   <h2>Contrôle qualité</h2>
                   <span>Points à traiter dans les référentiels</span>
                 </div>
-                <strong className={qualityCount > 0 ? 'admin-status-badge warning' : 'admin-status-badge'}>
+                <strong
+                  className={qualityCount > 0 ? 'admin-status-badge warning' : 'admin-status-badge'}
+                >
                   {quality ? qualityCount : '-'}
                 </strong>
               </div>

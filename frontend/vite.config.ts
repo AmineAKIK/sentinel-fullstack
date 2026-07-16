@@ -18,7 +18,25 @@ export default defineConfig({
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      include: ['src/utils/**', 'src/components/**', 'src/pages/**'],
+      include: [
+        'src/api/client.ts',
+        'src/hooks/useIncidentsData.ts',
+        'src/components/ConfirmModal.tsx',
+        'src/components/IncidentBadges.tsx',
+        'src/components/IncidentCard.tsx',
+        'src/components/IncidentMetricsBar.tsx',
+        'src/components/Modal.tsx',
+        'src/components/ReviewIncidentRequestModal.tsx',
+        'src/components/SupportChat.tsx',
+        'src/utils/**/*.{ts,tsx}',
+      ],
+      exclude: ['src/**/__tests__/**'],
+      thresholds: {
+        statements: 85,
+        branches: 80,
+        functions: 90,
+        lines: 90,
+      },
     },
   },
 });

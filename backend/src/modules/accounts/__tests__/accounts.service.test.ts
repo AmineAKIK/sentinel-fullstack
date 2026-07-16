@@ -116,17 +116,28 @@ describe('createAccountService', () => {
     if (result.ok) {
       expect(result.data).toEqual({ ...created, password_setup_code: 'ABCD234567' });
     }
-    expect(repo.createAccountData).toHaveBeenCalledWith(input, 'hashed-setup-code', new Date('2025-01-02T00:00:00Z'), null);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(created.id, 1, 'USER_CREATED', {
-      firstName: 'Jean',
-      lastName: 'Dupont',
-      badgeNumber: 'B001',
-      role: 'OPERATOR',
-      emailConfigured: false,
-    }, null);
+    expect(repo.createAccountData).toHaveBeenCalledWith(
+      input,
+      'hashed-setup-code',
+      new Date('2025-01-02T00:00:00Z'),
+      null
+    );
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(
+      created.id,
+      1,
+      'USER_CREATED',
+      {
+        firstName: 'Jean',
+        lastName: 'Dupont',
+        badgeNumber: 'B001',
+        role: 'OPERATOR',
+        emailConfigured: false,
+      },
+      null
+    );
   });
 
-  it('journalise uniquement la présence de l\'email professionnel à la création', async () => {
+  it("journalise uniquement la présence de l'email professionnel à la création", async () => {
     const email = 'jean.dupont@example.test';
     const created = mockAccount({ email });
     jest.mocked(repo.accountBadgeExists).mockResolvedValue(false);
@@ -150,7 +161,7 @@ describe('createAccountService', () => {
 // ─── getAccountService ────────────────────────────────────────────────────────
 
 describe('getAccountService', () => {
-  it('retourne NOT_FOUND quand le compte n\'existe pas', async () => {
+  it("retourne NOT_FOUND quand le compte n'existe pas", async () => {
     jest.mocked(repo.getAccountData).mockResolvedValue(null);
     const result = await getAccountService(999);
     expect(result.ok).toBe(false);
@@ -172,7 +183,7 @@ describe('getAccountService', () => {
 // ─── updateAccountService ─────────────────────────────────────────────────────
 
 describe('updateAccountService', () => {
-  it('retourne NOT_FOUND si l\'utilisateur n\'existe pas', async () => {
+  it("retourne NOT_FOUND si l'utilisateur n'existe pas", async () => {
     jest.mocked(repo.getAccountData).mockResolvedValue(null);
     const result = await updateAccountService(999, { firstName: 'Test' }, 1);
     expect(result.ok).toBe(false);
@@ -192,7 +203,7 @@ describe('updateAccountService', () => {
     }
   });
 
-  it('retourne RESOURCE_IN_USE si le rôle change et qu\'il y a des incidents actifs', async () => {
+  it("retourne RESOURCE_IN_USE si le rôle change et qu'il y a des incidents actifs", async () => {
     const current = mockAccount({ role: 'OPERATOR' });
     jest.mocked(repo.getAccountData).mockResolvedValue(current);
     jest.mocked(repo.accountBadgeExists).mockResolvedValue(false);
@@ -239,26 +250,29 @@ describe('updateAccountService', () => {
       nextEmail: null,
       action: 'removed',
     },
-  ])('journalise le type d\'action sans adresse lors de la $label d\'un email', async ({ currentEmail, nextEmail, action }) => {
-    const current = mockAccount({ email: currentEmail });
-    const updated = mockAccount({ email: nextEmail });
-    jest.mocked(repo.getAccountData).mockResolvedValue(current);
-    jest.mocked(repo.updateAccountData).mockResolvedValue(updated);
-    jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
+  ])(
+    "journalise le type d'action sans adresse lors de la $label d'un email",
+    async ({ currentEmail, nextEmail, action }) => {
+      const current = mockAccount({ email: currentEmail });
+      const updated = mockAccount({ email: nextEmail });
+      jest.mocked(repo.getAccountData).mockResolvedValue(current);
+      jest.mocked(repo.updateAccountData).mockResolvedValue(updated);
+      jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
 
-    await updateAccountService(1, { email: nextEmail }, 1);
+      await updateAccountService(1, { email: nextEmail }, 1);
 
-    const auditChanges = jest.mocked(events.createAccountAuditEvent).mock.calls[0][3];
-    expect(auditChanges).toEqual({ email: { action } });
-    if (currentEmail) expect(JSON.stringify(auditChanges)).not.toContain(currentEmail);
-    if (nextEmail) expect(JSON.stringify(auditChanges)).not.toContain(nextEmail);
-  });
+      const auditChanges = jest.mocked(events.createAccountAuditEvent).mock.calls[0][3];
+      expect(auditChanges).toEqual({ email: { action } });
+      if (currentEmail) expect(JSON.stringify(auditChanges)).not.toContain(currentEmail);
+      if (nextEmail) expect(JSON.stringify(auditChanges)).not.toContain(nextEmail);
+    }
+  );
 });
 
 // ─── deactivateAccountService ─────────────────────────────────────────────────
 
 describe('deactivateAccountService', () => {
-  it('retourne RESOURCE_IN_USE si l\'utilisateur a des incidents actifs pris en charge', async () => {
+  it("retourne RESOURCE_IN_USE si l'utilisateur a des incidents actifs pris en charge", async () => {
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(3);
 
     const result = await deactivateAccountService(1, 1);
@@ -269,7 +283,7 @@ describe('deactivateAccountService', () => {
     }
   });
 
-  it('retourne NOT_FOUND si l\'utilisateur n\'existe pas', async () => {
+  it("retourne NOT_FOUND si l'utilisateur n'existe pas", async () => {
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
     jest.mocked(repo.setAccountActive).mockResolvedValue(null);
 
@@ -278,7 +292,7 @@ describe('deactivateAccountService', () => {
     if (!result.ok) expect(result.code).toBe('NOT_FOUND');
   });
 
-  it('désactive le compte avec succès quand il n\'y a pas d\'incidents actifs', async () => {
+  it("désactive le compte avec succès quand il n'y a pas d'incidents actifs", async () => {
     const account = mockAccount({ is_active: false });
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
     jest.mocked(repo.setAccountActive).mockResolvedValue(account);
@@ -287,14 +301,20 @@ describe('deactivateAccountService', () => {
     const result = await deactivateAccountService(1, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.is_active).toBe(false);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_DEACTIVATED', null, null);
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(
+      1,
+      1,
+      'USER_DEACTIVATED',
+      null,
+      null
+    );
   });
 });
 
 // ─── deleteAccountService ─────────────────────────────────────────────────────
 
 describe('deleteAccountService', () => {
-  it('retourne RESOURCE_IN_USE si l\'utilisateur a des incidents actifs pris en charge', async () => {
+  it("retourne RESOURCE_IN_USE si l'utilisateur a des incidents actifs pris en charge", async () => {
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(1);
 
     const result = await deleteAccountService(1, 1);
@@ -305,7 +325,7 @@ describe('deleteAccountService', () => {
     }
   });
 
-  it('retourne NOT_FOUND si l\'utilisateur n\'existe pas', async () => {
+  it("retourne NOT_FOUND si l'utilisateur n'existe pas", async () => {
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
     jest.mocked(repo.softDeleteAccount).mockResolvedValue(false);
 
@@ -318,7 +338,11 @@ describe('deleteAccountService', () => {
   });
 
   it('supprime logiquement le compte avec succès', async () => {
-    const account = mockAccount({ first_name: 'Karim', last_name: 'Bensaïd', badge_number: 'B777' });
+    const account = mockAccount({
+      first_name: 'Karim',
+      last_name: 'Bensaïd',
+      badge_number: 'B777',
+    });
     jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
     jest.mocked(repo.getAccountData).mockResolvedValue(account);
     jest.mocked(repo.softDeleteAccount).mockResolvedValue(true);
@@ -329,7 +353,11 @@ describe('deleteAccountService', () => {
     if (result.ok) expect(result.data.message).toBe('Utilisateur supprimé.');
     // L'identité d'origine est figée dans l'event (pas le pseudonyme ANON).
     expect(events.createAccountAuditEvent).toHaveBeenCalledWith(
-      1, 1, 'USER_SOFT_DELETED', null, null,
+      1,
+      1,
+      'USER_SOFT_DELETED',
+      null,
+      null,
       { firstName: 'Karim', lastName: 'Bensaïd', badgeNumber: 'B777' }
     );
   });
@@ -338,7 +366,7 @@ describe('deleteAccountService', () => {
 // ─── resetAccountPasswordService ──────────────────────────────────────────────
 
 describe('resetAccountPasswordService', () => {
-  it('retourne NOT_FOUND si le compte n\'existe pas', async () => {
+  it("retourne NOT_FOUND si le compte n'existe pas", async () => {
     jest.mocked(repo.resetAccountPasswordData).mockResolvedValue(null);
 
     const result = await resetAccountPasswordService(999, 1);
@@ -359,15 +387,26 @@ describe('resetAccountPasswordService', () => {
     if (result.ok) {
       expect(result.data).toEqual({ ...account, password_setup_code: 'ABCD234567' });
     }
-    expect(repo.resetAccountPasswordData).toHaveBeenCalledWith(1, 'hashed-setup-code', new Date('2025-01-02T00:00:00Z'), null);
-    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(1, 1, 'USER_PASSWORD_RESET', null, null);
+    expect(repo.resetAccountPasswordData).toHaveBeenCalledWith(
+      1,
+      'hashed-setup-code',
+      new Date('2025-01-02T00:00:00Z'),
+      null
+    );
+    expect(events.createAccountAuditEvent).toHaveBeenCalledWith(
+      1,
+      1,
+      'USER_PASSWORD_RESET',
+      null,
+      null
+    );
   });
 });
 
 // ─── getAccountImpactService ──────────────────────────────────────────────────
 
 describe('getAccountImpactService', () => {
-  it('retourne les compteurs d\'impact de l\'utilisateur', async () => {
+  it("retourne les compteurs d'impact de l'utilisateur", async () => {
     const impact = { reported_incidents: 5, taken_incidents: 3, active_taken_incidents: 0 };
     jest.mocked(repo.getAccountImpactData).mockResolvedValue(impact);
 

@@ -73,37 +73,52 @@ async function resolveActorName(actorUserId: number): Promise<string> {
   return `${rows[0].first_name} ${rows[0].last_name}`.trim();
 }
 
-// ─── Envoi bas niveau — fire-and-forget ──────────────────────────────────────
+// ─── Envoi bas niveau ────────────────────────────────────────────────────────
 
-function sendMail(to: string | string[], subject: string, html: string): void {
+async function sendMail(to: string | string[], subject: string, html: string): Promise<void> {
   const mailer = getMailer();
   if (!mailer) return;
 
-  const recipients = Array.from(new Set(
-    (Array.isArray(to) ? to : [to])
-      .map((recipient) => recipient.trim())
-      .filter(Boolean)
-  ));
+  const recipients = Array.from(
+    new Set((Array.isArray(to) ? to : [to]).map((recipient) => recipient.trim()).filter(Boolean))
+  );
   if (recipients.length === 0) return;
 
   // Un message par destinataire : aucune adresse professionnelle n'est
   // divulguée aux autres personnes notifiées via l'en-tête To.
-  for (const recipient of recipients) {
-    mailer.sendMail({
-      from: getSenderAddress(),
-      to: recipient,
-      subject,
-      html,
-    }).catch((err: unknown) => {
+  const results = await Promise.allSettled(
+    recipients.map((recipient) =>
+      mailer.sendMail({
+        from: getSenderAddress(),
+        to: recipient,
+        subject,
+        html,
+      })
+    )
+  );
+  let failureCount = 0;
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      failureCount += 1;
       // L'erreur Nodemailer peut contenir le destinataire dans son message ou
       // ses propriétés. Ne journaliser que des métadonnées techniques sûres.
-      const mailError = err as { name?: unknown; code?: unknown };
-      logger.error({
-        errorName: typeof mailError?.name === 'string' ? mailError.name : 'Error',
-        errorCode: typeof mailError?.code === 'string' ? mailError.code : undefined,
-        subject,
-      }, '[mailer] Failed to send email');
-    });
+      const mailError = result.reason as { name?: unknown; code?: unknown };
+      logger.error(
+        {
+          errorName: typeof mailError?.name === 'string' ? mailError.name : 'Error',
+          errorCode: typeof mailError?.code === 'string' ? mailError.code : undefined,
+          subject,
+        },
+        '[mailer] Failed to send email'
+      );
+    }
+  }
+  if (failureCount > 0) {
+    const error = new Error('One or more notification deliveries failed.') as Error & {
+      code?: string;
+    };
+    error.code = 'SMTP_DELIVERY_FAILED';
+    throw error;
   }
 }
 
@@ -113,31 +128,33 @@ function clientOrigin(): string {
 
 // ─── Notifications admin ──────────────────────────────────────────────────────
 
-export function notifyAdminPasswordResetRequested(data: {
+export async function notifyAdminPasswordResetRequested(data: {
   firstName: string;
   lastName: string;
   badgeNumber: string;
   requestedAt: Date;
-}): void {
-  void (async () => {
-    if (!await getAdminNotifPref('notif_admin')) return;
-    const adminEmail = await getAdminEmail();
-    if (!adminEmail) return;
-    sendMail(
-      adminEmail,
-      adminResetTemplate.subject(),
-      adminResetTemplate.html({
-        ...data,
-        adminUrl: `${clientOrigin()}/admin/users`,
-      })
-    );
-  })();
+}): Promise<void> {
+  if (!(await getAdminNotifPref('notif_admin'))) return;
+  const adminEmail = await getAdminEmail();
+  if (!adminEmail) return;
+  await sendMail(
+    adminEmail,
+    adminResetTemplate.subject(),
+    adminResetTemplate.html({
+      ...data,
+      adminUrl: `${clientOrigin()}/admin/users`,
+    })
+  );
 }
 
 // ─── Notifications responsable — action requise ───────────────────────────────
 
-export async function notifyResponsablesEditRequested(incidentId: number, actorUserId: number, detail: string): Promise<void> {
-  if (!await getAdminNotifPref('notif_responsables')) return;
+export async function notifyResponsablesEditRequested(
+  incidentId: number,
+  actorUserId: number,
+  detail: string
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_responsables'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getResponsablesEmails(),
     getIncidentSnapshot(incidentId),
@@ -145,7 +162,7 @@ export async function notifyResponsablesEditRequested(incidentId: number, actorU
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     actionRequiredTemplate.subjectActionRequired('Demande de correction', incidentId),
     actionRequiredTemplate.htmlActionRequired({
@@ -160,8 +177,12 @@ export async function notifyResponsablesEditRequested(incidentId: number, actorU
   );
 }
 
-export async function notifyResponsablesCancelRequested(incidentId: number, actorUserId: number, reason: string): Promise<void> {
-  if (!await getAdminNotifPref('notif_responsables')) return;
+export async function notifyResponsablesCancelRequested(
+  incidentId: number,
+  actorUserId: number,
+  reason: string
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_responsables'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getResponsablesEmails(),
     getIncidentSnapshot(incidentId),
@@ -169,7 +190,7 @@ export async function notifyResponsablesCancelRequested(incidentId: number, acto
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     actionRequiredTemplate.subjectActionRequired("Demande d'annulation", incidentId),
     actionRequiredTemplate.htmlActionRequired({
@@ -186,8 +207,11 @@ export async function notifyResponsablesCancelRequested(incidentId: number, acto
 
 // ─── Notifications responsable — followers ────────────────────────────────────
 
-export async function notifyFollowersIncidentTaken(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyFollowersIncidentTaken(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -195,19 +219,27 @@ export async function notifyFollowersIncidentTaken(incidentId: number, actorUser
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Pris en charge', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
-      eventLabel: 'Pris en charge', detail: `Prise en charge par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/pilotage`,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
+      eventLabel: 'Pris en charge',
+      detail: `Prise en charge par ${actorName}`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/pilotage`,
     })
   );
 }
 
-export async function notifyFollowersIncidentSetPending(incidentId: number, actorUserId: number, diagnostic: string): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyFollowersIncidentSetPending(
+  incidentId: number,
+  actorUserId: number,
+  diagnostic: string
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -215,19 +247,26 @@ export async function notifyFollowersIncidentSetPending(incidentId: number, acto
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Suspendu', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
-      eventLabel: 'Incident suspendu', detail: `Diagnostic : ${diagnostic}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/pilotage`,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
+      eventLabel: 'Incident suspendu',
+      detail: `Diagnostic : ${diagnostic}`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/pilotage`,
     })
   );
 }
 
-export async function notifyFollowersIncidentClosed(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyFollowersIncidentClosed(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -235,19 +274,26 @@ export async function notifyFollowersIncidentClosed(incidentId: number, actorUse
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Clôturé', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
-      eventLabel: 'Incident clôturé', detail: `Clôturé par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/history`,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
+      eventLabel: 'Incident clôturé',
+      detail: `Clôturé par ${actorName}`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/history`,
     })
   );
 }
 
-export async function notifyFollowersIncidentCanceled(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyFollowersIncidentCanceled(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
@@ -255,21 +301,28 @@ export async function notifyFollowersIncidentCanceled(incidentId: number, actorU
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Annulé', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
-      eventLabel: 'Incident annulé', detail: `Annulé par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/history`,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
+      eventLabel: 'Incident annulé',
+      detail: `Annulé par ${actorName}`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/history`,
     })
   );
 }
 
 // ─── Notifications maintenance ────────────────────────────────────────────────
 
-export async function notifyMaintenanceIncidentUrgent(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_techniciens')) return;
+export async function notifyMaintenanceIncidentUrgent(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return;
   const [emails, incident, actorName] = await Promise.all([
     getMaintenanceEmails(),
     getIncidentSnapshot(incidentId),
@@ -277,20 +330,27 @@ export async function notifyMaintenanceIncidentUrgent(incidentId: number, actorU
   ]);
   if (emails.length === 0 || !incident) return;
 
-  sendMail(
+  await sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('URGENT', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: 'Incident marqué URGENT',
       detail: `Priorité définie par ${actorName} — intervention immédiate requise`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/pilotage`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/pilotage`,
     })
   );
 }
 
-export async function notifyTechnicianResponsibleComment(incidentId: number, actorUserId: number, comment: string): Promise<void> {
-  if (!await getAdminNotifPref('notif_techniciens')) return;
+export async function notifyTechnicianResponsibleComment(
+  incidentId: number,
+  actorUserId: number,
+  comment: string
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -300,19 +360,26 @@ export async function notifyTechnicianResponsibleComment(incidentId: number, act
   const email = await getUserEmail(incident.taken_by_user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Consigne responsable', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
-      eventLabel: 'Consigne du responsable', detail: comment,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/pilotage`,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
+      eventLabel: 'Consigne du responsable',
+      detail: comment,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/pilotage`,
     })
   );
 }
 
-export async function notifyTechnicianIncidentCanceled(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_techniciens')) return;
+export async function notifyTechnicianIncidentCanceled(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -322,20 +389,27 @@ export async function notifyTechnicianIncidentCanceled(incidentId: number, actor
   const email = await getUserEmail(incident.taken_by_user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Annulé', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: 'Incident annulé',
       detail: `Votre incident en cours a été annulé par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/history`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/history`,
     })
   );
 }
 
-export async function notifyTechnicianIncidentInvalidated(incidentId: number, actorUserId: number, reason: string): Promise<void> {
-  if (!await getAdminNotifPref('notif_techniciens')) return;
+export async function notifyTechnicianIncidentInvalidated(
+  incidentId: number,
+  actorUserId: number,
+  reason: string
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -345,21 +419,28 @@ export async function notifyTechnicianIncidentInvalidated(incidentId: number, ac
   const email = await getUserEmail(incident.taken_by_user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Clôture invalidée', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
-      eventLabel: 'Clôture invalidée par le responsable', detail: `Motif : ${reason}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/history`,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
+      eventLabel: 'Clôture invalidée par le responsable',
+      detail: `Motif : ${reason}`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/history`,
     })
   );
 }
 
 // ─── Notifications opérateur déclarant ───────────────────────────────────────
 
-export async function notifyDeclarantIncidentTaken(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyDeclarantIncidentTaken(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -369,20 +450,26 @@ export async function notifyDeclarantIncidentTaken(incidentId: number, actorUser
   const email = await getUserEmail(incident.user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Pris en charge', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: 'Votre incident est pris en charge',
       detail: `Prise en charge par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/dashboard`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     })
   );
 }
 
-export async function notifyDeclarantEditApproved(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyDeclarantEditApproved(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -392,20 +479,26 @@ export async function notifyDeclarantEditApproved(incidentId: number, actorUserI
   const email = await getUserEmail(incident.user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Correction approuvée', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: 'Votre demande de correction a été approuvée',
       detail: `Approuvée par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/dashboard`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     })
   );
 }
 
-export async function notifyDeclarantEditRejected(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyDeclarantEditRejected(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -415,20 +508,26 @@ export async function notifyDeclarantEditRejected(incidentId: number, actorUserI
   const email = await getUserEmail(incident.user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Correction refusée', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: 'Votre demande de correction a été refusée',
       detail: `Refusée par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/dashboard`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     })
   );
 }
 
-export async function notifyDeclarantCancelApproved(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyDeclarantCancelApproved(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -438,20 +537,26 @@ export async function notifyDeclarantCancelApproved(incidentId: number, actorUse
   const email = await getUserEmail(incident.user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate("Demande d'annulation approuvée", incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: "Votre demande d'annulation a été approuvée",
       detail: `Approuvée par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/history`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/history`,
     })
   );
 }
 
-export async function notifyDeclarantCancelRejected(incidentId: number, actorUserId: number): Promise<void> {
-  if (!await getAdminNotifPref('notif_operateurs')) return;
+export async function notifyDeclarantCancelRejected(
+  incidentId: number,
+  actorUserId: number
+): Promise<void> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return;
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
@@ -461,14 +566,17 @@ export async function notifyDeclarantCancelRejected(incidentId: number, actorUse
   const email = await getUserEmail(incident.user_id);
   if (!email) return;
 
-  sendMail(
+  await sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate("Demande d'annulation refusée", incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
-      incidentId, lineNumber: incident.line_number, machineId: incident.machine_id,
+      incidentId,
+      lineNumber: incident.line_number,
+      machineId: incident.machine_id,
       eventLabel: "Votre demande d'annulation a été refusée",
       detail: `Refusée par ${actorName}`,
-      actorName, workshopUrl: `${clientOrigin()}/workshop/dashboard`,
+      actorName,
+      workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     })
   );
 }

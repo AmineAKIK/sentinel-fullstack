@@ -8,7 +8,7 @@ const emailSchema = z
   .trim()
   .toLowerCase()
   .email('Adresse email invalide.')
-  .max(254, 'L\'adresse email ne peut pas dépasser 254 caractères.')
+  .max(254, "L'adresse email ne peut pas dépasser 254 caractères.")
   .optional()
   .nullable();
 
@@ -27,7 +27,10 @@ export const createAccountSchema = z.object({
     .string()
     .trim()
     .min(2, 'Le numéro de badge doit contenir au moins 2 caractères.')
-    .max(FIELD_LIMITS.BADGE, `Le numéro de badge ne peut pas dépasser ${FIELD_LIMITS.BADGE} caractères.`),
+    .max(
+      FIELD_LIMITS.BADGE,
+      `Le numéro de badge ne peut pas dépasser ${FIELD_LIMITS.BADGE} caractères.`
+    ),
   role: RoleEnum,
   email: emailSchema,
 });

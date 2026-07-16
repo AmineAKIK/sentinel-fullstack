@@ -6,10 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 24.14.1
+
 jobs:
   backend:
-    name: Backend — Build & Test
+    name: Backend / Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -17,19 +28,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
+      - run: npm run typecheck:scripts
       - run: npm run build
-      - run: npm test -- --selectProjects unit
+      - run: npm run test:coverage -- --selectProjects unit
+      - run: npm run verify:reliability
       - run: npm audit --audit-level=high
-      - run: node scripts/verifyReliability.js
 
   frontend:
-    name: Frontend — Build & Test
+    name: Frontend / Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -37,35 +51,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run build
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm audit --audit-level=high
 
-  docker:
-    name: Docker — Build Images
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build backend image
-        run: docker build -t sentinel-backend:ci ./backend
-      - name: Build frontend image
-        run: docker build -t sentinel-frontend:ci --build-arg VITE_API_URL=http://localhost:3000 ./frontend
-
   integration:
-    name: Backend — Integration Tests
+    name: Backend / PostgreSQL integration
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
-
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15.18-alpine3.23
         env:
           POSTGRES_DB: sentinel_test
           POSTGRES_USER: sentinel
@@ -77,19 +82,109 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
     env:
-      DATABASE_URL: postgres://sentinel:sentinel_test_password@localhost:5432/sentinel_test
+      DATABASE_URL: postgres://sentinel:sentinel_test_password@127.0.0.1:5432/sentinel_test
       NODE_ENV: test
       LOG_LEVEL: warn
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run build
       - run: npm test -- --selectProjects integration
+
+  e2e:
+    name: Browser / Critical journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15.18-alpine3.23
+        env:
+          POSTGRES_DB: sentinel_e2e
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: sentinel_e2e_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinel_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://sentinel:sentinel_e2e_password@127.0.0.1:5432/sentinel_e2e
+      NODE_ENV: test
+      LOG_LEVEL: warn
+      JWT_SECRET: ci_jwt_secret_with_at_least_32_characters
+      COOKIE_SECRET: ci_cookie_secret_with_at_least_32_characters
+      CLIENT_ORIGIN: http://127.0.0.1:5174
+      GLOBAL_API_RATE_LIMIT_MAX: 10000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend
+      - run: npx --prefix frontend playwright install --with-deps chromium
+      - run: npm --prefix frontend run test:e2e
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+  containers:
+    name: Containers / Production contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      POSTGRES_PASSWORD: ci_database_password_with_32_characters
+      DATABASE_URL: postgres://sentinel:ci_database_password_with_32_characters@postgres:5432/sentinel
+      COOKIE_SECRET: ci_cookie_secret_with_at_least_32_characters
+      JWT_SECRET: ci_jwt_secret_with_at_least_32_characters
+      CLIENT_ORIGIN: https://sentinel.example.test
+      BOARD_ACCESS_CODE_HASH: $2b$10$nUd3TqHyISvb.aORRwqoQOXRMva5G3a2a7ks7SUCbh2DWhRTuGRRu
+      TRUST_PROXY: 'true'
+      CADDY_DOMAIN: sentinel.example.test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose interpolation and schema
+        run: docker compose config --quiet
+      - name: Build production images
+        run: |
+          docker build --tag sentinel-backend:ci ./backend
+          docker build --tag sentinel-frontend:ci --build-arg VITE_API_URL= ./frontend
+      - name: Assert non-root image users
+        run: |
+          test "$(docker image inspect --format '{{.Config.User}}' sentinel-backend:ci)" = "node"
+          test "$(docker image inspect --format '{{.Config.User}}' sentinel-frontend:ci)" = "nginx"
+      - name: Validate unprivileged Nginx configuration
+        run: docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m sentinel-frontend:ci nginx -t
+      - name: Validate Caddy configuration
+        run: >-
+          docker run --rm
+          -e CADDY_DOMAIN=sentinel.example.test
+          -v "${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.11.4-alpine
+          validate --config /etc/caddy/Caddyfile
+      - name: ShellCheck operational scripts
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/mnt:ro"
+          -w /mnt
+          koalaman/shellcheck-alpine:v0.10.0
+          scripts/backup.sh scripts/restore.sh

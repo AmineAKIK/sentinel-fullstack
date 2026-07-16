@@ -7,8 +7,8 @@ export interface AdminNotifPrefs {
   notif_operateurs: boolean;
 }
 
-export async function getAdminNotifPrefs(): Promise<AdminNotifPrefs> {
-  return api.get<AdminNotifPrefs>('/api/admin/settings/notifications');
+export async function getAdminNotifPrefs(signal?: AbortSignal): Promise<AdminNotifPrefs> {
+  return api.get<AdminNotifPrefs>('/api/admin/settings/notifications', signal);
 }
 
 export async function patchAdminNotifPrefs(
@@ -22,12 +22,18 @@ export interface BoardSettingsResponse {
   hasCode: boolean;
 }
 
-export async function getBoardSettings(): Promise<BoardSettingsResponse> {
-  return api.get<BoardSettingsResponse>('/api/admin/settings/board');
+export async function getBoardSettings(signal?: AbortSignal): Promise<BoardSettingsResponse> {
+  return api.get<BoardSettingsResponse>('/api/admin/settings/board', signal);
 }
 
-export async function patchBoardEnabled(enabled: boolean, currentPassword: string): Promise<{ board_enabled: boolean }> {
-  return api.patch<{ board_enabled: boolean }>('/api/admin/settings/board/toggle', { enabled, currentPassword });
+export async function patchBoardEnabled(
+  enabled: boolean,
+  currentPassword: string
+): Promise<{ board_enabled: boolean }> {
+  return api.patch<{ board_enabled: boolean }>('/api/admin/settings/board/toggle', {
+    enabled,
+    currentPassword,
+  });
 }
 
 export async function patchBoardCode(payload: {
@@ -55,8 +61,8 @@ export interface AppSettingsPatch extends Partial<AppSettings> {
   currentPassword?: string;
 }
 
-export async function getAppSettings(): Promise<AppSettings> {
-  return api.get<AppSettings>('/api/admin/settings/app');
+export async function getAppSettings(signal?: AbortSignal): Promise<AppSettings> {
+  return api.get<AppSettings>('/api/admin/settings/app', signal);
 }
 
 export async function patchAppSettings(patch: AppSettingsPatch): Promise<AppSettings> {

@@ -8,28 +8,59 @@ function noop() {}
 // ─── basic rendering ──────────────────────────────────────────────────────────
 
 describe('Modal – rendering', () => {
+  it('renders through a portal outside the React container', () => {
+    const { container } = render(
+      <Modal title="T" footer={null}>
+        <span>Contenu porte</span>
+      </Modal>
+    );
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('renders the title', () => {
-    render(<Modal title="Mon titre" footer={null}><p>Contenu</p></Modal>);
+    render(
+      <Modal title="Mon titre" footer={null}>
+        <p>Contenu</p>
+      </Modal>
+    );
     expect(screen.getByText('Mon titre')).toBeDefined();
   });
 
   it('renders children inside the modal body', () => {
-    render(<Modal title="T" footer={null}><p>Corps du modal</p></Modal>);
+    render(
+      <Modal title="T" footer={null}>
+        <p>Corps du modal</p>
+      </Modal>
+    );
     expect(screen.getByText('Corps du modal')).toBeDefined();
   });
 
   it('renders the footer content', () => {
-    render(<Modal title="T" footer={<button>OK</button>}><span /></Modal>);
+    render(
+      <Modal title="T" footer={<button>OK</button>}>
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('button', { name: 'OK' })).toBeDefined();
   });
 
   it('sets role="dialog" on the modal container', () => {
-    render(<Modal title="T" footer={null}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null}>
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('dialog')).toBeDefined();
   });
 
   it('sets aria-label to the title on the dialog', () => {
-    render(<Modal title="Détails incident" footer={null}><span /></Modal>);
+    render(
+      <Modal title="Détails incident" footer={null}>
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('dialog', { name: 'Détails incident' })).toBeDefined();
   });
 });
@@ -38,25 +69,41 @@ describe('Modal – rendering', () => {
 
 describe('Modal – close button', () => {
   it('shows the close button when onClose is provided', () => {
-    render(<Modal title="T" footer={null} onClose={noop}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={noop}>
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('button', { name: 'Fermer' })).toBeDefined();
   });
 
   it('does NOT show the close button when onClose is omitted', () => {
-    render(<Modal title="T" footer={null}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null}>
+        <span />
+      </Modal>
+    );
     expect(screen.queryByRole('button', { name: 'Fermer' })).toBeNull();
   });
 
   it('calls onClose when the close button is clicked and isDirty=false', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose}>
+        <span />
+      </Modal>
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT call onClose when isLoading=true', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} isLoading><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} isLoading>
+        <span />
+      </Modal>
+    );
     // Close button should not be rendered while loading
     expect(screen.queryByRole('button', { name: 'Fermer' })).toBeNull();
   });
@@ -67,7 +114,11 @@ describe('Modal – close button', () => {
 describe('Modal – dirty confirmation overlay', () => {
   it('shows a confirmation overlay instead of calling onClose when isDirty=true', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} isDirty><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} isDirty>
+        <span />
+      </Modal>
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByText('Quitter sans enregistrer ?')).toBeDefined();
@@ -75,7 +126,11 @@ describe('Modal – dirty confirmation overlay', () => {
 
   it('dismisses the confirmation when "Continuer l\'édition" is clicked', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} isDirty><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} isDirty>
+        <span />
+      </Modal>
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
     fireEvent.click(screen.getByRole('button', { name: /Continuer/i }));
     expect(onClose).not.toHaveBeenCalled();
@@ -84,7 +139,11 @@ describe('Modal – dirty confirmation overlay', () => {
 
   it('calls onClose when "Quitter" is clicked in the confirmation', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} isDirty><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} isDirty>
+        <span />
+      </Modal>
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
     fireEvent.click(screen.getByRole('button', { name: 'Quitter' }));
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -96,7 +155,11 @@ describe('Modal – dirty confirmation overlay', () => {
 describe('Modal – overlay click', () => {
   it('calls onClose when closeOnOverlay=true and overlay is clicked', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} closeOnOverlay><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} closeOnOverlay>
+        <span />
+      </Modal>
+    );
     // The overlay is the outermost div (.modal-overlay)
     const overlay = screen.getByRole('dialog').parentElement!;
     fireEvent.click(overlay);
@@ -105,7 +168,11 @@ describe('Modal – overlay click', () => {
 
   it('does NOT call onClose when closeOnOverlay=false', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} closeOnOverlay={false}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} closeOnOverlay={false}>
+        <span />
+      </Modal>
+    );
     const overlay = screen.getByRole('dialog').parentElement!;
     fireEvent.click(overlay);
     expect(onClose).not.toHaveBeenCalled();
@@ -116,22 +183,38 @@ describe('Modal – overlay click', () => {
 
 describe('Modal – CSS classes', () => {
   it('applies modal-md by default', () => {
-    render(<Modal title="T" footer={null}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null}>
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('dialog').className).toContain('modal-md');
   });
 
   it('applies modal-sm for size="sm"', () => {
-    render(<Modal title="T" footer={null} size="sm"><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} size="sm">
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('dialog').className).toContain('modal-sm');
   });
 
   it('applies modal-danger for variant="danger"', () => {
-    render(<Modal title="T" footer={null} variant="danger"><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} variant="danger">
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('dialog').className).toContain('modal-danger');
   });
 
   it('does NOT apply modal-danger for default variant', () => {
-    render(<Modal title="T" footer={null}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null}>
+        <span />
+      </Modal>
+    );
     expect(screen.getByRole('dialog').className).not.toContain('modal-danger');
   });
 });
@@ -141,15 +224,84 @@ describe('Modal – CSS classes', () => {
 describe('Modal – Escape key', () => {
   it('calls onClose on Escape when closeOnEscape defaults to closeOnOverlay (true)', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} closeOnOverlay><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} closeOnOverlay>
+        <span />
+      </Modal>
+    );
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT call onClose on Escape when closeOnEscape=false', () => {
     const onClose = vi.fn();
-    render(<Modal title="T" footer={null} onClose={onClose} closeOnEscape={false}><span /></Modal>);
+    render(
+      <Modal title="T" footer={null} onClose={onClose} closeOnEscape={false}>
+        <span />
+      </Modal>
+    );
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('only closes the topmost modal', () => {
+    const closeFirst = vi.fn();
+    const closeSecond = vi.fn();
+    render(
+      <>
+        <Modal title="Premier" footer={null} onClose={closeFirst}>
+          <span />
+        </Modal>
+        <Modal title="Second" footer={null} onClose={closeSecond}>
+          <span />
+        </Modal>
+      </>
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(closeFirst).not.toHaveBeenCalled();
+    expect(closeSecond).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Modal – page isolation', () => {
+  it('locks the page while open and restores its previous styles on unmount', () => {
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'relative';
+    const { unmount } = render(
+      <Modal title="T" footer={null}>
+        <span />
+      </Modal>
+    );
+
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.style.position).toBe('fixed');
+
+    unmount();
+
+    expect(document.body.style.overflow).toBe('auto');
+    expect(document.body.style.position).toBe('relative');
+    document.body.removeAttribute('style');
+  });
+
+  it('marks the application root inert while the modal is open', () => {
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.append(root);
+    const { unmount } = render(
+      <Modal title="T" footer={null}>
+        <span />
+      </Modal>
+    );
+
+    expect(root.inert).toBe(true);
+    expect(root).toHaveAttribute('aria-hidden', 'true');
+
+    unmount();
+
+    expect(root.inert).toBe(false);
+    expect(root).not.toHaveAttribute('aria-hidden');
+    root.remove();
   });
 });

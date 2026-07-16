@@ -40,18 +40,26 @@ beforeEach(() => {
 });
 
 describe('loginWorkshopUserService – setup initial', () => {
-  it('retourne invalid_badge si le badge est inconnu', async () => {
+  it("ne révèle pas qu'un badge est inconnu à la première étape", async () => {
     jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(null);
 
     const result = await loginWorkshopUserService('9999', undefined, undefined, undefined);
 
-    expect(result).toEqual({ kind: 'invalid_badge' });
+    expect(result).toEqual({ kind: 'requires_password', badgeNumber: '9999' });
   });
 
-  it('retourne account_disabled si le compte est inactif', async () => {
+  it("ne révèle pas qu'un compte est inactif à la première étape", async () => {
     jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ is_active: false }));
 
     const result = await loginWorkshopUserService('3002', undefined, undefined, undefined);
+
+    expect(result).toEqual({ kind: 'requires_password', badgeNumber: '3002' });
+  });
+
+  it('refuse un compte inactif après soumission de credentials', async () => {
+    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ is_active: false }));
+
+    const result = await loginWorkshopUserService('3002', 'secret1', undefined, undefined);
 
     expect(result).toEqual({ kind: 'account_disabled' });
   });
@@ -75,9 +83,11 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('rejette un setup sans code actif', async () => {
-    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(
-      mockUser({ password_setup_token_hash: null, password_setup_expires_at: null })
-    );
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValue(
+        mockUser({ password_setup_token_hash: null, password_setup_expires_at: null })
+      );
 
     const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'ABCD234567');
 
@@ -85,9 +95,9 @@ describe('loginWorkshopUserService – setup initial', () => {
   });
 
   it('rejette un code temporaire expiré', async () => {
-    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(
-      mockUser({ password_setup_expires_at: new Date('2000-01-01T00:00:00Z') })
-    );
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValue(mockUser({ password_setup_expires_at: new Date('2000-01-01T00:00:00Z') }));
 
     const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'ABCD234567');
 
@@ -128,7 +138,9 @@ describe('loginWorkshopUserService – setup initial', () => {
 
 describe('loginWorkshopUserService – mot de passe existant', () => {
   it('demande le mot de passe si le compte en possède déjà un', async () => {
-    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValue(mockUser({ password_hash: 'hash' }));
 
     const result = await loginWorkshopUserService('3002', undefined, undefined, undefined);
 
@@ -136,7 +148,9 @@ describe('loginWorkshopUserService – mot de passe existant', () => {
   });
 
   it('rejette un mot de passe incorrect', async () => {
-    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValue(mockUser({ password_hash: 'hash' }));
     jest.mocked(bcrypt.verifyPassword).mockResolvedValue(false);
 
     const result = await loginWorkshopUserService('3002', 'bad', undefined, undefined);
@@ -145,7 +159,9 @@ describe('loginWorkshopUserService – mot de passe existant', () => {
   });
 
   it('retourne la session si le mot de passe est correct', async () => {
-    jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser({ password_hash: 'hash' }));
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValue(mockUser({ password_hash: 'hash' }));
     jest.mocked(bcrypt.verifyPassword).mockResolvedValue(true);
 
     const result = await loginWorkshopUserService('3002', 'secret1', undefined, undefined);

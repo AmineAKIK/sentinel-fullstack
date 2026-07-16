@@ -51,13 +51,17 @@ beforeAll(async () => {
      VALUES ('L-INT-01', $1::jsonb, TRUE, FALSE)
      ON CONFLICT DO NOTHING
      RETURNING id`,
-    [JSON.stringify([{
-      machineId: 'M-INT-01',
-      brand: 'Fanuc',
-      hasDoubleRobot: false,
-      robotNumber: 'R01',
-      robotHeads: 4,
-    }])]
+    [
+      JSON.stringify([
+        {
+          machineId: 'M-INT-01',
+          brand: 'Fanuc',
+          hasDoubleRobot: false,
+          robotNumber: 'R01',
+          robotHeads: 4,
+        },
+      ]),
+    ]
   );
 
   // If line already exists (re-run), fetch it
@@ -91,8 +95,14 @@ afterEach(async () => {
   // Clear all incidents on the integration test line between tests to avoid
   // the unique constraint on active incidents per machine.
   if (!RUN) return;
-  await pool.query(`DELETE FROM workshop_incident_events WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`, [lineId]);
-  await pool.query(`DELETE FROM workshop_incident_followers WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`, [lineId]);
+  await pool.query(
+    `DELETE FROM workshop_incident_events WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`,
+    [lineId]
+  );
+  await pool.query(
+    `DELETE FROM workshop_incident_followers WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`,
+    [lineId]
+  );
   await pool.query(`DELETE FROM workshop_incidents WHERE line_id = $1`, [lineId]);
 });
 
@@ -152,19 +162,35 @@ describeIntegration('Incident lifecycle (real DB)', () => {
   });
 
   it('full lifecycle: create → take → set_pending → resume → close', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     assertOk(await takeIncidentService(incidentId, maintenanceId, 'MAINTENANCE'));
     expect(await getIncidentStatus(incidentId)).toBe('OPEN');
 
-    assertOk(await setPendingIncidentService(incidentId, 'Diagnostic en cours', maintenanceId, 'MAINTENANCE'));
+    assertOk(
+      await setPendingIncidentService(
+        incidentId,
+        'Diagnostic en cours',
+        maintenanceId,
+        'MAINTENANCE'
+      )
+    );
     expect(await getIncidentStatus(incidentId)).toBe('PENDING');
 
     assertOk(await resumeIncidentService(incidentId, maintenanceId, 'MAINTENANCE'));
     expect(await getIncidentStatus(incidentId)).toBe('OPEN');
 
-    assertOk(await closeIncidentService(incidentId, 'Intervention terminée, remplacement pièce.', maintenanceId, 'MAINTENANCE'));
+    assertOk(
+      await closeIncidentService(
+        incidentId,
+        'Intervention terminée, remplacement pièce.',
+        maintenanceId,
+        'MAINTENANCE'
+      )
+    );
     expect(await getIncidentStatus(incidentId)).toBe('CLOSED');
 
     const events = await getEventTypes(incidentId);
@@ -176,27 +202,40 @@ describeIntegration('Incident lifecycle (real DB)', () => {
   });
 
   it('RESPONSABLE can invalidate a closed incident', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     assertOk(await takeIncidentService(incidentId, maintenanceId, 'MAINTENANCE'));
     assertOk(await closeIncidentService(incidentId, 'Résolu.', maintenanceId, 'MAINTENANCE'));
     expect(await getIncidentStatus(incidentId)).toBe('CLOSED');
 
-    assertOk(await invalidateIncidentService(incidentId, 'Erreur de déclaration.', responsableId, 'RESPONSABLE'));
+    assertOk(
+      await invalidateIncidentService(
+        incidentId,
+        'Erreur de déclaration.',
+        responsableId,
+        'RESPONSABLE'
+      )
+    );
     expect(await getIncidentStatus(incidentId)).toBe('INVALIDATED');
     expect(await getEventTypes(incidentId)).toContain('INCIDENT_INVALIDATED');
   });
 
   it('cancelled incident is preserved in DB with CANCELED status', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     assertOk(await cancelIncidentService(incidentId, maintenanceId, 'MAINTENANCE'));
     expect(await getIncidentStatus(incidentId)).toBe('CANCELED');
 
     // Row still exists (not hard-deleted)
-    const { rows } = await pool.query('SELECT id FROM workshop_incidents WHERE id = $1', [incidentId]);
+    const { rows } = await pool.query('SELECT id FROM workshop_incidents WHERE id = $1', [
+      incidentId,
+    ]);
     expect(rows.length).toBe(1);
   });
 });
@@ -205,7 +244,9 @@ describeIntegration('Incident lifecycle (real DB)', () => {
 
 describeIntegration('Policy enforcement through service layer (real DB)', () => {
   it('OPERATOR cannot take an incident', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     const result = await takeIncidentService(incidentId, operatorId, 'OPERATOR');
@@ -216,7 +257,9 @@ describeIntegration('Policy enforcement through service layer (real DB)', () => 
   });
 
   it('OPERATOR cannot close an incident', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
     assertOk(await takeIncidentService(incidentId, maintenanceId, 'MAINTENANCE'));
 
@@ -230,7 +273,9 @@ describeIntegration('Policy enforcement through service layer (real DB)', () => 
   it('MAINTENANCE can close a taken incident even if another MAINTENANCE took it', async () => {
     // Policy: CLOSE checks is_taken but NOT taken_by_user_id — any MAINTENANCE can close.
     // This is intentional: a team member can relieve another on shift handover.
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     const hash = await hashWorkshopPassword('test_pass_99');
@@ -246,14 +291,21 @@ describeIntegration('Policy enforcement through service layer (real DB)', () => 
     assertOk(await takeIncidentService(incidentId, otherMaintenanceId, 'MAINTENANCE'));
 
     // maintenanceId did not take it, but CLOSE is still allowed by policy
-    const result = await closeIncidentService(incidentId, 'Intervention terminée.', maintenanceId, 'MAINTENANCE');
+    const result = await closeIncidentService(
+      incidentId,
+      'Intervention terminée.',
+      maintenanceId,
+      'MAINTENANCE'
+    );
     expect(result.ok).toBe(true);
     expect(await getIncidentStatus(incidentId)).toBe('CLOSED');
     // MA-INT-02 user is cleaned up in afterAll via the badge pattern '%-INT-%'
   });
 
   it('RESPONSABLE cannot take an incident', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     const result = await takeIncidentService(incidentId, responsableId, 'RESPONSABLE');
@@ -264,14 +316,23 @@ describeIntegration('Policy enforcement through service layer (real DB)', () => 
   });
 
   it('nobody can close a PENDING incident', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as { id: number };
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
     const incidentId = created.id;
 
     assertOk(await takeIncidentService(incidentId, maintenanceId, 'MAINTENANCE'));
-    assertOk(await setPendingIncidentService(incidentId, 'Diagnostic.', maintenanceId, 'MAINTENANCE'));
+    assertOk(
+      await setPendingIncidentService(incidentId, 'Diagnostic.', maintenanceId, 'MAINTENANCE')
+    );
     expect(await getIncidentStatus(incidentId)).toBe('PENDING');
 
-    const result = await closeIncidentService(incidentId, 'Trying anyway.', maintenanceId, 'MAINTENANCE');
+    const result = await closeIncidentService(
+      incidentId,
+      'Trying anyway.',
+      maintenanceId,
+      'MAINTENANCE'
+    );
     expect(result.ok).toBe(false);
     expect(await getIncidentStatus(incidentId)).toBe('PENDING');
   });

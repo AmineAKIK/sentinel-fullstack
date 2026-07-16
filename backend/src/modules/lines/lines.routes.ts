@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { adminAuthMiddleware } from '../../middlewares/adminAuth';
 import {
-	archiveLine,
-	createLine,
-	getLine,
-	listLines,
-	updateLine,
-	checkLineAvailability,
-	checkLineConflicts,
-	getLineImpact,
+  archiveLine,
+  createLine,
+  getLine,
+  listLines,
+  updateLine,
+  checkLineAvailability,
+  checkLineConflicts,
+  getLineImpact,
 } from './lines.controller';
 
 const router = Router();

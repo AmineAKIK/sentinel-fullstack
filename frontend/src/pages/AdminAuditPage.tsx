@@ -9,13 +9,20 @@ import { ReferenceAuditEvent } from '../types';
 import { formatDateTime } from '../utils/date';
 import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   all: { label: 'Tous les changements', events: [] },
   creation: { label: 'Créations', events: ['USER_CREATED', 'LINE_CREATED'] },
   modification: {
     label: 'Mises à jour',
-    events: ['USER_UPDATED', 'LINE_UPDATED', 'LINE_SUMMARY_UPDATED', 'LINE_MACHINE_UPDATED', 'LINE_PLAN_UPDATED'],
+    events: [
+      'USER_UPDATED',
+      'LINE_UPDATED',
+      'LINE_SUMMARY_UPDATED',
+      'LINE_MACHINE_UPDATED',
+      'LINE_PLAN_UPDATED',
+    ],
   },
   status: { label: 'Activations/Désactivations', events: ['USER_ACTIVATED', 'USER_DEACTIVATED'] },
   deletion: { label: 'Suppressions', events: ['USER_SOFT_DELETED', 'LINE_SOFT_DELETED'] },
@@ -35,7 +42,6 @@ const TASK_GROUPS: Record<string, { label: string; events: string[] }> = {
   },
 };
 
-
 function changesLabel(changes: Record<string, unknown> | null, eventType?: string): string {
   if (!changes) return '-';
   const keys = Object.keys(changes);
@@ -46,7 +52,11 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
     return changes.enabled === true ? 'Board activé' : 'Board désactivé';
   }
   if (eventType === 'SESSIONS_REVOKED') {
-    const scopeLabels: Record<string, string> = { admin: 'sessions admin', workshop: 'sessions atelier', board: 'sessions board' };
+    const scopeLabels: Record<string, string> = {
+      admin: 'sessions admin',
+      workshop: 'sessions atelier',
+      board: 'sessions board',
+    };
     return scopeLabels[String(changes.scope)] ?? 'sessions révoquées';
   }
   if (eventType === 'ADMIN_EMAIL_CHANGED') {
@@ -71,10 +81,12 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
       notif_techniciens: 'notif. techniciens',
       notif_operateurs: 'notif. opérateurs',
     };
-    return keys.map((k) => {
-      const label = notifLabels[k] ?? k;
-      return `${label} : ${changes[k] ? 'activé' : 'désactivé'}`;
-    }).join(', ');
+    return keys
+      .map((k) => {
+        const label = notifLabels[k] ?? k;
+        return `${label} : ${changes[k] ? 'activé' : 'désactivé'}`;
+      })
+      .join(', ');
   }
 
   // Événements référentiel (utilisateurs / lignes)
@@ -90,26 +102,27 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
     machinesCount: 'machines',
     isActive: 'statut',
   };
-  return keys.map((key) => {
-    if (key === 'emailConfigured') {
-      return changes[key] === true
-        ? 'email professionnel configuré'
-        : 'aucun email professionnel configuré';
-    }
-    if (key === 'email') {
-      const value = changes[key];
-      const action = value && typeof value === 'object' && 'action' in value
-        ? String(value.action)
-        : '';
-      const actionLabels: Record<string, string> = {
-        configured: 'email professionnel ajouté',
-        updated: 'email professionnel modifié',
-        removed: 'email professionnel supprimé',
-      };
-      return actionLabels[action] ?? labels[key];
-    }
-    return labels[key] || key;
-  }).join(', ');
+  return keys
+    .map((key) => {
+      if (key === 'emailConfigured') {
+        return changes[key] === true
+          ? 'email professionnel configuré'
+          : 'aucun email professionnel configuré';
+      }
+      if (key === 'email') {
+        const value = changes[key];
+        const action =
+          value && typeof value === 'object' && 'action' in value ? String(value.action) : '';
+        const actionLabels: Record<string, string> = {
+          configured: 'email professionnel ajouté',
+          updated: 'email professionnel modifié',
+          removed: 'email professionnel supprimé',
+        };
+        return actionLabels[action] ?? labels[key];
+      }
+      return labels[key] || key;
+    })
+    .join(', ');
 }
 
 function dateBoundary(period: string, customStart: string, customEnd: string) {
@@ -150,6 +163,7 @@ export default function AdminAuditPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [events, setEvents] = useState<ReferenceAuditEvent[]>([]);
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [truncated, setTruncated] = useState(false);
@@ -157,38 +171,44 @@ export default function AdminAuditPage() {
   const LIMIT = 1000;
 
   useEffect(() => {
+    const controller = new AbortController();
     const { start, end } = dateBoundary(period, customStart, customEnd);
     setLoading(true);
     setError('');
     setTruncated(false);
-    listReferenceAudit({
-      scope,
-      taskGroup,
-      q: query.trim(),
-      start: start?.toISOString(),
-      end: end?.toISOString(),
-      order: sortOrder,
-      limit: LIMIT,
-    })
+    void listReferenceAudit(
+      {
+        scope,
+        taskGroup,
+        q: debouncedQuery.trim(),
+        start: start?.toISOString(),
+        end: end?.toISOString(),
+        order: sortOrder,
+        limit: LIMIT,
+      },
+      controller.signal
+    )
       .then((data) => {
+        if (controller.signal.aborted) return;
         setEvents(data);
         setTruncated(data.length === LIMIT);
       })
-      .catch(() => setError('Impossible de charger le journal.'))
-      .finally(() => setLoading(false));
-  }, [scope, taskGroup, period, customStart, customEnd, query, sortOrder]);
-
-  const filtered = useMemo(() => {
-    return events;
-  }, [events]);
+      .catch(() => {
+        if (!controller.signal.aborted) setError('Impossible de charger le journal.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [scope, taskGroup, period, customStart, customEnd, debouncedQuery, sortOrder]);
 
   const summary = useMemo(() => {
-    const accountCount = filtered.filter((event) => event.scope === 'account').length;
-    const lineCount = filtered.filter((event) => event.scope === 'line').length;
-    const systemCount = filtered.filter((event) => event.scope === 'system').length;
-    const lastEvent = filtered[0];
+    const accountCount = events.filter((event) => event.scope === 'account').length;
+    const lineCount = events.filter((event) => event.scope === 'line').length;
+    const systemCount = events.filter((event) => event.scope === 'system').length;
+    const lastEvent = events[0];
     return { accountCount, lineCount, systemCount, lastEvent };
-  }, [filtered]);
+  }, [events]);
 
   function resetFilters() {
     setScope('all');
@@ -200,7 +220,6 @@ export default function AdminAuditPage() {
     setQuery('');
   }
 
-
   function toggleDateSort() {
     setSortOrder((current) => (current === 'desc' ? 'asc' : 'desc'));
   }
@@ -210,35 +229,55 @@ export default function AdminAuditPage() {
   }
 
   const filterChips: FilterChip[] = [
-    ...(query.trim() ? [{
-      key: 'search',
-      label: `Recherche: ${query.trim()}`,
-      onRemove: () => setQuery(''),
-    }] : []),
-    ...(taskGroup !== 'all' ? [{
-      key: 'task',
-      label: `Action: ${TASK_GROUPS[taskGroup]?.label || taskGroup}`,
-      onRemove: () => setTaskGroup('all'),
-    }] : []),
-    ...(scope !== 'all' ? [{
-      key: 'scope',
-      label: `Référentiel: ${scope === 'account' ? 'Utilisateurs' : scope === 'line' ? 'Lignes' : 'Système'}`,
-      onRemove: () => setScope('all'),
-    }] : []),
-    ...(period !== 'all' ? [{
-      key: 'period',
-      label: `Période: ${period === 'today' ? "Aujourd'hui" : period === '7d' ? '7 jours' : period === '30d' ? '30 jours' : 'Personnalisée'}`,
-      onRemove: () => {
-        setPeriod('all');
-        setCustomStart('');
-        setCustomEnd('');
-      },
-    }] : []),
-    ...(sortOrder !== 'desc' ? [{
-      key: 'sort',
-      label: 'Plus anciennes d’abord',
-      onRemove: () => setSortOrder('desc'),
-    }] : []),
+    ...(query.trim()
+      ? [
+          {
+            key: 'search',
+            label: `Recherche: ${query.trim()}`,
+            onRemove: () => setQuery(''),
+          },
+        ]
+      : []),
+    ...(taskGroup !== 'all'
+      ? [
+          {
+            key: 'task',
+            label: `Action: ${TASK_GROUPS[taskGroup]?.label || taskGroup}`,
+            onRemove: () => setTaskGroup('all'),
+          },
+        ]
+      : []),
+    ...(scope !== 'all'
+      ? [
+          {
+            key: 'scope',
+            label: `Référentiel: ${scope === 'account' ? 'Utilisateurs' : scope === 'line' ? 'Lignes' : 'Système'}`,
+            onRemove: () => setScope('all'),
+          },
+        ]
+      : []),
+    ...(period !== 'all'
+      ? [
+          {
+            key: 'period',
+            label: `Période: ${period === 'today' ? "Aujourd'hui" : period === '7d' ? '7 jours' : period === '30d' ? '30 jours' : 'Personnalisée'}`,
+            onRemove: () => {
+              setPeriod('all');
+              setCustomStart('');
+              setCustomEnd('');
+            },
+          },
+        ]
+      : []),
+    ...(sortOrder !== 'desc'
+      ? [
+          {
+            key: 'sort',
+            label: 'Plus anciennes d’abord',
+            onRemove: () => setSortOrder('desc'),
+          },
+        ]
+      : []),
   ];
   const hasActiveFilters = filterChips.length > 0;
 
@@ -251,11 +290,13 @@ export default function AdminAuditPage() {
         </div>
 
         <div className="audit-context">
-          <span className="audit-context-text">Traçabilité complète des actions administratives.</span>
+          <span className="audit-context-text">
+            Traçabilité complète des actions administratives.
+          </span>
           <span className="audit-context-stats" aria-label="Résumé du journal">
             <span className="audit-context-stat">
               <span>résultats</span>
-              <strong>{filtered.length}</strong>
+              <strong>{events.length}</strong>
             </span>
             <span className="audit-context-stat">
               <span>utilisateurs</span>
@@ -275,7 +316,9 @@ export default function AdminAuditPage() {
         <div className="audit-filter-panel">
           <div className="audit-filter-main">
             <div className="filter-group audit-search">
-              <label className="filter-label" htmlFor="audit-search">Recherche</label>
+              <label className="filter-label" htmlFor="audit-search">
+                Recherche
+              </label>
               <input
                 id="audit-search"
                 className="form-input"
@@ -285,16 +328,23 @@ export default function AdminAuditPage() {
               />
             </div>
             <div className="filter-group">
-              <span className="filter-label" aria-hidden="true">Type d'action</span>
+              <span className="filter-label" aria-hidden="true">
+                Type d'action
+              </span>
               <SelectField
                 value={taskGroup}
                 onChange={setTaskGroup}
                 ariaLabel="Type d'action"
-                options={Object.entries(TASK_GROUPS).map(([value, group]) => ({ value, label: group.label }))}
+                options={Object.entries(TASK_GROUPS).map(([value, group]) => ({
+                  value,
+                  label: group.label,
+                }))}
               />
             </div>
             <div className="filter-group">
-              <span className="filter-label" aria-hidden="true">Référentiel</span>
+              <span className="filter-label" aria-hidden="true">
+                Référentiel
+              </span>
               <SelectField
                 value={scope}
                 onChange={setScope}
@@ -310,7 +360,9 @@ export default function AdminAuditPage() {
           </div>
           <div className="audit-filter-secondary">
             <div className="filter-group">
-              <span className="filter-label" aria-hidden="true">Période</span>
+              <span className="filter-label" aria-hidden="true">
+                Période
+              </span>
               <SelectField
                 value={period}
                 onChange={setPeriod}
@@ -327,21 +379,42 @@ export default function AdminAuditPage() {
             {period === 'custom' && (
               <>
                 <div className="filter-group">
-                  <label className="filter-label" htmlFor="audit-date-start">Début</label>
-                  <input id="audit-date-start" className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
+                  <label className="filter-label" htmlFor="audit-date-start">
+                    Début
+                  </label>
+                  <input
+                    id="audit-date-start"
+                    className="form-input"
+                    type="date"
+                    value={customStart}
+                    onChange={(event) => setCustomStart(event.target.value)}
+                  />
                 </div>
                 <div className="filter-group">
-                  <label className="filter-label" htmlFor="audit-date-end">Fin</label>
-                  <input id="audit-date-end" className="form-input" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
+                  <label className="filter-label" htmlFor="audit-date-end">
+                    Fin
+                  </label>
+                  <input
+                    id="audit-date-end"
+                    className="form-input"
+                    type="date"
+                    value={customEnd}
+                    onChange={(event) => setCustomEnd(event.target.value)}
+                  />
                 </div>
               </>
             )}
-            <button className="btn btn-secondary audit-clear-btn" type="button" onClick={resetFilters} disabled={!hasActiveFilters}>
+            <button
+              className="btn btn-secondary audit-clear-btn"
+              type="button"
+              onClick={resetFilters}
+              disabled={!hasActiveFilters}
+            >
               Effacer les filtres
             </button>
           </div>
           <FilterSummary
-            count={filtered.length}
+            count={events.length}
             countLabel="événement(s) affiché(s)"
             chips={filterChips}
             emptyText="Journal complet"
@@ -351,7 +424,8 @@ export default function AdminAuditPage() {
 
         {truncated && (
           <div className="notice" style={{ marginBottom: 12 }}>
-            Seuls les {LIMIT} événements les plus récents sont affichés. Affinez les filtres pour voir des résultats plus anciens.
+            Seuls les {LIMIT} événements les plus récents sont affichés. Affinez les filtres pour
+            voir des résultats plus anciens.
           </div>
         )}
 
@@ -360,7 +434,7 @@ export default function AdminAuditPage() {
             <EmptyState>Chargement...</EmptyState>
           ) : error ? (
             <ErrorBanner style={{ margin: 20 }}>{error}</ErrorBanner>
-          ) : filtered.length === 0 ? (
+          ) : events.length === 0 ? (
             <EmptyState>Aucun événement trouvé.</EmptyState>
           ) : (
             <>
@@ -376,7 +450,11 @@ export default function AdminAuditPage() {
                   <thead>
                     <tr>
                       <th scope="col" aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}>
-                        <button className="table-sort-button" type="button" onClick={toggleDateSort}>
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={toggleDateSort}
+                        >
                           Date
                           <span className="sr-only">{dateSortLabel()}</span>
                         </button>
@@ -388,10 +466,16 @@ export default function AdminAuditPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((event) => (
+                    {events.map((event) => (
                       <tr key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
                         <td>{formatDateTime(event.created_at)}</td>
-                        <td>{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</td>
+                        <td>
+                          {event.scope === 'line'
+                            ? 'Ligne'
+                            : event.scope === 'system'
+                              ? 'Système'
+                              : 'Utilisateur'}
+                        </td>
                         <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
                         <td>{formatAuditEventTarget(event, true)}</td>
                         <td>{changesLabel(event.changes, event.event_type)}</td>
@@ -402,8 +486,12 @@ export default function AdminAuditPage() {
               </div>
 
               <div className="audit-card-list">
-                {filtered.map((event) => (
-                  <div className="user-card-row" key={`${event.scope}-${event.id}`} style={{ cursor: 'default' }}>
+                {events.map((event) => (
+                  <div
+                    className="user-card-row"
+                    key={`${event.scope}-${event.id}`}
+                    style={{ cursor: 'default' }}
+                  >
                     <span className="user-card-main">
                       <span className="user-card-name">
                         {ADMIN_EVENT_LABELS[event.event_type] || event.event_type}
@@ -411,7 +499,13 @@ export default function AdminAuditPage() {
                       <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
                     </span>
                     <span className="user-card-meta">
-                      <span className="badge-role">{event.scope === 'line' ? 'Ligne' : event.scope === 'system' ? 'Système' : 'Utilisateur'}</span>
+                      <span className="badge-role">
+                        {event.scope === 'line'
+                          ? 'Ligne'
+                          : event.scope === 'system'
+                            ? 'Système'
+                            : 'Utilisateur'}
+                      </span>
                       {changesLabel(event.changes, event.event_type) !== '-' && (
                         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                           {changesLabel(event.changes, event.event_type)}

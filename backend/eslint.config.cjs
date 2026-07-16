@@ -9,7 +9,7 @@ module.exports = tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: true,
+        project: ['./tsconfig.json', './tsconfig.scripts.json'],
         tsconfigRootDir: __dirname,
       },
     },
@@ -37,6 +37,12 @@ module.exports = tseslint.config(
     files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.integration.test.ts'],
     rules: {
       '@typescript-eslint/require-await': 'off',
+    },
+  },
+  {
+    files: ['scripts/**/*.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 );

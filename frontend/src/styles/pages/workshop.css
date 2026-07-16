@@ -1711,24 +1711,70 @@ button.workshop-metric:hover,
   }
 
   .modal-overlay--depth-focus {
-    padding: var(--space-2);
+    align-items: center;
+    padding: 6px;
+    overflow: hidden;
   }
 
-  .modal--arbitration .modal-header,
-  .modal--arbitration .modal-body,
+  .modal--arbitration .modal-header {
+    padding: 8px 10px;
+  }
+
+  .modal--arbitration .modal-body {
+    padding: 8px 10px;
+  }
+
   .modal--arbitration .modal-footer {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding: 8px 10px 10px;
   }
 
-  .arbitration-footer-group,
-  .arbitration-footer-group--decision {
-    grid-template-columns: 1fr;
+  .modal--arbitration .arbitration-modal-layout,
+  .modal--arbitration .arbitration-command-grid,
+  .modal--arbitration .arbitration-decision-card,
+  .modal--arbitration .arbitration-context-card,
+  .modal--arbitration .arbitration-request-card {
+    gap: 6px;
+  }
+
+  .modal--arbitration .arbitration-decision-card,
+  .modal--arbitration .arbitration-context-card,
+  .modal--arbitration .arbitration-request-card {
+    padding: 8px;
   }
 
   .modal--arbitration .arbitration-decision-meta,
   .modal--arbitration .arbitration-context-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+  }
+
+  .modal--arbitration .arbitration-context-head {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .modal--arbitration .arbitration-responsible-callout,
+  .modal--arbitration .arbitration-reason-card,
+  .modal--arbitration .arbitration-diff-row,
+  .modal--arbitration .arbitration-system-note,
+  .modal--arbitration .arbitration-empty-state {
+    padding: 7px 8px;
+  }
+
+  .modal--arbitration .arbitration-narrative-strip {
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .modal--arbitration .arbitration-state-pill,
+  .modal--arbitration .arbitration-request-chip {
+    min-height: 24px;
+    padding: 4px 7px;
+  }
+
+  .arbitration-footer-group,
+  .arbitration-footer-group--decision {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

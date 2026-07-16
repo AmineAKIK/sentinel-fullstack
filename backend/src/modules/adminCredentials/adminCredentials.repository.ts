@@ -1,4 +1,5 @@
 import pool from '../../db/pool';
+import type { PoolClient } from 'pg';
 
 export interface AdminCredentialAccount {
   id: number;
@@ -6,7 +7,9 @@ export interface AdminCredentialAccount {
   password_hash: string;
 }
 
-export async function findAdminByUsername(username: string): Promise<AdminCredentialAccount | null> {
+export async function findAdminByUsername(
+  username: string
+): Promise<AdminCredentialAccount | null> {
   const { rows } = await pool.query<AdminCredentialAccount>(
     'SELECT id, username, password_hash FROM admin_accounts WHERE username = $1',
     [username]
@@ -15,8 +18,12 @@ export async function findAdminByUsername(username: string): Promise<AdminCreden
   return rows[0] ?? null;
 }
 
-export async function getAdminPasswordHash(adminId: number): Promise<string | null> {
-  const { rows } = await pool.query<{ password_hash: string }>(
+export async function getAdminPasswordHash(
+  adminId: number,
+  client?: PoolClient
+): Promise<string | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ password_hash: string }>(
     'SELECT password_hash FROM admin_accounts WHERE id = $1',
     [adminId]
   );
@@ -24,11 +31,16 @@ export async function getAdminPasswordHash(adminId: number): Promise<string | nu
   return rows[0]?.password_hash ?? null;
 }
 
-export async function updateAdminPasswordHash(adminId: number, passwordHash: string): Promise<boolean> {
-  const result = await pool.query(
-    'UPDATE admin_accounts SET password_hash = $1 WHERE id = $2',
-    [passwordHash, adminId]
-  );
+export async function updateAdminPasswordHash(
+  adminId: number,
+  passwordHash: string,
+  client?: PoolClient
+): Promise<boolean> {
+  const db = client ?? pool;
+  const result = await db.query('UPDATE admin_accounts SET password_hash = $1 WHERE id = $2', [
+    passwordHash,
+    adminId,
+  ]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -40,27 +52,40 @@ export async function getAdminSessionVersion(adminId: number): Promise<number | 
   return rows[0]?.session_version ?? null;
 }
 
-export async function incrementAdminSessionVersion(adminId: number): Promise<boolean> {
-  const result = await pool.query(
+export async function incrementAdminSessionVersion(
+  adminId: number,
+  client?: PoolClient
+): Promise<boolean> {
+  const db = client ?? pool;
+  const result = await db.query(
     'UPDATE admin_accounts SET session_version = session_version + 1 WHERE id = $1',
     [adminId]
   );
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function getAdminEmailFromDb(adminId: number): Promise<string | null> {
-  const { rows } = await pool.query<{ email: string | null }>(
+export async function getAdminEmailFromDb(
+  adminId: number,
+  client?: PoolClient
+): Promise<string | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ email: string | null }>(
     'SELECT email FROM admin_accounts WHERE id = $1',
     [adminId]
   );
   return rows[0]?.email ?? null;
 }
 
-export async function updateAdminEmail(adminId: number, email: string | null): Promise<boolean> {
-  const result = await pool.query(
-    'UPDATE admin_accounts SET email = $1 WHERE id = $2',
-    [email, adminId]
-  );
+export async function updateAdminEmail(
+  adminId: number,
+  email: string | null,
+  client?: PoolClient
+): Promise<boolean> {
+  const db = client ?? pool;
+  const result = await db.query('UPDATE admin_accounts SET email = $1 WHERE id = $2', [
+    email,
+    adminId,
+  ]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -82,16 +107,18 @@ export async function getAdminNotifPrefs(adminId: number): Promise<AdminNotifPre
 
 export async function updateAdminNotifPrefs(
   adminId: number,
-  prefs: Partial<AdminNotifPrefs>
+  prefs: Partial<AdminNotifPrefs>,
+  client?: PoolClient
 ): Promise<boolean> {
   const keys = Object.keys(prefs) as (keyof AdminNotifPrefs)[];
   if (keys.length === 0) return false;
   const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
   const values = keys.map((k) => prefs[k]);
-  const result = await pool.query(
-    `UPDATE admin_accounts SET ${setClauses} WHERE id = $1`,
-    [adminId, ...values]
-  );
+  const db = client ?? pool;
+  const result = await db.query(`UPDATE admin_accounts SET ${setClauses} WHERE id = $1`, [
+    adminId,
+    ...values,
+  ]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -103,6 +130,7 @@ export async function getAdminNotifPref(pref: keyof AdminNotifPrefs): Promise<bo
 }
 
 export interface BoardSettings {
+  id?: number;
   board_enabled: boolean;
   board_code_hash: string | null;
   board_session_version: number;
@@ -119,21 +147,35 @@ export async function getBoardSettings(adminId: number): Promise<BoardSettings |
 
 export async function getBoardSettingsGlobal(): Promise<BoardSettings | null> {
   const { rows } = await pool.query<BoardSettings>(
-    `SELECT board_enabled, board_code_hash, board_session_version
-     FROM admin_accounts LIMIT 1`
+    `SELECT id, board_enabled, board_code_hash, board_session_version
+     FROM admin_accounts ORDER BY id ASC LIMIT 1`
   );
   return rows[0] ?? null;
 }
 
-export async function updateBoardEnabled(adminId: number, enabled: boolean): Promise<void> {
+export async function upgradeBoardCodeHash(adminId: number, hash: string): Promise<void> {
   await pool.query(
-    `UPDATE admin_accounts SET board_enabled = $1 WHERE id = $2`,
-    [enabled, adminId]
+    `UPDATE admin_accounts SET board_code_hash = $1, updated_at = NOW() WHERE id = $2`,
+    [hash, adminId]
   );
 }
 
-export async function updateBoardCodeHash(adminId: number, hash: string): Promise<void> {
-  await pool.query(
+export async function updateBoardEnabled(
+  adminId: number,
+  enabled: boolean,
+  client?: PoolClient
+): Promise<void> {
+  const db = client ?? pool;
+  await db.query(`UPDATE admin_accounts SET board_enabled = $1 WHERE id = $2`, [enabled, adminId]);
+}
+
+export async function updateBoardCodeHash(
+  adminId: number,
+  hash: string,
+  client?: PoolClient
+): Promise<void> {
+  const db = client ?? pool;
+  await db.query(
     `UPDATE admin_accounts
      SET board_code_hash = $1, board_session_version = board_session_version + 1
      WHERE id = $2`,
@@ -141,8 +183,12 @@ export async function updateBoardCodeHash(adminId: number, hash: string): Promis
   );
 }
 
-export async function incrementBoardSessionVersion(adminId: number): Promise<void> {
-  await pool.query(
+export async function incrementBoardSessionVersion(
+  adminId: number,
+  client?: PoolClient
+): Promise<void> {
+  const db = client ?? pool;
+  await db.query(
     `UPDATE admin_accounts SET board_session_version = board_session_version + 1 WHERE id = $1`,
     [adminId]
   );
@@ -172,7 +218,7 @@ const SELECT_APP_SETTINGS = `
 
 export async function getAppSettings(): Promise<AppSettings> {
   const { rows } = await pool.query<AppSettings>(
-    `${SELECT_APP_SETTINGS} FROM admin_accounts LIMIT 1`
+    `${SELECT_APP_SETTINGS} FROM admin_accounts ORDER BY id ASC LIMIT 1`
   );
   return rows[0] ?? APP_SETTINGS_DEFAULTS;
 }
@@ -196,7 +242,8 @@ const APP_SETTINGS_KEYS: (keyof AppSettings)[] = [
 
 export async function updateAppSettings(
   adminId: number,
-  patch: Partial<AppSettings>
+  patch: Partial<AppSettings>,
+  client?: PoolClient
 ): Promise<void> {
   const keys = (Object.keys(patch) as (keyof AppSettings)[]).filter((k) =>
     APP_SETTINGS_KEYS.includes(k)
@@ -204,10 +251,8 @@ export async function updateAppSettings(
   if (keys.length === 0) return;
   const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
   const values = keys.map((k) => patch[k]);
-  await pool.query(
-    `UPDATE admin_accounts SET ${setClauses} WHERE id = $1`,
-    [adminId, ...values]
-  );
+  const db = client ?? pool;
+  await db.query(`UPDATE admin_accounts SET ${setClauses} WHERE id = $1`, [adminId, ...values]);
 }
 
 export async function getWorkshopSessionVersion(userId: number): Promise<number | null> {
@@ -218,8 +263,9 @@ export async function getWorkshopSessionVersion(userId: number): Promise<number 
   return rows[0]?.session_version ?? null;
 }
 
-export async function incrementAllWorkshopSessionVersions(): Promise<void> {
-  await pool.query(
+export async function incrementAllWorkshopSessionVersions(client?: PoolClient): Promise<void> {
+  const db = client ?? pool;
+  await db.query(
     'UPDATE sentinel_users SET session_version = session_version + 1 WHERE is_deleted = FALSE'
   );
 }

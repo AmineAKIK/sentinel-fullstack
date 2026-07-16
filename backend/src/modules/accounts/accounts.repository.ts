@@ -53,9 +53,10 @@ export async function listAccountsData(filters: ListAccountsFilters): Promise<Ac
   }
 
   const safeOrder = filters.order === 'asc' ? 'ASC' : 'DESC';
-  const orderClause = filters.sort === 'alphabetical'
-    ? `last_name ${safeOrder}, first_name ${safeOrder}`
-    : `created_at ${safeOrder}`;
+  const orderClause =
+    filters.sort === 'alphabetical'
+      ? `last_name ${safeOrder}, first_name ${safeOrder}`
+      : `created_at ${safeOrder}`;
 
   const { rows } = await pool.query<AccountDto>(
     `SELECT ${accountSelect}
@@ -68,14 +69,20 @@ export async function listAccountsData(filters: ListAccountsFilters): Promise<Ac
   return rows;
 }
 
-export async function accountBadgeExists(badgeNumber: string, excludeUserId?: number): Promise<boolean> {
+export async function accountBadgeExists(
+  badgeNumber: string,
+  excludeUserId?: number,
+  client?: PoolClient
+): Promise<boolean> {
+  const db = client ?? pool;
   const params: unknown[] = [badgeNumber];
   const excludeClause = excludeUserId ? 'AND id != $2' : '';
   if (excludeUserId) params.push(excludeUserId);
 
-  const { rows } = await pool.query<{ id: number }>(
+  const { rows } = await db.query<{ id: number }>(
     `SELECT id FROM sentinel_users
-     WHERE badge_number = $1 AND is_deleted = FALSE ${excludeClause}`,
+     WHERE lower(btrim(badge_number)) = lower(btrim($1))
+       AND is_deleted = FALSE ${excludeClause}`,
     params
   );
 
@@ -96,17 +103,31 @@ export async function createAccountData(
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING ${accountSelect}`,
-    [input.firstName, input.lastName, input.badgeNumber, input.role, input.email ?? null, setupCodeHash, setupExpiresAt]
+    [
+      input.firstName,
+      input.lastName,
+      input.badgeNumber,
+      input.role,
+      input.email ?? null,
+      setupCodeHash,
+      setupExpiresAt,
+    ]
   );
 
   return rows[0];
 }
 
-export async function getAccountData(id: number): Promise<AccountDto | null> {
-  const { rows } = await pool.query<AccountDto>(
+export async function getAccountData(
+  id: number,
+  client?: PoolClient,
+  forUpdate = false
+): Promise<AccountDto | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<AccountDto>(
     `SELECT ${accountSelect}
      FROM sentinel_users
-     WHERE id = $1 AND is_deleted = FALSE`,
+     WHERE id = $1 AND is_deleted = FALSE
+     ${forUpdate ? 'FOR UPDATE' : ''}`,
     [id]
   );
 
@@ -166,7 +187,11 @@ export async function updateAccountData(
   return rows[0] ?? null;
 }
 
-export async function setAccountActive(id: number, isActive: boolean, client?: PoolClient): Promise<AccountDto | null> {
+export async function setAccountActive(
+  id: number,
+  isActive: boolean,
+  client?: PoolClient
+): Promise<AccountDto | null> {
   const db = client ?? pool;
   const { rows } = await db.query<AccountDto>(
     `UPDATE sentinel_users
@@ -219,11 +244,13 @@ export async function getAccountImpactData(id: number): Promise<AccountImpactDto
     [id]
   );
 
-  return rows[0] || {
-    reported_incidents: 0,
-    taken_incidents: 0,
-    active_taken_incidents: 0,
-  };
+  return (
+    rows[0] || {
+      reported_incidents: 0,
+      taken_incidents: 0,
+      active_taken_incidents: 0,
+    }
+  );
 }
 
 export async function resetAccountPasswordData(
@@ -248,8 +275,12 @@ export async function resetAccountPasswordData(
   return rows[0] ?? null;
 }
 
-export async function getActiveTakenIncidentCountForUser(userId: number): Promise<number> {
-  const { rows } = await pool.query<{ count: number }>(
+export async function getActiveTakenIncidentCountForUser(
+  userId: number,
+  client?: PoolClient
+): Promise<number> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ count: number }>(
     `SELECT COUNT(*)::int AS count
      FROM workshop_incidents
      WHERE taken_by_user_id = $1 AND ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)}`,

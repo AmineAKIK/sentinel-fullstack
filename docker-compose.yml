@@ -1,57 +1,70 @@
-version: '3.9'
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '5'
 
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: sentinel_postgres
+    image: postgres:15.18-alpine3.23
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sentinel}
       POSTGRES_USER: ${POSTGRES_USER:-sentinel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - sentinel_data:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinel} -d ${POSTGRES_DB:-sentinel}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sentinel_backend
     restart: unless-stopped
+    init: true
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - internal
+      - edge
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
     environment:
-      PORT: ${PORT:-3000}
-      NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL:-postgres://sentinel:sentinel_password@postgres:5432/sentinel}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-      COOKIE_SECRET: ${COOKIE_SECRET:-change_me_in_production}
-      JWT_SECRET: ${JWT_SECRET:-jwt_secret_change_me_in_production}
-      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173}
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:?CLIENT_ORIGIN must be set}
       BOARD_ACCESS_LABEL: ${BOARD_ACCESS_LABEL:-Board atelier}
       BOARD_SESSION_TTL_HOURS: ${BOARD_SESSION_TTL_HOURS:-12}
-      BOARD_ACCESS_CODE_HASH: ${BOARD_ACCESS_CODE_HASH:-}
+      BOARD_ACCESS_CODE_HASH: ${BOARD_ACCESS_CODE_HASH:?BOARD_ACCESS_CODE_HASH must be set}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      TRUST_PROXY: ${TRUST_PROXY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-}
-      GLOBAL_API_RATE_LIMIT_MAX: ${GLOBAL_API_RATE_LIMIT_MAX:-}
-      GLOBAL_API_RATE_LIMIT_WINDOW_MS: ${GLOBAL_API_RATE_LIMIT_WINDOW_MS:-}
+      TRUST_PROXY: ${TRUST_PROXY:?TRUST_PROXY must be set}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      GLOBAL_API_RATE_LIMIT_MAX: ${GLOBAL_API_RATE_LIMIT_MAX:-3000}
+      GLOBAL_API_RATE_LIMIT_WINDOW_MS: ${GLOBAL_API_RATE_LIMIT_WINDOW_MS:-900000}
+      SUPPORT_API_TIMEOUT_MS: ${SUPPORT_API_TIMEOUT_MS:-20000}
+      NOTIFICATION_BATCH_SIZE: ${NOTIFICATION_BATCH_SIZE:-10}
+      NOTIFICATION_MAX_ATTEMPTS: ${NOTIFICATION_MAX_ATTEMPTS:-5}
+      NOTIFICATION_POLL_INTERVAL_MS: ${NOTIFICATION_POLL_INTERVAL_MS:-5000}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -59,24 +72,45 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    logging: *default-logging
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-    container_name: sentinel_frontend
+        VITE_API_URL: ${VITE_API_URL:-}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
 
   caddy:
-    image: caddy:2-alpine
-    container_name: sentinel_caddy
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -87,16 +121,23 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+      CADDY_DOMAIN: ${CADDY_DOMAIN:?CADDY_DOMAIN must be set}
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - internal
+      - edge
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
 
 networks:
   internal:
-    driver: bridge
+    internal: true
+  edge:
 
 volumes:
   sentinel_data:

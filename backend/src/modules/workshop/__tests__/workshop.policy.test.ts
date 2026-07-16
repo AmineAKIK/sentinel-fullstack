@@ -89,6 +89,17 @@ describe('OPERATOR permissions', () => {
     expect(canPerform('OPERATOR', 'TAKE', inc)).toBe(false);
     expect(canPerform('OPERATOR', 'CLOSE', inc)).toBe(false);
   });
+
+  it('can withdraw its own active edit request', () => {
+    expect(
+      canPerform(
+        'OPERATOR',
+        'WITHDRAW_EDIT',
+        incident({ edit_request: { comment: 'Correction' } }),
+        ACTOR_ID
+      )
+    ).toBe(true);
+  });
 });
 
 // ─── MAINTENANCE actions ──────────────────────────────────────────────────────
@@ -108,12 +119,7 @@ describe('MAINTENANCE permissions', () => {
 
   it('cannot TAKE a PENDING incident', () => {
     expect(
-      canPerform(
-        'MAINTENANCE',
-        'TAKE',
-        incident({ status: 'PENDING', is_taken: false }),
-        ACTOR_ID
-      )
+      canPerform('MAINTENANCE', 'TAKE', incident({ status: 'PENDING', is_taken: false }), ACTOR_ID)
     ).toBe(false);
   });
 
@@ -161,6 +167,24 @@ describe('MAINTENANCE permissions', () => {
 
   it('cannot DIRECT_EDIT when taken', () => {
     expect(canPerform('MAINTENANCE', 'DIRECT_EDIT', incident({ is_taken: true }))).toBe(false);
+  });
+
+  it('cannot progress treatment while an arbitration request is pending', () => {
+    const pendingEdit = incident({
+      status: 'OPEN',
+      is_taken: true,
+      edit_request: { comment: 'Correction' },
+    });
+    expect(canPerform('MAINTENANCE', 'TAKE', pendingEdit, 99)).toBe(false);
+    expect(canPerform('MAINTENANCE', 'SET_PENDING', pendingEdit)).toBe(false);
+    expect(canPerform('MAINTENANCE', 'CLOSE', pendingEdit)).toBe(false);
+    expect(
+      canPerform(
+        'MAINTENANCE',
+        'DIRECT_EDIT',
+        incident({ is_taken: false, edit_request: { comment: 'Correction' } })
+      )
+    ).toBe(false);
   });
 
   it('can CANCEL on active non-taken incident', () => {

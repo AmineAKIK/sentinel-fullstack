@@ -1,4 +1,4 @@
-import { useReducer } from 'react';
+import { useCallback, useMemo, useReducer } from 'react';
 import { WorkshopIncident } from '../types';
 
 export type ReviewType = 'edit' | 'delete';
@@ -96,15 +96,54 @@ export interface ModalStateApi {
 export function useModalState(): ModalStateApi {
   const [state, dispatch] = useReducer(modalReducer, initialState);
 
-  return {
-    state,
-    openModal: (modal) => dispatch({ type: 'OPEN', modal }),
-    closeModal: () => dispatch({ type: 'CLOSE' }),
-    openReview: (incident, type) => dispatch({ type: 'OPEN_REVIEW', incident, reviewType: type }),
-    closeReview: () => dispatch({ type: 'CLOSE_REVIEW' }),
-    setReviewError: (error) => dispatch({ type: 'SET_REVIEW_ERROR', error }),
-    setReviewLoading: (loading) => dispatch({ type: 'SET_REVIEW_LOADING', loading }),
-    setUnfollowConfirm: (incident) => dispatch({ type: 'SET_UNFOLLOW_CONFIRM', incident }),
-    setDeleteCommentConfirm: (incident) => dispatch({ type: 'SET_DELETE_COMMENT_CONFIRM', incident }),
-  };
+  const openModal = useCallback((modal: ActiveModal) => dispatch({ type: 'OPEN', modal }), []);
+  const closeModal = useCallback(() => dispatch({ type: 'CLOSE' }), []);
+  const openReview = useCallback(
+    (incident: WorkshopIncident, reviewType: ReviewType) =>
+      dispatch({ type: 'OPEN_REVIEW', incident, reviewType }),
+    []
+  );
+  const closeReview = useCallback(() => dispatch({ type: 'CLOSE_REVIEW' }), []);
+  const setReviewError = useCallback(
+    (error: string) => dispatch({ type: 'SET_REVIEW_ERROR', error }),
+    []
+  );
+  const setReviewLoading = useCallback(
+    (loading: boolean) => dispatch({ type: 'SET_REVIEW_LOADING', loading }),
+    []
+  );
+  const setUnfollowConfirm = useCallback(
+    (incident: WorkshopIncident | null) => dispatch({ type: 'SET_UNFOLLOW_CONFIRM', incident }),
+    []
+  );
+  const setDeleteCommentConfirm = useCallback(
+    (incident: WorkshopIncident | null) =>
+      dispatch({ type: 'SET_DELETE_COMMENT_CONFIRM', incident }),
+    []
+  );
+
+  return useMemo(
+    () => ({
+      state,
+      openModal,
+      closeModal,
+      openReview,
+      closeReview,
+      setReviewError,
+      setReviewLoading,
+      setUnfollowConfirm,
+      setDeleteCommentConfirm,
+    }),
+    [
+      state,
+      openModal,
+      closeModal,
+      openReview,
+      closeReview,
+      setReviewError,
+      setReviewLoading,
+      setUnfollowConfirm,
+      setDeleteCommentConfirm,
+    ]
+  );
 }

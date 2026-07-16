@@ -3,9 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Configuration Playwright (tests end-to-end).
  *
- * Les deux serveurs (backend :3000, frontend Vite :5173) sont démarrés au besoin
- * mais RÉUTILISÉS s'ils tournent déjà (`reuseExistingServer`) — pratique en dev,
- * où ils sont souvent lancés à la main, et évite les conflits de port.
+ * Les deux serveurs utilisent des ports réservés à la suite afin de ne jamais
+ * tester accidentellement une instance de développement ou une autre base.
  *
  * Pré-requis : la base doit contenir le jeu E2E. Le script `test:e2e` exécute
  * `seed:e2e` (backend) juste avant cette suite.
@@ -18,7 +17,7 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://127.0.0.1:5174',
     trace: 'on-first-retry',
   },
   projects: [
@@ -29,15 +28,15 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm --prefix ../backend run dev',
-      url: 'http://localhost:3000/api/health',
-      reuseExistingServer: true,
+      command: 'PORT=3100 CLIENT_ORIGIN=http://127.0.0.1:5174 npm --prefix ../backend run dev',
+      url: 'http://127.0.0.1:3100/api/health',
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {
-      command: 'npm run dev',
-      url: 'http://localhost:5173',
-      reuseExistingServer: true,
+      command: 'VITE_API_URL=http://127.0.0.1:3100 npm run dev -- --port 5174 --strictPort',
+      url: 'http://127.0.0.1:5174',
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],

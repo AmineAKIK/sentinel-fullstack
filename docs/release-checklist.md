@@ -1,79 +1,149 @@
 # Checklist de publication Sentinel
 
-Cette checklist fige ce qui doit etre vrai avant de declarer une version publiable.
-Voir `docs/runbook.md` pour les procedures detaillees d'exploitation.
+Une publication est autorisée uniquement lorsque chaque contrôle applicable est
+coché et rattaché au commit candidat.
 
-## 1. Etat du code
+## 1. Dépôt
 
-- `git status --short` ne contient que les fichiers attendus pour la release.
-- Les changements sont regroupes dans un commit de release clair.
-- Un tag de version est pose apres validation, par exemple `v1.0.0`.
+- [ ] la branche cible est `main` et synchronisée avec `origin/main`
+- [ ] `git status --short` ne contient aucun fichier inattendu
+- [ ] aucun `.env`, secret, export de données, PDF/DOCX personnel ou artefact de build n'est suivi
+- [ ] `git diff --check` ne signale aucune erreur d'espace ou marqueur de conflit
+- [ ] les migrations déjà publiées n'ont pas été modifiées
+- [ ] toute nouvelle migration est séquentielle, relue et couverte par un test réel
+- [ ] README, architecture, cycle de vie, runbook et déploiement décrivent le code du commit
 
-## 2. Configuration production
-
-- Copier `.env.release.example` vers `.env` sur l'hote de deploiement.
-- Remplacer tous les placeholders et valeurs de demo.
-- Generer `COOKIE_SECRET` et `JWT_SECRET` avec `openssl rand -hex 32`.
-- Generer `POSTGRES_PASSWORD` avec `openssl rand -hex 32`.
-- Definir `NODE_ENV=production`.
-- Definir `CADDY_DOMAIN` avec le domaine public (sans `https://`).
-- Definir `CLIENT_ORIGIN` avec l'URL publique exacte du frontend, sans slash final.
-- Definir `TRUST_PROXY=true`.
-- Definir `BOARD_ACCESS_CODE_HASH` avec le SHA-256 du code board.
-- Verifier que `ADMIN_PASSWORD`, `COOKIE_SECRET`, `JWT_SECRET` et `DATABASE_URL` ne reprennent aucune valeur de demo.
-
-Le backend refuse de demarrer en production si une valeur critique manque ou reste faible.
-
-## 3. Validation automatisee
-
-Depuis la racine du projet :
+## 2. Backend
 
 ```bash
 cd backend
 npm ci
+npm run format:check
+npm run lint
+npm run typecheck:scripts
 npm run build
-npm test
+npm run test:coverage -- --selectProjects unit
 npm run verify:reliability
-
-cd ../frontend
-npm ci
-npm run build
-npm test
+npm audit --audit-level=high
 ```
 
-## 4. Recette manuelle
+- [ ] toutes les commandes réussissent
+- [ ] les seuils Jest restent au-dessus de 80 % statements, 75 % branches,
+      70 % fonctions et 85 % lignes sur le périmètre critique
+- [ ] aucun test ciblé, ignoré ou exclusif n'a été laissé par erreur
+- [ ] les mutations critiques restent transactionnelles et actor-aware
+- [ ] les erreurs SQL attendues sont traduites sans fuite d'information
+- [ ] l'arrêt SIGTERM ferme HTTP, worker d'outbox et pool PostgreSQL proprement
 
-Executer la checklist `docs/manual-tests.md` sur un environnement frais.
+## 3. PostgreSQL réel
 
-Scenarios bloquants :
+Exécuter sur une base dédiée et jetable :
 
-- Board inaccessible sans code/session board, puis accessible en lecture seule sans actions sensibles.
-- Routes admin et workshop protegees sans cookie.
-- Connexion/deconnexion admin.
-- Connexion/deconnexion workshop avec creation du premier mot de passe.
-- Cycle incident complet : creation, prise en charge, attente, reprise, cloture, invalidation, demande d'annulation, approbation.
-- Historique et base de connaissance coherents apres cloture/annulation.
-- Modals critiques testees sur petit ecran.
-- Health check retourne `{"status":"ok","db":"ok"}`.
+```bash
+cd backend
+DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_test \
+  npm test -- --selectProjects integration
+```
 
-## 5. Donnees et exploitation
+- [ ] les migrations partent d'une base vide
+- [ ] une seconde exécution du runner est idempotente
+- [ ] les suites auth, comptes, lignes et atelier réussissent
+- [ ] les contraintes SQL refusent les payloads et transitions invalides
+- [ ] le ledger de migrations contient un checksum pour chaque migration
 
-- Backup PostgreSQL effectue avec `./scripts/backup.sh` et verifie (fichier non vide).
-- Restauration PostgreSQL testee au moins une fois sur un environnement temporaire avec `./scripts/restore.sh`.
-- Cron de backup configure sur le serveur (voir `docs/runbook.md` section 3).
-- Copie des backups vers un stockage hors site configuree.
-- Procedure de rotation du mot de passe admin connue (voir `docs/runbook.md` section 7).
-- Monitoring externe configure sur `/api/health` (voir `docs/runbook.md` section 9).
-- Acces serveur limites aux personnes autorisees.
-- Logs applicatifs consultables sans exposer les secrets.
+## 4. Frontend
 
-## 6. Decision
+```bash
+cd frontend
+npm ci
+npm run format:check
+npm run lint
+npm run build
+npm run test:coverage
+npm audit --audit-level=high
+```
 
-La release est publiable seulement si :
+- [ ] toutes les commandes réussissent
+- [ ] les seuils Vitest restent au-dessus de 85 % statements, 80 % branches,
+      90 % fonctions et 90 % lignes sur le périmètre critique
+- [ ] les appels annulés ne produisent ni erreur visible ni état obsolète
+- [ ] les mutations empêchent les doubles soumissions
+- [ ] les modales restaurent le focus, piègent Tab et répondent à Escape
+- [ ] les erreurs métier restent distinguées des erreurs réseau/timeout
 
-- tous les checks automatises passent ;
-- la recette manuelle est terminee ;
-- aucun secret de demo n'est utilise ;
-- le backup a ete effectue et teste ;
-- la version est taguee ;
-- le plan de retour arriere est connu (voir `docs/runbook.md` section 11).
+## 5. Parcours E2E
+
+```bash
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+```
+
+- [ ] modification d'une machine simple validée
+- [ ] passage simple vers double robot validé
+- [ ] arbitrage d'annulation décidé directement dans la modale mobile
+- [ ] arbitrage de correction décidé directement dans la modale mobile
+- [ ] Reporter conserve le cas actif et ouvre le dossier en haut sur mobile
+- [ ] aucune modale, aucun bouton et aucun contenu ne déborde horizontalement
+- [ ] le body est verrouillé pendant une modale et redevient scrollable après fermeture
+
+## 6. Configuration production
+
+- [ ] `.env` provient de `.env.release.example` et a le mode `600`
+- [ ] tous les placeholders ont été remplacés
+- [ ] `CADDY_DOMAIN` et `CLIENT_ORIGIN` ciblent le domaine HTTPS réel
+- [ ] `VITE_API_URL` est vide derrière Caddy
+- [ ] `TRUST_PROXY=true` derrière le proxy du Compose
+- [ ] `COOKIE_SECRET` et `JWT_SECRET` sont longs, aléatoires et distincts
+- [ ] `POSTGRES_PASSWORD` est long et cohérent avec `DATABASE_URL`
+- [ ] `BOARD_ACCESS_CODE_HASH` est un hash bcrypt valide `$2...`
+- [ ] les variables admin ne servent qu'au bootstrap d'une base vide
+- [ ] SMTP/DeepSeek sont configurés ou leur désactivation est acceptée explicitement
+- [ ] `docker compose config --quiet` réussit
+
+## 7. Conteneurs
+
+- [ ] les images backend et frontend se construisent sans cache local implicite
+- [ ] backend et frontend s'exécutent avec les utilisateurs `node` et `nginx`
+- [ ] Nginx démarre avec filesystem read-only et `/tmp` dédié
+- [ ] la configuration Caddy est valide
+- [ ] seuls les ports 80/443 sont publiés
+- [ ] PostgreSQL n'est attaché qu'au réseau interne
+- [ ] healthchecks backend, frontend et PostgreSQL passent
+- [ ] les logs sont bornés par rotation
+- [ ] ShellCheck valide `scripts/backup.sh` et `scripts/restore.sh`
+
+## 8. Recette manuelle
+
+- [ ] portail et trois espaces accessibles selon leurs droits
+- [ ] authentification, déconnexion et expiration de session vérifiées
+- [ ] compte inactif/supprimé refusé immédiatement
+- [ ] création, prise en charge, attente, reprise et clôture d'incident vérifiées
+- [ ] demande, report, consultation et décision d'arbitrage vérifiés
+- [ ] changement de rôle en session pris en compte côté serveur
+- [ ] historique, journal, pilotage et connaissance cohérents
+- [ ] Board inaccessible sans code puis fonctionnel avec sa session dédiée
+- [ ] affichage mobile 393 x 851 et desktop 1920 x 1080 contrôlé
+- [ ] navigation clavier et libellés accessibles contrôlés
+
+## 9. Exploitation
+
+- [ ] backup pré-déploiement créé et checksum vérifié
+- [ ] copie hors site confirmée
+- [ ] restauration testée sur un environnement isolé
+- [ ] compatibilité du schéma avec le rollback évaluée
+- [ ] métrique de santé et logs consultables
+- [ ] fenêtre, responsable et procédure de retour arrière définis
+
+## 10. Publication
+
+- [ ] CI GitHub verte sur le SHA exact à publier
+- [ ] commit et message de publication relus
+- [ ] déploiement effectué avec `git pull --ff-only`
+- [ ] `/api/health` répond HTTP 200 après déploiement
+- [ ] logs post-déploiement sans erreur inattendue
+- [ ] recette courte Admin/Atelier/Board réussie
+- [ ] SHA déployé et résultat de recette consignés
+
+**Décision :** `GO` seulement si aucun point bloquant n'est ouvert. Toute
+dérogation doit être écrite, limitée dans le temps et assortie d'un responsable.

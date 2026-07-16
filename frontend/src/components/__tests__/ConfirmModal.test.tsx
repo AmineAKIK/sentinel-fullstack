@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ConfirmModal from '../../components/ConfirmModal';
+import { ApiResponseError } from '../../api/client';
 
 // ─── rendering ────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,22 @@ describe('ConfirmModal – callbacks', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('prevents duplicate submissions while the first request is pending', () => {
+    const onConfirm = vi.fn(() => new Promise<void>(() => {}));
+    render(
+      <ConfirmModal title="T" onClose={vi.fn()} onConfirm={onConfirm}>
+        <span />
+      </ConfirmModal>
+    );
+    const confirmButton = screen.getByRole('button', { name: 'Confirmer' });
+
+    fireEvent.click(confirmButton);
+    fireEvent.click(confirmButton);
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(confirmButton).toBeDisabled();
+  });
 });
 
 // ─── loading state ────────────────────────────────────────────────────────────
@@ -148,6 +165,23 @@ describe('ConfirmModal – error', () => {
       </ConfirmModal>
     );
     expect(screen.queryByText('Erreur serveur.')).toBeNull();
+  });
+
+  it('displays the API business message when submission fails', async () => {
+    const onConfirm = vi.fn(() =>
+      Promise.reject(new ApiResponseError('INCIDENT_CONFLICT', 'Incident déjà traité.', 409))
+    );
+    render(
+      <ConfirmModal title="T" onClose={vi.fn()} onConfirm={onConfirm}>
+        <span />
+      </ConfirmModal>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Incident déjà traité.')
+    );
   });
 });
 

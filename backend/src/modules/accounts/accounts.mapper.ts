@@ -6,17 +6,19 @@ export interface AccountRow extends AccountDto {
 }
 
 export function toPublicAccount(row: AccountRow): AccountDto {
-  const hasPassword = typeof row.has_password === 'boolean'
-    ? row.has_password
-    : row.password_hash !== undefined && row.password_hash !== null;
-  const hasPasswordSetupCode = typeof row.has_password_setup_code === 'boolean'
-    ? row.has_password_setup_code
-    : Boolean(
-        !hasPassword &&
-        row.password_setup_token_hash &&
-        row.password_setup_expires_at &&
-        new Date(row.password_setup_expires_at).getTime() > Date.now()
-      );
+  const hasPassword =
+    typeof row.has_password === 'boolean'
+      ? row.has_password
+      : row.password_hash !== undefined && row.password_hash !== null;
+  const hasPasswordSetupCode =
+    typeof row.has_password_setup_code === 'boolean'
+      ? row.has_password_setup_code
+      : Boolean(
+          !hasPassword &&
+          row.password_setup_token_hash &&
+          row.password_setup_expires_at &&
+          new Date(row.password_setup_expires_at).getTime() > Date.now()
+        );
 
   return {
     id: row.id,

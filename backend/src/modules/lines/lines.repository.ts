@@ -4,15 +4,7 @@ import { statusInSql } from '../../db/sql';
 import { ACTIVE_INCIDENT_STATUSES } from '../../domain/constants';
 import { CreateLineInput, UpdateLineInput } from './lines.validation';
 
-export interface LineMachineDto {
-  machineId: string;
-  brand?: string;
-  machineType?: string;
-  position?: string;
-  hasDoubleRobot?: boolean;
-  robotA?: string;
-  robotB?: string;
-}
+export type LineMachineDto = CreateLineInput['machines'][number];
 
 export interface LineDto {
   id: number;
@@ -26,7 +18,7 @@ export interface LineDto {
 export interface LineForUpdateDto {
   line_number: string;
   is_active: boolean;
-  machine_sequence: Array<{ machineId: string }>;
+  machine_sequence: LineMachineDto[];
 }
 
 export interface LineImpactDto {
@@ -34,7 +26,8 @@ export interface LineImpactDto {
   open_or_pending_incidents: number;
 }
 
-const lineSelect = 'id, line_number, machine_sequence AS machines, is_active, created_at, updated_at';
+const lineSelect =
+  'id, line_number, machine_sequence AS machines, is_active, created_at, updated_at';
 
 export async function listLinesData(): Promise<LineDto[]> {
   const { rows } = await pool.query<LineDto>(
@@ -47,21 +40,30 @@ export async function listLinesData(): Promise<LineDto[]> {
   return rows;
 }
 
-export async function lineNumberExists(lineNumber: string, excludeLineId?: number): Promise<boolean> {
+export async function lineNumberExists(
+  lineNumber: string,
+  excludeLineId?: number,
+  client?: PoolClient
+): Promise<boolean> {
+  const db = client ?? pool;
   const params: unknown[] = [lineNumber];
   const excludeClause = excludeLineId ? 'AND id != $2' : '';
   if (excludeLineId) params.push(excludeLineId);
 
-  const { rows } = await pool.query<{ id: number }>(
+  const { rows } = await db.query<{ id: number }>(
     `SELECT id FROM production_lines
-     WHERE line_number = $1 AND is_deleted = FALSE ${excludeClause}`,
+     WHERE lower(btrim(line_number)) = lower(btrim($1))
+       AND is_deleted = FALSE ${excludeClause}`,
     params
   );
 
   return rows.length > 0;
 }
 
-export async function createLineData(input: CreateLineInput, client?: PoolClient): Promise<LineDto> {
+export async function createLineData(
+  input: CreateLineInput,
+  client?: PoolClient
+): Promise<LineDto> {
   const db = client ?? pool;
   const { rows } = await db.query<LineDto>(
     `INSERT INTO production_lines (line_number, machine_sequence, is_active)
@@ -73,8 +75,9 @@ export async function createLineData(input: CreateLineInput, client?: PoolClient
   return rows[0];
 }
 
-export async function getLineData(id: number): Promise<LineDto | null> {
-  const { rows } = await pool.query<LineDto>(
+export async function getLineData(id: number, client?: PoolClient): Promise<LineDto | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<LineDto>(
     `SELECT ${lineSelect}
      FROM production_lines
      WHERE id = $1 AND is_deleted = FALSE`,
@@ -84,18 +87,27 @@ export async function getLineData(id: number): Promise<LineDto | null> {
   return rows[0] ?? null;
 }
 
-export async function getLineForUpdate(id: number): Promise<LineForUpdateDto | null> {
-  const { rows } = await pool.query<LineForUpdateDto>(
+export async function getLineForUpdate(
+  id: number,
+  client?: PoolClient
+): Promise<LineForUpdateDto | null> {
+  const db = client ?? pool;
+  const { rows } = await db.query<LineForUpdateDto>(
     `SELECT line_number, is_active, machine_sequence
      FROM production_lines
-     WHERE id = $1 AND is_deleted = FALSE`,
+     WHERE id = $1 AND is_deleted = FALSE
+     FOR UPDATE`,
     [id]
   );
 
   return rows[0] ?? null;
 }
 
-export async function updateLineData(id: number, updates: UpdateLineInput, client?: PoolClient): Promise<LineDto | null> {
+export async function updateLineData(
+  id: number,
+  updates: UpdateLineInput,
+  client?: PoolClient
+): Promise<LineDto | null> {
   const db = client ?? pool;
   const setClauses: string[] = ['updated_at = NOW()'];
   const params: unknown[] = [];
@@ -150,30 +162,37 @@ export async function getLineImpactData(id: number): Promise<LineImpactDto> {
   return rows[0] || { incidents: 0, open_or_pending_incidents: 0 };
 }
 
-export async function findMachineConflicts(machineIds: string[], excludeLineId?: number): Promise<string[]> {
+export async function findMachineConflicts(
+  machineIds: string[],
+  excludeLineId?: number,
+  client?: PoolClient
+): Promise<string[]> {
   if (machineIds.length === 0) return [];
   const normalized = machineIds.map((id) => id.trim().toLowerCase()).filter(Boolean);
   if (normalized.length === 0) return [];
 
   const params: unknown[] = [normalized];
-  const excludeClause = excludeLineId ? 'AND pl.id != $2' : '';
+  const excludeClause = excludeLineId ? 'AND plm.line_id != $2' : '';
   if (excludeLineId) params.push(excludeLineId);
 
-  const { rows } = await pool.query<{ machine_id: string }>(
-    `SELECT DISTINCT elem->>'machineId' AS machine_id
-     FROM production_lines pl
-     CROSS JOIN LATERAL jsonb_array_elements(pl.machine_sequence) elem
-     WHERE pl.is_deleted = FALSE
-       ${excludeClause}
-       AND lower(elem->>'machineId') = ANY($1)`,
+  const db = client ?? pool;
+  const { rows } = await db.query<{ machine_id: string }>(
+    `SELECT DISTINCT plm.machine_id
+     FROM production_line_machines plm
+     WHERE plm.normalized_machine_id = ANY($1)
+       ${excludeClause}`,
     params
   );
 
   return rows.map((row) => row.machine_id);
 }
 
-export async function getActiveIncidentCountForLine(lineId: number): Promise<number> {
-  const { rows } = await pool.query<{ count: number }>(
+export async function getActiveIncidentCountForLine(
+  lineId: number,
+  client?: PoolClient
+): Promise<number> {
+  const db = client ?? pool;
+  const { rows } = await db.query<{ count: number }>(
     `SELECT COUNT(*)::int AS count
      FROM workshop_incidents
      WHERE line_id = $1 AND ${statusInSql('status', ACTIVE_INCIDENT_STATUSES)}`,
@@ -183,7 +202,10 @@ export async function getActiveIncidentCountForLine(lineId: number): Promise<num
   return rows[0]?.count ?? 0;
 }
 
-export async function cancelActiveIncidentsByLine(lineId: number, client?: PoolClient): Promise<number[]> {
+export async function cancelActiveIncidentsByLine(
+  lineId: number,
+  client?: PoolClient
+): Promise<number[]> {
   const db = client ?? pool;
   const { rows } = await db.query<{ id: number }>(
     `UPDATE workshop_incidents

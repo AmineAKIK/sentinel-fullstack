@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
-import { ADMIN_AUTH_COOKIE, WORKSHOP_AUTH_COOKIE, setAuthCookie, clearAuthCookie } from '../../auth/authCookies';
+import {
+  ADMIN_AUTH_COOKIE,
+  WORKSHOP_AUTH_COOKIE,
+  setAuthCookie,
+  clearAuthCookie,
+} from '../../auth/authCookies';
 import { signAuthToken, verifyAuthToken, isJwtSessionError } from '../../auth/jwt';
 import { sendError } from '../../utils/errors';
 import { sendInvalidServerConfig } from '../../auth/authResponses';
@@ -7,8 +12,7 @@ import { handleControllerError } from '../../utils/controller';
 import { unifiedLoginService, verifyAdminSession, verifyWorkshopSession } from './auth.service';
 import { loginSchema } from './auth.validation';
 import { loginLimiter } from '../../middlewares/loginRateLimit';
-import { AdminPayload } from '../../middlewares/adminAuth';
-import { WorkshopPayload } from '../../middlewares/workshopAuth';
+import { isAdminSessionPayload, isWorkshopSessionPayload } from '../../auth/sessionPayloads';
 import { getAppSettings } from '../adminCredentials/adminCredentials.repository';
 
 export async function login(req: Request, res: Response): Promise<void> {
@@ -40,15 +44,20 @@ export async function login(req: Request, res: Response): Promise<void> {
         return;
 
       case 'workshop_requires_password_setup':
-        res.status(200).json({ requiresPasswordSetup: true, badge_number: result.badgeNumber });
+        res.status(200).json({ requiresPasswordSetup: true });
         return;
 
       case 'workshop_requires_password':
-        res.status(200).json({ requiresPassword: true, badge_number: result.badgeNumber });
+        res.status(200).json({ requiresPassword: true });
         return;
 
       case 'workshop_account_disabled':
-        sendError(res, 403, 'FORBIDDEN', 'Votre accès atelier a été suspendu. Contactez votre responsable.');
+        sendError(
+          res,
+          403,
+          'FORBIDDEN',
+          'Votre accès atelier a été suspendu. Contactez votre responsable.'
+        );
         return;
 
       case 'workshop_invalid_setup_code':
@@ -58,15 +67,28 @@ export async function login(req: Request, res: Response): Promise<void> {
 
       case 'workshop_expired_setup_code':
         loginLimiter.recordFailure(req, settings.login_max_attempts);
-        sendError(res, 401, 'UNAUTHORIZED', "Code temporaire expiré ou absent. Demandez une réinitialisation à l'administrateur.");
+        sendError(
+          res,
+          401,
+          'UNAUTHORIZED',
+          "Code temporaire expiré ou absent. Demandez une réinitialisation à l'administrateur."
+        );
         return;
 
       case 'admin_success': {
         const token = signAuthToken(
-          { adminId: result.admin.id, username: result.admin.username, sessionVersion: result.admin.sessionVersion },
-          settings.session_duration_hours
+          {
+            adminId: result.admin.id,
+            username: result.admin.username,
+            sessionVersion: result.admin.sessionVersion,
+          },
+          settings.session_duration_hours,
+          'admin'
         );
-        if (!token) { sendInvalidServerConfig(res); return; }
+        if (!token) {
+          sendInvalidServerConfig(res);
+          return;
+        }
         loginLimiter.clear(req);
         setAuthCookie(res, ADMIN_AUTH_COOKIE, token, settings.session_duration_hours);
         res.json({ accountType: 'admin', id: result.admin.id, username: result.admin.username });
@@ -75,10 +97,19 @@ export async function login(req: Request, res: Response): Promise<void> {
 
       case 'workshop_success': {
         const token = signAuthToken(
-          { userId: result.user.id, badgeNumber: result.user.badge_number, role: result.user.role, sessionVersion: result.user.sessionVersion },
-          settings.workshop_session_hours
+          {
+            userId: result.user.id,
+            badgeNumber: result.user.badge_number,
+            role: result.user.role,
+            sessionVersion: result.user.sessionVersion,
+          },
+          settings.workshop_session_hours,
+          'workshop'
         );
-        if (!token) { sendInvalidServerConfig(res); return; }
+        if (!token) {
+          sendInvalidServerConfig(res);
+          return;
+        }
         loginLimiter.clear(req);
         setAuthCookie(res, WORKSHOP_AUTH_COOKIE, token, settings.workshop_session_hours);
         res.json({
@@ -103,8 +134,8 @@ export async function me(req: Request, res: Response): Promise<void> {
 
   try {
     if (adminToken) {
-      const payload = verifyAuthToken<AdminPayload>(adminToken);
-      if (payload) {
+      const payload = verifyAuthToken(adminToken, 'admin');
+      if (isAdminSessionPayload(payload)) {
         const admin = await verifyAdminSession(payload.adminId, payload.sessionVersion);
         if (admin) {
           res.json({ accountType: 'admin', id: admin.id, username: admin.username });
@@ -115,11 +146,22 @@ export async function me(req: Request, res: Response): Promise<void> {
     }
 
     if (workshopToken) {
-      const payload = verifyAuthToken<WorkshopPayload>(workshopToken);
-      if (payload) {
-        const user = await verifyWorkshopSession(payload.userId, payload.badgeNumber, payload.sessionVersion);
+      const payload = verifyAuthToken(workshopToken, 'workshop');
+      if (isWorkshopSessionPayload(payload)) {
+        const user = await verifyWorkshopSession(
+          payload.userId,
+          payload.badgeNumber,
+          payload.sessionVersion
+        );
         if (user) {
-          res.json({ accountType: 'workshop', id: user.id, first_name: user.first_name, last_name: user.last_name, badge_number: user.badge_number, role: user.role });
+          res.json({
+            accountType: 'workshop',
+            id: user.id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            badge_number: user.badge_number,
+            role: user.role,
+          });
           return;
         }
         clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);

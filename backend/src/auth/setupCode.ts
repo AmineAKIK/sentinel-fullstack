@@ -8,7 +8,9 @@ export const WORKSHOP_PASSWORD_SETUP_CODE_TTL_HOURS_DEFAULT = 24;
 
 export function generateWorkshopPasswordSetupCode(): string {
   const bytes = crypto.randomBytes(SETUP_CODE_LENGTH);
-  return Array.from(bytes, (byte) => SETUP_CODE_ALPHABET[byte % SETUP_CODE_ALPHABET.length]).join('');
+  return Array.from(bytes, (byte) => SETUP_CODE_ALPHABET[byte % SETUP_CODE_ALPHABET.length]).join(
+    ''
+  );
 }
 
 export function getWorkshopPasswordSetupExpiry(ttlHours: number, now = new Date()): Date {

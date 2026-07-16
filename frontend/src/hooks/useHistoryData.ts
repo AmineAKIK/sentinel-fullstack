@@ -7,10 +7,20 @@ import {
   listWorkshopLines,
 } from '../api/workshop';
 import { ProductionLine, WorkshopIncident, WorkshopIncidentEvent } from '../types';
-import { buildIncidentWorkspaceParams, withWorkshopLineFilter, withWorkshopUrlFilter } from '../utils/workshopFilters';
+import {
+  buildIncidentWorkspaceParams,
+  withWorkshopLineFilter,
+  withWorkshopUrlFilter,
+} from '../utils/workshopFilters';
 import { useDebouncedValue } from './useDebouncedValue';
 
-export type HistoryStatusFilter = 'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
+export type HistoryStatusFilter =
+  | 'all'
+  | 'OPEN'
+  | 'PENDING'
+  | 'CLOSED'
+  | 'CANCELED'
+  | 'INVALIDATED';
 
 export function readHistoryStatusFilter(value: string | null): HistoryStatusFilter {
   return value === 'OPEN' ||
@@ -53,15 +63,22 @@ export function useHistoryData() {
 
   useEffect(() => {
     if (!selectedId) return;
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       activeItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 80);
+    return () => window.clearTimeout(timer);
   }, [selectedId]);
 
   useEffect(() => {
-    listWorkshopLines()
+    const controller = new AbortController();
+    void listWorkshopLines(controller.signal)
       .then(setLines)
-      .catch(() => setError('Impossible de charger les référentiels atelier.'));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setError('Impossible de charger les référentiels atelier.');
+        }
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -76,8 +93,9 @@ export function useHistoryData() {
     });
     setLoading(true);
     setError('');
-    listWorkshopHistoryIncidents(params, controller.signal)
+    void listWorkshopHistoryIncidents(params, controller.signal)
       .then((incidentData) => {
+        if (controller.signal.aborted) return;
         setIncidents(incidentData);
         setSelectedId((currentId) => {
           if (incidentData.length === 0) return '';
@@ -86,49 +104,67 @@ export function useHistoryData() {
             : String(incidentData[0].id);
         });
       })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+      .catch(() => {
+        if (controller.signal.aborted) return;
         setError("Impossible de charger l'historique atelier.");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
   }, [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter]);
 
   useEffect(() => {
     const requestedId = searchParams.get('incident');
-    if (!requestedId) return;
+    if (!requestedId) return undefined;
     const requestedEventId = searchParams.get('event');
     const parsedEventId = requestedEventId ? Number(requestedEventId) : NaN;
     if (Number.isInteger(parsedEventId) && parsedEventId > 0) {
       setHighlightedEventId(parsedEventId);
     }
-    setIncidents((current) => {
-      if (current.some((inc) => String(inc.id) === requestedId)) {
-        setSelectedId(requestedId);
-        return current;
-      }
-      const parsedId = Number(requestedId);
-      if (!Number.isInteger(parsedId) || parsedId <= 0) return current;
-      getWorkshopHistoryIncident(parsedId)
-        .then((incident) => {
-          setIncidents((prev) => (prev.some((i) => i.id === incident.id) ? prev : [incident, ...prev]));
-          setSelectedId(String(incident.id));
-        })
-        .catch(() => setError("Impossible de charger l'incident demandé."));
-      return current;
-    });
-  }, [searchParams]);
+    if (incidents.some((incident) => String(incident.id) === requestedId)) {
+      setSelectedId(requestedId);
+      return undefined;
+    }
+    const parsedId = Number(requestedId);
+    if (!Number.isInteger(parsedId) || parsedId <= 0) return undefined;
+
+    const controller = new AbortController();
+    void getWorkshopHistoryIncident(parsedId, controller.signal)
+      .then((incident) => {
+        if (controller.signal.aborted) return;
+        setIncidents((current) =>
+          current.some((item) => item.id === incident.id) ? current : [incident, ...current]
+        );
+        setSelectedId(String(incident.id));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setError("Impossible de charger l'incident demandé.");
+      });
+    return () => controller.abort();
+  }, [searchParams, incidents]);
 
   useEffect(() => {
     if (!selectedId) {
       setEvents([]);
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
     setEventsLoading(true);
-    listIncidentEvents(Number(selectedId))
-      .then(setEvents)
-      .catch(() => setEvents([]))
-      .finally(() => setEventsLoading(false));
+    void listIncidentEvents(Number(selectedId), controller.signal)
+      .then((eventData) => {
+        if (!controller.signal.aborted) setEvents(eventData);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setEvents([]);
+          setError("Impossible de charger les événements de l'incident.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEventsLoading(false);
+      });
+    return () => controller.abort();
   }, [selectedId]);
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {

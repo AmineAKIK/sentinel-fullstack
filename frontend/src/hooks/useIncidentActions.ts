@@ -1,10 +1,11 @@
+import { useRef } from 'react';
 import {
   cancelWorkshopIncident,
   followWorkshopIncident,
   unfollowWorkshopIncident,
   updateWorkshopIncident,
 } from '../api/workshop';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/client';
 import { WorkshopIncident } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
 import { ModalStateApi } from './useModalState';
@@ -20,10 +21,6 @@ interface IncidentActionsOptions {
   userRole: string | undefined;
 }
 
-function actionErrorMessage(err: unknown, fallback: string): string {
-  return err instanceof ApiResponseError ? err.message : fallback;
-}
-
 export function useIncidentActions(opts: IncidentActionsOptions) {
   const {
     selectedIncident,
@@ -34,6 +31,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal,
     isMaintenance,
   } = opts;
+  const reviewActionRef = useRef(false);
 
   async function patchIncident(id: number, payload: Parameters<typeof updateWorkshopIncident>[1]) {
     const updated = await updateWorkshopIncident(id, payload);
@@ -79,11 +77,12 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
   }
 
   async function handleApplyEditRequest() {
-    if (!modal.state.reviewIncident) return;
+    if (!modal.state.reviewIncident || reviewActionRef.current) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
       modal.setReviewError('Modification interdite apres prise en charge.');
       return;
     }
+    reviewActionRef.current = true;
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
@@ -93,19 +92,23 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
-    } catch (_err) {
-      modal.setReviewError("Impossible d'appliquer la modification.");
+    } catch (requestError) {
+      modal.setReviewError(
+        apiErrorMessage(requestError, "Impossible d'appliquer la modification.")
+      );
     } finally {
+      reviewActionRef.current = false;
       modal.setReviewLoading(false);
     }
   }
 
   async function handleRejectEditRequest() {
-    if (!modal.state.reviewIncident) return;
+    if (!modal.state.reviewIncident || reviewActionRef.current) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
       modal.setReviewError('Modification interdite apres prise en charge.');
       return;
     }
+    reviewActionRef.current = true;
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
@@ -115,29 +118,33 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
-    } catch (_err) {
-      modal.setReviewError('Impossible de refuser la modification.');
+    } catch (requestError) {
+      modal.setReviewError(apiErrorMessage(requestError, 'Impossible de refuser la modification.'));
     } finally {
+      reviewActionRef.current = false;
       modal.setReviewLoading(false);
     }
   }
 
   async function handleApproveDeleteRequest() {
-    if (!modal.state.reviewIncident) return;
+    if (!modal.state.reviewIncident || reviewActionRef.current) return;
+    reviewActionRef.current = true;
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
       await applyCancelation(modal.state.reviewIncident.id);
       modal.closeReview();
     } catch (_err) {
-      modal.setReviewError(actionErrorMessage(_err, "Impossible d'annuler l'incident."));
+      modal.setReviewError(apiErrorMessage(_err, "Impossible d'annuler l'incident."));
     } finally {
+      reviewActionRef.current = false;
       modal.setReviewLoading(false);
     }
   }
 
   async function handleRejectDeleteRequest() {
-    if (!modal.state.reviewIncident) return;
+    if (!modal.state.reviewIncident || reviewActionRef.current) return;
+    reviewActionRef.current = true;
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
@@ -147,9 +154,10 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
-    } catch (_err) {
-      modal.setReviewError("Impossible de refuser l'annulation.");
+    } catch (requestError) {
+      modal.setReviewError(apiErrorMessage(requestError, "Impossible de refuser l'annulation."));
     } finally {
+      reviewActionRef.current = false;
       modal.setReviewLoading(false);
     }
   }
@@ -208,6 +216,9 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
   }
 
   async function handleMaintenanceDeleteConfirm(mode: 'direct' | 'approve') {
+    if (reviewActionRef.current) return;
+    reviewActionRef.current = true;
+    modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
       if (mode === 'approve' && modal.state.reviewIncident) {
@@ -220,7 +231,10 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
         modal.closeModal();
       }
     } catch (err) {
-      modal.setReviewError(actionErrorMessage(err, "Impossible d'annuler l'incident."));
+      modal.setReviewError(apiErrorMessage(err, "Impossible d'annuler l'incident."));
+    } finally {
+      reviewActionRef.current = false;
+      modal.setReviewLoading(false);
     }
   }
 

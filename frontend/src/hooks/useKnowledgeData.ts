@@ -30,9 +30,15 @@ export function useKnowledgeData() {
   const [selectedId, setSelectedId] = useState('');
 
   useEffect(() => {
-    listWorkshopLines()
+    const controller = new AbortController();
+    void listWorkshopLines(controller.signal)
       .then(setLines)
-      .catch(() => setError('Impossible de charger les référentiels atelier.'));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setError('Impossible de charger les référentiels atelier.');
+        }
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -47,37 +53,47 @@ export function useKnowledgeData() {
 
     setLoading(true);
     setError('');
-    listWorkshopKnowledgeIncidents(params, controller.signal)
+    void listWorkshopKnowledgeIncidents(params, controller.signal)
       .then((data) => {
+        if (controller.signal.aborted) return;
         setIncidents(data);
         setSelectedId((cur) => {
           if (data.length === 0) return '';
           return data.some((i) => String(i.id) === cur) ? cur : String(data[0].id);
         });
       })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+      .catch(() => {
+        if (controller.signal.aborted) return;
         setError('Impossible de charger la base de connaissance.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
   }, [debouncedQuery, stateFilter, lineFilter, machineFilter]);
 
   useEffect(() => {
     const requestedId = searchParams.get('incident');
-    if (!requestedId) return;
+    if (!requestedId) return undefined;
     if (incidents.some((i) => String(i.id) === requestedId)) {
       setSelectedId(requestedId);
-      return;
+      return undefined;
     }
     const parsedId = Number(requestedId);
-    if (!Number.isInteger(parsedId) || parsedId <= 0) return;
-    getWorkshopKnowledgeIncident(parsedId)
+    if (!Number.isInteger(parsedId) || parsedId <= 0) return undefined;
+    const controller = new AbortController();
+    void getWorkshopKnowledgeIncident(parsedId, controller.signal)
       .then((incident) => {
+        if (controller.signal.aborted) return;
         setIncidents((cur) => (cur.some((i) => i.id === incident.id) ? cur : [incident, ...cur]));
         setSelectedId(String(incident.id));
       })
-      .catch(() => setError("Cette fiche connaissance n'est pas disponible."));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setError("Cette fiche connaissance n'est pas disponible.");
+        }
+      });
+    return () => controller.abort();
   }, [searchParams, incidents]);
 
   const machineCount = new Set(incidents.map((i) => i.machine_id)).size;

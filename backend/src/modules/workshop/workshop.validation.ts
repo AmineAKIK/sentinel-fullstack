@@ -70,7 +70,7 @@ export const workshopAnalyticsQuerySchema = z.object({
 });
 
 export const arbitrationConsultationSchema = z.object({
-  requestType: z.enum(['EDIT', 'CANCEL', 'ALL']).default('ALL'),
+  requestType: z.enum(['EDIT', 'CANCEL']),
 });
 
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;

@@ -146,7 +146,10 @@ export async function listIncidentEvents(req: Request, res: Response): Promise<v
 
 export async function getIncidentMetrics(req: Request, res: Response): Promise<void> {
   try {
-    const result = await getIncidentMetricsService(req.workshopUser!.userId, req.workshopUser!.role);
+    const result = await getIncidentMetricsService(
+      req.workshopUser!.userId,
+      req.workshopUser!.role
+    );
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {

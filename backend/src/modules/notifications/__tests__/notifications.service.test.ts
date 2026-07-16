@@ -77,12 +77,11 @@ describe('notifications service email privacy', () => {
 
   it("ne journalise ni le destinataire ni le message brut d'une erreur SMTP", async () => {
     mockNotificationQueries(['responsable-prive@example.test']);
-    sendMail.mockRejectedValueOnce(
-      new Error('SMTP rejected responsable-prive@example.test')
-    );
+    sendMail.mockRejectedValueOnce(new Error('SMTP rejected responsable-prive@example.test'));
 
-    await notifyResponsablesEditRequested(42, 7, 'Correction demandée');
-    await Promise.resolve();
+    await expect(
+      notifyResponsablesEditRequested(42, 7, 'Correction demandée')
+    ).rejects.toMatchObject({ code: 'SMTP_DELIVERY_FAILED' });
 
     expect(mockedLogger.error).toHaveBeenCalledTimes(1);
     const loggedData = JSON.stringify(mockedLogger.error.mock.calls);

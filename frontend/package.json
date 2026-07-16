@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Sentinel frontend",
   "type": "module",
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -10,11 +14,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "npm --prefix ../backend run seed:e2e && playwright test",
-    "test:e2e:ui": "npm --prefix ../backend run seed:e2e && playwright test --ui",
+    "test:e2e": "npm --prefix ../backend run migrate && npm --prefix ../backend run seed:e2e && playwright test",
+    "test:e2e:ui": "npm --prefix ../backend run migrate && npm --prefix ../backend run seed:e2e && playwright test --ui",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "format": "prettier --write src"
+    "format:check": "prettier --check src e2e playwright.config.ts vite.config.ts",
+    "format": "prettier --write src e2e playwright.config.ts vite.config.ts"
   },
   "dependencies": {
     "react": "^18.2.0",

@@ -7,10 +7,7 @@ import {
 } from '../../utils/controller';
 import { sendError } from '../../utils/errors';
 import { badRequest } from '../../utils/serviceResult';
-import {
-  createAccountSchema,
-  updateAccountSchema,
-} from './accounts.validation';
+import { createAccountSchema, updateAccountSchema } from './accounts.validation';
 import {
   checkBadgeAvailabilityService,
   createAccountService,
@@ -162,7 +159,6 @@ export async function getAccountImpact(req: Request, res: Response): Promise<voi
     handleControllerError(res, 'getAccountImpact', err);
   }
 }
-
 
 export async function resetAccountPassword(req: Request, res: Response): Promise<void> {
   try {

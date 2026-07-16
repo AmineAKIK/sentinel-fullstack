@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getBoardData, logoutBoardSession } from '../api/board';
 import { ApiResponseError } from '../api/client';
@@ -17,9 +17,9 @@ import {
   isOpenOverSevenDays,
   normalizeScreenId,
   paginate,
-  statusLabel as _statusLabel,
 } from '../utils/boardUtils';
 import { usePageTitle } from '../hooks/usePageTitle';
+import ErrorBanner from '../components/ui/ErrorBanner';
 
 type BoardView = 'alerts' | 'all' | 'lines';
 const VIEWS: BoardView[] = ['alerts', 'all', 'lines'];
@@ -59,6 +59,45 @@ const PRESET_LABELS: Record<BoardPreset, string> = {
   responsable: 'Responsables',
   custom: 'Personnalisé',
 };
+const BOARD_PRESETS = new Set<BoardPreset>(['default', 'maintenance', 'responsable', 'custom']);
+const BOARD_PAGE_SIZES = new Set([4, 6, 8, 10]);
+
+function asBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function normalizeBoardSettings(value: unknown): BoardSettings {
+  if (!value || typeof value !== 'object') return DEFAULT_SETTINGS;
+  const parsed = value as Partial<Record<keyof BoardSettings, unknown>>;
+  const preset =
+    typeof parsed.preset === 'string' && BOARD_PRESETS.has(parsed.preset as BoardPreset)
+      ? (parsed.preset as BoardPreset)
+      : DEFAULT_SETTINGS.preset;
+  const viewDuration = Number(parsed.viewDurationSec);
+  const rowsPerPage = Number(parsed.rowsPerPage);
+  const lineIds = Array.isArray(parsed.lineIds)
+    ? parsed.lineIds
+        .filter((lineId): lineId is string => typeof lineId === 'string')
+        .map((lineId) => lineId.slice(0, 64))
+        .slice(0, 100)
+    : [];
+
+  return {
+    preset,
+    showAlerts: asBoolean(parsed.showAlerts, DEFAULT_SETTINGS.showAlerts),
+    showOpenCases: asBoolean(parsed.showOpenCases, DEFAULT_SETTINGS.showOpenCases),
+    showLineSummary: asBoolean(parsed.showLineSummary, DEFAULT_SETTINGS.showLineSummary),
+    onlyPriority: asBoolean(parsed.onlyPriority, DEFAULT_SETTINGS.onlyPriority),
+    onlyNotTaken: asBoolean(parsed.onlyNotTaken, DEFAULT_SETTINGS.onlyNotTaken),
+    lineIds,
+    viewDurationSec:
+      Number.isFinite(viewDuration) && viewDuration >= 5 && viewDuration <= 60
+        ? Math.round(viewDuration / 5) * 5
+        : DEFAULT_SETTINGS.viewDurationSec,
+    rowsPerPage: BOARD_PAGE_SIZES.has(rowsPerPage) ? rowsPerPage : DEFAULT_SETTINGS.rowsPerPage,
+    compactMetrics: asBoolean(parsed.compactMetrics, DEFAULT_SETTINGS.compactMetrics),
+  };
+}
 
 function getBoardSettingsKey(screenId: string): string {
   return `${BOARD_SETTINGS_KEY}.${screenId}`;
@@ -68,24 +107,46 @@ function loadBoardSettings(storageKey: string): BoardSettings {
   try {
     const raw = window.localStorage.getItem(storageKey);
     if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<BoardSettings>;
-    return { ...DEFAULT_SETTINGS, ...parsed, lineIds: Array.isArray(parsed.lineIds) ? parsed.lineIds : [] };
+    return normalizeBoardSettings(JSON.parse(raw));
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
-function saveBoardSettings(storageKey: string, settings: BoardSettings) {
-  window.localStorage.setItem(storageKey, JSON.stringify(settings));
+function saveBoardSettings(storageKey: string, settings: BoardSettings): boolean {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(settings));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function applyPreset(preset: BoardPreset, current: BoardSettings): BoardSettings {
-  const display = { viewDurationSec: current.viewDurationSec, rowsPerPage: current.rowsPerPage, compactMetrics: current.compactMetrics };
+  const display = {
+    viewDurationSec: current.viewDurationSec,
+    rowsPerPage: current.rowsPerPage,
+    compactMetrics: current.compactMetrics,
+  };
   if (preset === 'maintenance') {
-    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: true, showOpenCases: false, showLineSummary: false };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...display,
+      preset,
+      showAlerts: true,
+      showOpenCases: false,
+      showLineSummary: false,
+    };
   }
   if (preset === 'responsable') {
-    return { ...DEFAULT_SETTINGS, ...display, preset, showAlerts: false, showOpenCases: false, showLineSummary: true };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...display,
+      preset,
+      showAlerts: false,
+      showOpenCases: false,
+      showLineSummary: true,
+    };
   }
   return { ...DEFAULT_SETTINGS, ...display, preset };
 }
@@ -99,13 +160,13 @@ export default function WorkshopBoardPage() {
   // pour un écran kiosque sans session) pour afficher le retour dashboard.
   const [isWorkshopUser, setIsWorkshopUser] = useState(false);
   useEffect(() => {
-    let cancelled = false;
-    getUnifiedMe()
+    const controller = new AbortController();
+    void getUnifiedMe(controller.signal)
       .then((me) => {
-        if (!cancelled && me.accountType === 'workshop') setIsWorkshopUser(true);
+        if (!controller.signal.aborted && me.accountType === 'workshop') setIsWorkshopUser(true);
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => undefined);
+    return () => controller.abort();
   }, []);
   const screenParam = searchParams.get('screen');
   const screenId = normalizeScreenId(screenParam ?? getOrCreateSessionScreenId());
@@ -119,8 +180,12 @@ export default function WorkshopBoardPage() {
   const [viewIndex, setViewIndex] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
   const [settings, setSettings] = useState<BoardSettings>(() => loadBoardSettings(storageKey));
-  const [draftSettings, setDraftSettings] = useState<BoardSettings>(() => loadBoardSettings(storageKey));
+  const [draftSettings, setDraftSettings] = useState<BoardSettings>(() =>
+    loadBoardSettings(storageKey)
+  );
+  const refreshControllerRef = useRef<AbortController | null>(null);
 
   const configuredViews: BoardView[] = [
     settings.showAlerts ? 'alerts' : null,
@@ -137,30 +202,50 @@ export default function WorkshopBoardPage() {
   }, [screenId, screenParam, searchParams, setSearchParams]);
 
   const refreshBoard = useCallback(async () => {
+    if (refreshControllerRef.current) return;
+    const controller = new AbortController();
+    refreshControllerRef.current = controller;
     try {
-      const boardData = await getBoardData();
+      const boardData = await getBoardData(controller.signal);
+      if (controller.signal.aborted) return;
       setIncidents(boardData.incidents);
       setLines(boardData.lines);
       setLastUpdated(new Date());
       setDataError(false);
     } catch (err) {
+      if (controller.signal.aborted) return;
       if (err instanceof ApiResponseError && err.status === 401) {
         // Session board révoquée ou board désactivé — retour à l'accueil
-        await logoutBoardSession().catch(() => {});
-        navigate('/login', { replace: true, state: { reason: 'Session board expirée ou révoquée.' } });
+        await logoutBoardSession().catch(() => undefined);
+        navigate('/login', {
+          replace: true,
+          state: { reason: 'Session board expirée ou révoquée.' },
+        });
         return;
       }
       setDataError(true);
+    } finally {
+      if (refreshControllerRef.current === controller) refreshControllerRef.current = null;
     }
   }, [navigate]);
 
   useEffect(() => {
     void refreshBoard();
-    const refreshId = window.setInterval(() => void refreshBoard(), 30000);
+    const refreshWhenVisible = (): void => {
+      if (document.visibilityState === 'visible') void refreshBoard();
+    };
+    const refreshId = window.setInterval(refreshWhenVisible, 30000);
     const clockId = window.setInterval(() => setNow(new Date()), 15000);
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
+      const controller = refreshControllerRef.current;
+      refreshControllerRef.current = null;
+      controller?.abort();
       window.clearInterval(refreshId);
       window.clearInterval(clockId);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, [refreshBoard]);
 
@@ -214,7 +299,6 @@ export default function WorkshopBoardPage() {
         ? `${activeIncidents.length} cas ouvert${activeIncidents.length > 1 ? 's' : ''} dans le périmètre`
         : 'Aucun incident ouvert';
 
-
   const noLineScope = settings.lineIds.includes(NO_LINES_SELECTED);
   const alertIncidents = activeIncidents.filter(
     (inc) => inc.is_priority || !inc.is_taken || inc.status === 'PENDING'
@@ -238,7 +322,10 @@ export default function WorkshopBoardPage() {
   }, [activeIncidents]);
 
   const activeView = safeViews[viewIndex] ?? safeViews[0] ?? 'alerts';
-  const incidentPages = paginate(activeView === 'alerts' ? alertIncidents : activeIncidents, settings.rowsPerPage);
+  const incidentPages = paginate(
+    activeView === 'alerts' ? alertIncidents : activeIncidents,
+    settings.rowsPerPage
+  );
   const linePages = paginate(lineGroups, settings.rowsPerPage);
   const pages = activeView === 'lines' ? linePages : incidentPages;
   const safePageIndex = Math.min(pageIndex, pages.length - 1);
@@ -276,13 +363,17 @@ export default function WorkshopBoardPage() {
   }
 
   function saveSettings() {
-    setSettings(draftSettings);
-    saveBoardSettings(storageKey, draftSettings);
+    if (!saveBoardSettings(storageKey, draftSettings)) {
+      setSettingsError("Impossible d'enregistrer les paramètres sur cet écran.");
+      return;
+    }
+    setSettings(normalizeBoardSettings(draftSettings));
+    setSettingsError('');
     setShowSettings(false);
   }
 
   async function closeBoardAccess() {
-    await logoutBoardSession().catch(() => {});
+    await logoutBoardSession().catch(() => undefined);
     void navigate('/login', { replace: true });
   }
 
@@ -296,7 +387,11 @@ export default function WorkshopBoardPage() {
       const nextIds = currentIds.includes(lineId)
         ? currentIds.filter((id) => id !== lineId)
         : [...currentIds, lineId];
-      return { ...prev, lineIds: nextIds.length === 0 ? [NO_LINES_SELECTED] : nextIds, preset: 'custom' };
+      return {
+        ...prev,
+        lineIds: nextIds.length === 0 ? [NO_LINES_SELECTED] : nextIds,
+        preset: 'custom',
+      };
     });
   }
 
@@ -310,7 +405,10 @@ export default function WorkshopBoardPage() {
   const screenLabel = screenId.replace(/^ecran[-_]/i, '').toUpperCase();
 
   return (
-    <main id="main-content" className={`board-page board-page-${boardMode}${dataError ? ' board-page--stale' : ''}`}>
+    <main
+      id="main-content"
+      className={`board-page board-page-${boardMode}${dataError ? ' board-page--stale' : ''}`}
+    >
       <header className="board-header">
         <div>
           <div className="board-brand">SENTINEL · {profileLabel}</div>
@@ -325,18 +423,79 @@ export default function WorkshopBoardPage() {
                 : 'Actualisation en cours'}
             </div>
           </div>
-          <button className="board-exit" onClick={() => setShowSettings(true)} aria-label="Réglages" disabled={dataError}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'middle' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <button
+            className="board-exit"
+            onClick={() => {
+              setSettingsError('');
+              setShowSettings(true);
+            }}
+            aria-label="Réglages"
+            disabled={dataError}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ marginRight: 6, verticalAlign: 'middle' }}
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
             Réglages
           </button>
           {isWorkshopUser ? (
-            <button className="board-exit" onClick={() => void navigate('/workshop/dashboard')} aria-label="Tableau de bord">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'middle' }}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <button
+              className="board-exit"
+              onClick={() => void navigate('/workshop/dashboard')}
+              aria-label="Tableau de bord"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ marginRight: 6, verticalAlign: 'middle' }}
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
               Tableau de bord
             </button>
           ) : (
-            <button className="board-exit" onClick={() => void closeBoardAccess()} aria-label="Quitter">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'middle' }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <button
+              className="board-exit"
+              onClick={() => void closeBoardAccess()}
+              aria-label="Quitter"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ marginRight: 6, verticalAlign: 'middle' }}
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
               Quitter
             </button>
           )}
@@ -345,7 +504,25 @@ export default function WorkshopBoardPage() {
 
       {dataError && (
         <div className="board-stale-banner" role="alert">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="1" y1="1" x2="23" y2="23" />
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+            <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+            <line x1="12" y1="20" x2="12.01" y2="20" />
+          </svg>
           <span>
             Hors ligne — dernière synchronisation
             {lastUpdated ? ` il y a ${formatStaleDuration(lastUpdated, now)}` : ' inconnue'}
@@ -357,9 +534,7 @@ export default function WorkshopBoardPage() {
         <div className="board-status-copy">
           <span>{boardModeLabel}</span>
           <strong>{boardModeTitle}</strong>
-          {noLineScope && (
-            <p>Aucune ligne n'est incluse dans les paramètres de cet écran.</p>
-          )}
+          {noLineScope && <p>Aucune ligne n'est incluse dans les paramètres de cet écran.</p>}
         </div>
         <div className="board-status-meta">
           <span>Écran {screenLabel}</span>
@@ -369,27 +544,30 @@ export default function WorkshopBoardPage() {
         </div>
       </section>
 
-      <section className={`board-metrics${settings.compactMetrics ? ' board-metrics--hidden' : ''}`} aria-hidden={settings.compactMetrics}>
-          <div className="board-metric">
-            <span>Ouverts</span>
-            <strong>{openCount}</strong>
-          </div>
-          <div className="board-metric board-metric-danger">
-            <span>Urgents</span>
-            <strong>{priorityCount}</strong>
-          </div>
-          <div className="board-metric">
-            <span>Non pris</span>
-            <strong>{notTakenCount}</strong>
-          </div>
-          <div className="board-metric">
-            <span>En attente</span>
-            <strong>{pendingCount}</strong>
-          </div>
-          <div className="board-metric">
-            <span>Ouverts &gt; 7j</span>
-            <strong>{openOverSevenDaysCount}</strong>
-          </div>
+      <section
+        className={`board-metrics${settings.compactMetrics ? ' board-metrics--hidden' : ''}`}
+        aria-hidden={settings.compactMetrics}
+      >
+        <div className="board-metric">
+          <span>Ouverts</span>
+          <strong>{openCount}</strong>
+        </div>
+        <div className="board-metric board-metric-danger">
+          <span>Urgents</span>
+          <strong>{priorityCount}</strong>
+        </div>
+        <div className="board-metric">
+          <span>Non pris</span>
+          <strong>{notTakenCount}</strong>
+        </div>
+        <div className="board-metric">
+          <span>En attente</span>
+          <strong>{pendingCount}</strong>
+        </div>
+        <div className="board-metric">
+          <span>Ouverts &gt; 7j</span>
+          <strong>{openOverSevenDaysCount}</strong>
+        </div>
       </section>
 
       <section className={`board-viewport ${currentItemCount <= 4 ? 'is-compact' : ''}`}>
@@ -432,6 +610,7 @@ export default function WorkshopBoardPage() {
           title="Paramètres d'affichage"
           onClose={() => {
             setDraftSettings(settings);
+            setSettingsError('');
             setShowSettings(false);
           }}
           size="lg"
@@ -451,6 +630,7 @@ export default function WorkshopBoardPage() {
           }
         >
           <div className="board-settings-panel">
+            {settingsError && <ErrorBanner>{settingsError}</ErrorBanner>}
             <div className="notice">Paramètres locaux — écran {screenLabel} uniquement.</div>
 
             <section className="board-settings-section">
@@ -462,11 +642,19 @@ export default function WorkshopBoardPage() {
                 <label className="form-label">Type d'écran</label>
                 <SelectField
                   value={draftSettings.preset}
-                  onChange={(value) => setDraftSettings(applyPreset(value as BoardPreset, draftSettings))}
+                  onChange={(value) =>
+                    setDraftSettings(applyPreset(value as BoardPreset, draftSettings))
+                  }
                   options={[
                     { value: 'default', label: `${PRESET_LABELS.default} · rotation complète` },
-                    { value: 'maintenance', label: `${PRESET_LABELS.maintenance} · alertes à traiter` },
-                    { value: 'responsable', label: `${PRESET_LABELS.responsable} · situation par ligne` },
+                    {
+                      value: 'maintenance',
+                      label: `${PRESET_LABELS.maintenance} · alertes à traiter`,
+                    },
+                    {
+                      value: 'responsable',
+                      label: `${PRESET_LABELS.responsable} · situation par ligne`,
+                    },
                     { value: 'custom', label: `${PRESET_LABELS.custom} · filtres avancés` },
                   ]}
                 />
@@ -480,18 +668,33 @@ export default function WorkshopBoardPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label
+                    className="form-label"
+                    style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}
+                  >
                     <span>Vitesse de rotation</span>
                     <strong>{draftSettings.viewDurationSec} s</strong>
                   </label>
                   <input
                     type="range"
-                    min={5} max={60} step={5}
+                    min={5}
+                    max={60}
+                    step={5}
                     value={draftSettings.viewDurationSec}
-                    onChange={(e) => updateDraftSettings({ viewDurationSec: Number(e.target.value) })}
+                    onChange={(e) =>
+                      updateDraftSettings({ viewDurationSec: Number(e.target.value) })
+                    }
                     style={{ width: '100%' }}
                   />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      marginTop: 2,
+                    }}
+                  >
                     <span>5 s (rapide)</span>
                     <span>60 s (lent)</span>
                   </div>

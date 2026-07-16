@@ -1,4 +1,5 @@
 import { boundedInt } from '../../db/sql';
+import { withTransaction } from '../../db/transaction';
 import { notFound, ok, ServiceResult } from '../../utils/serviceResult';
 import {
   getReferenceDashboardData,
@@ -12,6 +13,7 @@ import {
   ReferenceQualityDto,
   PasswordResetRequestDto,
 } from './admin.repository';
+import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
 
 export interface ReferenceAuditQuery {
   scope?: unknown;
@@ -92,18 +94,33 @@ export async function getReferenceQualityService(): Promise<ReferenceQualityDto>
   };
 }
 
-export async function listReferenceAuditService(query: ReferenceAuditQuery): Promise<ReferenceAuditEventDto[]> {
+export async function listReferenceAuditService(
+  query: ReferenceAuditQuery
+): Promise<ReferenceAuditEventDto[]> {
   return listReferenceAuditData(normalizeReferenceAuditFilters(query));
 }
 
-export async function listPendingPasswordResetRequestsService(): Promise<PasswordResetRequestDto[]> {
+export async function listPendingPasswordResetRequestsService(): Promise<
+  PasswordResetRequestDto[]
+> {
   return listPendingPasswordResetRequestsData();
 }
 
 export async function markPasswordResetRequestHandledService(
-  id: number
+  id: number,
+  adminId: number
 ): Promise<ServiceResult<{ message: string }>> {
-  const handled = await markPasswordResetRequestHandledData(id);
+  const handled = await withTransaction(async (client) => {
+    const updated = await markPasswordResetRequestHandledData(id, client);
+    if (!updated) return false;
+    await createAdminSystemAuditEvent(
+      adminId,
+      'PASSWORD_RESET_REQUEST_HANDLED',
+      { requestId: id },
+      client
+    );
+    return true;
+  });
   if (!handled) return notFound('Demande introuvable ou déjà traitée.');
   return ok({ message: 'Demande marquée comme traitée.' });
 }

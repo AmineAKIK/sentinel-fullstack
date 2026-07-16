@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChatMessage } from '../api/support';
+import { apiErrorMessage } from '../api/client';
+import type { ChatMessage } from '../api/support';
 import { renderMarkdown } from '../utils/markdownParser';
 
 interface Props {
-  onSend: (message: string, history: ChatMessage[]) => Promise<string>;
+  onSend: (message: string, history: ChatMessage[], signal: AbortSignal) => Promise<string>;
 }
-
 
 export default function SupportChat({ onSend }: Props) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
@@ -14,9 +14,12 @@ export default function SupportChat({ onSend }: Props) {
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const requestRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [history, loading]);
 
   useEffect(() => {
@@ -41,13 +44,22 @@ export default function SupportChat({ onSend }: Props) {
     setInput('');
     setError(null);
     setLoading(true);
+    const controller = new AbortController();
+    requestRef.current = controller;
 
     try {
-      const reply = await onSend(message, history);
+      const reply = await onSend(message, history, controller.signal);
+      if (controller.signal.aborted) return;
       setHistory([...nextHistory, { role: 'assistant', content: reply }]);
-    } catch {
-      setError('Une erreur est survenue. Vérifiez votre connexion et réessayez.');
+    } catch (requestError) {
+      if (controller.signal.aborted) return;
+      setError(apiErrorMessage(
+        requestError,
+        'Une erreur est survenue. Vérifiez votre connexion et réessayez.'
+      ));
     } finally {
+      if (requestRef.current === controller) requestRef.current = null;
+      if (controller.signal.aborted) return;
       setLoading(false);
       // Re-focus after the re-render re-enables the textarea (disabled while loading).
       requestAnimationFrame(() => textareaRef.current?.focus());

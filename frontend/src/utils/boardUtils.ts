@@ -32,7 +32,7 @@ export function isOpenOverSevenDays(incident: WorkshopBoardIncident): boolean {
 export function formatStaleDuration(since: Date, now: Date): string {
   const diffMs = now.getTime() - since.getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'moins d\'1 min';
+  if (diffMin < 1) return "moins d'1 min";
   if (diffMin === 1) return '1 min';
   if (diffMin < 60) return `${diffMin} min`;
   const diffH = Math.floor(diffMin / 60);
@@ -41,15 +41,20 @@ export function formatStaleDuration(since: Date, now: Date): string {
 
 export function paginate<T>(items: T[], size: number): T[][] {
   if (items.length === 0) return [[]];
+  const pageSize = Number.isFinite(size) ? Math.max(1, Math.floor(size)) : 1;
   const pages: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    pages.push(items.slice(index, index + size));
+  for (let index = 0; index < items.length; index += pageSize) {
+    pages.push(items.slice(index, index + pageSize));
   }
   return pages;
 }
 
 export function normalizeScreenId(value: string | null): string {
-  const normalized = (value || 'default').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const normalized = (value || 'default')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '-')
+    .slice(0, 64);
   return normalized || 'default';
 }
 

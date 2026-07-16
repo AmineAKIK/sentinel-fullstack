@@ -9,9 +9,15 @@ export async function createLineAuditEvent(
   client?: PoolClient
 ): Promise<void> {
   const db = client ?? pool;
-  await db.query(
-    `INSERT INTO line_audit_events (target_line_id, admin_id, event_type, changes)
-     VALUES ($1, $2, $3, $4)`,
+  const { rowCount } = await db.query(
+    `INSERT INTO line_audit_events
+       (target_line_id, target_line_number, admin_id, event_type, changes)
+     SELECT pl.id, pl.line_number, $2, $3, $4
+     FROM production_lines pl
+     WHERE pl.id = $1`,
     [targetLineId, adminId, eventType, changes ? JSON.stringify(changes) : null]
   );
+  if (!rowCount) {
+    throw new Error(`createLineAuditEvent: ligne ${targetLineId} introuvable`);
+  }
 }

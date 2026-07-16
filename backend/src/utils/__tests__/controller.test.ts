@@ -23,7 +23,10 @@ describe('formatZodError', () => {
   });
 
   it('joins multiple error messages with a space', () => {
-    const schema = z.object({ a: z.string().min(1, 'A requis.'), b: z.string().min(1, 'B requis.') });
+    const schema = z.object({
+      a: z.string().min(1, 'A requis.'),
+      b: z.string().min(1, 'B requis.'),
+    });
     const result = schema.safeParse({ a: '', b: '' });
     if (!result.success) {
       expect(formatZodError(result.error)).toBe('A requis. B requis.');

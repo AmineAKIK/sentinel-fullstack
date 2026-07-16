@@ -33,21 +33,16 @@ let adminId: number;
 const createdUserIds: number[] = [];
 
 const BADGE = 'RGPD-INT-01';
-const ADMIN_USERNAME = 'admin-int-rgpd';
 
 beforeAll(async () => {
   if (!RUN) return;
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
 
-  // The audit trail has a real FK to admin_accounts: the suite needs its own admin.
-  const { rows } = await pool.query<{ id: number }>(
-    `INSERT INTO admin_accounts (username, password_hash)
-     VALUES ($1, 'integration-test-hash')
-     ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
-     RETURNING id`,
-    [ADMIN_USERNAME]
-  );
+  // The audit trail has a real FK to admin_accounts. Sentinel enforces a single
+  // administrator account (uq_admin_singleton_key), so the suite reuses whichever
+  // admin already exists rather than inserting a second one.
+  const { rows } = await pool.query<{ id: number }>(`SELECT id FROM admin_accounts LIMIT 1`);
   adminId = rows[0].id;
 }, 30_000);
 
@@ -67,9 +62,10 @@ beforeEach(async () => {
 
 afterAll(async () => {
   if (!RUN) return;
-  await pool.query(`DELETE FROM account_audit_events WHERE target_user_id = ANY($1::int[])`, [createdUserIds]);
+  await pool.query(`DELETE FROM account_audit_events WHERE target_user_id = ANY($1::int[])`, [
+    createdUserIds,
+  ]);
   await pool.query(`DELETE FROM sentinel_users WHERE id = ANY($1::int[])`, [createdUserIds]);
-  await pool.query(`DELETE FROM admin_accounts WHERE username = $1`, [ADMIN_USERNAME]);
   await pool.end();
 });
 
@@ -109,7 +105,7 @@ describeIntegration('RGPD — anonymisation à la suppression de compte', () => 
     // Une session émise avant la suppression porte l'ancien badge dans le JWT.
     await deleteAccountService(userId, adminId);
 
-    const session = await verifyWorkshopSession(userId, BADGE);
+    const session = await verifyWorkshopSession(userId, BADGE, 1);
     expect(session).toBeNull();
   });
 

@@ -114,6 +114,7 @@ function mockDashboardData(incidents: WorkshopIncident[]) {
     error: '',
     setIncidents: vi.fn(),
     refreshMetrics: vi.fn(() => Promise.resolve()),
+    refreshData: vi.fn(() => Promise.resolve()),
     upsertIncident: vi.fn(),
   });
 }
@@ -261,6 +262,7 @@ describe('WorkshopDashboardPage', () => {
         cancel_request_reason: 'doublon',
         arbitration: {
           cancel: {
+            caseId: 22,
             requestEventId: 7,
             requestedAt: '2026-06-28T11:00:00.000Z',
             state: 'ACTIVE',
@@ -297,6 +299,7 @@ describe('WorkshopDashboardPage', () => {
         cancel_request_reason: 'doublon',
         arbitration: {
           cancel: {
+            caseId: 22,
             requestEventId: 7,
             requestedAt: '2026-06-28T11:00:00.000Z',
             state: 'ACTIVE',

@@ -40,6 +40,16 @@ function isActiveIncident(incident: WorkshopIncident): boolean {
   );
 }
 
+function hasPendingArbitration(incident: WorkshopIncident): boolean {
+  return (
+    incident.edit_request != null ||
+    incident.cancel_request === true ||
+    incident.delete_request === true ||
+    incident.arbitration?.edit != null ||
+    incident.arbitration?.cancel != null
+  );
+}
+
 export function canPerform(
   role: Role | undefined,
   action: WorkshopAction,
@@ -54,6 +64,7 @@ export function canPerform(
       return (
         role === 'OPERATOR' &&
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         actorId !== undefined &&
         incident.user_id === actorId
       );
@@ -62,6 +73,7 @@ export function canPerform(
         role === 'OPERATOR' &&
         isActiveIncident(incident) &&
         incident.edit_request != null &&
+        incident.arbitration?.cancel == null &&
         actorId !== undefined &&
         incident.user_id === actorId
       );
@@ -70,6 +82,7 @@ export function canPerform(
       return (
         role === 'OPERATOR' &&
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         !incident.is_taken &&
         actorId !== undefined &&
         incident.user_id === actorId
@@ -77,25 +90,28 @@ export function canPerform(
     case 'directEdit':
       return (
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         !incident.is_taken &&
         (role === 'RESPONSABLE' || role === 'MAINTENANCE')
       );
     case 'responsableEdit':
-      return role === 'RESPONSABLE' && isActiveIncident(incident);
+      return role === 'RESPONSABLE' && isActiveIncident(incident) && !hasPendingArbitration(incident);
     case 'editAfterTake':
       return (
         role === 'MAINTENANCE' &&
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         incident.is_taken &&
         actorId !== undefined &&
         incident.taken_by_user_id === actorId
       );
     case 'cancel':
       if (incident.status === 'PENDING') {
-        return role === 'RESPONSABLE';
+        return role === 'RESPONSABLE' && !hasPendingArbitration(incident);
       }
       return (
         isActiveIncident(incident) &&
+        !hasPendingArbitration(incident) &&
         !incident.is_taken &&
         (role === 'RESPONSABLE' || role === 'MAINTENANCE')
       );
@@ -117,15 +133,31 @@ export function canPerform(
       return (
         role === 'MAINTENANCE' &&
         incident.status === 'OPEN' &&
+        !hasPendingArbitration(incident) &&
         actorId !== undefined &&
         (!incident.is_taken || incident.taken_by_user_id !== actorId)
       );
     case 'setPending':
-      return role === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
+      return (
+        role === 'MAINTENANCE' &&
+        incident.status === 'OPEN' &&
+        incident.is_taken &&
+        !hasPendingArbitration(incident)
+      );
     case 'resume':
-      return role === 'MAINTENANCE' && incident.status === 'PENDING' && incident.is_taken;
+      return (
+        role === 'MAINTENANCE' &&
+        incident.status === 'PENDING' &&
+        incident.is_taken &&
+        !hasPendingArbitration(incident)
+      );
     case 'close':
-      return role === 'MAINTENANCE' && incident.status === 'OPEN' && incident.is_taken;
+      return (
+        role === 'MAINTENANCE' &&
+        incident.status === 'OPEN' &&
+        incident.is_taken &&
+        !hasPendingArbitration(incident)
+      );
     case 'setPriority':
     case 'responsibleComment':
       return role === 'RESPONSABLE' && isActiveIncident(incident);

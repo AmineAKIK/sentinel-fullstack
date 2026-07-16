@@ -3,18 +3,15 @@ import { clearAuthCookie, WORKSHOP_AUTH_COOKIE } from '../auth/authCookies';
 import {
   handleJwtError,
   sendInvalidServerConfig,
+  sendInvalidSession,
   sendMissingAuth,
 } from '../auth/authResponses';
 import { getJwtSecret, verifyAuthToken } from '../auth/jwt';
+import { isWorkshopSessionPayload, WorkshopSessionPayload } from '../auth/sessionPayloads';
 import pool from '../db/pool';
 import { sendError } from '../utils/errors';
 
-export interface WorkshopPayload {
-  userId: number;
-  badgeNumber: string;
-  role: string;
-  sessionVersion: number;
-}
+export type WorkshopPayload = WorkshopSessionPayload;
 
 declare global {
   namespace Express {
@@ -24,11 +21,7 @@ declare global {
   }
 }
 
-export function workshopAuthMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+export function workshopAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   void authenticateWorkshopRequest(req, res, next);
 }
 
@@ -50,12 +43,18 @@ async function authenticateWorkshopRequest(
   }
 
   try {
-    const payload = verifyAuthToken<WorkshopPayload>(token);
-    if (!payload) {
-      sendInvalidServerConfig(res);
+    const payload = verifyAuthToken(token, 'workshop');
+    if (!isWorkshopSessionPayload(payload)) {
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+      sendInvalidSession(res);
       return;
     }
-    const { rows } = await pool.query<{ id: number; badge_number: string; role: string; session_version: number }>(
+    const { rows } = await pool.query<{
+      id: number;
+      badge_number: string;
+      role: string;
+      session_version: number;
+    }>(
       `SELECT id, badge_number, role, session_version
        FROM sentinel_users
        WHERE id = $1
@@ -81,6 +80,7 @@ async function authenticateWorkshopRequest(
     }
 
     req.workshopUser = {
+      scope: 'workshop',
       userId: user.id,
       badgeNumber: user.badge_number,
       role: user.role,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { archiveLine, getLineImpact } from '../api/lines';
 import { ProductionLine } from '../types';
+import { apiErrorMessage } from '../api/client';
 
 interface ArchiveLineConfirmModalProps {
   line: ProductionLine;
@@ -14,12 +15,21 @@ export default function ArchiveLineConfirmModal({
   onClose,
   onSuccess,
 }: ArchiveLineConfirmModalProps) {
-  const [impact, setImpact] = useState<{ incidents: number; open_or_pending_incidents: number } | null>(null);
+  const [impact, setImpact] = useState<{
+    incidents: number;
+    open_or_pending_incidents: number;
+  } | null>(null);
   const [forceMode, setForceMode] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getLineImpact(line.id).then(setImpact).catch(() => setImpact(null));
+    const controller = new AbortController();
+    void getLineImpact(line.id, controller.signal)
+      .then(setImpact)
+      .catch(() => {
+        if (!controller.signal.aborted) setImpact(null);
+      });
+    return () => controller.abort();
   }, [line.id]);
 
   const activeCount = impact?.open_or_pending_incidents ?? 0;
@@ -30,14 +40,12 @@ export default function ArchiveLineConfirmModal({
     try {
       await archiveLine(line.id, forceMode);
       onSuccess();
-    } catch {
-      setError("Une erreur s'est produite. Veuillez réessayer.");
+    } catch (requestError) {
+      setError(apiErrorMessage(requestError, "Impossible d'archiver la ligne."));
     }
   }
 
-  const title = forceMode
-    ? `Archiver et annuler ${activeCount} incident(s)`
-    : 'Archiver la ligne';
+  const title = forceMode ? `Archiver et annuler ${activeCount} incident(s)` : 'Archiver la ligne';
 
   return (
     <AdminPasswordConfirmModal
@@ -46,19 +54,20 @@ export default function ArchiveLineConfirmModal({
       onConfirm={handleConfirm}
       confirmLabel={forceMode ? `Annuler ${activeCount} incident(s) et archiver` : 'Archiver'}
     >
-      <p style={{ fontWeight: 500, marginBottom: 8 }}>
-        Archiver la ligne {line.line_number} ?
-      </p>
+      <p style={{ fontWeight: 500, marginBottom: 8 }}>Archiver la ligne {line.line_number} ?</p>
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
-        La ligne sera retirée de la gestion courante. Son historique et sa base de
-        connaissance restent consultables.
+        La ligne sera retirée de la gestion courante. Son historique et sa base de connaissance
+        restent consultables.
       </p>
 
       {impact && impact.incidents > 0 && (
         <div className="notice" style={{ marginTop: 12 }}>
           {impact.incidents} incident(s) lié(s) à cette ligne au total.
           {hasActiveIncidents && (
-            <> <strong>{activeCount} actif(s)</strong> — doivent être traités avant archivage.</>
+            <>
+              {' '}
+              <strong>{activeCount} actif(s)</strong> — doivent être traités avant archivage.
+            </>
           )}
         </div>
       )}

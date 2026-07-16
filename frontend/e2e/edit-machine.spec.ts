@@ -25,7 +25,10 @@ async function loginAsAdmin(page: Page): Promise<void> {
 async function openMachineModal(page: Page): Promise<void> {
   await page.goto('/admin/lines');
   // La ligne est cliquable ; le libellé accessible est unique par numéro.
-  await page.getByRole('button', { name: `Voir la ligne ${E2E_LINE_NUMBER}` }).first().click();
+  await page
+    .getByRole('button', { name: `Voir la ligne ${E2E_LINE_NUMBER}` })
+    .first()
+    .click();
   // Vue détail : titre « Ligne 999 ».
   await expect(page.getByRole('heading', { name: `Ligne ${E2E_LINE_NUMBER}` })).toBeVisible();
   // Clic sur la machine pour ouvrir la modale d'édition.
@@ -38,7 +41,7 @@ test.beforeEach(async ({ page }) => {
   await loginAsAdmin(page);
 });
 
-test('aucun changement : Aperçu désactivé, aucune confirmation ne s\'affiche', async ({ page }) => {
+test("aucun changement : Aperçu désactivé, aucune confirmation ne s'affiche", async ({ page }) => {
   await openMachineModal(page);
 
   // Sans aucune modification, le bouton « Aperçu » est désactivé.
