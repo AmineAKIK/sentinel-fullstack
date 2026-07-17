@@ -43,8 +43,8 @@ Trois audiences utilisent la même origine mais des sessions séparées :
 6. démarre HTTP et le worker d'outbox ;
 7. ferme HTTP, worker et pool PostgreSQL sur SIGTERM/SIGINT.
 
-La route `/api/health` vérifie une requête réelle vers PostgreSQL et répond 503
-si la base n'est pas joignable.
+La route `/api/health` vérifie une requête réelle vers PostgreSQL, publie le SHA
+Git complet embarqué dans l'image et répond 503 si la base n'est pas joignable.
 
 ### 2.2 Couches d'un module
 

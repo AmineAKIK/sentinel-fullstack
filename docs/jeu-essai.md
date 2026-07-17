@@ -42,8 +42,10 @@ Préparer une base PostgreSQL de test et les deux dépendances npm :
 ```bash
 cd backend
 npm ci
-DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_e2e npm run migrate
-DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_e2e npm run seed:e2e
+export DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_e2e
+npm run guard:e2e
+npm run migrate
+npm run seed:e2e
 
 cd ../frontend
 npm ci
@@ -133,8 +135,8 @@ Exécution :
 
 ```bash
 cd backend
-DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_test \
-  npm test -- --selectProjects integration
+export DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_test
+npm run test:integration
 ```
 
 ## 4. Cas de validation à présenter
@@ -154,8 +156,10 @@ traçabilité sans dépendre d'une donnée manuelle fragile.
 
 ## 5. Nettoyage
 
-Le moyen sûr est de supprimer la base de test entière. Sur une base de recette
-partagée, relancer `seed:e2e` ne touche qu'aux fixtures réservées de la ligne 999.
+Le moyen sûr est de supprimer la base de test entière. Le garde-fou refuse le
+seed E2E si le nom de base ne se termine pas par `_e2e` ou si
+`NODE_ENV=production`. Sur une base de recette partagée explicitement nommée
+pour l'E2E, le seed ne touche qu'aux fixtures réservées de la ligne 999.
 
 Ne pas utiliser `docker compose down -v` sur un environnement contenant des
 données à conserver.

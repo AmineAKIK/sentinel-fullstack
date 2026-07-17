@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 COPY migrations ./migrations
 
@@ -14,6 +14,10 @@ RUN npm run build
 FROM node:24.18.0-alpine3.23 AS production
 
 WORKDIR /app
+
+ARG BUILD_SHA=unknown
+ENV BUILD_SHA=$BUILD_SHA
+LABEL org.opencontainers.image.revision=$BUILD_SHA
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force

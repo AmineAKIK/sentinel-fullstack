@@ -48,6 +48,7 @@ const config: Config = {
       roots: ['<rootDir>/src/integration'],
       testMatch: ['<rootDir>/src/integration/**/__tests__/**/*.test.ts'],
       moduleFileExtensions: ['ts', 'js'],
+      setupFiles: ['<rootDir>/src/testing/jestIntegrationGuard.ts'],
       testTimeout: 30_000,
     },
   ],

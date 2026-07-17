@@ -1,0 +1,14 @@
+# Variante pour un VPS qui possède déjà son reverse proxy HTTPS.
+# Copier ce fichier vers docker-compose.override.yml, puis définir les deux
+# variables de port. Les publications restent strictement liées au loopback.
+services:
+  backend:
+    ports:
+      - '127.0.0.1:${SENTINEL_BACKEND_BIND_PORT:?set SENTINEL_BACKEND_BIND_PORT}:3000'
+
+  frontend:
+    ports:
+      - '127.0.0.1:${SENTINEL_FRONTEND_BIND_PORT:?set SENTINEL_FRONTEND_BIND_PORT}:8080'
+
+  caddy:
+    profiles: [bundled-edge]

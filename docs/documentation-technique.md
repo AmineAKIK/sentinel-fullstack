@@ -1,6 +1,6 @@
 # Documentation technique Sentinel
 
-**État documenté :** 16 juillet 2026  
+**État documenté :** 17 juillet 2026
 **Architecture :** SPA React + API Express + PostgreSQL + Docker Compose
 
 Cette référence décrit le code du dépôt. Les procédures d'exploitation sont
@@ -99,11 +99,12 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 | --- | --- | --- |
 | `NODE_ENV` | `production` | active cookies sécurisés et validation stricte |
 | `PORT` | `3000` | port interne API |
+| `BUILD_SHA` | requise | SHA Git complet exposé par `/api/health` |
 | `DATABASE_URL` | requise | URL PostgreSQL interne |
 | `COOKIE_SECRET` | requise | secret cookies, 24 caractères minimum |
 | `JWT_SECRET` | requise | secret JWT, 24 caractères minimum |
 | `CLIENT_ORIGIN` | requise | origine HTTPS exacte sans chemin |
-| `TRUST_PROXY` | requise | confiance accordée au proxy Caddy |
+| `TRUST_PROXY` | requise | confiance accordée au proxy inverse retenu |
 | `BOARD_ACCESS_CODE_HASH` | requise | hash bcrypt du code Board |
 | `ADMIN_USERNAME` | bootstrap | premier admin sur base vide |
 | `ADMIN_PASSWORD` | bootstrap | mot de passe initial fort |
@@ -117,10 +118,12 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 `assertProductionConfig()` refuse :
 
 - les variables requises absentes ;
-- les secrets trop courts ou valeurs de démonstration ;
-- une origine non HTTPS, avec credentials, chemin, query ou fragment ;
-- un mot de passe PostgreSQL de démonstration dans l'URL ;
-- un hash Board qui ne respecte pas le format bcrypt.
+- les secrets trop courts, identiques ou contenant encore un placeholder ;
+- une origine non HTTPS, locale, factice, avec credentials, chemin, query ou fragment ;
+- une URL PostgreSQL incomplète, d'un autre protocole ou avec un mot de passe faible ;
+- un hash Board qui ne respecte pas le format bcrypt ;
+- un `BUILD_SHA` absent ou différent d'un SHA Git complet ;
+- les quotas, timeouts et paramètres d'outbox hors des bornes documentées.
 
 Les variables admin ne sont plus requises après l'amorçage si un admin existe
 déjà. Une base de production vide sans ces variables refuse de démarrer.
@@ -457,8 +460,8 @@ GitHub sont limités à `contents: read`.
 | Service | Image/runtime | Port interne | Exposition |
 | --- | --- | --- | --- |
 | `postgres` | PostgreSQL 15.18 Alpine | 5432 | aucune |
-| `backend` | Node 24.14.1 Alpine, user `node` | 3000 | aucune |
-| `frontend` | Nginx 1.30.3 Alpine, user `nginx` | 8080 | aucune |
+| `backend` | Node 24.18.0 Alpine, user `node` | 3000 | aucune |
+| `frontend` | Nginx 1.30.4 Alpine, user `nginx` | 8080 | aucune |
 | `caddy` | Caddy 2.11.4 Alpine | 80/443 | 80/443 |
 
 Backend et frontend sont read-only, sans capabilities, avec `/tmp` temporaire.

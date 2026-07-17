@@ -27,8 +27,10 @@ import { loginRateLimit, globalApiRateLimit } from './middlewares/loginRateLimit
 import { boardRouter } from './modules/board/board.auth';
 import { FIELD_LIMITS } from './domain/constants';
 import { startNotificationOutboxWorker } from './modules/notifications/notificationOutbox.worker';
+import { apiErrorHandler, apiNotFoundHandler } from './middlewares/apiErrors';
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = parsePort(process.env.PORT, 'PORT', 3000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
@@ -86,11 +88,22 @@ app.get('/api/config', (_req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'ok', db: 'ok' });
+    res.json({
+      status: 'ok',
+      db: 'ok',
+      version: process.env.BUILD_SHA || 'development',
+    });
   } catch {
-    res.status(503).json({ status: 'error', db: 'unreachable' });
+    res.status(503).json({
+      status: 'error',
+      db: 'unreachable',
+      version: process.env.BUILD_SHA || 'development',
+    });
   }
 });
+
+app.use('/api', apiNotFoundHandler);
+app.use(apiErrorHandler);
 
 async function start(): Promise<void> {
   try {

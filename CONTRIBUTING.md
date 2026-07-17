@@ -2,8 +2,8 @@
 
 ## Prérequis
 
-- Node.js `24.14.1` (`nvm use` lit `.nvmrc`) ;
-- npm 10 ou supérieur ;
+- Node.js `24.18.0` (`nvm use` lit `.nvmrc`) ;
+- npm `11.16.0` (fourni avec cette version de Node.js) ;
 - PostgreSQL 15 pour l'intégration ;
 - Chromium Playwright pour les parcours E2E.
 
@@ -32,7 +32,7 @@ npm run format:check
 npm run lint
 npm run typecheck:scripts
 npm run build
-npm run test:coverage -- --selectProjects unit
+npm run test:coverage
 npm run verify:reliability
 ```
 

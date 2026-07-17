@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
-  "packageManager": "npm@11.6.2",
+  "packageManager": "npm@11.16.0",
   "description": "Sentinel backend API",
   "main": "dist/server.js",
   "engines": {
@@ -11,7 +11,8 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc --project tsconfig.build.json",
     "typecheck:scripts": "tsc --project tsconfig.scripts.json --noEmit",
     "start": "node dist/server.js",
     "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
@@ -20,13 +21,16 @@
     "hash:board": "ts-node src/scripts/hash-board-code.ts",
     "verify:reliability": "node scripts/verifyReliability.js",
     "seed:demo": "node scripts/seedWorkshopProductionDemo.js",
+    "guard:e2e": "ts-node scripts/assertTestDatabase.ts e2e",
+    "guard:integration": "ts-node scripts/assertTestDatabase.ts integration",
     "seed:e2e": "ts-node scripts/seedE2E.ts",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "lint": "eslint src scripts/seedE2E.ts",
-    "lint:fix": "eslint src scripts/seedE2E.ts --fix",
-    "format:check": "prettier --check src scripts/seedE2E.ts scripts/verifyReliability.js scripts/seedWorkshopProductionDemo.js",
-    "format": "prettier --write src scripts/seedE2E.ts scripts/verifyReliability.js scripts/seedWorkshopProductionDemo.js"
+    "test": "jest --selectProjects unit",
+    "test:integration": "npm run guard:integration && jest --selectProjects integration",
+    "test:coverage": "jest --coverage --selectProjects unit",
+    "lint": "eslint src scripts/*.ts",
+    "lint:fix": "eslint src scripts/*.ts --fix",
+    "format:check": "prettier --check src scripts package.json tsconfig.json tsconfig.build.json tsconfig.scripts.json jest.config.ts eslint.config.cjs",
+    "format": "prettier --write src scripts package.json tsconfig.json tsconfig.build.json tsconfig.scripts.json jest.config.ts eslint.config.cjs"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

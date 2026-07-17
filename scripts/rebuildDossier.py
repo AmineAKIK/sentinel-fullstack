@@ -661,7 +661,7 @@ def rebuild(args: argparse.Namespace) -> None:
         "—  Front-end  en production": "— Frontend : Vite réalise le build statique ; Nginx sert les fichiers compilés et redirige les routes de la SPA vers index.html.",
         "—  Environnement de production": "— Hébergement : sentinel.akiksystems.fr est une instance publique de démonstration sur VPS Linux. Elle prouve le déploiement technique mais ne constitue pas un déploiement dans une usine ni une validation par l'entreprise observée.",
         "—  Base de données": "— Base de données : PostgreSQL 15 utilise un volume persistant. Les migrations sont appliquées au démarrage. Le dépôt fournit des scripts pg_dump et de restauration ; l'activation d'une planification, la copie hors serveur et les essais périodiques de restauration doivent être vérifiés dans chaque environnement exploité.",
-        "—  CI/CD": "— Intégration continue : GitHub Actions exécute quatre jobs — backend unitaire, frontend, construction des images Docker et intégration backend sur PostgreSQL. Aucun déploiement automatique n'est configuré : la livraison sur le VPS reste manuelle et documentée.",
+        "—  CI/CD": "— Intégration continue : GitHub Actions exécute cinq jobs — qualité backend, qualité frontend, intégration PostgreSQL, parcours navigateur Playwright et contrat des conteneurs. Aucun déploiement automatique n'est configuré : la livraison sur le VPS reste manuelle et documentée.",
     }
     for needle, replacement in architecture_replacements.items():
         replace_paragraph(body, needle, replacement)
@@ -906,7 +906,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     security_watch = find_body_element(body, "À COMPLÉTER Décrivez ici votre démarche réelle de veille")
     watch_nodes = [
         make_paragraph(
-            "La veille sécurité repose d'abord sur des contrôles automatisés et traçables : Dependabot analyse chaque semaine les dépendances backend et frontend ; la CI exécute npm audit avec un seuil high ; les avis de sécurité npm et les recommandations OWASP servent de grille lors des audits de publication. Pour une exploitation en entreprise, cette veille doit être complétée par les bulletins CERT-FR/ANSSI pertinents pour Node.js, PostgreSQL, Docker et le système du VPS.",
+            "La veille sécurité repose d'abord sur des contrôles automatisés et traçables : Dependabot analyse chaque semaine les dépendances npm, les Dockerfiles et les actions GitHub ; les images épinglées uniquement dans Compose font l'objet d'une revue manuelle. La CI exécute npm audit avec un seuil high ; les avis de sécurité npm et les recommandations OWASP servent de grille lors des audits de publication. Pour une exploitation en entreprise, cette veille doit être complétée par les bulletins CERT-FR/ANSSI pertinents pour Node.js, PostgreSQL, Docker et le système du VPS.",
         ),
         make_paragraph(
             "Exemple concret : l'audit d'authentification a identifié des incohérences de révocation et de contrôle des actions sensibles. Les commits 99606b8 et dd17b81 ont ajouté la revalidation des sessions et l'exigence du mot de passe administrateur avant certaines révocations. L'audit final du dossier a ensuite conduit à incrémenter session_version lors d'une réinitialisation de mot de passe ou d'un changement d'activation, afin qu'un ancien JWT ne puisse pas redevenir valable.",
@@ -1032,7 +1032,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     replace_paragraph(
         body,
         "—  Frontend ( Vitest",
-        f"— Frontend : {args.frontend} tests Vitest et Testing Library en jsdom, complétés par deux scénarios Playwright locaux. Les scénarios Playwright ne font pas encore partie de la CI.",
+        f"— Frontend : {args.frontend} tests Vitest et Testing Library en jsdom, complétés par quatre parcours Playwright exécutés dans la CI.",
     )
     replace_paragraph(
         body,
@@ -1084,7 +1084,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
             "Si je recommençais, je formaliserais plus tôt le modèle de permissions, le cycle de vie et le plan de tests d'intégration. La première version m'a permis de valider le besoin, mais elle mélangeait prototype et produit. La reconstruction a montré l'intérêt d'accepter de repartir sur des fondations plus simples plutôt que d'empiler des correctifs sur une structure devenue trop limitée.",
         ),
         make_paragraph(
-            "Le projet reste perfectible : la purge RGPD doit être configurée pour un contexte d'exploitation réel, les scénarios Playwright doivent rejoindre la CI et certaines écritures périphériques pourraient être harmonisées avec le modèle transactionnel principal. Identifier ces limites fait partie du résultat : je peux aujourd'hui distinguer ce qui est démontré, ce qui est seulement prévu et ce qui nécessite une décision de l'organisation.",
+            "Le projet reste perfectible : la purge RGPD doit être configurée pour un contexte d'exploitation réel, les sauvegardes hors site et les restaurations périodiques doivent être prouvées sur chaque environnement, et certaines écritures périphériques pourraient être harmonisées avec le modèle transactionnel principal. Identifier ces limites fait partie du résultat : je peux aujourd'hui distinguer ce qui est démontré, ce qui est seulement prévu et ce qui nécessite une décision de l'organisation.",
         ),
         make_paragraph(
             "Enfin, Sentinel représente pour moi le passage d'un problème vécu comme conducteur de ligne à un système conçu, développé, testé, documenté et déployé. Cette continuité entre expérience métier et développement est l'apport principal du projet et la raison pour laquelle je peux en défendre chaque choix devant le jury.",
@@ -1169,7 +1169,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
         "media/image40.png": "Interface réelle du rôle OPERATOR",
         "media/image41.png": "Interface réelle du rôle MAINTENANCE",
         "media/image42.png": "Interface réelle du rôle RESPONSABLE",
-        "media/image43.png": "Quatre jobs GitHub Actions réussis au commit audité",
+        "media/image43.png": "Cinq jobs GitHub Actions réussis au commit audité",
         "media/sequence-workflow-simplifie.png": "Séquence simplifiée du workflow incident",
         "media/auth-jwt-flow.png": "Séquence d'authentification JWT et cookie HttpOnly",
     }
@@ -1323,12 +1323,12 @@ def main() -> None:
     parser.add_argument("--output", default="Dossier-projet-Sentinel-DWWM-CORRIGE.docx")
     parser.add_argument("--assets-dir", default="docs/dossier-projet/assets-corrected")
     parser.add_argument("--backend-unit", type=int, required=True)
-    parser.add_argument("--backend-integration", type=int, default=29)
+    parser.add_argument("--backend-integration", type=int, required=True)
     parser.add_argument("--frontend", type=int, required=True)
-    parser.add_argument("--deposit-date", default="14/07/2026")
-    parser.add_argument("--audit-date", default="14 juillet 2026")
-    parser.add_argument("--commit", default="9e8105b")
-    parser.add_argument("--source-label", default="version locale corrigée du 14/07/2026")
+    parser.add_argument("--deposit-date", required=True)
+    parser.add_argument("--audit-date", required=True)
+    parser.add_argument("--commit", required=True)
+    parser.add_argument("--source-label", required=True)
     rebuild(parser.parse_args())
 
 

@@ -1,4 +1,10 @@
-import { assertProductionConfig, parseBooleanEnv, parsePort, parseTrustProxy } from '../production';
+import {
+  assertProductionConfig,
+  parseBooleanEnv,
+  parseIntegerEnv,
+  parsePort,
+  parseTrustProxy,
+} from '../production';
 
 const ORIGINAL_ENV = process.env;
 
@@ -10,9 +16,10 @@ function setProductionEnv(overrides: NodeJS.ProcessEnv = {}): void {
     ADMIN_PASSWORD: 'very-long-admin-password',
     COOKIE_SECRET: '12345678901234567890123456789012',
     JWT_SECRET: 'abcdefghijklmnopqrstuvwxyz123456',
-    CLIENT_ORIGIN: 'https://sentinel.example.com',
+    CLIENT_ORIGIN: 'https://sentinel.akiksystems.fr',
     TRUST_PROXY: 'true',
     BOARD_ACCESS_CODE_HASH: '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234',
+    BUILD_SHA: '0123456789abcdef0123456789abcdef01234567',
     DEEPSEEK_API_KEY: 'test-deepseek-key',
     SMTP_HOST: 'smtp.example.com',
     SMTP_PORT: '587',
@@ -38,6 +45,19 @@ describe('assertProductionConfig', () => {
     setProductionEnv({ JWT_SECRET: 'jwt_secret_change_me_in_production' });
 
     expect(() => assertProductionConfig()).toThrow('Unsafe production secret values');
+  });
+
+  it('rejects placeholder secrets even when they are long enough', () => {
+    setProductionEnv({ COOKIE_SECRET: 'replace_with_64_hex_chars_replace_with_64_hex_chars' });
+
+    expect(() => assertProductionConfig()).toThrow('COOKIE_SECRET');
+  });
+
+  it('requires distinct cookie and JWT secrets', () => {
+    const sharedSecret = 'a-shared-secret-that-is-at-least-32-characters';
+    setProductionEnv({ COOKIE_SECRET: sharedSecret, JWT_SECRET: sharedSecret });
+
+    expect(() => assertProductionConfig()).toThrow('must be distinct');
   });
 
   it('allows bootstrap admin credentials to be removed after first deployment', () => {
@@ -70,6 +90,12 @@ describe('assertProductionConfig', () => {
     expect(() => assertProductionConfig()).toThrow('BOARD_ACCESS_CODE_HASH');
   });
 
+  it('requires an exact deployable Git revision', () => {
+    setProductionEnv({ BUILD_SHA: 'main' });
+
+    expect(() => assertProductionConfig()).toThrow('BUILD_SHA');
+  });
+
   it('rejects a legacy fast SHA-256 board hash', () => {
     setProductionEnv({
       BOARD_ACCESS_CODE_HASH: '0315b4020af3eccab7706679580ac87a710d82970733b8719e70af9b57e7b9e6',
@@ -86,6 +112,26 @@ describe('assertProductionConfig', () => {
     expect(() => assertProductionConfig()).toThrow('origin');
   });
 
+  it('rejects a placeholder production origin', () => {
+    setProductionEnv({ CLIENT_ORIGIN: 'https://sentinel.example.com' });
+
+    expect(() => assertProductionConfig()).toThrow('placeholder hostname');
+  });
+
+  it('requires a complete PostgreSQL URL with a strong password', () => {
+    setProductionEnv({ DATABASE_URL: 'mysql://sentinel:strong_password@postgres/sentinel' });
+    expect(() => assertProductionConfig()).toThrow('postgres');
+
+    setProductionEnv({
+      DATABASE_URL:
+        'postgres://sentinel:replace_with_a_long_random_database_password@postgres/sentinel',
+    });
+    expect(() => assertProductionConfig()).toThrow('non-placeholder');
+
+    setProductionEnv({ DATABASE_URL: 'postgres://sentinel:short@postgres/sentinel' });
+    expect(() => assertProductionConfig()).toThrow('strong');
+  });
+
   it('requires explicit reverse-proxy trust in production', () => {
     setProductionEnv({ TRUST_PROXY: '' });
     expect(() => assertProductionConfig()).toThrow('TRUST_PROXY');
@@ -100,6 +146,17 @@ describe('assertProductionConfig', () => {
 
     setProductionEnv({ PORT: '65536' });
     expect(() => assertProductionConfig()).toThrow('PORT');
+  });
+
+  it('rejects invalid production runtime limits', () => {
+    setProductionEnv({ GLOBAL_API_RATE_LIMIT_MAX: '0' });
+    expect(() => assertProductionConfig()).toThrow('GLOBAL_API_RATE_LIMIT_MAX');
+
+    setProductionEnv({ SUPPORT_API_TIMEOUT_MS: '60000' });
+    expect(() => assertProductionConfig()).toThrow('SUPPORT_API_TIMEOUT_MS');
+
+    setProductionEnv({ NOTIFICATION_BATCH_SIZE: 'many' });
+    expect(() => assertProductionConfig()).toThrow('NOTIFICATION_BATCH_SIZE');
   });
 
   it('requires a coherent SMTP configuration when delivery is enabled', () => {
@@ -171,5 +228,21 @@ describe('parseBooleanEnv', () => {
 
   it('refuse une valeur ambiguë', () => {
     expect(() => parseBooleanEnv('yes', 'SMTP_SECURE', false)).toThrow('SMTP_SECURE');
+  });
+});
+
+describe('parseIntegerEnv', () => {
+  it.each([
+    [undefined, 10],
+    ['', 10],
+    ['1', 1],
+    [' 25 ', 25],
+    ['100', 100],
+  ] as const)('normalise %p vers %p', (value, expected) => {
+    expect(parseIntegerEnv(value, 'LIMIT', 10, 1, 100)).toBe(expected);
+  });
+
+  it.each(['0', '-1', '1.5', '10items', '101'])('refuse %p', (value) => {
+    expect(() => parseIntegerEnv(value, 'LIMIT', 10, 1, 100)).toThrow('LIMIT');
   });
 });

@@ -1,8 +1,9 @@
 # Déploiement VPS de Sentinel
 
-Ce document décrit le déploiement correspondant au `docker-compose.yml` actuel.
-Il n'utilise ni proxy Nginx installé sur l'hôte, ni ports applicatifs publiés :
-Caddy est l'unique point d'entrée HTTP/HTTPS.
+Ce document décrit les deux topologies de déploiement maintenues. Le Compose
+racine fournit une distribution autonome où Caddy est l'unique point d'entrée.
+L'instance publique `sentinel.akiksystems.fr` conserve le Nginx déjà présent sur
+le VPS et utilise l'override assaini `docker-compose.host-proxy.example.yml`.
 
 ## 1. Architecture de production
 
@@ -18,6 +19,13 @@ Nginx non-root :8080   API Node non-root :3000
                           |
                           v
                     PostgreSQL :5432
+```
+
+Variante de l'instance publique :
+
+```text
+Internet -> Nginx hôte :443 -> 127.0.0.1:18080 -> frontend/Nginx :8080
+                         \-> 127.0.0.1:13000 -> API Node :3000 -> PostgreSQL
 ```
 
 - `caddy` appartient aux réseaux `edge` et `internal` ;
@@ -44,8 +52,29 @@ docker compose version
 ss -ltnp | grep -E ':(80|443)\b' || true
 ```
 
-Arrêter ou reconfigurer tout Apache, Nginx ou Caddy de l'hôte qui utiliserait
-déjà 80/443. Le Compose Sentinel fournit son propre Caddy.
+Pour la distribution autonome, arrêter ou reconfigurer tout Apache, Nginx ou
+Caddy de l'hôte qui utiliserait déjà 80/443. Pour un VPS mutualisant son Nginx,
+suivre la variante décrite à la section 2.1.
+
+### 2.1 Variante avec Nginx hôte
+
+Copier l'override d'exemple vers un fichier local ignoré, choisir deux ports
+loopback libres et adapter le virtual host Nginx à partir de
+`deploy/nginx/sentinel.conf.example` :
+
+```bash
+cp docker-compose.host-proxy.example.yml docker-compose.override.yml
+export SENTINEL_BACKEND_BIND_PORT=13000
+export SENTINEL_FRONTEND_BIND_PORT=18080
+export BUILD_SHA="$(git rev-parse HEAD)"
+docker compose config --quiet
+docker compose up -d --build --remove-orphans
+```
+
+Dans cette variante, le profil `bundled-edge` n'est pas activé : Caddy ne
+démarre pas. Les ports applicatifs sont liés à `127.0.0.1` et ne doivent jamais
+être ouverts dans le pare-feu public. Le Nginx hôte termine TLS, redirige HTTP et
+transmet `Host`, `X-Real-IP`, `X-Forwarded-For` et `X-Forwarded-Proto`.
 
 ## 3. Installation
 
@@ -55,6 +84,7 @@ git clone <URL_DU_DEPOT> /opt/sentinel
 cd /opt/sentinel
 cp .env.release.example .env
 chmod 600 .env
+export BUILD_SHA="$(git rev-parse HEAD)"
 ```
 
 Ne jamais versionner `.env`. Toutes les valeurs `replace_with_...` doivent être
@@ -73,7 +103,11 @@ TRUST_PROXY=true
 
 `CLIENT_ORIGIN` est une origine HTTPS exacte, sans chemin ni slash final.
 `VITE_API_URL` reste vide : le navigateur appelle `/api` sur la même origine et
-Caddy route ces requêtes vers le backend.
+le proxy retenu route ces requêtes vers le backend.
+
+`BUILD_SHA` doit contenir les 40 caractères de `git rev-parse HEAD`. Le backend
+refuse une valeur absente ou symbolique et la publie dans `/api/health` pour
+permettre une comparaison exacte après déploiement.
 
 ### PostgreSQL
 
@@ -136,13 +170,11 @@ cd ..
 Reporter la sortie complète `$2b$...` :
 
 ```dotenv
-BOARD_ACCESS_LABEL=Board atelier
-BOARD_SESSION_TTL_HOURS=12
 BOARD_ACCESS_CODE_HASH=<hash_bcrypt>
 ```
 
-Après le premier démarrage, le code et les paramètres Board peuvent être changés
-depuis l'administration. Le hash d'environnement reste le bootstrap initial.
+Le libellé et la durée de session Board sont stockés en base et administrables
+depuis l'interface. Le hash d'environnement reste le bootstrap initial du code.
 
 ### Services optionnels
 
@@ -203,7 +235,7 @@ curl --fail --show-error --head https://sentinel.example.com/login
 Réponse santé attendue :
 
 ```json
-{"status":"ok","db":"ok"}
+{"status":"ok","db":"ok","version":"<sha_git_40_caracteres>"}
 ```
 
 Contrôler ensuite les trois accès depuis un navigateur : portail, Board et
@@ -224,6 +256,9 @@ docker compose ps
 curl --fail --show-error https://sentinel.example.com/api/health
 docker compose logs --since=10m backend frontend caddy
 ```
+
+La propriété `version` retournée par la santé doit être strictement égale à
+`git rev-parse HEAD` sur le serveur.
 
 Ne supprimer ni le volume `sentinel_data`, ni les volumes Caddy lors d'une mise
 à jour normale. Consulter les migrations ajoutées avant de déployer et conserver

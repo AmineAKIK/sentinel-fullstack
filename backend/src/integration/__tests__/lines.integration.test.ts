@@ -1,8 +1,7 @@
 import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 
-const DB_URL = process.env.DATABASE_URL;
-const describeIntegration = DB_URL ? describe : describe.skip;
+const DB_URL = process.env.DATABASE_URL!;
 const prefix = `INT-LINE-${process.pid}`;
 
 let pool: Pool;
@@ -22,19 +21,17 @@ async function cleanup(): Promise<void> {
 }
 
 beforeAll(async () => {
-  if (!DB_URL) return;
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
   await cleanup();
 }, 30_000);
 
 afterAll(async () => {
-  if (!DB_URL) return;
   await cleanup();
   await pool.end();
 });
 
-describeIntegration('Production line integrity (real DB)', () => {
+describe('Production line integrity (real DB)', () => {
   it('arbitre atomiquement deux créations concurrentes utilisant la même machine', async () => {
     const results = await Promise.allSettled([
       pool.query(

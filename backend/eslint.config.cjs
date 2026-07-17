@@ -14,10 +14,16 @@ module.exports = tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
       // Express router.get/post/... expects (req, res, next) => void but we pass async handlers — intentional
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { arguments: false } }],
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { arguments: false } },
+      ],
       // pg QueryResult.rows is any[] — unsafe access is unavoidable without full row typing
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
@@ -44,5 +50,5 @@ module.exports = tseslint.config(
     rules: {
       'no-console': 'off',
     },
-  },
+  }
 );

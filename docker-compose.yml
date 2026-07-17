@@ -17,7 +17,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -30,6 +30,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        BUILD_SHA: ${BUILD_SHA:?BUILD_SHA must be set to the deployed Git commit}
     restart: unless-stopped
     init: true
     depends_on:
@@ -39,7 +41,7 @@ services:
       - internal
       - edge
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health > /dev/null || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/health > /dev/null || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -53,8 +55,6 @@ services:
       COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET must be set}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:?CLIENT_ORIGIN must be set}
-      BOARD_ACCESS_LABEL: ${BOARD_ACCESS_LABEL:-Board atelier}
-      BOARD_SESSION_TTL_HOURS: ${BOARD_SESSION_TTL_HOURS:-12}
       BOARD_ACCESS_CODE_HASH: ${BOARD_ACCESS_CODE_HASH:?BOARD_ACCESS_CODE_HASH must be set}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       TRUST_PROXY: ${TRUST_PROXY:?TRUST_PROXY must be set}
@@ -88,6 +88,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-}
+        BUILD_SHA: ${BUILD_SHA:?BUILD_SHA must be set to the deployed Git commit}
     restart: unless-stopped
     depends_on:
       backend:
@@ -95,7 +96,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ > /dev/null || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/ > /dev/null || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -113,9 +114,9 @@ services:
     image: caddy:2.11.4-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

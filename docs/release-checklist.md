@@ -22,7 +22,7 @@ npm run format:check
 npm run lint
 npm run typecheck:scripts
 npm run build
-npm run test:coverage -- --selectProjects unit
+npm run test:coverage
 npm run verify:reliability
 npm audit --audit-level=high
 ```
@@ -41,8 +41,8 @@ Exécuter sur une base dédiée et jetable :
 
 ```bash
 cd backend
-DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_test \
-  npm test -- --selectProjects integration
+export DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_test
+npm run test:integration
 ```
 
 - [ ] les migrations partent d'une base vide
@@ -91,9 +91,12 @@ npm run test:e2e
 
 - [ ] `.env` provient de `.env.release.example` et a le mode `600`
 - [ ] tous les placeholders ont été remplacés
-- [ ] `CADDY_DOMAIN` et `CLIENT_ORIGIN` ciblent le domaine HTTPS réel
-- [ ] `VITE_API_URL` est vide derrière Caddy
-- [ ] `TRUST_PROXY=true` derrière le proxy du Compose
+- [ ] `BUILD_SHA` est égal à `git rev-parse HEAD`
+- [ ] `CLIENT_ORIGIN` cible le domaine HTTPS réel
+- [ ] `CADDY_DOMAIN` cible ce domaine avec le frontal intégré, ou Caddy est
+      désactivé par l'override Nginx hôte
+- [ ] `VITE_API_URL` est vide pour l'API same-origin
+- [ ] `TRUST_PROXY=true` derrière le proxy inverse retenu
 - [ ] `COOKIE_SECRET` et `JWT_SECRET` sont longs, aléatoires et distincts
 - [ ] `POSTGRES_PASSWORD` est long et cohérent avec `DATABASE_URL`
 - [ ] `BOARD_ACCESS_CODE_HASH` est un hash bcrypt valide `$2...`
@@ -104,10 +107,12 @@ npm run test:e2e
 ## 7. Conteneurs
 
 - [ ] les images backend et frontend se construisent sans cache local implicite
+- [ ] l'image backend ne contient ni tests compilés, ni déclarations, ni sources maps
 - [ ] backend et frontend s'exécutent avec les utilisateurs `node` et `nginx`
 - [ ] Nginx démarre avec filesystem read-only et `/tmp` dédié
-- [ ] la configuration Caddy est valide
-- [ ] seuls les ports 80/443 sont publiés
+- [ ] la configuration Caddy est valide pour la distribution autonome
+- [ ] seuls 80/443 sont publics ; la variante Nginx hôte ne lie l'API et le
+      frontend qu'à `127.0.0.1`
 - [ ] PostgreSQL n'est attaché qu'au réseau interne
 - [ ] healthchecks backend, frontend et PostgreSQL passent
 - [ ] les logs sont bornés par rotation
@@ -141,6 +146,7 @@ npm run test:e2e
 - [ ] commit et message de publication relus
 - [ ] déploiement effectué avec `git pull --ff-only`
 - [ ] `/api/health` répond HTTP 200 après déploiement
+- [ ] la propriété `version` de `/api/health` égale le SHA déployé
 - [ ] logs post-déploiement sans erreur inattendue
 - [ ] recette courte Admin/Atelier/Board réussie
 - [ ] SHA déployé et résultat de recette consignés

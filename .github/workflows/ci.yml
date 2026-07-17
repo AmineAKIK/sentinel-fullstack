@@ -36,7 +36,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck:scripts
       - run: npm run build
-      - run: npm run test:coverage -- --selectProjects unit
+      - run: npm run test:coverage
       - run: npm run verify:reliability
       - run: npm audit --audit-level=high
 
@@ -95,7 +95,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npm test -- --selectProjects integration
+      - run: npm run test:integration
 
   e2e:
     name: Browser / Critical journeys
@@ -156,24 +156,59 @@ jobs:
       DATABASE_URL: postgres://sentinel:ci_database_password_with_32_characters@postgres:5432/sentinel
       COOKIE_SECRET: ci_cookie_secret_with_at_least_32_characters
       JWT_SECRET: ci_jwt_secret_with_at_least_32_characters
-      CLIENT_ORIGIN: https://sentinel.example.test
+      CLIENT_ORIGIN: https://ci.sentinel.akiksystems.fr
       BOARD_ACCESS_CODE_HASH: $2b$10$nUd3TqHyISvb.aORRwqoQOXRMva5G3a2a7ks7SUCbh2DWhRTuGRRu
       TRUST_PROXY: 'true'
+      BUILD_SHA: ${{ github.sha }}
       CADDY_DOMAIN: sentinel.example.test
     steps:
       - uses: actions/checkout@v7
       - name: Validate Compose interpolation and schema
         run: docker compose config --quiet
+      - name: Validate host-proxy Compose variant
+        env:
+          SENTINEL_BACKEND_BIND_PORT: 13000
+          SENTINEL_FRONTEND_BIND_PORT: 18080
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f docker-compose.host-proxy.example.yml
+          config --quiet
       - name: Build production images
         run: |
-          docker build --tag sentinel-backend:ci ./backend
-          docker build --tag sentinel-frontend:ci --build-arg VITE_API_URL= ./frontend
+          docker build \
+            --build-arg BUILD_SHA="$BUILD_SHA" \
+            --tag sentinel-backend:ci \
+            ./backend
+          docker build \
+            --build-arg VITE_API_URL= \
+            --build-arg BUILD_SHA="$BUILD_SHA" \
+            --tag sentinel-frontend:ci \
+            ./frontend
       - name: Assert non-root image users
         run: |
           test "$(docker image inspect --format '{{.Config.User}}' sentinel-backend:ci)" = "node"
           test "$(docker image inspect --format '{{.Config.User}}' sentinel-frontend:ci)" = "nginx"
+          test "$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' sentinel-backend:ci)" = "$BUILD_SHA"
+          test "$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' sentinel-frontend:ci)" = "$BUILD_SHA"
+      - name: Assert minimal backend runtime artifact
+        run: |
+          test -z "$(docker run --rm --entrypoint find sentinel-backend:ci /app/dist -type f \( -path '*/__tests__/*' -o -path '*/integration/*' -o -path '*/testing/*' -o -name '*.map' -o -name '*.d.ts' \) -print -quit)"
+          docker run --rm --entrypoint test sentinel-backend:ci -f /app/dist/server.js
       - name: Validate unprivileged Nginx configuration
         run: docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m sentinel-frontend:ci nginx -t
+      - name: Validate host Nginx example
+        run: |
+          mkdir -p .ci-certs/live/sentinel.akiksystems.fr
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=sentinel.akiksystems.fr' \
+            -keyout .ci-certs/live/sentinel.akiksystems.fr/privkey.pem \
+            -out .ci-certs/live/sentinel.akiksystems.fr/fullchain.pem \
+            >/dev/null 2>&1
+          docker run --rm \
+            -v "${{ github.workspace }}/deploy/nginx/sentinel.conf.example:/etc/nginx/conf.d/default.conf:ro" \
+            -v "${{ github.workspace }}/.ci-certs:/etc/letsencrypt:ro" \
+            nginx:1.30.4-alpine3.24 nginx -t
       - name: Validate Caddy configuration
         run: >-
           docker run --rm

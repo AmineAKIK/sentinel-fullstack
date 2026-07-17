@@ -9,7 +9,7 @@
  * numéro réservé et recréée à neuf à chaque exécution. À lancer avant la suite
  * Playwright (voir le script `test:e2e` du frontend).
  *
- * Usage : `npm run seed:e2e` (depuis backend/).
+ * Usage : `npm run guard:e2e && npm run seed:e2e` (depuis backend/).
  */
 import 'dotenv/config';
 import pool from '../src/db/pool';
@@ -20,6 +20,7 @@ import {
   requestEditIncidentService,
 } from '../src/modules/workshop/workshop.service.edit';
 import { requestCancelIncidentService } from '../src/modules/workshop/workshop.service.mutations';
+import { assertSafeTestDatabaseUrl } from '../src/testing/databaseGuard';
 
 // Identifiants partagés avec le test (frontend/e2e/fixtures.ts en garde une copie).
 export const E2E_ADMIN_USERNAME = 'e2e-admin';
@@ -185,6 +186,7 @@ async function createArbitrationIncidents(lineId: number, operatorId: number): P
 }
 
 async function main(): Promise<void> {
+  assertSafeTestDatabaseUrl(process.env.DATABASE_URL, 'e2e');
   await upsertAdmin();
   await resetE2ELine();
   const lineId = await createE2ELine();

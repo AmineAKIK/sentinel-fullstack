@@ -1,4 +1,14 @@
+const explicitConfirmation = process.env.SENTINEL_DEMO_SEED_CONFIRM;
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+
+const REQUIRED_CONFIRMATION = 'RESET_ALL_WORKSHOP_INCIDENTS';
+if (explicitConfirmation !== REQUIRED_CONFIRMATION) {
+  console.error(
+    'Seed refused: this command deletes every workshop incident before loading demo data.\n' +
+      `Set SENTINEL_DEMO_SEED_CONFIRM=${REQUIRED_CONFIRMATION} to confirm the reset explicitly.`
+  );
+  process.exit(1);
+}
 
 const { Pool } = require('pg');
 

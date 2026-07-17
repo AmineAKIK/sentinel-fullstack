@@ -1,8 +1,8 @@
 /**
  * Integration tests for account deletion (RGPD anonymization) against a real PostgreSQL database.
  *
- * These tests run only when DATABASE_URL is set. They are skipped automatically
- * in environments without a database so the normal unit-test suite is unaffected.
+ * The integration project guard requires a dedicated PostgreSQL database whose
+ * name ends with `_test` or `_integration` before this suite can start.
  *
  * What they verify that unit tests with mocks cannot:
  *  - Deleting an account anonymizes personal data (first/last name, badge) in the row itself.
@@ -24,10 +24,7 @@ import {
   type IntegrationAdminFixture,
 } from '../helpers/adminFixture';
 
-const DB_URL = process.env.DATABASE_URL;
-const RUN = Boolean(DB_URL);
-
-const describeIntegration = RUN ? describe : describe.skip;
+const DB_URL = process.env.DATABASE_URL!;
 
 let pool: Pool;
 let userId: number;
@@ -41,7 +38,6 @@ const createdUserIds: number[] = [];
 const BADGE = 'RGPD-INT-01';
 
 beforeAll(async () => {
-  if (!RUN) return;
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
 
@@ -52,7 +48,6 @@ beforeAll(async () => {
 }, 30_000);
 
 beforeEach(async () => {
-  if (!RUN) return;
   const hash = await hashWorkshopPassword('test_pass_rgpd');
   const { rows } = await pool.query<{ id: number }>(
     `INSERT INTO sentinel_users (first_name, last_name, badge_number, role, is_active, is_deleted, password_hash)
@@ -66,7 +61,6 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  if (!RUN) return;
   try {
     await pool.query(`DELETE FROM account_audit_events WHERE target_user_id = ANY($1::int[])`, [
       createdUserIds,
@@ -78,7 +72,7 @@ afterAll(async () => {
   }
 });
 
-describeIntegration('RGPD — anonymisation à la suppression de compte', () => {
+describe('RGPD — anonymisation à la suppression de compte', () => {
   it('anonymise nom, prénom et badge, et détruit les credentials', async () => {
     const result = await deleteAccountService(userId, adminId);
     expect(result.ok).toBe(true);

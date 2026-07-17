@@ -1,9 +1,8 @@
 /**
  * Integration tests for the auth flow against a real PostgreSQL database.
  *
- * These tests run only when DATABASE_URL is set (CI with `services: postgres`,
- * or local dev with a running DB). They are skipped automatically in
- * environments without a database so the normal unit-test suite is unaffected.
+ * The integration project guard requires a dedicated PostgreSQL database whose
+ * name ends with `_test` or `_integration` before this suite can start.
  *
  * What they verify that unit tests with mocks cannot:
  *  - Migrations run and produce the correct schema.
@@ -32,11 +31,7 @@ import {
   type IntegrationAdminRecord,
 } from '../helpers/adminFixture';
 
-const DB_URL = process.env.DATABASE_URL;
-const RUN = Boolean(DB_URL);
-
-// Use a conditional describe so the suite is visible but skipped when no DB
-const describeIntegration = RUN ? describe : describe.skip;
+const DB_URL = process.env.DATABASE_URL!;
 
 let pool: Pool;
 
@@ -53,7 +48,6 @@ let originalAdmin: IntegrationAdminRecord | undefined;
 let adminFixture: IntegrationAdminFixture | undefined;
 
 beforeAll(async () => {
-  if (!RUN) return;
   pool = new Pool({ connectionString: DB_URL });
   // Run all migrations against the real DB
   await runMigrations();
@@ -63,7 +57,6 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  if (!RUN) return;
   try {
     if (originalAdmin) await restoreAdminFixture();
     await cleanAuthFixtures();
@@ -130,7 +123,7 @@ async function insertWorkshopUser(opts: {
 
 // ── Admin login ────────────────────────────────────────────────────────────────
 
-describeIntegration('Admin login (real DB)', () => {
+describe('Admin login (real DB)', () => {
   const ADMIN = 'int-auth-admin';
   // Chaque test réécrit l'unique compte admin (voir insertAdmin) : on repart
   // toujours de son état d'origine plutôt que d'un état laissé par le test précédent.
@@ -171,7 +164,7 @@ describeIntegration('Admin login (real DB)', () => {
 
 // ── Workshop login ─────────────────────────────────────────────────────────────
 
-describeIntegration('Workshop login (real DB)', () => {
+describe('Workshop login (real DB)', () => {
   beforeEach(cleanAuthFixtures);
 
   it('returns requires_password_setup for a user without a password set', async () => {
@@ -241,7 +234,7 @@ describeIntegration('Workshop login (real DB)', () => {
 
 // ── Migration idempotency ──────────────────────────────────────────────────────
 
-describeIntegration('Migrations (real DB)', () => {
+describe('Migrations (real DB)', () => {
   it('can run migrations twice without error (idempotent)', async () => {
     await expect(runMigrations()).resolves.not.toThrow();
   });

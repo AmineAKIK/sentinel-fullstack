@@ -1,8 +1,8 @@
 /**
  * Integration tests for the workshop incident lifecycle against a real PostgreSQL database.
  *
- * These tests run only when DATABASE_URL is set. They are skipped automatically
- * in environments without a database so the normal unit-test suite is unaffected.
+ * The integration project guard requires a dedicated PostgreSQL database whose
+ * name ends with `_test` or `_integration` before this suite can start.
  *
  * What they verify that unit tests with mocks cannot:
  *  - DB constraints prevent invalid status transitions at the storage layer.
@@ -28,10 +28,7 @@ import {
   invalidateIncidentService,
 } from '../../modules/workshop/workshop.service';
 
-const DB_URL = process.env.DATABASE_URL;
-const RUN = Boolean(DB_URL);
-
-const describeIntegration = RUN ? describe : describe.skip;
+const DB_URL = process.env.DATABASE_URL!;
 
 let pool: Pool;
 
@@ -42,7 +39,6 @@ let responsableId: number;
 let lineId: number;
 
 beforeAll(async () => {
-  if (!RUN) return;
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
 
@@ -94,7 +90,6 @@ beforeAll(async () => {
 afterEach(async () => {
   // Clear all incidents on the integration test line between tests to avoid
   // the unique constraint on active incidents per machine.
-  if (!RUN) return;
   await pool.query(
     `DELETE FROM workshop_incident_events WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`,
     [lineId]
@@ -107,7 +102,6 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  if (!RUN) return;
   // Nettoyage chirurgical : uniquement les badges de CE fichier (préfixe de
   // deux lettres + « -INT- », ex. OP-INT-01). On évite « %-INT-% » qui
   // attraperait aussi les fixtures d'autres suites (ex. RGPD-INT-01) lorsque
@@ -151,7 +145,7 @@ async function getIncidentStatus(incidentId: number): Promise<string | null> {
 
 // ── Full lifecycle ─────────────────────────────────────────────────────────────
 
-describeIntegration('Incident lifecycle (real DB)', () => {
+describe('Incident lifecycle (real DB)', () => {
   it('creates an incident and persists it in the DB', async () => {
     const result = await createIncidentService(validInput(), operatorId, 'OPERATOR');
     const incident = assertOk(result) as { id: number };
@@ -242,7 +236,7 @@ describeIntegration('Incident lifecycle (real DB)', () => {
 
 // ── Policy enforcement end-to-end ──────────────────────────────────────────────
 
-describeIntegration('Policy enforcement through service layer (real DB)', () => {
+describe('Policy enforcement through service layer (real DB)', () => {
   it('OPERATOR cannot take an incident', async () => {
     const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
       id: number;
@@ -340,7 +334,7 @@ describeIntegration('Policy enforcement through service layer (real DB)', () => 
 
 // ── DB constraint enforcement ─────────────────────────────────────────────────
 
-describeIntegration('DB constraints (real DB)', () => {
+describe('DB constraints (real DB)', () => {
   it('rejects an incident with an invalid status value at the DB level', async () => {
     await expect(
       pool.query(

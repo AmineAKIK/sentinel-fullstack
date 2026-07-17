@@ -1,5 +1,10 @@
 # Sentinel
 
+[![CI](https://github.com/AmineAKIK/sentinel-fullstack/actions/workflows/ci.yml/badge.svg)](https://github.com/AmineAKIK/sentinel-fullstack/actions/workflows/ci.yml)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-1f6b96.svg)](LICENSE)
+
+**Instance publique de démonstration :** [sentinel.akiksystems.fr](https://sentinel.akiksystems.fr)
+
 Sentinel est une application full-stack de suivi des incidents industriels. Elle
 réunit trois points d'entrée dans un même portail :
 
@@ -17,7 +22,7 @@ réunit trois points d'entrée dans un même portail :
 
 ## Démarrage local
 
-Prérequis : Node.js 24+, npm 10+ et PostgreSQL 15+.
+Prérequis : Node.js 24.18.0, npm 11.16.0 et PostgreSQL 15+.
 
 ```bash
 # Terminal 1 : API
@@ -48,10 +53,13 @@ production.
 
 Le Compose racine décrit la topologie de production. Seul Caddy publie les ports
 `80` et `443`; PostgreSQL, l'API et Nginx restent sur des réseaux internes.
+L'instance publique utilise la variante documentée avec Nginx hôte : Caddy y est
+désactivé et seuls deux ports loopback sont publiés.
 
 ```bash
 cp .env.release.example .env
 # Remplacer chaque placeholder et générer le hash bcrypt du code Board.
+export BUILD_SHA="$(git rev-parse HEAD)"
 cd backend
 BOARD_ACCESS_CODE='code-board-temporaire' npm run hash:board
 cd ..
@@ -63,8 +71,10 @@ curl --fail https://votre-domaine.example/api/health
 ```
 
 Le frontend appelle `/api` sur sa propre origine ; `VITE_API_URL` reste vide
-derrière Caddy. Le backend refuse de démarrer en production si un secret requis,
-l'origine HTTPS, le proxy de confiance ou le hash bcrypt Board sont invalides.
+avec les deux proxies documentés. Le backend refuse de démarrer en production
+si un secret requis, l'origine HTTPS, le proxy de confiance, le hash bcrypt
+Board ou le SHA déployé sont invalides. `/api/health` publie ce SHA pour vérifier
+l'alignement du VPS.
 
 La procédure complète se trouve dans
 [docs/deploiement-vps.md](docs/deploiement-vps.md) et l'exploitation quotidienne
@@ -81,15 +91,16 @@ npm run format:check
 npm run lint
 npm run typecheck:scripts
 npm run build
-npm run test:coverage -- --selectProjects unit
+npm run test:coverage
 npm run verify:reliability
 ```
 
-Les tests d'intégration nécessitent une base PostgreSQL dédiée :
+Les tests d'intégration nécessitent une base PostgreSQL dédiée dont le nom se
+termine par `_test` ou `_integration` :
 
 ```bash
-DATABASE_URL=postgres://sentinel:mot_de_passe@localhost:5432/sentinel_test \
-  npm test -- --selectProjects integration
+export DATABASE_URL=postgres://sentinel:mot_de_passe@localhost:5432/sentinel_test
+npm run test:integration
 ```
 
 ### Frontend et parcours navigateur
@@ -120,7 +131,7 @@ Backend :
 - `npm run migrate` : applique les migrations sous verrou PostgreSQL et vérifie leurs checksums ;
 - `npm run reset:admin` : régénère le mot de passe de l'admin unique et invalide ses sessions ;
 - `npm run hash:board` : produit le hash bcrypt d'un code Board ;
-- `npm run seed:demo` : charge le jeu de démonstration atelier ;
+- `SENTINEL_DEMO_SEED_CONFIRM=RESET_ALL_WORKSHOP_INCIDENTS npm run seed:demo` : remplace explicitement tous les incidents par le jeu de démonstration ;
 - `npm run seed:e2e` : recrée les fixtures Playwright déterministes.
 
 Exploitation :

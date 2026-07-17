@@ -21,10 +21,16 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
       // JSX event handlers returning promises are fine (React ignores the return value)
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false } },
+      ],
       // autoFocus in modals is intentional for accessibility (focus trap)
       'jsx-a11y/no-autofocus': 'off',
       // setState inside effects is a common idiom for derived/initial state
@@ -45,5 +51,5 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'off',
       'jsx-a11y/aria-role': 'off',
     },
-  },
+  }
 );
