@@ -189,8 +189,8 @@ jobs:
         run: |
           test "$(docker image inspect --format '{{.Config.User}}' sentinel-backend:ci)" = "node"
           test "$(docker image inspect --format '{{.Config.User}}' sentinel-frontend:ci)" = "nginx"
-          test "$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' sentinel-backend:ci)" = "$BUILD_SHA"
-          test "$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' sentinel-frontend:ci)" = "$BUILD_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' sentinel-backend:ci)" = "$BUILD_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' sentinel-frontend:ci)" = "$BUILD_SHA"
       - name: Assert minimal backend runtime artifact
         run: |
           test -z "$(docker run --rm --entrypoint find sentinel-backend:ci /app/dist -type f \( -path '*/__tests__/*' -o -path '*/integration/*' -o -path '*/testing/*' -o -name '*.map' -o -name '*.d.ts' \) -print -quit)"
