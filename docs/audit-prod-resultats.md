@@ -152,12 +152,16 @@ registre officiel.
 
 ## Validation distante
 
-Le candidat technique `b9690d75422010e7bb19513d9aa1477ae7b061fb` a été
-validé par le [run GitHub Actions 231](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29540419011).
+Le candidat technique `f18ecb049e601be11b44146879c77625a6627d49` a été
+validé par le [run GitHub Actions 237](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29543504829).
 Les cinq jobs sont verts : qualité backend, qualité frontend, intégration
 PostgreSQL, parcours navigateur et contrat de production des conteneurs. Ce
 dernier confirme Compose, les deux images, leurs utilisateurs non-root, Nginx,
 Caddy et ShellCheck.
+
+Les sept mises à jour planifiées Dependabot associées à ce candidat sont elles
+aussi vertes et le dépôt ne conserve aucune pull request ouverte à la clôture
+de l'audit.
 
 ## Contrôles restant externes
 
