@@ -1,19 +1,18 @@
 # Résultats de l'audit de publication Sentinel
 
-Audit exécuté le **16 juillet 2026** sur le candidat local destiné à `main`,
-selon [audit-prod.md](audit-prod.md) et
-[release-checklist.md](release-checklist.md).
+Audit final exécuté le **17 juillet 2026** sur le candidat
+`a77d6cb9e449e689f34bd224b102238cac81fb6c`, publié sur `main`, selon
+[audit-prod.md](audit-prod.md) et [release-checklist.md](release-checklist.md).
 
 ## Périmètre et environnement
 
-- Node local : `24.13.0` ; npm : `11.6.2` ;
-- cible déclarée, CI et images : Node `24.18.0` LTS, npm `>=10` ;
-- PostgreSQL temporaire réel sur `127.0.0.1:55432`, puis reproduction sur une
-  seconde base vierge isolée sur le port `55433` ;
-- Chromium piloté par Playwright ;
-- Caddy `2.11.4` et ShellCheck `0.10.0` exécutés localement avec les versions
-  exactes de la CI ; Docker reste indisponible dans cette distribution WSL et
-  son contrat complet est exécuté par le job `Containers / Production contract` ;
+- environnement local : Node `24.13.0`, npm `11.6.2`, sans démon Docker ni
+  serveur PostgreSQL ;
+- cible déclarée, CI et images : Node `24.18.0`, npm `11.16.0` ;
+- PostgreSQL `15.18`, Chromium Playwright, Caddy `2.11.4`, Nginx `1.30.4` et
+  ShellCheck `0.10.0` validés dans GitHub Actions ;
+- les contrôles ne nécessitant ni Docker ni PostgreSQL ont aussi été rejoués
+  localement ;
 - aucune donnée de production utilisée.
 
 Ce rapport distingue les preuves réellement exécutées des campagnes qui exigent
@@ -22,11 +21,11 @@ verte.
 
 ## Synthèse
 
-| Contrat                         | Résultat local                            |
+| Contrat                         | Résultat prouvé                           |
 | ------------------------------- | ----------------------------------------- |
 | Installation reproductible      | OK, `npm ci` backend et frontend          |
-| Format, lint, types, builds     | OK                                        |
-| Backend unitaire                | **30 suites, 327 tests**                  |
+| Format, lint, types, builds      | OK                                        |
+| Backend unitaire                | **32 suites, 354 tests**                  |
 | Frontend unitaire               | **34 fichiers, 346 tests**                |
 | Fiabilité structurelle          | **20 contrôles sur 20**                   |
 | Intégration PostgreSQL          | **4 suites, 37 tests**                    |
@@ -47,7 +46,7 @@ npm run format:check
 npm run lint
 npm run typecheck:scripts
 npm run build
-npm run test:coverage -- --selectProjects unit
+npm run test:coverage
 npm run verify:reliability
 npm audit --audit-level=high
 ```
@@ -89,13 +88,11 @@ Le build Vite est découpé par route. Le plus gros chunk partagé produit mesur
 
 ## Base réelle et navigateur
 
-Les quatre suites PostgreSQL couvrent l'authentification, les comptes, les
-lignes et l'Atelier. Elles repartent d'un schéma migré, vérifient notamment les
-contraintes, les collisions et les invalidations de session, puis nettoient leur
-jeu de données. Une exécution supplémentaire sur une base entièrement vierge a
-validé la création autonome de l'administrateur de test et son nettoyage : après
-les 37 tests, les compteurs de fixtures admin, utilisateurs et lignes étaient
-tous à zéro.
+Le job distant utilise une base PostgreSQL dédiée `sentinel_test`. Un garde-fou
+exécuté en CLI et dans Jest refuse l'intégration si `NODE_ENV=production`, si
+`DATABASE_URL` manque ou si le nom de base ne se termine pas par `_test` ou
+`_integration`. Les quatre suites et leurs 37 tests couvrent l'authentification,
+les comptes, les lignes et l'Atelier sur le schéma réellement migré.
 
 Les quatre parcours Playwright valident :
 
@@ -116,6 +113,12 @@ Vérifications obtenues :
 - version de session Admin invalidable ;
 - secrets faibles, origine non HTTPS, proxy ambigu, ports invalides et SMTP
   incohérent refusés au démarrage de production ;
+- SHA Git complet obligatoire, exposé par la santé et inscrit dans les labels
+  OCI des images ;
+- routes API inconnues et erreurs de parsing renvoyées en JSON sans exposer
+  Express ;
+- fixtures PostgreSQL protégées par suffixe et seed de démonstration destructif
+  soumis à une confirmation explicite non persistable dans `.env` ;
 - payload JSON limité, validations Zod et contraintes SQL ;
 - migrations sérialisées, checksums vérifiés et migrations publiées immuables ;
 - mutations critiques transactionnelles et conflits SQL traduits ;
@@ -123,7 +126,9 @@ Vérifications obtenues :
 - outbox durable, retry borné et arrêt gracieux ;
 - recherche statique sans secret réel, test exclusif ni artefact généré suivi ;
 - fichiers YAML parsés par Prettier et scripts backup/restore valides avec
-  `bash -n` et ShellCheck `0.10.0`.
+  `bash -n` et ShellCheck `0.10.0` ;
+- artefact backend de production nettoyé avant build, sans tests compilés,
+  déclarations TypeScript ni source maps.
 
 La livraison SMTP est volontairement **au moins une fois**. La source d'outbox
 est dédupliquée, mais un crash après acceptation par le fournisseur et avant
@@ -152,16 +157,32 @@ registre officiel.
 
 ## Validation distante
 
-Le candidat technique `f18ecb049e601be11b44146879c77625a6627d49` a été
-validé par le [run GitHub Actions 237](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29543504829).
+Le candidat technique `a77d6cb9e449e689f34bd224b102238cac81fb6c` est validé
+par le [run GitHub Actions 240](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29547477634).
 Les cinq jobs sont verts : qualité backend, qualité frontend, intégration
 PostgreSQL, parcours navigateur et contrat de production des conteneurs. Ce
-dernier confirme Compose, les deux images, leurs utilisateurs non-root, Nginx,
-Caddy et ShellCheck.
+dernier confirme les deux variantes Compose, les labels de provenance, les deux
+images et leurs utilisateurs non-root, l'artefact runtime minimal, Nginx intégré,
+Nginx hôte, Caddy et ShellCheck.
 
-Les sept mises à jour planifiées Dependabot associées à ce candidat sont elles
-aussi vertes et le dépôt ne conserve aucune pull request ouverte à la clôture
-de l'audit.
+Le run précédent a détecté un sur-échappement dans l'assertion de label Docker.
+La syntaxe a été corrigée dans `a77d6cb`, puis toute la matrice a été rejouée :
+les cinq jobs et toutes les étapes obligatoires du run 240 sont réussis. Seul
+l'upload conditionnel des diagnostics Playwright est logiquement ignoré en
+l'absence d'échec.
+
+## État de l'instance publique
+
+La sonde HTTPS du 17 juillet 2026 confirme que le VPS est disponible et que sa
+base répond. Elle prouve aussi que le déploiement actuellement servi précède ce
+candidat : `/api/health` ne contient pas encore `version`, la réponse expose
+encore `X-Powered-By: Express`, et la page racine sert l'ancien titre et les
+anciens bundles.
+
+Le dépôt et le VPS ne doivent donc pas être déclarés alignés à ce stade. Après
+déploiement, la propriété `version` devra être strictement égale au résultat de
+`git rev-parse HEAD` sur le checkout effectivement déployé, puis la recette
+courte devra être consignée.
 
 ## Contrôles restant externes
 
@@ -172,11 +193,13 @@ GO de production :
 2. charge et endurance sur un volume représentatif ;
 3. audit axe/Lighthouse, clavier et lecteur d'écran ;
 4. recette Chrome, Edge, Firefox, Safari et écran Board cible ;
-5. vérification HTTPS réelle des cookies, headers, CORS, SMTP et logs.
+5. déploiement du candidat validé, puis vérification HTTPS des cookies, headers,
+   CORS, SMTP, logs et du SHA retourné par `/api/health`.
 
 ## Verdict
 
-**GO technique pour publication.** Aucun défaut bloquant n'est connu dans les
-contrats locaux ou distants automatisés. Le **GO production reste conditionnel**
-aux cinq campagnes iso-production ci-dessus. Cette réserve est une limite de
-preuve, pas une validation implicite.
+**GO technique pour le dépôt et le candidat de déploiement.** Aucun défaut
+bloquant n'est connu dans les contrats locaux ou distants automatisés. Le VPS
+actuel n'est toutefois **pas encore aligné** sur ce candidat : le GO de mise à
+jour production reste conditionnel au backup, au déploiement, à la vérification
+du SHA et à la recette décrits ci-dessus.
