@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
+  E2E_ADMIN_LINE_NUMBER,
+  E2E_ADMIN_MACHINE_ID,
   E2E_ADMIN_USERNAME,
   E2E_ADMIN_PASSWORD,
   E2E_LINE_NUMBER,
@@ -22,17 +24,20 @@ async function loginAsAdmin(page: Page): Promise<void> {
   await page.waitForURL('**/admin/accueil');
 }
 
-async function openMachineModal(page: Page): Promise<void> {
+async function openMachineModal(
+  page: Page,
+  lineNumber = E2E_ADMIN_LINE_NUMBER,
+  machineId = E2E_ADMIN_MACHINE_ID
+): Promise<void> {
   await page.goto('/admin/lines');
   // La ligne est cliquable ; le libellé accessible est unique par numéro.
   await page
-    .getByRole('button', { name: `Voir la ligne ${E2E_LINE_NUMBER}` })
+    .getByRole('button', { name: `Voir la ligne ${lineNumber}` })
     .first()
     .click();
-  // Vue détail : titre « Ligne 999 ».
-  await expect(page.getByRole('heading', { name: `Ligne ${E2E_LINE_NUMBER}` })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Ligne ${lineNumber}` })).toBeVisible();
   // Clic sur la machine pour ouvrir la modale d'édition.
-  await page.getByText(E2E_MACHINE_ID, { exact: true }).click();
+  await page.getByText(machineId, { exact: true }).click();
   // Le titre de la modale est porté par l'aria-label du dialog (pas un heading).
   await expect(page.getByRole('dialog', { name: 'Modifier la machine' })).toBeVisible();
 }
@@ -55,23 +60,41 @@ test("aucun changement : Aperçu désactivé, aucune confirmation ne s'affiche",
 test('modification réelle : aperçu avant/après puis confirmation', async ({ page }) => {
   await openMachineModal(page);
 
-  // On change la marque → l'aperçu s'active. Le label est « Marque * ».
+  // L'alternance garde le test réexécutable si Playwright relance ce cas après
+  // une sauvegarde réussie dont seule l'assertion finale aurait expiré.
   const brand = page.getByLabel(/Marque/);
-  await brand.fill('Fuji');
+  const previousBrand = await brand.inputValue();
+  const nextBrand = previousBrand === 'Fuji' ? 'Panasonic' : 'Fuji';
+  await brand.fill(nextBrand);
   const apercu = page.getByRole('button', { name: 'Aperçu' });
   await expect(apercu).toBeEnabled();
   await apercu.click();
 
   // Le récap (dialog « Aperçu machine ») montre l'ancienne et la nouvelle valeur.
   const preview = page.getByRole('dialog', { name: 'Aperçu machine' });
-  await expect(preview.getByText('Panasonic')).toBeVisible();
-  await expect(preview.getByText('Fuji')).toBeVisible();
+  await expect(preview.getByText(previousBrand, { exact: true })).toBeVisible();
+  await expect(preview.getByText(nextBrand, { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Confirmer' }).click();
 
   // Cette fois, le message de succès apparaît bien.
   await expect(page.getByText('Machine modifiée avec succès.')).toBeVisible();
+});
 
-  // Note : ce test modifie la machine de façon persistante. L'idempotence de la
-  // suite repose sur le re-seed (script `test:e2e`), pas sur un cleanup ici.
+test('ligne avec incident actif : la modification structurelle est refusée', async ({ page }) => {
+  await openMachineModal(page, E2E_LINE_NUMBER, E2E_MACHINE_ID);
+
+  const brand = page.getByLabel(/Marque/);
+  const previousBrand = await brand.inputValue();
+  await brand.fill(previousBrand === 'Fuji' ? 'Panasonic' : 'Fuji');
+  await page.getByRole('button', { name: 'Aperçu' }).click();
+  await page.getByRole('button', { name: 'Confirmer' }).click();
+
+  const preview = page.getByRole('dialog', { name: 'Aperçu machine' });
+  await expect(
+    preview.getByText(
+      /Impossible de modifier la structure de cette ligne : [1-9]\d* incident\(s\) actif\(s\) y sont encore liés\./
+    )
+  ).toBeVisible();
+  await expect(page.getByText('Machine modifiée avec succès.')).toHaveCount(0);
 });

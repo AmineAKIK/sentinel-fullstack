@@ -3,11 +3,11 @@
  *
  * Crée un jeu de données minimal, déterministe et ré-exécutable :
  *   - un compte admin directement connectable (username + mot de passe connus) ;
- *   - une ligne de production avec une machine à robot simple.
+ *   - une ligne Admin modifiable et une ligne Atelier avec incidents actifs.
  *
- * Volontairement isolé des données réelles : la ligne E2E est identifiée par un
- * numéro réservé et recréée à neuf à chaque exécution. À lancer avant la suite
- * Playwright (voir le script `test:e2e` du frontend).
+ * Volontairement isolé des données réelles : les lignes E2E sont identifiées par
+ * des numéros réservés et recréées à neuf à chaque exécution. À lancer avant
+ * la suite Playwright (voir le script `test:e2e` du frontend).
  *
  * Usage : `npm run guard:e2e && npm run seed:e2e` (depuis backend/).
  */
@@ -25,6 +25,8 @@ import { assertSafeTestDatabaseUrl } from '../src/testing/databaseGuard';
 // Identifiants partagés avec le test (frontend/e2e/fixtures.ts en garde une copie).
 export const E2E_ADMIN_USERNAME = 'e2e-admin';
 export const E2E_ADMIN_PASSWORD = 'E2eAdminPass!23'; // ≥ 12 caractères (politique admin)
+export const E2E_ADMIN_LINE_NUMBER = '998';
+export const E2E_ADMIN_MACHINE_ID = 'E2E-MCH-ADMIN-1';
 export const E2E_LINE_NUMBER = '999';
 export const E2E_MACHINE_ID = 'E2E-MCH-1';
 export const E2E_RESPONSABLE_BADGE = 'E2E-RESP';
@@ -42,39 +44,39 @@ async function upsertAdmin(): Promise<void> {
   );
 }
 
-async function resetE2ELine(): Promise<void> {
+async function resetE2ELine(lineNumber: string): Promise<void> {
   await pool.query(
     `DELETE FROM workshop_arbitration_cases
      WHERE incident_id IN (
        SELECT id FROM workshop_incidents WHERE line_number = $1
      )`,
-    [E2E_LINE_NUMBER]
+    [lineNumber]
   );
   await pool.query(
     `DELETE FROM workshop_incident_followers
      WHERE incident_id IN (
        SELECT id FROM workshop_incidents WHERE line_number = $1
      )`,
-    [E2E_LINE_NUMBER]
+    [lineNumber]
   );
-  await pool.query('DELETE FROM workshop_incidents WHERE line_number = $1', [E2E_LINE_NUMBER]);
+  await pool.query('DELETE FROM workshop_incidents WHERE line_number = $1', [lineNumber]);
   await pool.query(
     `DELETE FROM line_audit_events
      WHERE target_line_id IN (
        SELECT id FROM production_lines WHERE line_number = $1
      )`,
-    [E2E_LINE_NUMBER]
+    [lineNumber]
   );
-  await pool.query('DELETE FROM production_lines WHERE line_number = $1', [E2E_LINE_NUMBER]);
+  await pool.query('DELETE FROM production_lines WHERE line_number = $1', [lineNumber]);
 }
 
-async function createE2ELine(): Promise<number> {
+async function createE2ELine(lineNumber: string, machineId: string): Promise<number> {
   const line = await createLineData({
-    lineNumber: E2E_LINE_NUMBER,
+    lineNumber,
     isActive: true,
     machines: [
       {
-        machineId: E2E_MACHINE_ID,
+        machineId,
         brand: 'Panasonic',
         hasDoubleRobot: false,
         robotNumber: '1',
@@ -188,8 +190,10 @@ async function createArbitrationIncidents(lineId: number, operatorId: number): P
 async function main(): Promise<void> {
   assertSafeTestDatabaseUrl(process.env.DATABASE_URL, 'e2e');
   await upsertAdmin();
-  await resetE2ELine();
-  const lineId = await createE2ELine();
+  await resetE2ELine(E2E_ADMIN_LINE_NUMBER);
+  await resetE2ELine(E2E_LINE_NUMBER);
+  await createE2ELine(E2E_ADMIN_LINE_NUMBER, E2E_ADMIN_MACHINE_ID);
+  const lineId = await createE2ELine(E2E_LINE_NUMBER, E2E_MACHINE_ID);
   const operatorId = await upsertWorkshopUser({
     firstName: 'Opérateur',
     lastName: 'E2E',
@@ -205,7 +209,8 @@ async function main(): Promise<void> {
   await createArbitrationIncidents(lineId, operatorId);
   console.log(
     `Seed E2E OK — admin « ${E2E_ADMIN_USERNAME} », atelier « ${E2E_RESPONSABLE_BADGE} », ` +
-      `ligne ${E2E_LINE_NUMBER} (${E2E_MACHINE_ID}).`
+      `ligne admin ${E2E_ADMIN_LINE_NUMBER} (${E2E_ADMIN_MACHINE_ID}), ` +
+      `ligne atelier ${E2E_LINE_NUMBER} (${E2E_MACHINE_ID}).`
   );
 }
 
