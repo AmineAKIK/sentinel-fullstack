@@ -125,9 +125,9 @@ commit audité au démarrage de cette branche.
 | --- | --- | ---: | --- | --- | --- |
 | `HTTP-01` | P1 | 4 | `COOKIE_SECRET` requis mais cookies non signés. | Tests cookie valide, absent et altéré. | VERIFIED |
 | `HTTP-02` | P1 | 4 | Absence de `no-store` global sur les API authentifiées. | Tests d'en-têtes sur Admin, Atelier et Board. | VERIFIED |
-| `HTTP-03` | P1 | 4 | Réauthentification backend à cinq, frontend annoncé à trois et couplé au texte. | Code `SESSION_REVOKED` et parcours frontend dédié. | IMPLEMENTED |
-| `HTTP-04` | P1 | 4 | Un username admin peut masquer un badge Atelier identique. | Contrat de namespace et tests de création/login. | IMPLEMENTED |
-| `HTTP-05` | P1 | 4 | Identifiants numériques côté UI, chaînes libres côté API. | Validation partagée et migration avec préflight. | IMPLEMENTED |
+| `HTTP-03` | P1 | 4 | Réauthentification backend à cinq, frontend annoncé à trois et couplé au texte. | Code `SESSION_REVOKED` et parcours frontend dédié. | VERIFIED |
+| `HTTP-04` | P1 | 4 | Un username admin peut masquer un badge Atelier identique. | Contrat de namespace et tests de création/login. | VERIFIED |
+| `HTTP-05` | P1 | 4 | Identifiants numériques côté UI, chaînes libres côté API. | Validation partagée et migration avec préflight. | VERIFIED |
 | `HTTP-06` | P1 | 4 | Timeout annulé avant lecture du corps HTTP. | Test d'un corps bloqué après réception des headers. | OPEN |
 | `HTTP-07` | P1 | 4 | Maximum bcrypt exprimé en caractères au-delà de 72 octets. | Tests ASCII et multioctets aux frontières. | OPEN |
 | `HTTP-08` | P2 | 4 | Politique Atelier/Board trop faible pour la cible annoncée. | Minimums `DR-17` documentés et testés. | OPEN |
@@ -236,7 +236,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 | Sous-lot | Périmètre | Constats | État |
 | --- | --- | --- | --- |
 | `4A` | Signer les cookies, refuser leur altération et empêcher le cache des API authentifiées. | `HTTP-01`, `HTTP-02` | VERIFIED |
-| `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | IMPLEMENTED |
+| `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | VERIFIED |
 | `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | OPEN |
 | `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | OPEN |
 | `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | OPEN |
@@ -258,6 +258,9 @@ Preuves des lots clos :
 - lot 4A : implémentation `ade07b1a59a2eadca94fc704fc540817abd6ce8f`,
   correction du harnais navigateur `6cdc7898894cbe13bc183b24f1beaff105afcf8a`
   et [run CI 254](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29705503071).
+- lot 4B : commit `4f35a5b93dc4fd3d1011742714fe03b436936388` et
+  [run CI 256](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29706833863),
+  avec migration PostgreSQL `046` et neuf parcours Playwright.
 
 Les cinq jobs de chaque preuve sont verts.
 
