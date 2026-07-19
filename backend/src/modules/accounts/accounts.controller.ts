@@ -7,7 +7,7 @@ import {
 } from '../../utils/controller';
 import { sendError } from '../../utils/errors';
 import { badRequest } from '../../utils/serviceResult';
-import { createAccountSchema, updateAccountSchema } from './accounts.validation';
+import { badgeNumberSchema, createAccountSchema, updateAccountSchema } from './accounts.validation';
 import {
   checkBadgeAvailabilityService,
   createAccountService,
@@ -37,13 +37,13 @@ export async function listAccounts(req: Request, res: Response): Promise<void> {
 
 export async function checkBadgeAvailability(req: Request, res: Response): Promise<void> {
   try {
-    const badgeNumber = String(req.query.badgeNumber || '').trim();
-    if (!badgeNumber) {
-      sendServiceError(res, badRequest('Numéro de badge requis.'));
+    const parsed = badgeNumberSchema.safeParse(req.query.badgeNumber);
+    if (!parsed.success) {
+      sendServiceError(res, badRequest(formatZodError(parsed.error)));
       return;
     }
 
-    res.json(await checkBadgeAvailabilityService(badgeNumber));
+    res.json(await checkBadgeAvailabilityService(parsed.data));
   } catch (err) {
     handleControllerError(res, 'checkBadgeAvailability', err);
   }

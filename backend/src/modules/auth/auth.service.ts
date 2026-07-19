@@ -9,6 +9,7 @@ import {
 } from '../workshopCredentials/workshopCredentials.service';
 import { verifyPassword } from '../../auth/bcrypt';
 import pool from '../../db/pool';
+import { isWorkshopIdentifier } from '../../domain/identifiers';
 
 export type AuthLoginResult =
   | { kind: 'admin_requires_password' }
@@ -94,9 +95,9 @@ export async function unifiedLoginService(
   newPassword: string | undefined,
   setupCode: string | undefined
 ): Promise<AuthLoginResult> {
-  // Try admin first: admin accounts use alphanumeric usernames
-  const admin = await findAdminByUsername(identifier);
-  if (admin) {
+  if (!isWorkshopIdentifier(identifier)) {
+    const admin = await findAdminByUsername(identifier);
+    if (!admin) return { kind: 'invalid_credentials' };
     if (!password) return { kind: 'admin_requires_password' };
     const passwordHash = await getAdminPasswordHash(admin.id);
     if (!passwordHash) return { kind: 'invalid_credentials' };
@@ -109,7 +110,6 @@ export async function unifiedLoginService(
     };
   }
 
-  // Not an admin — try workshop user by badge number
   const workshopResult: WorkshopLoginResult = await loginWorkshopUserService(
     identifier,
     password,

@@ -31,6 +31,7 @@ Ne jamais réinitialiser un environnement partagé avec `docker compose down -v`
 | 2.9 | Rejouer le code temporaire | refus |
 | 2.10 | Connexion Atelier valide | dashboard et rôle corrects |
 | 2.11 | Déconnexion Atelier | cookie supprimé, route workshop refusée |
+| 2.12 | Saisir un badge avec lettres | validation locale et aucun appel de connexion |
 
 Vérifier dans DevTools que les cookies de production sont `HttpOnly`, `Secure` et
 `SameSite=Strict`.
@@ -51,7 +52,7 @@ Vérifier dans DevTools que les cookies de production sont `HttpOnly`, `Secure` 
 | # | Action | Résultat attendu |
 | --- | --- | --- |
 | 4.1 | Créer un compte valide | fiche créée, code setup affiché une fois |
-| 4.2 | Badge identique avec casse/espaces différents | conflit explicite |
+| 4.2 | Badge non numérique | validation frontend et API, aucune écriture |
 | 4.3 | Modifier sans changer de valeur | aucun faux événement d'audit |
 | 4.4 | Changer nom, e-mail et rôle | valeurs et audit cohérents |
 | 4.5 | Réinitialiser le mot de passe | nouveau code, ancienne session invalidée |
@@ -59,14 +60,16 @@ Vérifier dans DevTools que les cookies de production sont `HttpOnly`, `Secure` 
 | 4.7 | Réactiver | connexion possible avec setup/secret attendu |
 | 4.8 | Désactiver un technicien affecté | opération bloquée avec impact |
 | 4.9 | Archiver un compte admissible | données anonymisées, historique lisible |
-| 4.10 | Réauthentification admin fausse | action sensible refusée |
+| 4.10 | Quatre réauthentifications Admin fausses | action refusée, session conservée |
+| 4.11 | Cinquième réauthentification Admin fausse | session révoquée, cookie effacé, retour au login |
+| 4.12 | Badge `0012` puis badge `12` | deux identifiants distincts acceptés |
 
 ## 5. Lignes et machines
 
 | # | Action | Résultat attendu |
 | --- | --- | --- |
 | 5.1 | Créer une ligne + machine simple | ligne visible et sélectionnable Atelier |
-| 5.2 | Numéro de ligne doublon normalisé | conflit |
+| 5.2 | Numéro de ligne non numérique | validation frontend et API, aucune écriture |
 | 5.3 | ID machine doublon sur autre ligne | conflit global |
 | 5.4 | Machine sans marque/ID ou tête à 0 | validation avant écriture |
 | 5.5 | Passer simple vers double robot | champs cohérents, sauvegarde persistée |
@@ -75,6 +78,7 @@ Vérifier dans DevTools que les cookies de production sont `HttpOnly`, `Secure` 
 | 5.8 | Sauvegarder deux fois rapidement | une seule mutation |
 | 5.9 | Désactiver une ligne avec incident actif | blocage et impact exact |
 | 5.10 | Archiver une ligne admissible | disparition du référentiel actif, audit conservé |
+| 5.11 | Ligne `0012` puis ligne `12` | deux numéros distincts acceptés |
 
 ## 6. Cycle incident
 

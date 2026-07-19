@@ -1,3 +1,5 @@
+import { normalizeAdminUsername } from '../domain/identifiers';
+
 const DEFAULT_SECRET_VALUES = new Set([
   'change_me_in_production',
   'jwt_secret_change_me_in_production',
@@ -133,6 +135,7 @@ export function assertProductionConfig(): void {
   if (process.env.COOKIE_SECRET === process.env.JWT_SECRET) {
     throw new Error('COOKIE_SECRET and JWT_SECRET must be distinct in production.');
   }
+  if (process.env.ADMIN_USERNAME) normalizeAdminUsername(process.env.ADMIN_USERNAME);
 
   let clientOrigin: URL;
   try {

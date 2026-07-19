@@ -37,7 +37,7 @@ sentinel/
     workflows/ci.yml         pipeline de qualité
     dependabot.yml           mises à jour automatisées
   backend/
-    migrations/              001 à 045, SQL immuable
+    migrations/              001 à 046, SQL append-only
     scripts/                 seeds et audit structurel
     src/
       auth/                  JWT, cookies, bcrypt et payloads
@@ -176,7 +176,7 @@ nouvelle migration.
 
 ### 6.2 Évolution du schéma
 
-Le dépôt comprend 45 migrations :
+Le dépôt comprend 46 migrations :
 
 - 001-006 : admin, utilisateurs, audit initial, lignes et mots de passe ;
 - 007-019 : incidents, workflow, événements, intégrité et followers ;
@@ -186,7 +186,8 @@ Le dépôt comprend 45 migrations :
 - 041 : admin singleton et bornes runtime ;
 - 042-043 : projection normalisée et validation des machines ;
 - 044 : normalisation/unicité des badges actifs ;
-- 045 : outbox durable.
+- 045 : outbox durable ;
+- 046 : namespaces des identifiants opérationnels.
 
 ### 6.3 Modèle principal
 
@@ -292,6 +293,12 @@ est refusée puis effacée. Les anciennes API de login séparées ont été supp
 les cookies de session. Les espaces `/api/auth`, `/api/admin`, `/api/workshop` et
 `/api/board` répondent avec `Cache-Control: no-store`, y compris en erreur.
 
+Le namespace est disjoint par construction : les badges Atelier contiennent
+uniquement des chiffres, tandis que l'identifiant Admin ne peut pas être
+uniquement numérique. Le même contrat s'applique au formulaire, à Zod et aux
+contraintes PostgreSQL. Les numéros de ligne sont également numériques ; les
+zéros initiaux restent significatifs.
+
 ### 8.2 Payloads
 
 ```ts
@@ -304,6 +311,12 @@ type AuthScope = 'admin' | 'workshop' | 'board';
 
 Chaque guard valide le shape runtime, l'issuer, l'audience, l'algorithme et la
 version courante en base.
+
+Les actions Admin sensibles partagent un compteur de réauthentification. Les
+quatre premiers échecs répondent `REAUTHENTICATION_FAILED` sans fermer la
+session ; le cinquième incrémente la version de session, efface le cookie et
+répond `SESSION_REVOKED`. Le frontend branche son comportement sur ces codes,
+jamais sur le texte du message.
 
 ### 8.3 Mots de passe et codes
 

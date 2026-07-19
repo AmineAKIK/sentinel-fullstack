@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { checkBadgeAvailability } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
 import { UserFormData } from '../components/UserForm';
+import { isDigitsOnly } from '../utils/identifiers';
 
 export type UserFormStep = 'form' | 'preview' | 'created';
 
@@ -50,6 +51,8 @@ export function useUserForm(): UseUserFormReturn {
       issues.push('Le numéro de badge est obligatoire.');
     } else if (form.badgeNumber.trim().length < 2) {
       issues.push('Le numéro de badge doit contenir au moins 2 caractères.');
+    } else if (!isDigitsOnly(form.badgeNumber.trim())) {
+      issues.push('Le numéro de badge doit contenir uniquement des chiffres.');
     }
 
     if (!form.role) {

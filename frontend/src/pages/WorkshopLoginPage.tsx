@@ -199,9 +199,11 @@ export default function WorkshopLoginPage() {
               id="identifier"
               className="form-input"
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={identifier}
               onChange={(e) => {
-                setIdentifier(e.target.value);
+                setIdentifier(e.target.value.replace(/\D/g, ''));
                 resetToIdentifier();
               }}
               disabled={loading}

@@ -4,6 +4,7 @@ import UserForm, { UserFormData } from './UserForm';
 import EditSummaryModal from './EditSummaryModal';
 import ResetPasswordConfirmModal from './ResetPasswordConfirmModal';
 import { SentinelUser } from '../types';
+import { isDigitsOnly } from '../utils/identifiers';
 
 interface EditUserModalProps {
   user: SentinelUser;
@@ -60,6 +61,10 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
     }
     if (!form.badgeNumber.trim() || form.badgeNumber.trim().length < 2) {
       setError('Le numéro de badge doit contenir au moins 2 caractères.');
+      return;
+    }
+    if (!isDigitsOnly(form.badgeNumber.trim())) {
+      setError('Le numéro de badge doit contenir uniquement des chiffres.');
       return;
     }
     if (!form.role) {

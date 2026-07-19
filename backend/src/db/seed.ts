@@ -1,6 +1,7 @@
 import { hashAdminPassword } from '../auth/bcrypt';
 import pool from './pool';
 import logger from '../logger';
+import { normalizeAdminUsername } from '../domain/identifiers';
 
 async function seedAdminAccount(): Promise<void> {
   const configuredUsername = process.env.ADMIN_USERNAME?.trim();
@@ -16,7 +17,7 @@ async function seedAdminAccount(): Promise<void> {
     return;
   }
 
-  const username = configuredUsername;
+  const username = configuredUsername ? normalizeAdminUsername(configuredUsername) : undefined;
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) {
     const message =

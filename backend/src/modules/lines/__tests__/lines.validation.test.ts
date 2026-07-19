@@ -10,10 +10,18 @@ const machine = {
 
 describe('line validation', () => {
   it('accepte une ligne valide', () => {
-    expect(createLineSchema.safeParse({ lineNumber: '120', machines: [machine] }).success).toBe(
-      true
-    );
+    const result = createLineSchema.safeParse({ lineNumber: '00120', machines: [machine] });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.lineNumber).toBe('00120');
   });
+
+  it.each(['L120', '12-0', '１２０'])(
+    'refuse le numéro de ligne non numérique %p',
+    (lineNumber) => {
+      expect(createLineSchema.safeParse({ lineNumber, machines: [machine] }).success).toBe(false);
+      expect(updateLineSchema.safeParse({ lineNumber }).success).toBe(false);
+    }
+  );
 
   it('refuse deux IDs machine identiques sans tenir compte de la casse', () => {
     const result = createLineSchema.safeParse({

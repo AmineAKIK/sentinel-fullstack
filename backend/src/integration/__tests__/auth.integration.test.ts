@@ -40,7 +40,7 @@ let pool: Pool;
 // qu'à nos propres lignes), pour que la suite reste sûre même si d'autres
 // fichiers d'intégration s'exécutent en parallèle sur la même base. Pas de
 // TRUNCATE — qui détruirait les données des autres suites.
-const BADGE_PREFIX = 'IA-';
+const BADGE_PREFIX = '9100';
 
 // Sentinel n'autorise qu'un seul compte admin (uq_admin_singleton_key) : les tests
 // de login admin ne peuvent pas insérer un second compte, ils réécrivent
@@ -229,7 +229,7 @@ describe('Workshop login (real DB)', () => {
   });
 
   it('returns invalid_credentials for unknown badge number', async () => {
-    const result = await unifiedLoginService(`${BADGE_PREFIX}UNKNOWN`, 'any', undefined, undefined);
+    const result = await unifiedLoginService(`${BADGE_PREFIX}999`, 'any', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
   });
 
@@ -373,7 +373,7 @@ describe('Migrations (real DB)', () => {
        FROM schema_migrations`
     );
     expect(rows[0].checksummed).toBe(rows[0].total);
-    expect(rows[0].total).toBeGreaterThanOrEqual(45);
+    expect(rows[0].total).toBeGreaterThanOrEqual(46);
   });
 
   it('refuses a modified migration ledger entry', async () => {
@@ -412,5 +412,63 @@ describe('Migrations (real DB)', () => {
     } finally {
       await pool.query('ROLLBACK');
     }
+  });
+
+  it('enforces disjoint Admin and Workshop identifier namespaces', async () => {
+    await pool.query('BEGIN');
+    try {
+      const admin = requireOriginalAdmin();
+      await expect(
+        pool.query('UPDATE admin_accounts SET username = $2 WHERE id = $1', [admin.id, '9100999'])
+      ).rejects.toMatchObject({
+        code: '23514',
+        constraint: 'chk_admin_username_namespace',
+      });
+    } finally {
+      await pool.query('ROLLBACK');
+    }
+  });
+
+  it('enforces numeric active badges while preserving deleted RGPD pseudonyms', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO sentinel_users
+           (first_name, last_name, badge_number, role, is_active, is_deleted)
+         VALUES ('Invalid', 'Badge', 'BADGE-ALPHA', 'OPERATOR', TRUE, FALSE)`
+      )
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'chk_sentinel_users_badge_numeric',
+    });
+
+    const { rows } = await pool.query<{ id: number }>(
+      `INSERT INTO sentinel_users
+         (first_name, last_name, badge_number, role, is_active, is_deleted)
+       VALUES ('Utilisateur', 'Supprimé', 'ANON-INTEGRATION', 'OPERATOR', FALSE, TRUE)
+       RETURNING id`
+    );
+    await pool.query('DELETE FROM sentinel_users WHERE id = $1', [rows[0].id]);
+  });
+
+  it('enforces numeric active production line numbers', async () => {
+    const machines = JSON.stringify([
+      {
+        machineId: 'M-IDENTIFIER-CONTRACT',
+        brand: 'Integration',
+        hasDoubleRobot: false,
+        robotNumber: '1',
+        robotHeads: 1,
+      },
+    ]);
+    await expect(
+      pool.query(
+        `INSERT INTO production_lines (line_number, machine_sequence, is_active, is_deleted)
+         VALUES ('LINE-ALPHA', $1::jsonb, TRUE, FALSE)`,
+        [machines]
+      )
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'chk_production_lines_number_numeric',
+    });
   });
 });

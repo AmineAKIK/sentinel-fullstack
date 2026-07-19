@@ -12,8 +12,8 @@ Source : `backend/scripts/seedE2E.ts`.
 | --- | --- |
 | Admin | `e2e-admin` |
 | Mot de passe admin | `E2eAdminPass!23` |
-| Responsable | badge `E2E-RESP` |
-| Opérateur | badge `E2E-OPER` |
+| Responsable | badge `990001` |
+| Opérateur | badge `990002` |
 | Mot de passe Atelier | `E2eWorkshop!23` |
 | Ligne Admin modifiable | `998` |
 | Machine Admin | `E2E-MCH-ADMIN-1`, Panasonic, robot simple, 16 têtes |
@@ -98,13 +98,15 @@ Viewport 393 x 851 :
 - connexion Admin et altération d'un octet du cookie signé ;
 - refus `401` et suppression du cookie falsifié ;
 - `Cache-Control: no-store` vérifié sur Auth, Admin, Atelier et Board ;
+- quatre réauthentifications incorrectes refusées sans déconnexion, puis session
+  révoquée et cookie effacé au cinquième échec ;
 - contrôles exécutés contre les vrais serveurs Express et Vite de la suite.
 
 ## 3. Jeu d'intégration PostgreSQL
 
 Sources : `backend/src/integration/__tests__/`.
 
-Chaque suite utilise ses propres préfixes, applique les 45 migrations et nettoie
+Chaque suite utilise ses propres préfixes, applique les 46 migrations et nettoie
 uniquement ses fixtures.
 
 ### Authentification

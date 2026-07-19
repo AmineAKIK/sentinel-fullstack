@@ -40,7 +40,7 @@ docker compose logs --since=15m backend frontend caddy postgres
 | `COOKIE_SECRET` | oui | signature des cookies Express |
 | `JWT_SECRET` | oui | signature des sessions JWT |
 | `BOARD_ACCESS_CODE_HASH` | oui | hash bcrypt du code Board initial |
-| `ADMIN_USERNAME` | base vide | identifiant de bootstrap du premier admin |
+| `ADMIN_USERNAME` | base vide | bootstrap Admin, non vide, max. 80 caractères, non numérique |
 | `ADMIN_PASSWORD` | base vide | mot de passe temporaire du premier admin |
 | `VITE_API_URL` | vide en same-origin | surcharge de l'origine API au build |
 

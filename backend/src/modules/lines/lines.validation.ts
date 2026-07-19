@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { FIELD_LIMITS } from '../../domain/constants';
+import { numericIdentifierSchema } from '../../domain/identifiers';
 
 const MAX_ROBOT_HEADS = 64;
+
+export const lineNumberSchema = numericIdentifierSchema({
+  label: 'Le numéro de ligne',
+  min: 1,
+  max: FIELD_LIMITS.LINE_NUMBER,
+});
 
 const machineIdSchema = z
   .string()
@@ -44,11 +51,7 @@ export const lineMachineSchema = z.discriminatedUnion('hasDoubleRobot', [
 ]);
 
 const lineFieldsSchema = z.object({
-  lineNumber: z
-    .string()
-    .trim()
-    .min(1, 'Le numéro de ligne est obligatoire.')
-    .max(FIELD_LIMITS.LINE_NUMBER),
+  lineNumber: lineNumberSchema,
   isActive: z.boolean().optional(),
   machines: z
     .array(lineMachineSchema)
