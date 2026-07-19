@@ -6,7 +6,12 @@ jest.mock('../../../db/pool', () => ({
 }));
 
 import pool from '../../../db/pool';
-import { resetAccountPasswordData, setAccountActive } from '../accounts.repository';
+import {
+  resetAccountPasswordData,
+  setAccountActive,
+  softDeleteAccount,
+  updateAccountData,
+} from '../accounts.repository';
 
 const mockedPool = jest.mocked(pool);
 
@@ -51,5 +56,29 @@ describe('accounts repository — révocation des sessions workshop', () => {
     expect(String(sql)).toContain('password_hash = NULL');
     expect(String(sql)).toContain('session_version = session_version + 1');
     expect(params).toEqual([1, 'setup-code-hash', expiresAt]);
+  });
+
+  it.each([
+    ['badgeNumber', { badgeNumber: 'B002' }],
+    ['role', { role: 'MAINTENANCE' as const }],
+  ])('révoque les sessions lors d’un changement de %s', async (_field, updates) => {
+    await updateAccountData(1, updates, true);
+
+    const [sql] = mockedPool.query.mock.calls[0];
+    expect(String(sql)).toContain('session_version = session_version + 1');
+  });
+
+  it('ne révoque pas les sessions lors d’un changement sans effet sur l’autorité', async () => {
+    await updateAccountData(1, { firstName: 'Pierre' }, false);
+
+    const [sql] = mockedPool.query.mock.calls[0];
+    expect(String(sql)).not.toContain('session_version = session_version + 1');
+  });
+
+  it('révoque les sessions lors de la suppression logique', async () => {
+    await softDeleteAccount(1);
+
+    const [sql] = mockedPool.query.mock.calls[0];
+    expect(String(sql)).toContain('session_version = session_version + 1');
   });
 });

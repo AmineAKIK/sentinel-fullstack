@@ -80,8 +80,8 @@ Chaque compte Atelier possède un badge et un mot de passe. À la création ou l
 d'une réinitialisation, l'admin remet un code temporaire ; l'utilisateur choisit
 son mot de passe au premier accès. Le code expire et ne peut être réutilisé.
 
-Une désactivation, suppression, rotation de mot de passe ou modification de rôle
-invalide les sessions concernées via `session_version`.
+Une désactivation, suppression, rotation de mot de passe ou modification de badge
+ou de rôle invalide les sessions concernées via `session_version`.
 
 ### Admin
 
@@ -110,7 +110,8 @@ snapshot de l'identité cible.
 - mise à jour des données et du rôle ;
 - suppression des no-op : aucune trace si aucune valeur ne change ;
 - conflit badge détecté côté service et garanti par PostgreSQL ;
-- changement de rôle bloqué si l'utilisateur porte des incidents actifs.
+- changement de rôle bloqué si l'utilisateur porte des incidents actifs ;
+- changement de badge ou de rôle révoquant immédiatement les sessions Atelier.
 
 ### Activation, désactivation, archivage
 

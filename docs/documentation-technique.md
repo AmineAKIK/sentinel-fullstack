@@ -256,6 +256,14 @@ ligne active verrouillée, sélection validée, puis insertion. Si l'incident a 
 pendant la préparation d'une édition ou d'un arbitrage, l'API répond `409 CONFLICT`
 et n'applique aucun effet sur un état obsolète.
 
+La prise en charge n'a pas de dépendance ligne : elle verrouille donc l'utilisateur,
+revalide sous verrou son activation, sa non-suppression et son rôle Maintenance,
+puis verrouille l'incident. Désactivation, suppression et changement de rôle
+verrouillent le même utilisateur avant de recompter ses affectations actives. Selon
+l'opération qui obtient le verrou en premier, la prise en charge est refusée ou la
+mutation administrative répond `409 RESOURCE_IN_USE` ; aucun état intermédiaire ne
+peut associer un incident actif à un technicien devenu inéligible.
+
 Les éditions directes sans écart réel sont court-circuitées avant toute écriture,
 journalisation ou création implicite de suivi. Pour une demande de correction,
 le service compare sous verrou les sept champs éditables, ne conserve que les
@@ -294,7 +302,8 @@ version courante en base.
 - premier accès : consommation atomique par `UPDATE` conditionnel sur le hash,
   l'expiration et l'absence de mot de passe ; seule la ligne retournée peut ouvrir
   une session ;
-- changement/activation/suppression : incrément de `session_version`.
+- changement de badge ou de rôle, activation/désactivation, suppression et
+  réinitialisation du mot de passe : incrément atomique de `session_version`.
 
 ## 9. Autorisation Atelier
 
