@@ -1,5 +1,12 @@
 # Résultats de l'audit de publication Sentinel
 
+> **Rapport historique, remplacé pour la décision de release.** Ce document
+> conserve les preuves obtenues le 17 juillet 2026, mais son verdict technique a
+> été invalidé par les écarts découverts ensuite. Le statut courant et les
+> critères de fermeture sont dans
+> [release-readiness.md](release-readiness.md). La release reste `NO-GO` jusqu'à
+> leur vérification.
+
 Audit final exécuté le **17 juillet 2026** sur le candidat
 `a77d6cb9e449e689f34bd224b102238cac81fb6c`, publié sur `main`, selon
 [audit-prod.md](audit-prod.md) et [release-checklist.md](release-checklist.md).
@@ -196,10 +203,11 @@ GO de production :
 5. déploiement du candidat validé, puis vérification HTTPS des cookies, headers,
    CORS, SMTP, logs et du SHA retourné par `/api/health`.
 
-## Verdict
+## Verdict historique du 17 juillet 2026 — invalidé
 
-**GO technique pour le dépôt et le candidat de déploiement.** Aucun défaut
-bloquant n'est connu dans les contrats locaux ou distants automatisés. Le VPS
+**GO technique rendu à cette date, désormais invalidé pour la release.** Aucun
+défaut bloquant n'était alors connu dans les contrats locaux ou distants
+automatisés. Le VPS
 actuel n'est toutefois **pas encore aligné** sur ce candidat : le GO de mise à
 jour production reste conditionnel au backup, au déploiement, à la vérification
 du SHA et à la recette décrits ci-dessus.
