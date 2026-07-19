@@ -123,8 +123,8 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `HTTP-01` | P1 | 4 | `COOKIE_SECRET` requis mais cookies non signés. | Tests cookie valide, absent et altéré. | IMPLEMENTED |
-| `HTTP-02` | P1 | 4 | Absence de `no-store` global sur les API authentifiées. | Tests d'en-têtes sur Admin, Atelier et Board. | IMPLEMENTED |
+| `HTTP-01` | P1 | 4 | `COOKIE_SECRET` requis mais cookies non signés. | Tests cookie valide, absent et altéré. | VERIFIED |
+| `HTTP-02` | P1 | 4 | Absence de `no-store` global sur les API authentifiées. | Tests d'en-têtes sur Admin, Atelier et Board. | VERIFIED |
 | `HTTP-03` | P1 | 4 | Réauthentification backend à cinq, frontend annoncé à trois et couplé au texte. | Code `SESSION_REVOKED` et parcours frontend dédié. | OPEN |
 | `HTTP-04` | P1 | 4 | Un username admin peut masquer un badge Atelier identique. | Contrat de namespace et tests de création/login. | OPEN |
 | `HTTP-05` | P1 | 4 | Identifiants numériques côté UI, chaînes libres côté API. | Validation partagée et migration avec préflight. | OPEN |
@@ -235,7 +235,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 
 | Sous-lot | Périmètre | Constats | État |
 | --- | --- | --- | --- |
-| `4A` | Signer les cookies, refuser leur altération et empêcher le cache des API authentifiées. | `HTTP-01`, `HTTP-02` | IMPLEMENTED |
+| `4A` | Signer les cookies, refuser leur altération et empêcher le cache des API authentifiées. | `HTTP-01`, `HTTP-02` | VERIFIED |
 | `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | OPEN |
 | `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | OPEN |
 | `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | OPEN |
@@ -254,7 +254,10 @@ Preuves des lots clos :
   `924e81f2cf317af4c63e7b32ee9dbc1dbe43cea8` ;
 - validation commune des lots 3A et 3B, y compris les fixtures E2E isolées :
   commit `85ae0e078f884b1409ba507355b966e72ec9f1f1` et
-  [run CI 251](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29704087931).
+  [run CI 251](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29704087931) ;
+- lot 4A : implémentation `ade07b1a59a2eadca94fc704fc540817abd6ce8f`,
+  correction du harnais navigateur `6cdc7898894cbe13bc183b24f1beaff105afcf8a`
+  et [run CI 254](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29705503071).
 
 Les cinq jobs de chaque preuve sont verts.
 
