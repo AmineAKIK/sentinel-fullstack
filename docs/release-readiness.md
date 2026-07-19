@@ -204,12 +204,12 @@ commit audité au démarrage de cette branche.
 
 Chaque lot part du dernier commit vert de cette branche. Il produit un commit
 fonctionnel ciblé, ses tests et la mise à jour des constats concernés. La preuve
-distante reste attachée à la pull request de stabilisation ; le registre ne
-recopie pas des URL ou numéros de runs susceptibles de devenir obsolètes.
+distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
+à la pull request de stabilisation.
 
 | Lot | Objectif borné | Constats principaux | Prérequis | État |
 | ---: | --- | --- | --- | --- |
-| `0` | Geler la baseline, les décisions, le registre et les portes qualité. | Gouvernance du chantier | Aucun | IMPLEMENTED |
+| `0` | Geler la baseline, les décisions, le registre et les portes qualité. | Gouvernance du chantier | Aucun | VERIFIED |
 | `1` | Rendre le premier accès atomique. | `SEC-01` | Lot 0 | OPEN |
 | `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | OPEN |
 | `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | OPEN |
@@ -223,8 +223,9 @@ recopie pas des URL ou numéros de runs susceptibles de devenir obsolètes.
 | `11` | Régénérer un dossier exact, reproductible et conforme. | `DOC-01` à `DOC-06`, `GOV-01` | Lots 1 à 10 | OPEN |
 | `12` | Construire, déployer et recetter le candidat immuable. | `REL-01` à `REL-04` | Lots 1 à 11 | OPEN |
 
-`IMPLEMENTED` sur le lot 0 signifie que ses artefacts sont présents sur la
-branche. Il ne passe à `VERIFIED` qu'après commit publié et CI distante verte.
+Le lot 0 est vérifié par le commit `064884da348db2c106791033e1fa6772e837cd90`
+et le [run CI 242](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29687592997),
+dont les cinq jobs sont verts.
 
 ### Porte A — intégrité métier
 
