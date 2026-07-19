@@ -186,6 +186,7 @@ frontend/
 - [Déploiement VPS](docs/deploiement-vps.md)
 - [Runbook d'exploitation](docs/runbook.md)
 - [Checklist de publication](docs/release-checklist.md)
+- [Préparation de la release v1.0.0](docs/release-readiness.md)
 - [Protocole d'audit production](docs/audit-prod.md)
 - [Derniers résultats d'audit](docs/audit-prod-resultats.md)
 - [Politique de sécurité](SECURITY.md)

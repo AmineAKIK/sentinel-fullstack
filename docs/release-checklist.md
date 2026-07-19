@@ -3,6 +3,10 @@
 Une publication est autorisée uniquement lorsque chaque contrôle applicable est
 coché et rattaché au commit candidat.
 
+La stabilisation `v1.0.0` est pilotée dans
+[release-readiness.md](release-readiness.md). Aucun candidat ne peut recevoir un
+`GO` tant qu'un constat `P0` ou `P1` de ce registre n'est pas `VERIFIED`.
+
 ## 1. Dépôt
 
 - [ ] la branche cible est `main` et synchronisée avec `origin/main`

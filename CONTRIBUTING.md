@@ -57,3 +57,8 @@ Avec PostgreSQL dédié, exécuter aussi les tests d'intégration et
 - aucun changement utilisateur existant n'est écrasé ;
 - la revue recherche d'abord régressions, sécurité, concurrence et tests manquants ;
 - le push n'est terminé qu'après validation de la CI distante.
+
+La stabilisation `v1.0.0` est menée sur `release/v1.0.0-readiness`. Chaque lot
+met à jour son état et ses preuves dans
+[`docs/release-readiness.md`](docs/release-readiness.md). Un constat n'est fermé
+qu'au statut `VERIFIED`, après tests adaptés et CI verte.
