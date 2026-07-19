@@ -535,6 +535,81 @@ describe('updateIncidentService – OPERATOR', () => {
     );
   });
 
+  it('retourne NO_CHANGES sans écriture pour une demande identique', async () => {
+    const incident = mockIncident({ current_product: 'REF-10' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+
+    const result = await updateIncidentService(
+      1,
+      {
+        requestOnly: true,
+        lineId: 1,
+        machineId: 'M01',
+        robotLabel: 'R01',
+        headNumber: 1,
+        state: 'DEGRADEE',
+        comment: '',
+        currentProduct: 'REF-10',
+      },
+      1,
+      'OPERATOR'
+    );
+
+    expect(result).toMatchObject({ ok: false, status: 400, code: 'NO_CHANGES' });
+    expect(repo.requestEditIncident).not.toHaveBeenCalled();
+    expect(events.logIncidentEvent).not.toHaveBeenCalled();
+    expect(arbitrationRepo.createArbitrationCase).not.toHaveBeenCalled();
+  });
+
+  it("ne conserve que les écarts réels dans la demande et son événement d'audit", async () => {
+    const incident = mockIncident({ current_product: 'REF-10' });
+    const updated = mockIncident({
+      state: 'INDISPONIBLE',
+      current_product: 'REF-10',
+      edit_request: { state: 'INDISPONIBLE' },
+    });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(repo.requestEditIncident).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(17);
+
+    const result = await updateIncidentService(
+      1,
+      {
+        requestOnly: true,
+        lineId: 1,
+        machineId: 'M01',
+        robotLabel: 'R01',
+        headNumber: 1,
+        state: 'INDISPONIBLE',
+        comment: '',
+        currentProduct: 'REF-10',
+      },
+      1,
+      'OPERATOR'
+    );
+
+    expect(result.ok).toBe(true);
+    expect(repo.requestEditIncident).toHaveBeenCalledWith(1, { state: 'INDISPONIBLE' }, null);
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(
+      1,
+      1,
+      'EDIT_REQUESTED',
+      { changes: { state: 'INDISPONIBLE' }, fields: ['state'] },
+      null
+    );
+    expect(arbitrationRepo.createArbitrationCase).toHaveBeenCalledWith(
+      {
+        incidentId: 1,
+        requestEventId: 17,
+        requestType: 'EDIT',
+        payload: { state: 'INDISPONIBLE' },
+        requestedByUserId: 1,
+      },
+      null
+    );
+  });
+
   it('OPERATOR peut demander une correction de ligne sans contourner la whitelist', async () => {
     const incident = mockIncident();
     const updated = mockIncident({ edit_request: { lineId: 2 } });
@@ -611,6 +686,33 @@ describe('arbitration workflow guards', () => {
 });
 
 describe('updateIncidentService – RESPONSABLE', () => {
+  it('traite une édition identique comme un succès sans écriture, audit ni suivi automatique', async () => {
+    const incident = mockIncident({ current_product: 'REF-10' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
+
+    const result = await updateIncidentService(
+      1,
+      {
+        lineId: 1,
+        machineId: 'M01',
+        robotLabel: 'R01',
+        headNumber: 1,
+        state: 'DEGRADEE',
+        comment: '',
+        currentProduct: 'REF-10',
+      },
+      7,
+      'RESPONSABLE'
+    );
+
+    expect(result.ok).toBe(true);
+    expect(repo.getActiveWorkshopLine).not.toHaveBeenCalled();
+    expect(repo.updateIncidentData).not.toHaveBeenCalled();
+    expect(events.logIncidentEvent).not.toHaveBeenCalled();
+    expect(repo.followIncidentData).not.toHaveBeenCalled();
+  });
+
   it("RESPONSABLE peut approuver une correction et l'événement EDIT_APPLIED est loggué", async () => {
     const incident = mockIncident({ edit_request: { state: 'INDISPONIBLE' } });
     const updated = mockIncident({ state: 'INDISPONIBLE' });

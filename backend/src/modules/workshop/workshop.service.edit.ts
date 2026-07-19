@@ -3,6 +3,7 @@ import {
   conflict,
   forbidden,
   notFound,
+  serviceError,
   ServiceResult,
 } from '../../utils/serviceResult';
 import { withTransaction } from '../../db/transaction';
@@ -31,6 +32,44 @@ export const EDIT_FIELD_KEYS = [
 ] as const satisfies readonly (keyof UpdateIncidentInput)[];
 
 export const EDIT_FIELD_SET = new Set<string>(EDIT_FIELD_KEYS);
+
+type EditField = (typeof EDIT_FIELD_KEYS)[number];
+type EditPayload = Partial<Pick<UpdateIncidentInput, EditField>>;
+
+const INCIDENT_FIELD_BY_EDIT_FIELD = {
+  lineId: 'line_id',
+  machineId: 'machine_id',
+  robotLabel: 'robot_label',
+  headNumber: 'head_number',
+  state: 'state',
+  comment: 'comment',
+  currentProduct: 'current_product',
+} as const satisfies Record<EditField, keyof workshopRepository.WorkshopIncidentRow>;
+
+function comparableEditValue(field: EditField, value: unknown): unknown {
+  if (field === 'comment' && (value === null || value === '')) return null;
+  return value;
+}
+
+function changedEditPayload(
+  payload: EditPayload,
+  current: workshopRepository.WorkshopIncidentRow
+): EditPayload {
+  const changes: EditPayload = {};
+
+  for (const field of EDIT_FIELD_KEYS) {
+    const next = payload[field];
+    if (next === undefined) continue;
+
+    const previous = current[INCIDENT_FIELD_BY_EDIT_FIELD[field]];
+    if (Object.is(comparableEditValue(field, next), comparableEditValue(field, previous))) {
+      continue;
+    }
+    changes[field] = next as never;
+  }
+
+  return changes;
+}
 
 export function definedUpdateKeys(updates: UpdateIncidentInput): string[] {
   return Object.keys(updates).filter(
@@ -173,10 +212,15 @@ export async function editIncidentService(
       return { kind: 'forbidden' as const };
     }
 
-    const lineId = updates.lineId ?? current.line_id;
-    const machineId = updates.machineId ?? current.machine_id;
-    const robotLabel = updates.robotLabel ?? current.robot_label;
-    const headNumber = updates.headNumber ?? current.head_number;
+    const effectiveUpdates = changedEditPayload(updates, current);
+    if (requestedChangeKeys(effectiveUpdates).length === 0) {
+      return { kind: 'unchanged' as const, id: current.id };
+    }
+
+    const lineId = effectiveUpdates.lineId ?? current.line_id;
+    const machineId = effectiveUpdates.machineId ?? current.machine_id;
+    const robotLabel = effectiveUpdates.robotLabel ?? current.robot_label;
+    const headNumber = effectiveUpdates.headNumber ?? current.head_number;
 
     const selection = await validateIncidentSelectionService({
       lineId,
@@ -188,30 +232,37 @@ export async function editIncidentService(
       return { kind: 'bad_request' as const, msg: 'Sélection ligne/machine/robot/tête invalide.' };
 
     const directChanges: Record<string, { old: unknown; new: unknown }> = {};
-    if (updates.lineId !== undefined && updates.lineId !== current.line_id) {
+    if (effectiveUpdates.lineId !== undefined) {
       directChanges.lineId = { old: current.line_id, new: lineId };
-      directChanges.lineNumber = { old: current.line_number, new: selection.lineNumber };
+      if (selection.lineNumber !== current.line_number) {
+        directChanges.lineNumber = { old: current.line_number, new: selection.lineNumber };
+      }
     }
-    if (updates.machineId !== undefined && updates.machineId !== current.machine_id) {
+    if (effectiveUpdates.machineId !== undefined) {
       directChanges.machineId = { old: current.machine_id, new: machineId };
-      directChanges.machineBrand = { old: current.machine_brand, new: selection.machineBrand };
+      if (selection.machineBrand !== current.machine_brand) {
+        directChanges.machineBrand = { old: current.machine_brand, new: selection.machineBrand };
+      }
     }
-    if (updates.robotLabel !== undefined && updates.robotLabel !== current.robot_label)
+    if (effectiveUpdates.robotLabel !== undefined)
       directChanges.robotLabel = { old: current.robot_label, new: robotLabel };
-    if (updates.headNumber !== undefined && updates.headNumber !== current.head_number)
+    if (effectiveUpdates.headNumber !== undefined)
       directChanges.headNumber = { old: current.head_number, new: headNumber };
-    if (updates.state !== undefined && updates.state !== current.state)
-      directChanges.state = { old: current.state, new: updates.state };
-    if (updates.comment !== undefined && updates.comment !== current.comment)
-      directChanges.comment = { old: current.comment, new: updates.comment };
-    if (updates.currentProduct !== undefined && updates.currentProduct !== current.current_product)
-      directChanges.currentProduct = { old: current.current_product, new: updates.currentProduct };
+    if (effectiveUpdates.state !== undefined)
+      directChanges.state = { old: current.state, new: effectiveUpdates.state };
+    if (effectiveUpdates.comment !== undefined)
+      directChanges.comment = { old: current.comment, new: effectiveUpdates.comment };
+    if (effectiveUpdates.currentProduct !== undefined)
+      directChanges.currentProduct = {
+        old: current.current_product,
+        new: effectiveUpdates.currentProduct,
+      };
 
     const id = await workshopRepository.updateIncidentData(
       {
         incidentId,
         current,
-        updates,
+        updates: effectiveUpdates,
         role: actorRole,
         actorUserId,
         selection,
@@ -257,7 +308,7 @@ export async function editIncidentService(
 
 export async function requestEditIncidentService(
   incidentId: number,
-  editPayload: Record<string, unknown>,
+  editPayload: EditPayload,
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
@@ -270,18 +321,23 @@ export async function requestEditIncidentService(
     }
     if (!canPerform(actorRole, 'REQUEST_EDIT', current, actorUserId))
       return { kind: 'forbidden' as const };
-    if (Object.keys(editPayload).length === 0)
+    if (requestedChangeKeys(editPayload).length === 0) {
       return { kind: 'bad_request' as const, msg: 'Aucune modification demandée.' };
+    }
+    const requestedChanges = changedEditPayload(editPayload, current);
+    if (requestedChangeKeys(requestedChanges).length === 0) {
+      return { kind: 'no_changes' as const };
+    }
 
-    const id = await workshopRepository.requestEditIncident(incidentId, editPayload, client);
+    const id = await workshopRepository.requestEditIncident(incidentId, requestedChanges, client);
     if (!id) return { kind: 'not_found' as const };
     const requestEventId = await logIncidentEvent(
       incidentId,
       actorUserId,
       'EDIT_REQUESTED',
       {
-        changes: editPayload,
-        fields: requestedChangeKeys(editPayload),
+        changes: requestedChanges,
+        fields: requestedChangeKeys(requestedChanges),
       },
       client
     );
@@ -290,7 +346,7 @@ export async function requestEditIncidentService(
         incidentId,
         requestEventId,
         requestType: 'EDIT',
-        payload: editPayload,
+        payload: requestedChanges,
         requestedByUserId: actorUserId,
       },
       client
@@ -306,6 +362,9 @@ export async function requestEditIncidentService(
     );
   if (result.kind === 'forbidden')
     return forbidden('Demande de correction non autorisée pour ce statut.');
+  if (result.kind === 'no_changes') {
+    return serviceError(400, 'NO_CHANGES', "Aucune modification réelle n'a été détectée.");
+  }
   if (result.kind === 'bad_request') return badRequest(result.msg);
   return {
     ok: true,
