@@ -3,7 +3,7 @@ import { ServiceResult } from '../../utils/serviceResult';
 import { isPostgresError } from '../../utils/postgresError';
 import { withTransaction } from '../../db/transaction';
 import { createLineAuditEvent } from './lines.events';
-import { getLineEventType } from './lines.policy';
+import { getLineEventType, hasStructuralLineChanges } from './lines.policy';
 import {
   cancelActiveIncidentsByLine,
   createLineData,
@@ -173,6 +173,13 @@ export async function updateLineService(
           : { kind: 'not_found' as const };
       }
 
+      if (hasStructuralLineChanges(effective)) {
+        const activeIncidents = await getActiveIncidentCountForLine(id, client);
+        if (activeIncidents > 0) {
+          return { kind: 'in_use' as const, activeIncidents };
+        }
+      }
+
       if (
         effective.lineNumber !== undefined &&
         (await lineNumberExists(effective.lineNumber, id, client))
@@ -187,13 +194,6 @@ export async function updateLineService(
           client
         );
         if (machineConflicts.length > 0) return { kind: 'machine_conflict' as const };
-      }
-
-      if (effective.isActive === false && current.is_active) {
-        const activeIncidents = await getActiveIncidentCountForLine(id, client);
-        if (activeIncidents > 0) {
-          return { kind: 'in_use' as const, activeIncidents };
-        }
       }
 
       const eventType = getLineEventType(current, effective);
@@ -213,7 +213,7 @@ export async function updateLineService(
         ok: false,
         status: 409,
         code: 'RESOURCE_IN_USE',
-        message: `Impossible de désactiver cette ligne : ${result.activeIncidents} incident(s) actif(s) y sont encore liés.`,
+        message: `Impossible de modifier la structure de cette ligne : ${result.activeIncidents} incident(s) actif(s) y sont encore liés.`,
       };
     }
     return { ok: true, data: result.line };

@@ -38,6 +38,13 @@ jest.mock('../../workshop/workshop.arbitration.repository', () => ({
 
 jest.mock('../lines.policy', () => ({
   getLineEventType: jest.fn().mockReturnValue('LINE_UPDATED'),
+  hasStructuralLineChanges: jest.fn((updates: Record<string, unknown>) =>
+    Boolean(
+      updates.lineNumber !== undefined ||
+      updates.machines !== undefined ||
+      updates.isActive === false
+    )
+  ),
 }));
 
 jest.mock('../../../db/transaction', () => ({
@@ -250,6 +257,48 @@ describe('updateLineService', () => {
       expect(result.code).toBe('RESOURCE_IN_USE');
       expect(result.status).toBe(409);
     }
+  });
+
+  it.each([
+    ['renommage', { lineNumber: 'L02' }],
+    [
+      'reconfiguration des machines',
+      {
+        machines: [
+          {
+            machineId: 'M02',
+            brand: 'ABB',
+            hasDoubleRobot: false as const,
+            robotNumber: 'R02',
+            robotHeads: 2,
+          },
+        ],
+      },
+    ],
+  ])('retourne RESOURCE_IN_USE lors du %s d’une ligne utilisée', async (_label, updates) => {
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(mockLineForUpdate());
+    jest.mocked(repo.getActiveIncidentCountForLine).mockResolvedValue(1);
+
+    const result = await updateLineService(1, updates, 1);
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'RESOURCE_IN_USE' });
+    expect(repo.updateLineData).not.toHaveBeenCalled();
+    expect(events.createLineAuditEvent).not.toHaveBeenCalled();
+    expect(repo.lineNumberExists).not.toHaveBeenCalled();
+    expect(repo.findMachineConflicts).not.toHaveBeenCalled();
+  });
+
+  it('autorise l’activation d’une ligne inactive sans la traiter comme une mutation structurelle', async () => {
+    const current = mockLineForUpdate({ is_active: false });
+    const updated = mockLine({ is_active: true });
+    jest.mocked(repo.getLineForUpdate).mockResolvedValue(current);
+    jest.mocked(repo.updateLineData).mockResolvedValue(updated);
+    jest.mocked(events.createLineAuditEvent).mockResolvedValue(undefined);
+
+    const result = await updateLineService(1, { isActive: true }, 1);
+
+    expect(result).toEqual({ ok: true, data: updated });
+    expect(repo.getActiveIncidentCountForLine).not.toHaveBeenCalled();
   });
 
   it('met à jour la ligne avec succès', async () => {

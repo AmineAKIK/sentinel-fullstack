@@ -18,6 +18,8 @@ import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 import { hashWorkshopPassword } from '../../auth/bcrypt';
 import type { ServiceResult } from '../../utils/serviceResult';
+import { archiveLineService, updateLineService } from '../../modules/lines/lines.service';
+import type { UpdateLineInput } from '../../modules/lines/lines.validation';
 import {
   createIncidentService,
   takeIncidentService,
@@ -28,6 +30,11 @@ import {
   invalidateIncidentService,
   updateIncidentService,
 } from '../../modules/workshop/workshop.service';
+import {
+  acquireIntegrationAdminFixture,
+  releaseIntegrationAdminFixture,
+  type IntegrationAdminFixture,
+} from '../helpers/adminFixture';
 
 const DB_URL = process.env.DATABASE_URL!;
 
@@ -38,6 +45,8 @@ let operatorId: number;
 let maintenanceId: number;
 let responsableId: number;
 let lineId: number;
+let adminId: number;
+let adminFixture: IntegrationAdminFixture | undefined;
 
 const integrationMachines = [
   {
@@ -49,9 +58,30 @@ const integrationMachines = [
   },
 ];
 
+const structuralLineMutations: Array<[string, UpdateLineInput]> = [
+  ['line number', { lineNumber: 'L-INT-RENAMED' }],
+  [
+    'machine configuration',
+    {
+      machines: [
+        {
+          machineId: 'M-INT-REPLACEMENT',
+          brand: 'ABB',
+          hasDoubleRobot: false,
+          robotNumber: 'R02',
+          robotHeads: 2,
+        },
+      ],
+    },
+  ],
+  ['deactivation', { isActive: false }],
+];
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
+  adminFixture = await acquireIntegrationAdminFixture(pool);
+  adminId = adminFixture.admin.id;
 
   const { rows: lineRows } = await pool.query<{ id: number }>(
     `INSERT INTO production_lines (line_number, machine_sequence, is_active, is_deleted)
@@ -73,7 +103,8 @@ beforeAll(async () => {
 
   await pool.query(
     `UPDATE production_lines
-     SET machine_sequence = $2::jsonb,
+     SET line_number = 'L-INT-01',
+         machine_sequence = $2::jsonb,
          is_active = TRUE,
          is_deleted = FALSE,
          deleted_at = NULL,
@@ -81,6 +112,7 @@ beforeAll(async () => {
      WHERE id = $1`,
     [lineId, JSON.stringify(integrationMachines)]
   );
+  await pool.query('DELETE FROM line_audit_events WHERE target_line_id = $1', [lineId]);
 
   const hash = await hashWorkshopPassword('test_pass_99');
   const upsertUser = async (badge: string, role: string): Promise<number> => {
@@ -102,7 +134,8 @@ beforeAll(async () => {
 afterEach(async () => {
   await pool.query(
     `UPDATE production_lines
-     SET machine_sequence = $2::jsonb,
+     SET line_number = 'L-INT-01',
+         machine_sequence = $2::jsonb,
          is_active = TRUE,
          is_deleted = FALSE,
          deleted_at = NULL,
@@ -110,6 +143,7 @@ afterEach(async () => {
      WHERE id = $1`,
     [lineId, JSON.stringify(integrationMachines)]
   );
+  await pool.query('DELETE FROM line_audit_events WHERE target_line_id = $1', [lineId]);
 
   // Clear all incidents on the integration test line between tests to avoid
   // the unique constraint on active incidents per machine.
@@ -133,8 +167,10 @@ afterAll(async () => {
   // deux lettres + « -INT- », ex. OP-INT-01). On évite « %-INT-% » qui
   // attraperait aussi les fixtures d'autres suites (ex. RGPD-INT-01) lorsque
   // les fichiers d'intégration s'exécutent en parallèle.
+  await pool.query('DELETE FROM line_audit_events WHERE target_line_id = $1', [lineId]);
   await pool.query(`DELETE FROM sentinel_users WHERE badge_number LIKE '__-INT-%'`);
-  await pool.query(`DELETE FROM production_lines WHERE line_number = 'L-INT-01'`);
+  await pool.query('DELETE FROM production_lines WHERE id = $1', [lineId]);
+  if (adminFixture) await releaseIntegrationAdminFixture(pool, adminFixture);
   await pool.end();
 });
 
@@ -358,158 +394,245 @@ describe('No-op incident mutations (real DB)', () => {
 });
 
 describe('Incident line locking (real DB)', () => {
-  it('never creates an incident on a line archived by a concurrent transaction', async () => {
-    const blocker = await pool.connect();
-    let transactionOpen = false;
-    let createPromise: ReturnType<typeof createIncidentService> | undefined;
+  it.each([1, 2, 3])(
+    'never creates an incident on a line archived by a concurrent transaction (attempt %i)',
+    async () => {
+      const blocker = await pool.connect();
+      let transactionOpen = false;
+      let createPromise: ReturnType<typeof createIncidentService> | undefined;
 
-    try {
-      await blocker.query('BEGIN');
-      transactionOpen = true;
-      await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+      try {
+        await blocker.query('BEGIN');
+        transactionOpen = true;
+        await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
 
-      createPromise = createIncidentService(validInput(), operatorId, 'OPERATOR');
-      await waitForWorkshopLineLockWait();
+        createPromise = createIncidentService(validInput(), operatorId, 'OPERATOR');
+        await waitForWorkshopLineLockWait();
 
-      await blocker.query(
-        `UPDATE production_lines
+        await blocker.query(
+          `UPDATE production_lines
          SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
          WHERE id = $1`,
-        [lineId]
-      );
-      await blocker.query('COMMIT');
-      transactionOpen = false;
+          [lineId]
+        );
+        await blocker.query('COMMIT');
+        transactionOpen = false;
 
-      const result = await createPromise;
-      expect(result).toMatchObject({ ok: false, status: 404, code: 'NOT_FOUND' });
+        const result = await createPromise;
+        expect(result).toMatchObject({ ok: false, status: 404, code: 'NOT_FOUND' });
 
-      const { rows } = await pool.query<{ count: number }>(
-        'SELECT COUNT(*)::int AS count FROM workshop_incidents WHERE line_id = $1',
-        [lineId]
-      );
-      expect(rows[0].count).toBe(0);
-    } finally {
-      if (transactionOpen) await blocker.query('ROLLBACK');
-      blocker.release();
-      await createPromise?.catch(() => undefined);
+        const { rows } = await pool.query<{ count: number }>(
+          'SELECT COUNT(*)::int AS count FROM workshop_incidents WHERE line_id = $1',
+          [lineId]
+        );
+        expect(rows[0].count).toBe(0);
+      } finally {
+        if (transactionOpen) await blocker.query('ROLLBACK');
+        blocker.release();
+        await createPromise?.catch(() => undefined);
+      }
     }
-  });
+  );
 
-  it('rejects a direct edit when a concurrent line reconfiguration invalidates its machine', async () => {
-    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
-      id: number;
-    };
-    const eventsBefore = await getEventTypes(created.id);
-    const blocker = await pool.connect();
-    let transactionOpen = false;
-    let editPromise: ReturnType<typeof updateIncidentService> | undefined;
-    const replacementMachines = [
-      {
-        machineId: `M-INT-RACE-${lineId}`,
-        brand: 'ABB',
-        hasDoubleRobot: false,
-        robotNumber: 'R99',
-        robotHeads: 2,
-      },
-    ];
+  it.each([1, 2, 3])(
+    'rejects a direct edit when concurrent line reconfiguration invalidates its machine (attempt %i)',
+    async () => {
+      const created = assertOk(
+        await createIncidentService(validInput(), operatorId, 'OPERATOR')
+      ) as {
+        id: number;
+      };
+      const eventsBefore = await getEventTypes(created.id);
+      const blocker = await pool.connect();
+      let transactionOpen = false;
+      let editPromise: ReturnType<typeof updateIncidentService> | undefined;
+      const replacementMachines = [
+        {
+          machineId: `M-INT-RACE-${lineId}`,
+          brand: 'ABB',
+          hasDoubleRobot: false,
+          robotNumber: 'R99',
+          robotHeads: 2,
+        },
+      ];
 
-    try {
-      await blocker.query('BEGIN');
-      transactionOpen = true;
-      await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+      try {
+        await blocker.query('BEGIN');
+        transactionOpen = true;
+        await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
 
-      editPromise = updateIncidentService(
-        created.id,
-        { state: 'INDISPONIBLE' },
-        responsableId,
-        'RESPONSABLE'
-      );
-      await waitForWorkshopLineLockWait();
+        editPromise = updateIncidentService(
+          created.id,
+          { state: 'INDISPONIBLE' },
+          responsableId,
+          'RESPONSABLE'
+        );
+        await waitForWorkshopLineLockWait();
 
-      await blocker.query(
-        `UPDATE production_lines
+        await blocker.query(
+          `UPDATE production_lines
          SET machine_sequence = $2::jsonb, updated_at = NOW()
          WHERE id = $1`,
-        [lineId, JSON.stringify(replacementMachines)]
-      );
-      await blocker.query('COMMIT');
-      transactionOpen = false;
+          [lineId, JSON.stringify(replacementMachines)]
+        );
+        await blocker.query('COMMIT');
+        transactionOpen = false;
 
-      const result = await editPromise;
-      expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
+        const result = await editPromise;
+        expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
 
-      const { rows } = await pool.query<{ state: string }>(
-        'SELECT state FROM workshop_incidents WHERE id = $1',
-        [created.id]
-      );
-      expect(rows[0].state).toBe('DEGRADEE');
-      expect(await getEventTypes(created.id)).toEqual(eventsBefore);
-    } finally {
-      if (transactionOpen) await blocker.query('ROLLBACK');
-      blocker.release();
-      await editPromise?.catch(() => undefined);
+        const { rows } = await pool.query<{ state: string }>(
+          'SELECT state FROM workshop_incidents WHERE id = $1',
+          [created.id]
+        );
+        expect(rows[0].state).toBe('DEGRADEE');
+        expect(await getEventTypes(created.id)).toEqual(eventsBefore);
+      } finally {
+        if (transactionOpen) await blocker.query('ROLLBACK');
+        blocker.release();
+        await editPromise?.catch(() => undefined);
+      }
     }
+  );
+
+  it.each([1, 2, 3])(
+    'keeps an edit request open when concurrent reconfiguration invalidates approval (attempt %i)',
+    async () => {
+      const created = assertOk(
+        await createIncidentService(validInput(), operatorId, 'OPERATOR')
+      ) as {
+        id: number;
+      };
+      assertOk(
+        await updateIncidentService(
+          created.id,
+          { requestOnly: true, state: 'INDISPONIBLE' },
+          operatorId,
+          'OPERATOR'
+        )
+      );
+      const blocker = await pool.connect();
+      let transactionOpen = false;
+      let approvalPromise: ReturnType<typeof updateIncidentService> | undefined;
+      const replacementMachines = [
+        {
+          machineId: `M-INT-APPROVAL-${lineId}`,
+          brand: 'Kuka',
+          hasDoubleRobot: false,
+          robotNumber: 'R98',
+          robotHeads: 2,
+        },
+      ];
+
+      try {
+        await blocker.query('BEGIN');
+        transactionOpen = true;
+        await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+
+        approvalPromise = updateIncidentService(
+          created.id,
+          { applyEditRequest: true },
+          responsableId,
+          'RESPONSABLE'
+        );
+        await waitForWorkshopLineLockWait();
+
+        await blocker.query(
+          `UPDATE production_lines
+         SET machine_sequence = $2::jsonb, updated_at = NOW()
+         WHERE id = $1`,
+          [lineId, JSON.stringify(replacementMachines)]
+        );
+        await blocker.query('COMMIT');
+        transactionOpen = false;
+
+        const result = await approvalPromise;
+        expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
+
+        const snapshot = await getIncidentMutationSnapshot(created.id);
+        expect(snapshot.edit_request).toMatchObject({ state: 'INDISPONIBLE' });
+        expect(await countArbitrationCases(created.id)).toBe(1);
+        expect(await getEventTypes(created.id)).not.toContain('EDIT_APPLIED');
+      } finally {
+        if (transactionOpen) await blocker.query('ROLLBACK');
+        blocker.release();
+        await approvalPromise?.catch(() => undefined);
+      }
+    }
+  );
+});
+
+describe('Active line structural freeze (real DB)', () => {
+  it.each(structuralLineMutations)(
+    'rejects %s while an active incident references the line',
+    async (_label, updates) => {
+      assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR'));
+
+      const result = await updateLineService(lineId, updates, adminId);
+
+      expect(result).toMatchObject({ ok: false, status: 409, code: 'RESOURCE_IN_USE' });
+      const { rows } = await pool.query<{
+        line_number: string;
+        machine_sequence: typeof integrationMachines;
+        is_active: boolean;
+      }>(
+        `SELECT line_number, machine_sequence, is_active
+         FROM production_lines
+         WHERE id = $1`,
+        [lineId]
+      );
+      expect(rows[0]).toEqual({
+        line_number: 'L-INT-01',
+        machine_sequence: integrationMachines,
+        is_active: true,
+      });
+      const { rows: auditRows } = await pool.query<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM line_audit_events WHERE target_line_id = $1',
+        [lineId]
+      );
+      expect(auditRows[0].count).toBe(0);
+    }
+  );
+
+  it('rejects archival after a concurrent-safe incident creation', async () => {
+    assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR'));
+
+    const result = await archiveLineService(lineId, adminId);
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: 409,
+      code: 'LINE_HAS_ACTIVE_INCIDENTS',
+    });
+    const { rows } = await pool.query<{ is_deleted: boolean }>(
+      'SELECT is_deleted FROM production_lines WHERE id = $1',
+      [lineId]
+    );
+    expect(rows[0].is_deleted).toBe(false);
   });
 
-  it('keeps an edit request open when concurrent reconfiguration invalidates its approval', async () => {
+  it('allows a rename after closure without rewriting the incident snapshot', async () => {
     const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
       id: number;
     };
+    assertOk(await takeIncidentService(created.id, maintenanceId, 'MAINTENANCE'));
     assertOk(
-      await updateIncidentService(
+      await closeIncidentService(
         created.id,
-        { requestOnly: true, state: 'INDISPONIBLE' },
-        operatorId,
-        'OPERATOR'
+        'Intervention terminée pour vérifier le snapshot de ligne.',
+        maintenanceId,
+        'MAINTENANCE'
       )
     );
-    const blocker = await pool.connect();
-    let transactionOpen = false;
-    let approvalPromise: ReturnType<typeof updateIncidentService> | undefined;
-    const replacementMachines = [
-      {
-        machineId: `M-INT-APPROVAL-${lineId}`,
-        brand: 'Kuka',
-        hasDoubleRobot: false,
-        robotNumber: 'R98',
-        robotHeads: 2,
-      },
-    ];
 
-    try {
-      await blocker.query('BEGIN');
-      transactionOpen = true;
-      await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+    const result = await updateLineService(lineId, { lineNumber: 'L-INT-RENAMED' }, adminId);
 
-      approvalPromise = updateIncidentService(
-        created.id,
-        { applyEditRequest: true },
-        responsableId,
-        'RESPONSABLE'
-      );
-      await waitForWorkshopLineLockWait();
-
-      await blocker.query(
-        `UPDATE production_lines
-         SET machine_sequence = $2::jsonb, updated_at = NOW()
-         WHERE id = $1`,
-        [lineId, JSON.stringify(replacementMachines)]
-      );
-      await blocker.query('COMMIT');
-      transactionOpen = false;
-
-      const result = await approvalPromise;
-      expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
-
-      const snapshot = await getIncidentMutationSnapshot(created.id);
-      expect(snapshot.edit_request).toMatchObject({ state: 'INDISPONIBLE' });
-      expect(await countArbitrationCases(created.id)).toBe(1);
-      expect(await getEventTypes(created.id)).not.toContain('EDIT_APPLIED');
-    } finally {
-      if (transactionOpen) await blocker.query('ROLLBACK');
-      blocker.release();
-      await approvalPromise?.catch(() => undefined);
-    }
+    expect(result.ok).toBe(true);
+    const { rows } = await pool.query<{ line_number: string }>(
+      'SELECT line_number FROM workshop_incidents WHERE id = $1',
+      [created.id]
+    );
+    expect(rows[0].line_number).toBe('L-INT-01');
   });
 });
 
