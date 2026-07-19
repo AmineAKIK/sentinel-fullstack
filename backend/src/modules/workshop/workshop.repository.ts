@@ -97,6 +97,12 @@ export interface ActiveWorkshopLine {
   machines: StoredMachine[];
 }
 
+export interface IncidentLineLockContext {
+  line_id: number;
+  edit_request: Record<string, unknown> | null;
+  row_version: string;
+}
+
 export interface IncidentCancelSnapshot {
   status: IncidentStatus;
   is_taken: boolean;
@@ -136,6 +142,10 @@ export interface WorkshopIncidentRow extends CurrentIncident {
   followed_at?: Date | null;
   arbitration?: Record<string, unknown> | null;
   [key: string]: unknown;
+}
+
+export interface LockedWorkshopIncidentRow extends WorkshopIncidentRow {
+  row_version: string;
 }
 
 export interface IncidentSelection {
@@ -462,6 +472,41 @@ export async function getActiveWorkshopLine(lineId: number): Promise<ActiveWorks
   return rows[0] ?? null;
 }
 
+export async function getIncidentLineLockContext(
+  incidentId: number
+): Promise<IncidentLineLockContext | null> {
+  const { rows } = await pool.query<IncidentLineLockContext>(
+    `SELECT line_id, edit_request, xmin::text AS row_version
+     FROM workshop_incidents
+     WHERE id = $1`,
+    [incidentId]
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function lockActiveWorkshopLines(
+  lineIds: number[],
+  client: PoolClient
+): Promise<ActiveWorkshopLine[]> {
+  const sortedLineIds = [...new Set(lineIds)].sort((left, right) => left - right);
+  const lines: ActiveWorkshopLine[] = [];
+
+  // One query per row makes the global ascending lock order explicit and stable.
+  for (const lineId of sortedLineIds) {
+    const { rows } = await client.query<ActiveWorkshopLine>(
+      `SELECT id, line_number, machine_sequence AS machines
+       FROM production_lines
+       WHERE id = $1 AND is_deleted = FALSE AND is_active = TRUE
+       FOR UPDATE`,
+      [lineId]
+    );
+    if (rows[0]) lines.push(rows[0]);
+  }
+
+  return lines;
+}
+
 export async function createIncidentData(
   input: {
     actorUserId: number;
@@ -543,11 +588,15 @@ export async function cancelIncidentData(
 export async function getIncidentById(
   incidentId: number,
   client?: PoolClient
-): Promise<WorkshopIncidentRow | null> {
+): Promise<LockedWorkshopIncidentRow | null> {
   const db = client ?? pool;
-  const { rows } = await db.query('SELECT * FROM workshop_incidents WHERE id = $1 FOR UPDATE', [
-    incidentId,
-  ]);
+  const { rows } = await db.query<LockedWorkshopIncidentRow>(
+    `SELECT *, xmin::text AS row_version
+     FROM workshop_incidents
+     WHERE id = $1
+     FOR UPDATE`,
+    [incidentId]
+  );
   return rows[0] ?? null;
 }
 
