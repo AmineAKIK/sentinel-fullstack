@@ -7,6 +7,8 @@
  */
 export const E2E_ADMIN_USERNAME = 'e2e-admin';
 export const E2E_ADMIN_PASSWORD = 'E2eAdminPass!23';
+export const E2E_ADMIN_LINE_NUMBER = '998';
+export const E2E_ADMIN_MACHINE_ID = 'E2E-MCH-ADMIN-1';
 export const E2E_LINE_NUMBER = '999';
 export const E2E_MACHINE_ID = 'E2E-MCH-1';
 export const E2E_RESPONSABLE_BADGE = 'E2E-RESP';

@@ -15,8 +15,10 @@ Source : `backend/scripts/seedE2E.ts`.
 | Responsable | badge `E2E-RESP` |
 | Opérateur | badge `E2E-OPER` |
 | Mot de passe Atelier | `E2eWorkshop!23` |
-| Ligne | `999` |
-| Machine | `E2E-MCH-1`, Panasonic, robot simple, 16 têtes |
+| Ligne Admin modifiable | `998` |
+| Machine Admin | `E2E-MCH-ADMIN-1`, Panasonic, robot simple, 16 têtes |
+| Ligne Atelier avec incidents actifs | `999` |
+| Machine Atelier | `E2E-MCH-1`, Panasonic, robot simple, 16 têtes |
 
 Ces secrets sont publics et strictement destinés à une base jetable. Ils ne
 doivent jamais être créés en production.
@@ -26,8 +28,8 @@ doivent jamais être créés en production.
 Le seed :
 
 1. crée ou remet à niveau l'admin E2E ;
-2. supprime uniquement les anciens incidents/cas/followers/audits de la ligne 999 ;
-3. recrée la ligne et sa machine ;
+2. supprime uniquement les anciennes fixtures réservées des lignes 998 et 999 ;
+3. recrée la ligne Admin sans incident et la ligne Atelier avec leurs machines ;
 4. crée ou met à niveau l'opérateur et le responsable ;
 5. crée un incident `INDISPONIBLE` avec demande d'annulation `ACTIVE` ;
 6. crée un incident `DEGRADEE` avec demande de correction `ACTIVE`.
@@ -65,11 +67,11 @@ déjà lancé.
 ### Administration des machines
 
 - connexion admin ;
-- ouverture de la ligne 999 ;
-- modification du numéro de robot simple ;
-- confirmation que la sauvegarde persiste ;
-- conversion simple vers double robot ;
-- validation des champs gauche/droite et persistance.
+- ouverture de la ligne Admin 998 ;
+- no-op bloqué avant l'appel serveur et sans faux message de succès ;
+- aperçu avant/après d'une vraie modification de marque puis confirmation ;
+- nouvelle exécution robuste aux retries Playwright ;
+- tentative sur la ligne Atelier 999 et refus tant que ses incidents sont actifs.
 
 ### Arbitrage mobile d'annulation
 
@@ -159,7 +161,7 @@ traçabilité sans dépendre d'une donnée manuelle fragile.
 Le moyen sûr est de supprimer la base de test entière. Le garde-fou refuse le
 seed E2E si le nom de base ne se termine pas par `_e2e` ou si
 `NODE_ENV=production`. Sur une base de recette partagée explicitement nommée
-pour l'E2E, le seed ne touche qu'aux fixtures réservées de la ligne 999.
+pour l'E2E, le seed ne touche qu'aux fixtures réservées des lignes 998 et 999.
 
 Ne pas utiliser `docker compose down -v` sur un environnement contenant des
 données à conserver.
