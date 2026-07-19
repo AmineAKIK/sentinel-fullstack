@@ -6,6 +6,16 @@ function machineOrder(machines: Array<{ machineId: string }>): string[] {
   return machines.map((machine) => machine.machineId);
 }
 
+export function hasStructuralLineChanges(updates: {
+  lineNumber?: string;
+  isActive?: boolean;
+  machines?: Array<{ machineId: string }>;
+}): boolean {
+  return (
+    updates.lineNumber !== undefined || updates.machines !== undefined || updates.isActive === false
+  );
+}
+
 export function getLineEventType(
   current: {
     line_number: string;

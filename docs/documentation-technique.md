@@ -256,6 +256,14 @@ ligne active verrouillée, sélection validée, puis insertion. Si l'incident a 
 pendant la préparation d'une édition ou d'un arbitrage, l'API répond `409 CONFLICT`
 et n'applique aucun effet sur un état obsolète.
 
+Les mutations du référentiel verrouillent elles aussi la ligne avant de recompter
+ses incidents `OPEN` ou `PENDING`. Si ce compteur est non nul, le numéro, toute
+modification de `machine_sequence` et la désactivation répondent
+`409 RESOURCE_IN_USE` avant les recherches de conflits, l'écriture ou l'audit.
+Une fois tous les incidents terminés, ces mutations redeviennent possibles sans
+modifier les snapshots `line_number`, machine, robot et tête déjà portés par les
+incidents historiques.
+
 La prise en charge n'a pas de dépendance ligne : elle verrouille donc l'utilisateur,
 revalide sous verrou son activation, sa non-suppression et son rôle Maintenance,
 puis verrouille l'incident. Désactivation, suppression et changement de rôle

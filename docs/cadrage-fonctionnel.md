@@ -132,7 +132,8 @@ Règles :
 - identifiant machine unique dans tout le référentiel actif ;
 - payload machine validé côté formulaire, Zod et PostgreSQL ;
 - conflits recalculés sous transaction au moment de l'écriture ;
-- désactivation refusée en présence d'incidents actifs ;
+- numéro, séquence/configuration des machines et désactivation gelés en présence
+  d'incidents actifs ;
 - archivage forcé explicite possible selon l'impact affiché et les droits.
 
 Le backend conserve l'ordre JSON attendu par l'interface et une projection SQL
