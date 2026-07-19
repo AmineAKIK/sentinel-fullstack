@@ -93,6 +93,13 @@ Viewport 393 x 851 :
 - application de la valeur demandée ;
 - fermeture du cas d'arbitrage.
 
+### Sécurité HTTP
+
+- connexion Admin et altération d'un octet du cookie signé ;
+- refus `401` et suppression du cookie falsifié ;
+- `Cache-Control: no-store` vérifié sur Auth, Admin, Atelier et Board ;
+- contrôles exécutés contre les vrais serveurs Express et Vite de la suite.
+
 ## 3. Jeu d'intégration PostgreSQL
 
 Sources : `backend/src/integration/__tests__/`.

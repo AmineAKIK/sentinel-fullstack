@@ -1,6 +1,12 @@
 import crypto from 'crypto';
 import { NextFunction, Request, Response, Router } from 'express';
-import { WORKSHOP_AUTH_COOKIE, authCookieOptions, clearAuthCookie } from '../../auth/authCookies';
+import {
+  WORKSHOP_AUTH_COOKIE,
+  authCookieOptions,
+  clearAuthCookie,
+  hasTamperedAuthCookie,
+  readSignedAuthCookie,
+} from '../../auth/authCookies';
 import {
   sendInvalidServerConfig,
   sendInvalidSession,
@@ -58,8 +64,13 @@ function clearBoardCookie(res: Response): void {
 }
 
 async function hasValidWorkshopSession(req: Request, res: Response): Promise<boolean> {
-  const token = req.cookies?.[WORKSHOP_AUTH_COOKIE];
-  if (!token) return false;
+  const token = readSignedAuthCookie(req, WORKSHOP_AUTH_COOKIE);
+  if (!token) {
+    if (hasTamperedAuthCookie(req, WORKSHOP_AUTH_COOKIE)) {
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+    }
+    return false;
+  }
 
   const payload = verifyAuthToken(token, 'workshop');
   if (!isWorkshopSessionPayload(payload)) return false;
@@ -91,8 +102,11 @@ async function hasValidWorkshopSession(req: Request, res: Response): Promise<boo
 }
 
 async function hasValidBoardSession(req: Request, res: Response): Promise<boolean> {
-  const token = req.cookies?.[BOARD_AUTH_COOKIE];
-  if (!token) return false;
+  const token = readSignedAuthCookie(req, BOARD_AUTH_COOKIE);
+  if (!token) {
+    if (hasTamperedAuthCookie(req, BOARD_AUTH_COOKIE)) clearBoardCookie(res);
+    return false;
+  }
 
   const payload = verifyAuthToken(token, 'board');
   if (!isBoardSessionPayload(payload)) {

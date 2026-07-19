@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { clearAuthCookie, WORKSHOP_AUTH_COOKIE } from '../auth/authCookies';
+import {
+  clearAuthCookie,
+  hasTamperedAuthCookie,
+  readSignedAuthCookie,
+  WORKSHOP_AUTH_COOKIE,
+} from '../auth/authCookies';
 import {
   handleJwtError,
   sendInvalidServerConfig,
@@ -30,9 +35,14 @@ async function authenticateWorkshopRequest(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const token = req.cookies?.[WORKSHOP_AUTH_COOKIE];
+  const token = readSignedAuthCookie(req, WORKSHOP_AUTH_COOKIE);
 
   if (!token) {
+    if (hasTamperedAuthCookie(req, WORKSHOP_AUTH_COOKIE)) {
+      clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+      sendInvalidSession(res);
+      return;
+    }
     sendMissingAuth(res);
     return;
   }

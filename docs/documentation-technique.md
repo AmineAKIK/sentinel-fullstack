@@ -283,11 +283,14 @@ et un commentaire `NULL` sont équivalents pour cette comparaison.
 ### 8.1 Entrée unifiée
 
 `POST /api/auth/login` détermine le type de compte à partir de l'entrée validée,
-vérifie bcrypt et émet le cookie de l'audience correspondante. Les anciennes API
-de login séparées ont été supprimées.
+vérifie bcrypt et émet le cookie de l'audience correspondante. Chaque cookie est
+HTTP-only, signé par `COOKIE_SECRET` et contient un JWT signé séparément par
+`JWT_SECRET`. Les guards lisent uniquement `signedCookies` ; une valeur altérée
+est refusée puis effacée. Les anciennes API de login séparées ont été supprimées.
 
 `GET /api/auth/me` retourne la session valide et `POST /api/auth/logout` efface
-les cookies de session.
+les cookies de session. Les espaces `/api/auth`, `/api/admin`, `/api/workshop` et
+`/api/board` répondent avec `Cache-Control: no-store`, y compris en erreur.
 
 ### 8.2 Payloads
 

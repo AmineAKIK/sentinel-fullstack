@@ -4,6 +4,8 @@ import {
   WORKSHOP_AUTH_COOKIE,
   setAuthCookie,
   clearAuthCookie,
+  hasTamperedAuthCookie,
+  readSignedAuthCookie,
 } from '../../auth/authCookies';
 import { signAuthToken, verifyAuthToken, isJwtSessionError } from '../../auth/jwt';
 import { sendError } from '../../utils/errors';
@@ -129,8 +131,14 @@ export async function login(req: Request, res: Response): Promise<void> {
 }
 
 export async function me(req: Request, res: Response): Promise<void> {
-  const adminToken = req.cookies?.[ADMIN_AUTH_COOKIE];
-  const workshopToken = req.cookies?.[WORKSHOP_AUTH_COOKIE];
+  if (hasTamperedAuthCookie(req, ADMIN_AUTH_COOKIE)) {
+    clearAuthCookie(res, ADMIN_AUTH_COOKIE);
+  }
+  if (hasTamperedAuthCookie(req, WORKSHOP_AUTH_COOKIE)) {
+    clearAuthCookie(res, WORKSHOP_AUTH_COOKIE);
+  }
+  const adminToken = readSignedAuthCookie(req, ADMIN_AUTH_COOKIE);
+  const workshopToken = readSignedAuthCookie(req, WORKSHOP_AUTH_COOKIE);
 
   try {
     if (adminToken) {
