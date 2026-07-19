@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { ADMIN_AUTH_COOKIE } from '../auth/authCookies';
+import {
+  ADMIN_AUTH_COOKIE,
+  clearAuthCookie,
+  hasTamperedAuthCookie,
+  readSignedAuthCookie,
+} from '../auth/authCookies';
 import {
   handleJwtError,
   sendInvalidServerConfig,
@@ -29,9 +34,14 @@ async function authenticateAdminRequest(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const token = req.cookies?.[ADMIN_AUTH_COOKIE];
+  const token = readSignedAuthCookie(req, ADMIN_AUTH_COOKIE);
 
   if (!token) {
+    if (hasTamperedAuthCookie(req, ADMIN_AUTH_COOKIE)) {
+      clearAuthCookie(res, ADMIN_AUTH_COOKIE);
+      sendInvalidSession(res);
+      return;
+    }
     sendMissingAuth(res);
     return;
   }

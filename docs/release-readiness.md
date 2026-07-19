@@ -123,8 +123,8 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `HTTP-01` | P1 | 4 | `COOKIE_SECRET` requis mais cookies non signés. | Tests cookie valide, absent et altéré. | OPEN |
-| `HTTP-02` | P1 | 4 | Absence de `no-store` global sur les API authentifiées. | Tests d'en-têtes sur Admin, Atelier et Board. | OPEN |
+| `HTTP-01` | P1 | 4 | `COOKIE_SECRET` requis mais cookies non signés. | Tests cookie valide, absent et altéré. | IMPLEMENTED |
+| `HTTP-02` | P1 | 4 | Absence de `no-store` global sur les API authentifiées. | Tests d'en-têtes sur Admin, Atelier et Board. | IMPLEMENTED |
 | `HTTP-03` | P1 | 4 | Réauthentification backend à cinq, frontend annoncé à trois et couplé au texte. | Code `SESSION_REVOKED` et parcours frontend dédié. | OPEN |
 | `HTTP-04` | P1 | 4 | Un username admin peut masquer un badge Atelier identique. | Contrat de namespace et tests de création/login. | OPEN |
 | `HTTP-05` | P1 | 4 | Identifiants numériques côté UI, chaînes libres côté API. | Validation partagée et migration avec préflight. | OPEN |
@@ -230,6 +230,16 @@ preuve propre :
 | --- | --- | --- | --- |
 | `3A` | Revalider l'utilisateur affecté, sérialiser son cycle de vie et révoquer les sessions après changement d'autorité. | `CON-04`, `AUTH-01` | VERIFIED |
 | `3B` | Verrouiller et revalider les lignes, puis geler leurs champs structurels tant qu'un incident actif les référence. | `CON-01`, `CON-02`, `CON-03` | VERIFIED |
+
+Les lots 4 et 5 suivent le même découpage de preuve :
+
+| Sous-lot | Périmètre | Constats | État |
+| --- | --- | --- | --- |
+| `4A` | Signer les cookies, refuser leur altération et empêcher le cache des API authentifiées. | `HTTP-01`, `HTTP-02` | IMPLEMENTED |
+| `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | OPEN |
+| `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | OPEN |
+| `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | OPEN |
+| `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | OPEN |
 
 Preuves des lots clos :
 
