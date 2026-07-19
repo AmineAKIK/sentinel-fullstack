@@ -5,7 +5,11 @@ import {
   verifyPassword,
 } from '../../auth/bcrypt';
 import { verifyWorkshopPasswordSetupCode } from '../../auth/setupCode';
-import { findWorkshopUserByBadge, setWorkshopUserPassword } from './workshopCredentials.repository';
+import {
+  consumeWorkshopPasswordSetupCode,
+  findWorkshopUserByBadge,
+  WorkshopLoginUser,
+} from './workshopCredentials.repository';
 
 export type LoginResult =
   | { kind: 'invalid_badge' }
@@ -26,6 +30,20 @@ export type LoginResult =
         sessionVersion: number;
       };
     };
+
+function successResult(user: WorkshopLoginUser): LoginResult {
+  return {
+    kind: 'success',
+    user: {
+      id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      badge_number: user.badge_number,
+      role: user.role,
+      sessionVersion: user.session_version,
+    },
+  };
+}
 
 export async function loginWorkshopUserService(
   badgeNumber: string,
@@ -70,7 +88,29 @@ export async function loginWorkshopUserService(
     if (!validSetupCode) return { kind: 'invalid_setup_code' };
 
     const passwordHash = await hashWorkshopPassword(newPassword);
-    await setWorkshopUserPassword(user.id, passwordHash);
+    const authenticatedUser = await consumeWorkshopPasswordSetupCode({
+      userId: user.id,
+      passwordHash,
+      expectedSetupTokenHash: user.password_setup_token_hash,
+    });
+    if (!authenticatedUser) {
+      const currentUser = await findWorkshopUserByBadge(badgeNumber);
+      if (!currentUser) return { kind: 'invalid_badge' };
+      if (!currentUser.is_active) return { kind: 'account_disabled' };
+      if (currentUser.password_hash) {
+        return { kind: 'requires_password', badgeNumber: currentUser.badge_number };
+      }
+      if (
+        !currentUser.password_setup_token_hash ||
+        !currentUser.password_setup_expires_at ||
+        currentUser.password_setup_expires_at.getTime() <= Date.now()
+      ) {
+        return { kind: 'expired_setup_code' };
+      }
+      return { kind: 'invalid_setup_code' };
+    }
+
+    return successResult(authenticatedUser);
   } else {
     if (!password || typeof password !== 'string') {
       return { kind: 'requires_password', badgeNumber: user.badge_number };
@@ -79,15 +119,5 @@ export async function loginWorkshopUserService(
     if (!valid) return { kind: 'invalid_password' };
   }
 
-  return {
-    kind: 'success',
-    user: {
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      badge_number: user.badge_number,
-      role: user.role,
-      sessionVersion: user.session_version,
-    },
-  };
+  return successResult(user);
 }

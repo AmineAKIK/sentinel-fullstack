@@ -271,6 +271,9 @@ version courante en base.
 - mots de passe Admin/Atelier : bcrypt avec politiques distinctes ;
 - code Board : bcrypt et comparaison constante fournie par la bibliothèque ;
 - setup/reset : token aléatoire remis une fois, condensat seulement en base ;
+- premier accès : consommation atomique par `UPDATE` conditionnel sur le hash,
+  l'expiration et l'absence de mot de passe ; seule la ligne retournée peut ouvrir
+  une session ;
 - changement/activation/suppression : incrément de `session_version`.
 
 ## 9. Autorisation Atelier

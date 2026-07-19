@@ -110,7 +110,7 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `SEC-01` | P0 | 1 | Code temporaire vérifié puis supprimé par opérations séparées. | Test PostgreSQL concurrent : un seul succès. | OPEN |
+| `SEC-01` | P0 | 1 | Code temporaire vérifié puis supprimé par opérations séparées. | Test PostgreSQL concurrent : un seul succès. | IMPLEMENTED |
 | `AUD-01` | P0 | 2 | Une édition directe identique écrit `INCIDENT_UPDATED` vide. | Test service + intégration sur le nombre d'événements. | OPEN |
 | `AUD-02` | P0 | 2 | Une demande identique peut ouvrir un arbitrage. | Réponse `NO_CHANGES`, aucun cas ni événement créé. | OPEN |
 | `CON-01` | P0 | 3 | Création validée avant transaction contre archivage/modification de ligne. | Test concurrent création/archivage et invariant final. | OPEN |
@@ -210,7 +210,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | Lot | Objectif borné | Constats principaux | Prérequis | État |
 | ---: | --- | --- | --- | --- |
 | `0` | Geler la baseline, les décisions, le registre et les portes qualité. | Gouvernance du chantier | Aucun | VERIFIED |
-| `1` | Rendre le premier accès atomique. | `SEC-01` | Lot 0 | OPEN |
+| `1` | Rendre le premier accès atomique. | `SEC-01` | Lot 0 | IMPLEMENTED |
 | `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | OPEN |
 | `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | OPEN |
 | `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | OPEN |

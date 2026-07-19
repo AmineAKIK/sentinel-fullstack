@@ -19,6 +19,7 @@ import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 import { hashAdminPassword, hashWorkshopPassword } from '../../auth/bcrypt';
 import { unifiedLoginService } from '../../modules/auth/auth.service';
+import { consumeWorkshopPasswordSetupCode } from '../../modules/workshopCredentials/workshopCredentials.repository';
 import {
   generateWorkshopPasswordSetupCode,
   hashWorkshopPasswordSetupCode,
@@ -102,12 +103,13 @@ async function insertWorkshopUser(opts: {
   role?: string;
   withPassword?: string;
   active?: boolean;
+  setupCode?: string;
 }): Promise<number> {
-  const { badge, role = 'OPERATOR', withPassword, active = true } = opts;
+  const { badge, role = 'OPERATOR', withPassword, active = true, setupCode } = opts;
   const passwordHash = withPassword ? await hashWorkshopPassword(withPassword) : null;
   const setupTokenHash = withPassword
     ? null
-    : await hashWorkshopPasswordSetupCode(generateWorkshopPasswordSetupCode());
+    : await hashWorkshopPasswordSetupCode(setupCode ?? generateWorkshopPasswordSetupCode());
   const setupExpiry = withPassword ? null : getWorkshopPasswordSetupExpiry(24);
 
   const { rows } = await pool.query<{ id: number }>(
@@ -229,6 +231,95 @@ describe('Workshop login (real DB)', () => {
   it('returns invalid_credentials for unknown badge number', async () => {
     const result = await unifiedLoginService(`${BADGE_PREFIX}UNKNOWN`, 'any', undefined, undefined);
     expect(result.kind).toBe('invalid_credentials');
+  });
+
+  it('authorizes exactly one of two concurrent first-access requests', async () => {
+    const badge = `${BADGE_PREFIX}006`;
+    const setupCode = 'ABCD234567';
+    const candidatePasswords = ['concurrent_password_A', 'concurrent_password_B'] as const;
+    await insertWorkshopUser({ badge, setupCode });
+
+    const results = await Promise.all(
+      candidatePasswords.map((newPassword) =>
+        unifiedLoginService(badge, undefined, newPassword, setupCode)
+      )
+    );
+
+    const successfulIndexes = results.flatMap((result, index) =>
+      result.kind === 'workshop_success' ? [index] : []
+    );
+    expect(successfulIndexes).toHaveLength(1);
+
+    const winningIndex = successfulIndexes[0];
+    const losingIndex = winningIndex === 0 ? 1 : 0;
+    await expect(
+      unifiedLoginService(badge, candidatePasswords[winningIndex], undefined, undefined)
+    ).resolves.toMatchObject({ kind: 'workshop_success' });
+    await expect(
+      unifiedLoginService(badge, candidatePasswords[losingIndex], undefined, undefined)
+    ).resolves.toEqual({ kind: 'invalid_credentials' });
+
+    const { rows } = await pool.query<{
+      password_hash: string | null;
+      password_setup_token_hash: string | null;
+      password_setup_expires_at: Date | null;
+    }>(
+      `SELECT password_hash, password_setup_token_hash, password_setup_expires_at
+       FROM sentinel_users
+       WHERE badge_number = $1`,
+      [badge]
+    );
+    expect(rows[0]).toMatchObject({
+      password_hash: expect.any(String),
+      password_setup_token_hash: null,
+      password_setup_expires_at: null,
+    });
+  });
+
+  it('atomically consumes a setup hash only once in PostgreSQL', async () => {
+    const badge = `${BADGE_PREFIX}007`;
+    const setupCode = 'EFGH345678';
+    const userId = await insertWorkshopUser({ badge, setupCode });
+    const { rows } = await pool.query<{ password_setup_token_hash: string }>(
+      `SELECT password_setup_token_hash
+       FROM sentinel_users
+       WHERE id = $1`,
+      [userId]
+    );
+    const setupTokenHash = rows[0].password_setup_token_hash;
+    const candidateHashes = await Promise.all([
+      hashWorkshopPassword('repository_concurrent_A'),
+      hashWorkshopPassword('repository_concurrent_B'),
+    ]);
+
+    const consumers = await Promise.all(
+      candidateHashes.map((passwordHash) =>
+        consumeWorkshopPasswordSetupCode({
+          userId,
+          passwordHash,
+          expectedSetupTokenHash: setupTokenHash,
+        })
+      )
+    );
+
+    const winningIndexes = consumers.flatMap((user, index) => (user ? [index] : []));
+    expect(winningIndexes).toHaveLength(1);
+
+    const stored = await pool.query<{
+      password_hash: string;
+      password_setup_token_hash: string | null;
+      password_setup_expires_at: Date | null;
+    }>(
+      `SELECT password_hash, password_setup_token_hash, password_setup_expires_at
+       FROM sentinel_users
+       WHERE id = $1`,
+      [userId]
+    );
+    expect(stored.rows[0]).toEqual({
+      password_hash: candidateHashes[winningIndexes[0]],
+      password_setup_token_hash: null,
+      password_setup_expires_at: null,
+    });
   });
 });
 
