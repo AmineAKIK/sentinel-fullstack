@@ -39,6 +39,16 @@ let maintenanceId: number;
 let responsableId: number;
 let lineId: number;
 
+const integrationMachines = [
+  {
+    machineId: 'M-INT-01',
+    brand: 'Fanuc',
+    hasDoubleRobot: false,
+    robotNumber: 'R01',
+    robotHeads: 4,
+  },
+];
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: DB_URL });
   await runMigrations();
@@ -48,17 +58,7 @@ beforeAll(async () => {
      VALUES ('L-INT-01', $1::jsonb, TRUE, FALSE)
      ON CONFLICT DO NOTHING
      RETURNING id`,
-    [
-      JSON.stringify([
-        {
-          machineId: 'M-INT-01',
-          brand: 'Fanuc',
-          hasDoubleRobot: false,
-          robotNumber: 'R01',
-          robotHeads: 4,
-        },
-      ]),
-    ]
+    [JSON.stringify(integrationMachines)]
   );
 
   // If line already exists (re-run), fetch it
@@ -70,6 +70,17 @@ beforeAll(async () => {
   } else {
     lineId = lineRows[0].id;
   }
+
+  await pool.query(
+    `UPDATE production_lines
+     SET machine_sequence = $2::jsonb,
+         is_active = TRUE,
+         is_deleted = FALSE,
+         deleted_at = NULL,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [lineId, JSON.stringify(integrationMachines)]
+  );
 
   const hash = await hashWorkshopPassword('test_pass_99');
   const upsertUser = async (badge: string, role: string): Promise<number> => {
@@ -89,6 +100,17 @@ beforeAll(async () => {
 }, 30_000);
 
 afterEach(async () => {
+  await pool.query(
+    `UPDATE production_lines
+     SET machine_sequence = $2::jsonb,
+         is_active = TRUE,
+         is_deleted = FALSE,
+         deleted_at = NULL,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [lineId, JSON.stringify(integrationMachines)]
+  );
+
   // Clear all incidents on the integration test line between tests to avoid
   // the unique constraint on active incidents per machine.
   await pool.query(
@@ -165,6 +187,29 @@ async function countArbitrationCases(incidentId: number): Promise<number> {
     [incidentId]
   );
   return rows[0].count;
+}
+
+async function waitForWorkshopLineLockWait(timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const { rows } = await pool.query<{ waiting: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM pg_stat_activity
+         WHERE datname = current_database()
+           AND pid <> pg_backend_pid()
+           AND state = 'active'
+           AND wait_event_type = 'Lock'
+           AND query ILIKE '%FROM production_lines%'
+           AND query ILIKE '%FOR UPDATE%'
+       ) AS waiting`
+    );
+    if (rows[0].waiting) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new Error("La mutation concurrente n'a pas atteint le verrou de ligne à temps.");
 }
 
 // ── Full lifecycle ─────────────────────────────────────────────────────────────
@@ -309,6 +354,162 @@ describe('No-op incident mutations (real DB)', () => {
     expect(after.edit_request).toBeNull();
     expect(await getEventTypes(created.id)).toEqual(eventsBefore);
     expect(await countArbitrationCases(created.id)).toBe(0);
+  });
+});
+
+describe('Incident line locking (real DB)', () => {
+  it('never creates an incident on a line archived by a concurrent transaction', async () => {
+    const blocker = await pool.connect();
+    let transactionOpen = false;
+    let createPromise: ReturnType<typeof createIncidentService> | undefined;
+
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+
+      createPromise = createIncidentService(validInput(), operatorId, 'OPERATOR');
+      await waitForWorkshopLineLockWait();
+
+      await blocker.query(
+        `UPDATE production_lines
+         SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
+         WHERE id = $1`,
+        [lineId]
+      );
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      const result = await createPromise;
+      expect(result).toMatchObject({ ok: false, status: 404, code: 'NOT_FOUND' });
+
+      const { rows } = await pool.query<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM workshop_incidents WHERE line_id = $1',
+        [lineId]
+      );
+      expect(rows[0].count).toBe(0);
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+      await createPromise?.catch(() => undefined);
+    }
+  });
+
+  it('rejects a direct edit when a concurrent line reconfiguration invalidates its machine', async () => {
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
+    const eventsBefore = await getEventTypes(created.id);
+    const blocker = await pool.connect();
+    let transactionOpen = false;
+    let editPromise: ReturnType<typeof updateIncidentService> | undefined;
+    const replacementMachines = [
+      {
+        machineId: `M-INT-RACE-${lineId}`,
+        brand: 'ABB',
+        hasDoubleRobot: false,
+        robotNumber: 'R99',
+        robotHeads: 2,
+      },
+    ];
+
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+
+      editPromise = updateIncidentService(
+        created.id,
+        { state: 'INDISPONIBLE' },
+        responsableId,
+        'RESPONSABLE'
+      );
+      await waitForWorkshopLineLockWait();
+
+      await blocker.query(
+        `UPDATE production_lines
+         SET machine_sequence = $2::jsonb, updated_at = NOW()
+         WHERE id = $1`,
+        [lineId, JSON.stringify(replacementMachines)]
+      );
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      const result = await editPromise;
+      expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
+
+      const { rows } = await pool.query<{ state: string }>(
+        'SELECT state FROM workshop_incidents WHERE id = $1',
+        [created.id]
+      );
+      expect(rows[0].state).toBe('DEGRADEE');
+      expect(await getEventTypes(created.id)).toEqual(eventsBefore);
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+      await editPromise?.catch(() => undefined);
+    }
+  });
+
+  it('keeps an edit request open when concurrent reconfiguration invalidates its approval', async () => {
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
+    assertOk(
+      await updateIncidentService(
+        created.id,
+        { requestOnly: true, state: 'INDISPONIBLE' },
+        operatorId,
+        'OPERATOR'
+      )
+    );
+    const blocker = await pool.connect();
+    let transactionOpen = false;
+    let approvalPromise: ReturnType<typeof updateIncidentService> | undefined;
+    const replacementMachines = [
+      {
+        machineId: `M-INT-APPROVAL-${lineId}`,
+        brand: 'Kuka',
+        hasDoubleRobot: false,
+        robotNumber: 'R98',
+        robotHeads: 2,
+      },
+    ];
+
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM production_lines WHERE id = $1 FOR UPDATE', [lineId]);
+
+      approvalPromise = updateIncidentService(
+        created.id,
+        { applyEditRequest: true },
+        responsableId,
+        'RESPONSABLE'
+      );
+      await waitForWorkshopLineLockWait();
+
+      await blocker.query(
+        `UPDATE production_lines
+         SET machine_sequence = $2::jsonb, updated_at = NOW()
+         WHERE id = $1`,
+        [lineId, JSON.stringify(replacementMachines)]
+      );
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      const result = await approvalPromise;
+      expect(result).toMatchObject({ ok: false, status: 400, code: 'VALIDATION_ERROR' });
+
+      const snapshot = await getIncidentMutationSnapshot(created.id);
+      expect(snapshot.edit_request).toMatchObject({ state: 'INDISPONIBLE' });
+      expect(await countArbitrationCases(created.id)).toBe(1);
+      expect(await getEventTypes(created.id)).not.toContain('EDIT_APPLIED');
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+      await approvalPromise?.catch(() => undefined);
+    }
   });
 });
 

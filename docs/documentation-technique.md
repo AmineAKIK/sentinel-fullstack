@@ -239,6 +239,23 @@ COMMIT
 Les violations concurrentes (`23505`, `23503`, `23514`) sont reconnues par des
 helpers et traduites en résultats métier sans exposer le SQL.
 
+Les mutations d'incident qui dépendent du référentiel appliquent un ordre de
+verrouillage unique : lignes par identifiant croissant, utilisateur lorsque
+l'action en dépend, puis incident. Une lecture préparatoire non verrouillante peut
+uniquement servir à découvrir les identifiants à verrouiller. Dans la transaction,
+le service :
+
+1. verrouille chaque ligne active avec le même `PoolClient` ;
+2. verrouille ensuite l'incident ;
+3. revalide `line_id` et la version MVCC `xmin` contre la lecture préparatoire ;
+4. valide machine, robot et tête depuis le JSON de la ligne verrouillée ;
+5. écrit l'incident, son événement et ses effets associés avant le `COMMIT`.
+
+La création suit le même principe sans lecture préparatoire : transaction ouverte,
+ligne active verrouillée, sélection validée, puis insertion. Si l'incident a changé
+pendant la préparation d'une édition ou d'un arbitrage, l'API répond `409 CONFLICT`
+et n'applique aucun effet sur un état obsolète.
+
 Les éditions directes sans écart réel sont court-circuitées avant toute écriture,
 journalisation ou création implicite de suivi. Pour une demande de correction,
 le service compare sous verrou les sept champs éditables, ne conserve que les

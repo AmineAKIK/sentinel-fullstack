@@ -115,6 +115,47 @@ function getRobotOptions(
   return [{ label: machine.robotNumber, heads: machine.robotHeads }];
 }
 
+function validateIncidentSelection(
+  line: workshopRepository.ActiveWorkshopLine,
+  data: {
+    machineId: string;
+    robotLabel: string;
+    headNumber: number;
+  }
+): { lineNumber: string; machineBrand: string } | null {
+  const machine = line.machines.find((item) => item.machineId === data.machineId);
+  if (!machine) return null;
+
+  const robot = getRobotOptions(machine).find((item) => item.label === data.robotLabel);
+  if (!robot || data.headNumber < 1 || data.headNumber > robot.heads) return null;
+
+  return { lineNumber: line.line_number, machineBrand: machine.brand };
+}
+
+function incidentSnapshotIsCurrent(
+  context: workshopRepository.IncidentLineLockContext,
+  incident: workshopRepository.LockedWorkshopIncidentRow
+): boolean {
+  return context.line_id === incident.line_id && context.row_version === incident.row_version;
+}
+
+function requestedTargetLineId(
+  editRequest: Record<string, unknown> | null,
+  fallbackLineId: number
+): number {
+  const requestedLineId = editRequest?.lineId;
+  return typeof requestedLineId === 'number' && Number.isInteger(requestedLineId)
+    ? requestedLineId
+    : fallbackLineId;
+}
+
+function concurrentIncidentChange(): ServiceResult<never> {
+  return conflict(
+    'CONFLICT',
+    "L'incident a été modifié simultanément. Rechargez le dossier puis réessayez."
+  );
+}
+
 // ─── Validation sélection ligne/machine/robot ─────────────────────────────────
 
 export async function validateIncidentSelectionService(data: {
@@ -127,14 +168,11 @@ export async function validateIncidentSelectionService(data: {
 
   const line = await workshopRepository.getActiveWorkshopLine(data.lineId);
   if (!line) return null;
-
-  const machine = line.machines.find((item) => item.machineId === data.machineId);
-  if (!machine) return null;
-
-  const robot = getRobotOptions(machine).find((item) => item.label === data.robotLabel);
-  if (!robot || data.headNumber < 1 || data.headNumber > robot.heads) return null;
-
-  return { lineNumber: line.line_number, machineBrand: machine.brand };
+  return validateIncidentSelection(line, {
+    machineId: data.machineId,
+    robotLabel: data.robotLabel,
+    headNumber: data.headNumber,
+  });
 }
 
 // ─── Création ─────────────────────────────────────────────────────────────────
@@ -144,18 +182,19 @@ export async function createIncidentService(
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
-  const line = await workshopRepository.getActiveWorkshopLine(data.lineId);
-  if (!line) return notFound('Ligne introuvable ou inactive.');
+  const result = await withTransaction(async (client) => {
+    const [line] = await workshopRepository.lockActiveWorkshopLines([data.lineId], client);
+    if (!line) return { kind: 'line_not_found' as const };
 
-  const machine = line.machines.find((item) => item.machineId === data.machineId);
-  if (!machine) return badRequest('Machine invalide pour cette ligne.');
+    const machine = line.machines.find((item) => item.machineId === data.machineId);
+    if (!machine) return { kind: 'invalid_machine' as const };
 
-  const robot = getRobotOptions(machine).find((item) => item.label === data.robotLabel);
-  if (!robot) return badRequest('Robot invalide pour cette machine.');
-  if (data.headNumber < 1 || data.headNumber > robot.heads)
-    return badRequest('Tête invalide pour ce robot.');
+    const robot = getRobotOptions(machine).find((item) => item.label === data.robotLabel);
+    if (!robot) return { kind: 'invalid_robot' as const };
+    if (data.headNumber < 1 || data.headNumber > robot.heads) {
+      return { kind: 'invalid_head' as const };
+    }
 
-  const incidentId = await withTransaction(async (client) => {
     const id = await workshopRepository.createIncidentData(
       { actorUserId, data, line, machine, robotLabel: robot.label },
       client
@@ -176,12 +215,17 @@ export async function createIncidentService(
       client
     );
     await autoFollowForResponsable(id, actorUserId, actorRole, client);
-    return id;
+    return { kind: 'ok' as const, id };
   });
+
+  if (result.kind === 'line_not_found') return notFound('Ligne introuvable ou inactive.');
+  if (result.kind === 'invalid_machine') return badRequest('Machine invalide pour cette ligne.');
+  if (result.kind === 'invalid_robot') return badRequest('Robot invalide pour cette machine.');
+  if (result.kind === 'invalid_head') return badRequest('Tête invalide pour ce robot.');
 
   return {
     ok: true,
-    data: await workshopRepository.fetchIncidentWithUsersForActor(incidentId, actorUserId),
+    data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
   };
 }
 
@@ -196,9 +240,20 @@ export async function editIncidentService(
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
+  const context = await workshopRepository.getIncidentLineLockContext(incidentId);
+  if (!context) return notFound('Incident introuvable.');
+  const requestedLineId = updates.lineId ?? context.line_id;
+
   const result = await withTransaction(async (client) => {
+    const lockedLines = await workshopRepository.lockActiveWorkshopLines(
+      [context.line_id, requestedLineId],
+      client
+    );
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    if (!incidentSnapshotIsCurrent(context, current)) {
+      return { kind: 'concurrent_change' as const };
+    }
     const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
     if (openArbitration || hasPendingArbitration(current)) {
       return { kind: 'arbitration_required' as const };
@@ -222,12 +277,14 @@ export async function editIncidentService(
     const robotLabel = effectiveUpdates.robotLabel ?? current.robot_label;
     const headNumber = effectiveUpdates.headNumber ?? current.head_number;
 
-    const selection = await validateIncidentSelectionService({
-      lineId,
-      machineId,
-      robotLabel,
-      headNumber,
-    });
+    const targetLine = lockedLines.find((line) => line.id === lineId);
+    const selection = targetLine
+      ? validateIncidentSelection(targetLine, {
+          machineId,
+          robotLabel,
+          headNumber,
+        })
+      : null;
     if (!selection)
       return { kind: 'bad_request' as const, msg: 'Sélection ligne/machine/robot/tête invalide.' };
 
@@ -290,6 +347,7 @@ export async function editIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'concurrent_change') return concurrentIncidentChange();
   if (result.kind === 'arbitration_required')
     return conflict(
       'ARBITRATION_REQUIRED',
@@ -428,9 +486,20 @@ export async function approveEditIncidentService(
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
+  const context = await workshopRepository.getIncidentLineLockContext(incidentId);
+  if (!context) return notFound('Incident introuvable.');
+  const requestedLineId = requestedTargetLineId(context.edit_request, context.line_id);
+
   const result = await withTransaction(async (client) => {
+    const lockedLines = await workshopRepository.lockActiveWorkshopLines(
+      [context.line_id, requestedLineId],
+      client
+    );
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
+    if (!incidentSnapshotIsCurrent(context, current)) {
+      return { kind: 'concurrent_change' as const };
+    }
     const arbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
     if (!arbitration || arbitration.request_type !== 'EDIT') {
       return { kind: 'bad_request' as const, msg: 'Aucune demande de modification à appliquer.' };
@@ -440,12 +509,15 @@ export async function approveEditIncidentService(
       return { kind: 'bad_request' as const, msg: 'Aucune demande de modification à appliquer.' };
 
     const requested = current.edit_request as Record<string, unknown>;
-    const selection = await validateIncidentSelectionService({
-      lineId: (requested.lineId as number | undefined) ?? current.line_id,
-      machineId: (requested.machineId as string | undefined) ?? current.machine_id,
-      robotLabel: (requested.robotLabel as string | undefined) ?? current.robot_label,
-      headNumber: (requested.headNumber as number | undefined) ?? current.head_number,
-    });
+    const lineId = (requested.lineId as number | undefined) ?? current.line_id;
+    const targetLine = lockedLines.find((line) => line.id === lineId);
+    const selection = targetLine
+      ? validateIncidentSelection(targetLine, {
+          machineId: (requested.machineId as string | undefined) ?? current.machine_id,
+          robotLabel: (requested.robotLabel as string | undefined) ?? current.robot_label,
+          headNumber: (requested.headNumber as number | undefined) ?? current.head_number,
+        })
+      : null;
     if (!selection)
       return { kind: 'bad_request' as const, msg: 'Sélection ligne/machine/robot/tête invalide.' };
 
@@ -477,6 +549,7 @@ export async function approveEditIncidentService(
   });
 
   if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'concurrent_change') return concurrentIncidentChange();
   if (result.kind === 'forbidden')
     return forbidden('Seul le responsable peut appliquer une correction.');
   if (result.kind === 'bad_request') return badRequest(result.msg);

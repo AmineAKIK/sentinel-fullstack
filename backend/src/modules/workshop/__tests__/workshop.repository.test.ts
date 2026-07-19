@@ -6,7 +6,13 @@ jest.mock('../../../db/pool', () => ({
 }));
 
 import pool from '../../../db/pool';
-import { getBoardData, updateIncidentData } from '../workshop.repository';
+import {
+  getBoardData,
+  getIncidentById,
+  getIncidentLineLockContext,
+  lockActiveWorkshopLines,
+  updateIncidentData,
+} from '../workshop.repository';
 
 const mockedPool = jest.mocked(pool);
 
@@ -50,6 +56,62 @@ describe('getBoardData', () => {
     expect(boardData.incidents[0]?.responsible_comment).toBe(
       'Sécuriser la zone avant intervention.'
     );
+  });
+});
+
+describe('incident line lock protocol', () => {
+  beforeEach(() => {
+    mockedPool.query.mockReset();
+  });
+
+  it('reads the incident lock context without acquiring the incident row lock', async () => {
+    mockedPool.query.mockResolvedValueOnce(
+      result([
+        {
+          line_id: 4,
+          edit_request: { lineId: 8 },
+          row_version: '42',
+        },
+      ])
+    );
+
+    const context = await getIncidentLineLockContext(12);
+    const sql = String(mockedPool.query.mock.calls[0]?.[0]);
+
+    expect(context).toMatchObject({ line_id: 4, edit_request: { lineId: 8 } });
+    expect(sql).toContain('xmin::text AS row_version');
+    expect(sql).not.toContain('FOR UPDATE');
+    expect(mockedPool.query.mock.calls[0]).toEqual([expect.any(String), [12]]);
+  });
+
+  it('returns the same MVCC version while locking the incident row', async () => {
+    mockedPool.query.mockResolvedValueOnce(result([{ id: 12, row_version: '42' }]));
+
+    const incident = await getIncidentById(12);
+    const sql = String(mockedPool.query.mock.calls[0]?.[0]);
+
+    expect(incident).toMatchObject({ id: 12, row_version: '42' });
+    expect(sql).toContain('xmin::text AS row_version');
+    expect(sql).toContain('FOR UPDATE');
+  });
+
+  it('deduplicates and locks lines one by one in ascending id order on the supplied client', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce(result([{ id: 2, line_number: 'L02', machines: [] }]))
+        .mockResolvedValueOnce(result([{ id: 7, line_number: 'L07', machines: [] }])),
+    };
+
+    const lines = await lockActiveWorkshopLines([7, 2, 7], client as never);
+
+    expect(client.query).toHaveBeenCalledTimes(2);
+    expect(client.query.mock.calls.map((call) => call[1])).toEqual([[2], [7]]);
+    expect(client.query.mock.calls.every((call) => String(call[0]).includes('FOR UPDATE'))).toBe(
+      true
+    );
+    expect(lines.map((line) => line.id)).toEqual([2, 7]);
+    expect(mockedPool.query.mock.calls).toHaveLength(0);
   });
 });
 

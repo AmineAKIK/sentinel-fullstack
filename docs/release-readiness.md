@@ -113,8 +113,8 @@ commit audité au démarrage de cette branche.
 | `SEC-01` | P0 | 1 | Code temporaire vérifié puis supprimé par opérations séparées. | Test PostgreSQL concurrent : un seul succès. | VERIFIED |
 | `AUD-01` | P0 | 2 | Une édition directe identique écrit `INCIDENT_UPDATED` vide. | Test service + intégration sur le nombre d'événements. | VERIFIED |
 | `AUD-02` | P0 | 2 | Une demande identique peut ouvrir un arbitrage. | Réponse `NO_CHANGES`, aucun cas ni événement créé. | VERIFIED |
-| `CON-01` | P0 | 3 | Création validée avant transaction contre archivage/modification de ligne. | Test concurrent création/archivage et invariant final. | OPEN |
-| `CON-02` | P0 | 3 | Validation ligne/machine d'une édition utilise le pool hors transaction. | Ligne verrouillée et sélection revalidée avec le même client. | OPEN |
+| `CON-01` | P0 | 3 | Création validée avant transaction contre archivage/modification de ligne. | Test concurrent création/archivage et invariant final. | IMPLEMENTED |
+| `CON-02` | P0 | 3 | Validation ligne/machine d'une édition utilise le pool hors transaction. | Ligne verrouillée et sélection revalidée avec le même client. | IMPLEMENTED |
 | `CON-03` | P0 | 3 | Une ligne utilisée peut être renommée ou reconfigurée. | `409 RESOURCE_IN_USE` et tests de chaque champ structurel. | OPEN |
 | `CON-04` | P0 | 3 | Prise en charge concurrente avec désactivation/changement de rôle. | Test à deux transactions, aucun affecté invalide. | OPEN |
 | `AUTH-01` | P1 | 3 | Badge/rôle modifié sans incrément de `session_version`. | Ancien token refusé après chaque changement d'autorité. | OPEN |
@@ -212,7 +212,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `0` | Geler la baseline, les décisions, le registre et les portes qualité. | Gouvernance du chantier | Aucun | VERIFIED |
 | `1` | Rendre le premier accès atomique. | `SEC-01` | Lot 0 | VERIFIED |
 | `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | VERIFIED |
-| `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | OPEN |
+| `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | IN_PROGRESS |
 | `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | OPEN |
 | `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | OPEN |
 | `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | OPEN |
@@ -222,6 +222,15 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `10` | Remplacer les preuves textuelles fragiles par des tests comportementaux. | `TEST-01` à `TEST-05` | Lots 1 à 9 | OPEN |
 | `11` | Régénérer un dossier exact, reproductible et conforme. | `DOC-01` à `DOC-06`, `GOV-01` | Lots 1 à 10 | OPEN |
 | `12` | Construire, déployer et recetter le candidat immuable. | `REL-01` à `REL-04` | Lots 1 à 11 | OPEN |
+
+Le lot 3 est livré en sous-lots ordonnés afin que chaque invariant dispose de sa
+preuve propre :
+
+| Sous-lot | Périmètre | Constats | État |
+| --- | --- | --- | --- |
+| `3A` | Verrouiller et revalider les lignes lors de la création, de l'édition directe et de l'approbation d'une correction. | `CON-01`, `CON-02` | IMPLEMENTED |
+| `3B` | Geler les champs structurels d'une ligne portant un incident actif. | `CON-03` | OPEN |
+| `3C` | Revalider l'utilisateur affecté et révoquer les sessions après changement d'autorité. | `CON-04`, `AUTH-01` | OPEN |
 
 Preuves des lots clos :
 

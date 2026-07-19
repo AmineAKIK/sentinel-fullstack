@@ -16,6 +16,8 @@ jest.mock('../workshop.repository', () => ({
   // métier, pas un mock qui la contournerait.
   ...jest.requireActual('../workshop.repository'),
   getActiveWorkshopLine: jest.fn(),
+  getIncidentLineLockContext: jest.fn(),
+  lockActiveWorkshopLines: jest.fn(),
   fetchIncidentWithUsers: jest.fn(),
   createIncidentData: jest.fn(),
   getIncidentCancelSnapshot: jest.fn(),
@@ -165,6 +167,7 @@ function mockIncident(overrides: Record<string, unknown> = {}) {
     display_order: 0,
     responsible_comment: null,
     taken_at: null,
+    row_version: '100',
     created_at: now,
     updated_at: now,
     ...overrides,
@@ -182,6 +185,14 @@ const validCreateInput = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(repo.getIncidentLineLockContext).mockReset();
+  jest.mocked(repo.getIncidentLineLockContext).mockResolvedValue({
+    line_id: 1,
+    edit_request: null,
+    row_version: '100',
+  });
+  jest.mocked(repo.lockActiveWorkshopLines).mockReset();
+  jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([mockLine()]);
   jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockReset();
   jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(null);
   jest.mocked(arbitrationRepo.createArbitrationCase).mockReset();
@@ -196,7 +207,7 @@ beforeEach(() => {
 
 describe('createIncidentService', () => {
   it("retourne NOT_FOUND si la ligne n'existe pas", async () => {
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(null);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([]);
 
     const result = await createIncidentService(validCreateInput, 1, 'OPERATOR');
     expect(result.ok).toBe(false);
@@ -208,7 +219,7 @@ describe('createIncidentService', () => {
 
   it("retourne VALIDATION_ERROR si la machine n'existe pas dans la ligne", async () => {
     const line = mockLine();
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
 
     const result = await createIncidentService(
       { ...validCreateInput, machineId: 'INEXISTANT' },
@@ -224,7 +235,7 @@ describe('createIncidentService', () => {
 
   it("retourne VALIDATION_ERROR si le robot n'existe pas dans la machine", async () => {
     const line = mockLine();
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
 
     const result = await createIncidentService(
       { ...validCreateInput, robotLabel: 'INEXISTANT' },
@@ -237,7 +248,7 @@ describe('createIncidentService', () => {
 
   it('retourne VALIDATION_ERROR si le numéro de tête est invalide (0)', async () => {
     const line = mockLine();
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
 
     const result = await createIncidentService(
       { ...validCreateInput, headNumber: 0 },
@@ -250,7 +261,7 @@ describe('createIncidentService', () => {
 
   it('retourne VALIDATION_ERROR si le numéro de tête dépasse le max', async () => {
     const line = mockLine();
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
 
     const result = await createIncidentService(
       { ...validCreateInput, headNumber: 99 },
@@ -264,7 +275,7 @@ describe('createIncidentService', () => {
   it("crée l'incident avec succès et logge l'événement INCIDENT_CREATED", async () => {
     const line = mockLine();
     const incident = mockIncident();
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
     jest.mocked(repo.createIncidentData).mockResolvedValue(1);
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
@@ -272,6 +283,10 @@ describe('createIncidentService', () => {
     const result = await createIncidentService(validCreateInput, 1, 'OPERATOR');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(incident);
+    expect(repo.lockActiveWorkshopLines).toHaveBeenCalledWith([1], null);
+    expect(jest.mocked(repo.lockActiveWorkshopLines).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(repo.createIncidentData).mock.invocationCallOrder[0]
+    );
     expect(events.logIncidentEvent).toHaveBeenCalledWith(
       1,
       1,
@@ -707,10 +722,24 @@ describe('updateIncidentService – RESPONSABLE', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(repo.getActiveWorkshopLine).not.toHaveBeenCalled();
+    expect(repo.lockActiveWorkshopLines).toHaveBeenCalledWith([1, 1], null);
+    expect(jest.mocked(repo.lockActiveWorkshopLines).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(repo.getIncidentById).mock.invocationCallOrder[0]
+    );
     expect(repo.updateIncidentData).not.toHaveBeenCalled();
     expect(events.logIncidentEvent).not.toHaveBeenCalled();
     expect(repo.followIncidentData).not.toHaveBeenCalled();
+  });
+
+  it("retourne CONFLICT si l'incident change entre la lecture préparatoire et son verrouillage", async () => {
+    const current = mockIncident({ row_version: '101' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(current);
+
+    const result = await updateIncidentService(1, { state: 'INDISPONIBLE' }, 7, 'RESPONSABLE');
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'CONFLICT' });
+    expect(repo.updateIncidentData).not.toHaveBeenCalled();
+    expect(events.logIncidentEvent).not.toHaveBeenCalled();
   });
 
   it("RESPONSABLE peut approuver une correction et l'événement EDIT_APPLIED est loggué", async () => {
@@ -719,13 +748,16 @@ describe('updateIncidentService – RESPONSABLE', () => {
     const line = mockLine();
     jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
     jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(mockArbitrationCase());
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
     jest.mocked(repo.applyEditRequestIncident).mockResolvedValue(1);
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
 
     const result = await updateIncidentService(1, { applyEditRequest: true }, 1, 'RESPONSABLE');
     expect(result.ok).toBe(true);
+    expect(jest.mocked(repo.lockActiveWorkshopLines).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(repo.getIncidentById).mock.invocationCallOrder[0]
+    );
     expect(events.logIncidentEvent).toHaveBeenCalledWith(
       1,
       1,
@@ -1387,7 +1419,7 @@ describe('updateIncidentService – cohérence transactionnelle', () => {
   it('withTransaction est appelé lors de la création', async () => {
     const line = mockLine();
     const incident = mockIncident();
-    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([line]);
     jest.mocked(repo.createIncidentData).mockResolvedValue(1);
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(incident);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
