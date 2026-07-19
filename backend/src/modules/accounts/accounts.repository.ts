@@ -3,7 +3,6 @@ import pool from '../../db/pool';
 import { statusInSql } from '../../db/sql';
 import { ACTIVE_INCIDENT_STATUSES, isWorkshopRole } from '../../domain/constants';
 import { CreateAccountInput, UpdateAccountInput } from './accounts.validation';
-import { AccountRow, toPublicAccount } from './accounts.mapper';
 
 export interface ListAccountsFilters {
   role?: string;
@@ -137,49 +136,42 @@ export async function getAccountData(
 export async function updateAccountData(
   id: number,
   updates: UpdateAccountInput,
+  revokeWorkshopSessions: boolean,
   client?: PoolClient
 ): Promise<AccountDto | null> {
   const db = client ?? pool;
-
-  const { rows: existing } = await db.query<AccountRow>(
-    'SELECT * FROM sentinel_users WHERE id = $1 AND is_deleted = FALSE',
-    [id]
-  );
-  if (existing.length === 0) return null;
-
-  const current = existing[0];
   const setClauses: string[] = ['updated_at = NOW()'];
   const params: unknown[] = [];
 
-  if (updates.firstName !== undefined && updates.firstName !== current.first_name) {
+  if (updates.firstName !== undefined) {
     params.push(updates.firstName);
     setClauses.push(`first_name = $${params.length}`);
   }
-  if (updates.lastName !== undefined && updates.lastName !== current.last_name) {
+  if (updates.lastName !== undefined) {
     params.push(updates.lastName);
     setClauses.push(`last_name = $${params.length}`);
   }
-  if (updates.badgeNumber !== undefined && updates.badgeNumber !== current.badge_number) {
+  if (updates.badgeNumber !== undefined) {
     params.push(updates.badgeNumber);
     setClauses.push(`badge_number = $${params.length}`);
   }
-  if (updates.role !== undefined && updates.role !== current.role) {
+  if (updates.role !== undefined) {
     params.push(updates.role);
     setClauses.push(`role = $${params.length}`);
   }
-  if (updates.email !== undefined && updates.email !== current.email) {
+  if (updates.email !== undefined) {
     params.push(updates.email ?? null);
     setClauses.push(`email = $${params.length}`);
   }
 
-  if (params.length === 0) {
-    return toPublicAccount(current);
+  if (revokeWorkshopSessions) {
+    setClauses.push('session_version = session_version + 1');
   }
 
   params.push(id);
   const { rows } = await db.query<AccountDto>(
     `UPDATE sentinel_users SET ${setClauses.join(', ')}
-     WHERE id = $${params.length}
+     WHERE id = $${params.length} AND is_deleted = FALSE
      RETURNING ${accountSelect}`,
     params
   );
@@ -223,7 +215,8 @@ export async function softDeleteAccount(id: number, client?: PoolClient): Promis
          email = NULL,
          password_hash = NULL,
          password_setup_token_hash = NULL,
-         password_setup_expires_at = NULL
+         password_setup_expires_at = NULL,
+         session_version = session_version + 1
      WHERE id = $1 AND is_deleted = FALSE
      RETURNING id`,
     [id]

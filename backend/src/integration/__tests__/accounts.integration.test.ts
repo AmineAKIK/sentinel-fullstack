@@ -16,7 +16,11 @@
 import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 import { hashWorkshopPassword } from '../../auth/bcrypt';
-import { deleteAccountService, listAccountsService } from '../../modules/accounts/accounts.service';
+import {
+  deleteAccountService,
+  listAccountsService,
+  updateAccountService,
+} from '../../modules/accounts/accounts.service';
 import { verifyWorkshopSession } from '../../modules/auth/auth.service';
 import {
   acquireIntegrationAdminFixture,
@@ -52,7 +56,12 @@ beforeEach(async () => {
   const { rows } = await pool.query<{ id: number }>(
     `INSERT INTO sentinel_users (first_name, last_name, badge_number, role, is_active, is_deleted, password_hash)
      VALUES ('Karim', 'Bensaïd', $1, 'OPERATOR', TRUE, FALSE, $2)
-     ON CONFLICT (badge_number) WHERE is_deleted = FALSE DO UPDATE SET password_hash = EXCLUDED.password_hash
+     ON CONFLICT (badge_number) WHERE is_deleted = FALSE DO UPDATE
+       SET first_name = EXCLUDED.first_name,
+           last_name = EXCLUDED.last_name,
+           role = EXCLUDED.role,
+           is_active = TRUE,
+           password_hash = EXCLUDED.password_hash
      RETURNING id`,
     [BADGE, hash]
   );
@@ -110,6 +119,48 @@ describe('RGPD — anonymisation à la suppression de compte', () => {
 
     const session = await verifyWorkshopSession(userId, BADGE, 1);
     expect(session).toBeNull();
+  });
+
+  it('révoque une session workshop existante après changement de badge', async () => {
+    const { rows: beforeRows } = await pool.query<{ session_version: number }>(
+      'SELECT session_version FROM sentinel_users WHERE id = $1',
+      [userId]
+    );
+    const previousSessionVersion = beforeRows[0].session_version;
+
+    const result = await updateAccountService(userId, { badgeNumber: `${BADGE}-NEW` }, adminId);
+
+    expect(result.ok).toBe(true);
+    const { rows: afterRows } = await pool.query<{
+      badge_number: string;
+      session_version: number;
+    }>('SELECT badge_number, session_version FROM sentinel_users WHERE id = $1', [userId]);
+    expect(afterRows[0]).toEqual({
+      badge_number: `${BADGE}-NEW`,
+      session_version: previousSessionVersion + 1,
+    });
+    expect(await verifyWorkshopSession(userId, BADGE, previousSessionVersion)).toBeNull();
+  });
+
+  it('révoque une session workshop existante après changement de rôle', async () => {
+    const { rows: beforeRows } = await pool.query<{ session_version: number }>(
+      'SELECT session_version FROM sentinel_users WHERE id = $1',
+      [userId]
+    );
+    const previousSessionVersion = beforeRows[0].session_version;
+
+    const result = await updateAccountService(userId, { role: 'RESPONSABLE' }, adminId);
+
+    expect(result.ok).toBe(true);
+    const { rows: afterRows } = await pool.query<{ role: string; session_version: number }>(
+      'SELECT role, session_version FROM sentinel_users WHERE id = $1',
+      [userId]
+    );
+    expect(afterRows[0]).toEqual({
+      role: 'RESPONSABLE',
+      session_version: previousSessionVersion + 1,
+    });
+    expect(await verifyWorkshopSession(userId, BADGE, previousSessionVersion)).toBeNull();
   });
 
   it('est idempotente : une seconde suppression renvoie NOT_FOUND sans modifier la ligne', async () => {

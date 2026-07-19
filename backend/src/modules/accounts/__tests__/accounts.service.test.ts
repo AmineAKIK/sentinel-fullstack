@@ -229,6 +229,52 @@ describe('updateAccountService', () => {
     const result = await updateAccountService(1, { firstName: 'Pierre' }, 1);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(updated);
+    expect(repo.updateAccountData).toHaveBeenCalledWith(1, { firstName: 'Pierre' }, false, null);
+  });
+
+  it.each([
+    ['badge', mockAccount(), { badgeNumber: 'B002' }, mockAccount({ badge_number: 'B002' })],
+    [
+      'rôle',
+      mockAccount({ role: 'MAINTENANCE' }),
+      { role: 'RESPONSABLE' as const },
+      mockAccount({ role: 'RESPONSABLE' }),
+    ],
+  ])(
+    'demande la révocation des sessions après changement de %s',
+    async (_label, current, updates, updated) => {
+      jest.mocked(repo.getAccountData).mockResolvedValue(current);
+      jest.mocked(repo.accountBadgeExists).mockResolvedValue(false);
+      jest.mocked(repo.getActiveTakenIncidentCountForUser).mockResolvedValue(0);
+      jest.mocked(repo.updateAccountData).mockResolvedValue(updated);
+      jest.mocked(events.createAccountAuditEvent).mockResolvedValue(undefined);
+
+      const result = await updateAccountService(1, updates, 1);
+
+      expect(result.ok).toBe(true);
+      expect(repo.updateAccountData).toHaveBeenCalledWith(1, updates, true, null);
+    }
+  );
+
+  it('court-circuite une mise à jour sans changement réel', async () => {
+    const current = mockAccount();
+    jest.mocked(repo.getAccountData).mockResolvedValue(current);
+
+    const result = await updateAccountService(
+      1,
+      {
+        firstName: current.first_name,
+        lastName: current.last_name,
+        badgeNumber: current.badge_number,
+        role: 'OPERATOR',
+        email: current.email,
+      },
+      1
+    );
+
+    expect(result).toEqual({ ok: true, data: current });
+    expect(repo.updateAccountData).not.toHaveBeenCalled();
+    expect(events.createAccountAuditEvent).not.toHaveBeenCalled();
   });
 
   it.each([

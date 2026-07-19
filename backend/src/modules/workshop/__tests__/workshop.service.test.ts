@@ -4,6 +4,7 @@ import {
   cancelIncidentService,
   consultArbitrationRequestService,
   followIncidentService,
+  takeIncidentService,
   unfollowIncidentService,
   updateIncidentService,
 } from '../workshop.service';
@@ -18,6 +19,7 @@ jest.mock('../workshop.repository', () => ({
   getActiveWorkshopLine: jest.fn(),
   getIncidentLineLockContext: jest.fn(),
   lockActiveWorkshopLines: jest.fn(),
+  lockWorkshopAssignee: jest.fn(),
   fetchIncidentWithUsers: jest.fn(),
   createIncidentData: jest.fn(),
   getIncidentCancelSnapshot: jest.fn(),
@@ -193,6 +195,13 @@ beforeEach(() => {
   });
   jest.mocked(repo.lockActiveWorkshopLines).mockReset();
   jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([mockLine()]);
+  jest.mocked(repo.lockWorkshopAssignee).mockReset();
+  jest.mocked(repo.lockWorkshopAssignee).mockResolvedValue({
+    id: 2,
+    role: 'MAINTENANCE',
+    is_active: true,
+    is_deleted: false,
+  });
   jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockReset();
   jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(null);
   jest.mocked(arbitrationRepo.createArbitrationCase).mockReset();
@@ -294,6 +303,68 @@ describe('createIncidentService', () => {
       expect.any(Object),
       null
     );
+  });
+});
+
+// ─── takeIncidentService ─────────────────────────────────────────────────────
+
+describe('takeIncidentService', () => {
+  it('verrouille et revalide le technicien avant de verrouiller l’incident', async () => {
+    const current = mockIncident();
+    const updated = mockIncident({ is_taken: true, taken_by_user_id: 2 });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(current);
+    jest.mocked(repo.updateIncidentData).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
+
+    const result = await takeIncidentService(1, 2, 'MAINTENANCE');
+
+    expect(result).toEqual({ ok: true, data: updated });
+    expect(repo.lockWorkshopAssignee).toHaveBeenCalledWith(2, null);
+    expect(jest.mocked(repo.lockWorkshopAssignee).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(repo.getIncidentById).mock.invocationCallOrder[0]
+    );
+    expect(repo.updateIncidentData).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'MAINTENANCE', actorUserId: 2 }),
+      null
+    );
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(
+      1,
+      2,
+      'INCIDENT_TAKEN',
+      { previousTakenByUserId: null },
+      null
+    );
+  });
+
+  it.each([
+    ['absent', null],
+    ['inactif', { id: 2, role: 'MAINTENANCE', is_active: false, is_deleted: false }],
+    ['supprimé', { id: 2, role: 'MAINTENANCE', is_active: true, is_deleted: true }],
+    ['sans rôle maintenance', { id: 2, role: 'OPERATOR', is_active: true, is_deleted: false }],
+  ])('refuse un technicien %s sans toucher à l’incident', async (_label, assignee) => {
+    jest.mocked(repo.lockWorkshopAssignee).mockResolvedValue(assignee);
+
+    const result = await takeIncidentService(1, 2, 'MAINTENANCE');
+
+    expect(result).toMatchObject({ ok: false, status: 403, code: 'FORBIDDEN' });
+    expect(repo.getIncidentById).not.toHaveBeenCalled();
+    expect(repo.updateIncidentData).not.toHaveBeenCalled();
+    expect(events.logIncidentEvent).not.toHaveBeenCalled();
+  });
+
+  it('refuse une autorité devenue différente de celle de la requête', async () => {
+    jest.mocked(repo.lockWorkshopAssignee).mockResolvedValue({
+      id: 2,
+      role: 'MAINTENANCE',
+      is_active: true,
+      is_deleted: false,
+    });
+
+    const result = await takeIncidentService(1, 2, 'OPERATOR');
+
+    expect(result).toMatchObject({ ok: false, status: 403, code: 'FORBIDDEN' });
+    expect(repo.getIncidentById).not.toHaveBeenCalled();
   });
 });
 

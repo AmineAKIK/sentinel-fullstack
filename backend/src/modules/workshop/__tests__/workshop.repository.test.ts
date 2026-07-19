@@ -11,6 +11,7 @@ import {
   getIncidentById,
   getIncidentLineLockContext,
   lockActiveWorkshopLines,
+  lockWorkshopAssignee,
   updateIncidentData,
 } from '../workshop.repository';
 
@@ -111,6 +112,24 @@ describe('incident line lock protocol', () => {
       true
     );
     expect(lines.map((line) => line.id)).toEqual([2, 7]);
+    expect(mockedPool.query.mock.calls).toHaveLength(0);
+  });
+
+  it('locks the complete assignee lifecycle row on the supplied client', async () => {
+    const assignee = {
+      id: 9,
+      role: 'MAINTENANCE',
+      is_active: true,
+      is_deleted: false,
+    };
+    const client = { query: jest.fn().mockResolvedValueOnce(result([assignee])) };
+
+    await expect(lockWorkshopAssignee(9, client as never)).resolves.toEqual(assignee);
+
+    const [sql, params] = client.query.mock.calls[0];
+    expect(String(sql)).toContain('role, is_active, is_deleted');
+    expect(String(sql)).toContain('FOR UPDATE');
+    expect(params).toEqual([9]);
     expect(mockedPool.query.mock.calls).toHaveLength(0);
   });
 });

@@ -116,8 +116,8 @@ commit audité au démarrage de cette branche.
 | `CON-01` | P0 | 3 | Création validée avant transaction contre archivage/modification de ligne. | Test concurrent création/archivage et invariant final. | VERIFIED |
 | `CON-02` | P0 | 3 | Validation ligne/machine d'une édition utilise le pool hors transaction. | Ligne verrouillée et sélection revalidée avec le même client. | VERIFIED |
 | `CON-03` | P0 | 3 | Une ligne utilisée peut être renommée ou reconfigurée. | `409 RESOURCE_IN_USE` et tests de chaque champ structurel. | OPEN |
-| `CON-04` | P0 | 3 | Prise en charge concurrente avec désactivation/changement de rôle. | Test à deux transactions, aucun affecté invalide. | OPEN |
-| `AUTH-01` | P1 | 3 | Badge/rôle modifié sans incrément de `session_version`. | Ancien token refusé après chaque changement d'autorité. | OPEN |
+| `CON-04` | P0 | 3 | Prise en charge concurrente avec désactivation/changement de rôle. | Test à deux transactions, aucun affecté invalide. | IMPLEMENTED |
+| `AUTH-01` | P1 | 3 | Badge/rôle modifié sans incrément de `session_version`. | Ancien token refusé après chaque changement d'autorité. | IMPLEMENTED |
 
 ### Authentification et HTTP
 
@@ -228,9 +228,8 @@ preuve propre :
 
 | Sous-lot | Périmètre | Constats | État |
 | --- | --- | --- | --- |
-| `3A` | Verrouiller et revalider les lignes lors de la création, de l'édition directe et de l'approbation d'une correction. | `CON-01`, `CON-02` | VERIFIED |
-| `3B` | Geler les champs structurels d'une ligne portant un incident actif. | `CON-03` | OPEN |
-| `3C` | Revalider l'utilisateur affecté et révoquer les sessions après changement d'autorité. | `CON-04`, `AUTH-01` | OPEN |
+| `3A` | Revalider l'utilisateur affecté, sérialiser son cycle de vie et révoquer les sessions après changement d'autorité. | `CON-04`, `AUTH-01` | IMPLEMENTED |
+| `3B` | Verrouiller et revalider les lignes, puis geler leurs champs structurels tant qu'un incident actif les référence. | `CON-01`, `CON-02`, `CON-03` | IN_PROGRESS |
 
 Preuves des lots clos :
 
@@ -240,7 +239,8 @@ Preuves des lots clos :
   [run CI 244](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29691306837) ;
 - lot 2 : commit `091433fd36a866e2af0a108be4a33a9369f74ca3` et
   [run CI 246](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29692190921) ;
-- lot 3A : commit `51f53ebbefd7cf3b1d212c77fc13910e842615ea` et
+- lot 3B, verrouillage et revalidation : commit
+  `51f53ebbefd7cf3b1d212c77fc13910e842615ea` et
   [run CI 248](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29694004289).
 
 Les cinq jobs de chaque preuve sont verts.

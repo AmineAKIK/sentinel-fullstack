@@ -103,6 +103,13 @@ export interface IncidentLineLockContext {
   row_version: string;
 }
 
+export interface WorkshopAssigneeLockContext {
+  id: number;
+  role: string;
+  is_active: boolean;
+  is_deleted: boolean;
+}
+
 export interface IncidentCancelSnapshot {
   status: IncidentStatus;
   is_taken: boolean;
@@ -505,6 +512,21 @@ export async function lockActiveWorkshopLines(
   }
 
   return lines;
+}
+
+export async function lockWorkshopAssignee(
+  userId: number,
+  client: PoolClient
+): Promise<WorkshopAssigneeLockContext | null> {
+  const { rows } = await client.query<WorkshopAssigneeLockContext>(
+    `SELECT id, role, is_active, is_deleted
+     FROM sentinel_users
+     WHERE id = $1
+     FOR UPDATE`,
+    [userId]
+  );
+
+  return rows[0] ?? null;
 }
 
 export async function createIncidentData(

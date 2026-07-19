@@ -45,13 +45,26 @@ export async function takeIncidentService(
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
   const result = await withTransaction(async (client) => {
+    // Global lock order: line(s), user, incident. TAKE has no line dependency,
+    // so the assignee must be locked and revalidated before the incident.
+    const assignee = await workshopRepository.lockWorkshopAssignee(actorUserId, client);
+    if (
+      !assignee ||
+      !assignee.is_active ||
+      assignee.is_deleted ||
+      assignee.role !== 'MAINTENANCE' ||
+      assignee.role !== actorRole
+    ) {
+      return { kind: 'forbidden' as const };
+    }
+
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
     const openArbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
     if (openArbitration || hasPendingArbitration(current)) {
       return { kind: 'arbitration_required' as const };
     }
-    if (!canPerform(actorRole, 'TAKE', current, actorUserId)) {
+    if (!canPerform(assignee.role, 'TAKE', current, actorUserId)) {
       return { kind: 'forbidden' as const };
     }
 
@@ -60,7 +73,7 @@ export async function takeIncidentService(
         incidentId,
         current,
         updates: { isTaken: true },
-        role: actorRole,
+        role: assignee.role,
         actorUserId,
         ...unchangedSelectionFields(current),
       },

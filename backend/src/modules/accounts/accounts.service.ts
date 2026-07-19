@@ -141,18 +141,28 @@ export async function updateAccountService(
       if (!current) return { kind: 'not_found' as const };
 
       const changes: Record<string, unknown> = {};
-      if (updates.firstName !== undefined && updates.firstName !== current.first_name)
+      const effective: UpdateAccountInput = {};
+      if (updates.firstName !== undefined && updates.firstName !== current.first_name) {
         changes.firstName = { old: current.first_name, new: updates.firstName };
-      if (updates.lastName !== undefined && updates.lastName !== current.last_name)
+        effective.firstName = updates.firstName;
+      }
+      if (updates.lastName !== undefined && updates.lastName !== current.last_name) {
         changes.lastName = { old: current.last_name, new: updates.lastName };
-      if (updates.badgeNumber !== undefined && updates.badgeNumber !== current.badge_number)
+        effective.lastName = updates.lastName;
+      }
+      if (updates.badgeNumber !== undefined && updates.badgeNumber !== current.badge_number) {
         changes.badgeNumber = { old: current.badge_number, new: updates.badgeNumber };
-      if (updates.role !== undefined && updates.role !== current.role)
+        effective.badgeNumber = updates.badgeNumber;
+      }
+      if (updates.role !== undefined && updates.role !== current.role) {
         changes.role = { old: current.role, new: updates.role };
+        effective.role = updates.role;
+      }
       if (updates.email !== undefined && updates.email !== current.email) {
         changes.email = {
           action: updates.email === null ? 'removed' : current.email ? 'updated' : 'configured',
         };
+        effective.email = updates.email;
       }
 
       if (Object.keys(changes).length === 0) return { kind: 'ok' as const, account: current };
@@ -170,7 +180,9 @@ export async function updateAccountService(
         if (guard) return { kind: 'guard' as const, error: guard };
       }
 
-      const updated = await updateAccountData(id, updates, client);
+      const revokesWorkshopSessions =
+        effective.badgeNumber !== undefined || effective.role !== undefined;
+      const updated = await updateAccountData(id, effective, revokesWorkshopSessions, client);
       if (!updated) return { kind: 'not_found' as const };
       await createAccountAuditEvent(id, adminId, 'USER_UPDATED', changes, client);
       return { kind: 'ok' as const, account: updated };
