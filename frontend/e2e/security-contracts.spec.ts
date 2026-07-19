@@ -7,6 +7,7 @@ import {
 } from './fixtures';
 
 const ADMIN_COOKIE = 'sentinel_admin_token';
+const API_ORIGIN = 'http://127.0.0.1:3100';
 
 async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto('/admin/login');
@@ -39,7 +40,7 @@ async function fetchContract(
       status: response.status,
       cacheControl: response.headers.get('cache-control'),
     };
-  }, path);
+  }, `${API_ORIGIN}${path}`);
 }
 
 async function tamperCookie(context: BrowserContext, name: string): Promise<void> {
@@ -83,13 +84,13 @@ test('les espaces Admin, Atelier et Board interdisent la mise en cache', async (
     expect(response.cacheControl).toContain('no-store');
   }
 
-  await page.evaluate(async () => {
-    const response = await fetch('/api/auth/logout', {
+  await page.evaluate(async (url) => {
+    const response = await fetch(url, {
       method: 'POST',
       credentials: 'include',
     });
     if (!response.ok) throw new Error(`Logout failed with ${response.status}.`);
-  });
+  }, `${API_ORIGIN}/api/auth/logout`);
   await loginAsResponsable(page);
   for (const path of ['/api/workshop/lines', '/api/board/data']) {
     const response = await fetchContract(page, path);
