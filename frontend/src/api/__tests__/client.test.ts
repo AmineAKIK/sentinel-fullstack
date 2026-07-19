@@ -46,13 +46,47 @@ describe('API client', () => {
     });
   });
 
-  it('déclenche une seule voie globale sur une session expirée', async () => {
+  it('ne révoque pas la session globale sur un mot de passe de réauthentification faux', async () => {
     const onUnauthorized = vi.fn();
     setOn401Handler(onUnauthorized);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: 'REAUTHENTICATION_FAILED', message: 'Mot de passe incorrect.' },
+          }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    );
+
+    await expect(api.post('/api/admin/security/verify-password')).rejects.toMatchObject({
+      code: 'REAUTHENTICATION_FAILED',
+    });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('déclenche une seule voie globale sur une session révoquée', async () => {
+    const onUnauthorized = vi.fn();
+    setOn401Handler(onUnauthorized);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: 'SESSION_REVOKED', message: 'Session révoquée.' },
+          }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    );
 
     await expect(api.get('/api/private')).rejects.toBeInstanceOf(ApiResponseError);
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'SESSION_REVOKED', status: 401 })
+    );
   });
 
   it('transforme une panne réseau en erreur exploitable', async () => {

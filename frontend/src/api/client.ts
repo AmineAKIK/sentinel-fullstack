@@ -28,8 +28,8 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiResponseError ? error.message : fallback;
 }
 
-let onUnauthorized: (() => void) | null = null;
-export function setOn401Handler(handler: (() => void) | null): void {
+let onUnauthorized: ((error: ApiResponseError) => void) | null = null;
+export function setOn401Handler(handler: ((error: ApiResponseError) => void) | null): void {
   onUnauthorized = handler;
 }
 
@@ -78,8 +78,6 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401) onUnauthorized?.();
-
     let code = 'SERVER_ERROR';
     let message = 'Une erreur est survenue.';
     try {
@@ -89,7 +87,9 @@ async function request<T>(
     } catch {
       // Le contrat d'erreur de secours reste volontairement générique.
     }
-    throw new ApiResponseError(code, message, res.status);
+    const error = new ApiResponseError(code, message, res.status);
+    if (res.status === 401 && code !== 'REAUTHENTICATION_FAILED') onUnauthorized?.(error);
+    throw error;
   }
 
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;

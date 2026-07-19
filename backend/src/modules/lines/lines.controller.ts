@@ -17,7 +17,7 @@ import {
   listLinesService,
   updateLineService,
 } from './lines.service';
-import { createLineSchema, updateLineSchema } from './lines.validation';
+import { createLineSchema, lineNumberSchema, updateLineSchema } from './lines.validation';
 
 export async function listLines(_req: Request, res: Response): Promise<void> {
   try {
@@ -29,13 +29,13 @@ export async function listLines(_req: Request, res: Response): Promise<void> {
 
 export async function checkLineAvailability(req: Request, res: Response): Promise<void> {
   try {
-    const lineNumber = String(req.query.lineNumber || '').trim();
-    if (!lineNumber) {
-      sendServiceError(res, badRequest('Numéro de ligne requis.'));
+    const parsed = lineNumberSchema.safeParse(req.query.lineNumber);
+    if (!parsed.success) {
+      sendServiceError(res, badRequest(formatZodError(parsed.error)));
       return;
     }
 
-    res.json(await checkLineAvailabilityService(lineNumber));
+    res.json(await checkLineAvailabilityService(parsed.data));
   } catch (err) {
     handleControllerError(res, 'checkLineAvailability', err);
   }
@@ -43,16 +43,16 @@ export async function checkLineAvailability(req: Request, res: Response): Promis
 
 export async function checkLineConflicts(req: Request, res: Response): Promise<void> {
   try {
-    const lineNumber = String(req.body?.lineNumber || '').trim();
+    const parsedLineNumber = lineNumberSchema.safeParse(req.body?.lineNumber);
     const machineIds = Array.isArray(req.body?.machineIds) ? req.body.machineIds : [];
     const lineId = req.body?.lineId ? Number(req.body.lineId) : undefined;
 
-    if (!lineNumber) {
-      sendServiceError(res, badRequest('Numéro de ligne requis.'));
+    if (!parsedLineNumber.success) {
+      sendServiceError(res, badRequest(formatZodError(parsedLineNumber.error)));
       return;
     }
 
-    res.json(await checkLineConflictsService(lineNumber, machineIds, lineId));
+    res.json(await checkLineConflictsService(parsedLineNumber.data, machineIds, lineId));
   } catch (err) {
     handleControllerError(res, 'checkLineConflicts', err);
   }

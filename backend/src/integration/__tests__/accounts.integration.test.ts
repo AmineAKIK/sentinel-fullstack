@@ -39,7 +39,8 @@ let adminFixture: IntegrationAdminFixture | undefined;
 // are safe to run against a shared development database.
 const createdUserIds: number[] = [];
 
-const BADGE = 'RGPD-INT-01';
+const BADGE = '9200001';
+const UPDATED_BADGE = '9200002';
 
 beforeAll(async () => {
   pool = new Pool({ connectionString: DB_URL });
@@ -128,7 +129,7 @@ describe('RGPD — anonymisation à la suppression de compte', () => {
     );
     const previousSessionVersion = beforeRows[0].session_version;
 
-    const result = await updateAccountService(userId, { badgeNumber: `${BADGE}-NEW` }, adminId);
+    const result = await updateAccountService(userId, { badgeNumber: UPDATED_BADGE }, adminId);
 
     expect(result.ok).toBe(true);
     const { rows: afterRows } = await pool.query<{
@@ -136,7 +137,7 @@ describe('RGPD — anonymisation à la suppression de compte', () => {
       session_version: number;
     }>('SELECT badge_number, session_version FROM sentinel_users WHERE id = $1', [userId]);
     expect(afterRows[0]).toEqual({
-      badge_number: `${BADGE}-NEW`,
+      badge_number: UPDATED_BADGE,
       session_version: previousSessionVersion + 1,
     });
     expect(await verifyWorkshopSession(userId, BADGE, previousSessionVersion)).toBeNull();

@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAppAuth } from '../routes/AppAuthContext';
 import { verifyAdminPassword } from '../api/adminSecurity';
 import { ApiResponseError } from '../api/client';
 import ConfirmModal from './ConfirmModal';
@@ -26,8 +24,6 @@ export default function AdminPasswordConfirmModal({
   confirmLabel = 'Confirmer',
   loadingLabel = 'Suppression…',
 }: AdminPasswordConfirmModalProps) {
-  const navigate = useNavigate();
-  const { logout } = useAppAuth();
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -48,16 +44,10 @@ export default function AdminPasswordConfirmModal({
       await onConfirm(password);
     } catch (err) {
       if (err instanceof ApiResponseError) {
-        if (err.code === 'UNAUTHORIZED') {
-          if (err.message.includes('Session expirée')) {
-            await logout();
-            navigate('/login', {
-              replace: true,
-              state: { reason: 'Session expirée après 3 tentatives de mot de passe incorrect.' },
-            });
-            return;
-          }
+        if (err.code === 'REAUTHENTICATION_FAILED') {
           setPasswordError('Mot de passe incorrect.');
+        } else if (err.code === 'SESSION_REVOKED') {
+          // Le gestionnaire global 401 redirige avec le motif structuré.
         } else {
           setError(err.message);
         }

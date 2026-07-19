@@ -72,6 +72,12 @@ describe('assertProductionConfig', () => {
     expect(() => assertProductionConfig()).toThrow('ADMIN_PASSWORD');
   });
 
+  it('rejects a numeric-only administrator username', () => {
+    setProductionEnv({ ADMIN_USERNAME: '0012' });
+
+    expect(() => assertProductionConfig()).toThrow('uniquement numérique');
+  });
+
   it('rejects localhost production origin', () => {
     setProductionEnv({ CLIENT_ORIGIN: 'http://localhost:5173' });
 

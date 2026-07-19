@@ -45,17 +45,21 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const redirectingRef = useRef(false);
 
   // Callback stable appelé sur 401 — protégé par ref pour ne déclencher qu'une fois.
-  const markExpired = useCallback(() => {
-    if (redirectingRef.current) return;
-    redirectingRef.current = true;
-    void unifiedLogout().catch(() => undefined);
-    setSession(null);
-    sessionStorage.setItem(
-      'sentinel.login.reason',
-      'Session expirée ou révoquée. Reconnectez-vous.'
-    );
-    navigate('/login', { replace: true });
-  }, [navigate]);
+  const markExpired = useCallback(
+    (error?: ApiResponseError) => {
+      if (redirectingRef.current) return;
+      redirectingRef.current = true;
+      void unifiedLogout().catch(() => undefined);
+      setSession(null);
+      const reason =
+        error?.code === 'SESSION_REVOKED'
+          ? 'Session révoquée après cinq tentatives de mot de passe incorrectes.'
+          : 'Session expirée ou révoquée. Reconnectez-vous.';
+      sessionStorage.setItem('sentinel.login.reason', reason);
+      navigate('/login', { replace: true });
+    },
+    [navigate]
+  );
 
   // Reset du flag à chaque changement de route (nouvelle navigation = nouvelle session potentielle).
   useEffect(() => {
@@ -104,7 +108,7 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         if (err instanceof ApiResponseError && err.status === 401) {
-          markExpired();
+          markExpired(err);
         } else {
           setSession(null);
           sessionStorage.setItem(

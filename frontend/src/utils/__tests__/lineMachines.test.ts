@@ -153,7 +153,7 @@ describe('validateMachine – double robot', () => {
 
 describe('validateLineForm', () => {
   it('returns no issues for a valid form', () => {
-    expect(validateLineForm({ lineNumber: 'L01', machines: [singleMachine()] })).toHaveLength(0);
+    expect(validateLineForm({ lineNumber: '001', machines: [singleMachine()] })).toHaveLength(0);
   });
 
   it('requires lineNumber', () => {
@@ -162,7 +162,7 @@ describe('validateLineForm', () => {
   });
 
   it('requires at least one machine', () => {
-    const errors = validateLineForm({ lineNumber: 'L01', machines: [] });
+    const errors = validateLineForm({ lineNumber: '001', machines: [] });
     expect(errors.some((e) => e.includes('machine'))).toBe(true);
   });
 
@@ -170,14 +170,19 @@ describe('validateLineForm', () => {
     const machines = Array.from({ length: 11 }, (_, i) =>
       singleMachine({ machineId: `M${String(i).padStart(2, '0')}` })
     );
-    const errors = validateLineForm({ lineNumber: 'L01', machines });
+    const errors = validateLineForm({ lineNumber: '001', machines });
     expect(errors.some((e) => e.includes('10'))).toBe(true);
   });
 
   it('detects duplicate machineIds (case-insensitive)', () => {
     const machines = [singleMachine({ machineId: 'M01' }), singleMachine({ machineId: 'm01' })];
-    const errors = validateLineForm({ lineNumber: 'L01', machines });
+    const errors = validateLineForm({ lineNumber: '001', machines });
     expect(errors.some((e) => e.includes('déjà utilisé'))).toBe(true);
+  });
+
+  it('rejects a line number containing non-digits', () => {
+    const errors = validateLineForm({ lineNumber: 'L01', machines: [singleMachine()] });
+    expect(errors).toContain('Le numéro de ligne doit contenir uniquement des chiffres.');
   });
 });
 

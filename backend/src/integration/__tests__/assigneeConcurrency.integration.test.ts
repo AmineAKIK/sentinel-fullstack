@@ -24,11 +24,11 @@ import {
 
 const DB_URL = process.env.DATABASE_URL!;
 const ATTEMPTS = [1, 2, 3] as const;
-const fixtureSuffix = `${process.pid}-${Date.now().toString(36)}`;
-const lineNumber = `GA-${fixtureSuffix}`;
+const fixtureSuffix = `${process.pid}${Date.now()}`;
+const lineNumber = `94${fixtureSuffix}1`;
 const machineId = `GA-M-${fixtureSuffix}`;
-const operatorBadge = `GA-O-${fixtureSuffix}`;
-const technicianBadge = `GA-T-${fixtureSuffix}`;
+const operatorBadge = `94${fixtureSuffix}2`;
+const technicianBadge = `94${fixtureSuffix}3`;
 
 const machines = [
   {

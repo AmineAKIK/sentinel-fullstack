@@ -7,6 +7,7 @@ import {
 } from './fixtures';
 
 const ADMIN_COOKIE = 'sentinel_admin_token';
+const WORKSHOP_COOKIE = 'sentinel_workshop_token';
 const API_ORIGIN = 'http://127.0.0.1:3100';
 
 async function loginAsAdmin(page: Page): Promise<void> {
@@ -60,6 +61,19 @@ async function tamperCookie(context: BrowserContext, name: string): Promise<void
   ]);
 }
 
+async function verifyWrongAdminPassword(page: Page): Promise<{ status: number; code: string }> {
+  return page.evaluate(async (url) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'E2eWrongPassword!23' }),
+    });
+    const body = (await response.json()) as { error?: { code?: string } };
+    return { status: response.status, code: body.error?.code ?? '' };
+  }, `${API_ORIGIN}/api/admin/security/verify-password`);
+}
+
 test('le cookie Admin absent ou altéré est refusé', async ({ page, context }) => {
   await page.goto('/admin/login');
   const missingCookieResponse = await fetchContract(page, '/api/admin/dashboard');
@@ -97,4 +111,37 @@ test('les espaces Admin, Atelier et Board interdisent la mise en cache', async (
     expect(response.status).toBe(200);
     expect(response.cacheControl).toContain('no-store');
   }
+});
+
+test('la réauthentification révoque la session exactement au cinquième échec', async ({
+  page,
+  context,
+}) => {
+  await loginAsAdmin(page);
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    await expect(verifyWrongAdminPassword(page)).resolves.toEqual({
+      status: 401,
+      code: 'REAUTHENTICATION_FAILED',
+    });
+    expect((await context.cookies()).some((cookie) => cookie.name === ADMIN_COOKIE)).toBe(true);
+  }
+
+  await expect(verifyWrongAdminPassword(page)).resolves.toEqual({
+    status: 401,
+    code: 'SESSION_REVOKED',
+  });
+  expect((await context.cookies()).some((cookie) => cookie.name === ADMIN_COOKIE)).toBe(false);
+});
+
+test("l'écran Admin refuse le namespace numérique sans ouvrir de session Atelier", async ({
+  page,
+  context,
+}) => {
+  await page.goto('/admin/login');
+  await page.getByLabel('Identifiant').fill(E2E_RESPONSABLE_BADGE);
+  await page.getByRole('button', { name: 'Continuer' }).click();
+
+  await expect(page.getByRole('alert')).toHaveText('Identifiant ou mot de passe incorrect.');
+  expect((await context.cookies()).some((cookie) => cookie.name === WORKSHOP_COOKIE)).toBe(false);
 });

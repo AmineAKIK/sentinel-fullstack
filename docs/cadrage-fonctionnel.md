@@ -80,6 +80,9 @@ Chaque compte Atelier possède un badge et un mot de passe. À la création ou l
 d'une réinitialisation, l'admin remet un code temporaire ; l'utilisateur choisit
 son mot de passe au premier accès. Le code expire et ne peut être réutilisé.
 
+Le badge est une chaîne composée uniquement de chiffres. Les zéros initiaux sont
+conservés et significatifs.
+
 Une désactivation, suppression, rotation de mot de passe ou modification de badge
 ou de rôle invalide les sessions concernées via `session_version`.
 
@@ -87,7 +90,10 @@ ou de rôle invalide les sessions concernées via `session_version`.
 
 Le premier admin est amorcé sur une base vide. Ensuite, son identifiant et son
 mot de passe sont gérés depuis l'application. Les actions sensibles demandent
-une réauthentification, sans créer une nouvelle session parallèle.
+une réauthentification, sans créer une nouvelle session parallèle. Quatre mots
+de passe erronés refusent seulement l'action ; le cinquième révoque toutes les
+sessions Admin. L'identifiant Admin ne peut pas être uniquement numérique afin
+de ne jamais entrer en collision avec un badge Atelier.
 
 ### Board
 
@@ -99,8 +105,9 @@ Atelier déjà connecté peut aussi lire cette projection sans obtenir de nouvea
 
 ### Création
 
-Données : prénom, nom, badge normalisé, rôle, e-mail optionnel et activation.
-Le badge est unique sans tenir compte de la casse ou des espaces périphériques.
+Données : prénom, nom, badge numérique, rôle, e-mail optionnel et activation.
+Le badge actif est unique après retrait des espaces périphériques ; `0012` et
+`12` restent deux identifiants distincts.
 
 La création produit un code de setup remis une fois et un événement d'audit avec
 snapshot de l'identité cible.
@@ -128,7 +135,8 @@ simple ou double robot avec nombres de têtes bornés.
 
 Règles :
 
-- numéro de ligne actif unique après normalisation ;
+- numéro de ligne numérique, actif et unique après retrait des espaces
+  périphériques ; les zéros initiaux sont significatifs ;
 - identifiant machine unique dans tout le référentiel actif ;
 - payload machine validé côté formulaire, Zod et PostgreSQL ;
 - conflits recalculés sous transaction au moment de l'écriture ;

@@ -17,22 +17,7 @@ import {
 import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
 import { withTransaction } from '../../db/transaction';
 import { reauthenticateAdmin } from './adminReauthentication.service';
-
-function sendReauthenticationFailure(
-  res: Response,
-  reason: 'ACCOUNT_MISSING' | 'INVALID_PASSWORD' | 'SESSION_REVOKED'
-): void {
-  if (reason === 'ACCOUNT_MISSING') {
-    sendUnauthenticated(res);
-    return;
-  }
-  if (reason === 'SESSION_REVOKED') {
-    clearAuthCookie(res, ADMIN_AUTH_COOKIE);
-    sendError(res, 401, 'UNAUTHORIZED', 'Session révoquée après trop de tentatives incorrectes.');
-    return;
-  }
-  sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe incorrect.');
-}
+import { sendAdminReauthenticationFailure } from './adminReauthentication.http';
 
 export async function changePassword(req: Request, res: Response): Promise<void> {
   if (!req.admin) {
@@ -68,7 +53,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   try {
     const authentication = await reauthenticateAdmin(req.admin.adminId, currentPassword);
     if (!authentication.ok) {
-      sendReauthenticationFailure(res, authentication.reason);
+      sendAdminReauthenticationFailure(res, authentication.reason);
       return;
     }
 
@@ -132,7 +117,7 @@ export async function updateEmail(req: Request, res: Response): Promise<void> {
     ]);
 
     if (!authentication.ok) {
-      sendReauthenticationFailure(res, authentication.reason);
+      sendAdminReauthenticationFailure(res, authentication.reason);
       return;
     }
 
@@ -141,7 +126,7 @@ export async function updateEmail(req: Request, res: Response): Promise<void> {
       const providedCurrent =
         typeof currentEmail === 'string' ? currentEmail.trim().toLowerCase() : '';
       if (providedCurrent !== resolvedCurrent) {
-        sendError(res, 401, 'UNAUTHORIZED', 'Adresse email actuelle incorrecte.');
+        sendError(res, 400, 'VALIDATION_ERROR', 'Adresse email actuelle incorrecte.');
         return;
       }
     }
@@ -180,7 +165,7 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
   try {
     const authentication = await reauthenticateAdmin(req.admin.adminId, password);
     if (!authentication.ok) {
-      sendReauthenticationFailure(res, authentication.reason);
+      sendAdminReauthenticationFailure(res, authentication.reason);
       return;
     }
     res.json({ valid: true });

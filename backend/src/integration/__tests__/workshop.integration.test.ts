@@ -48,6 +48,13 @@ let lineId: number;
 let adminId: number;
 let adminFixture: IntegrationAdminFixture | undefined;
 
+const INTEGRATION_LINE_NUMBER = '930001';
+const RENAMED_LINE_NUMBER = '930002';
+const OPERATOR_BADGE = '9300101';
+const MAINTENANCE_BADGE = '9300102';
+const RESPONSABLE_BADGE = '9300103';
+const OTHER_MAINTENANCE_BADGE = '9300104';
+
 const integrationMachines = [
   {
     machineId: 'M-INT-01',
@@ -59,7 +66,7 @@ const integrationMachines = [
 ];
 
 const structuralLineMutations: Array<[string, UpdateLineInput]> = [
-  ['line number', { lineNumber: 'L-INT-RENAMED' }],
+  ['line number', { lineNumber: RENAMED_LINE_NUMBER }],
   [
     'machine configuration',
     {
@@ -85,16 +92,17 @@ beforeAll(async () => {
 
   const { rows: lineRows } = await pool.query<{ id: number }>(
     `INSERT INTO production_lines (line_number, machine_sequence, is_active, is_deleted)
-     VALUES ('L-INT-01', $1::jsonb, TRUE, FALSE)
+     VALUES ($1, $2::jsonb, TRUE, FALSE)
      ON CONFLICT DO NOTHING
      RETURNING id`,
-    [JSON.stringify(integrationMachines)]
+    [INTEGRATION_LINE_NUMBER, JSON.stringify(integrationMachines)]
   );
 
   // If line already exists (re-run), fetch it
   if (lineRows.length === 0) {
     const { rows } = await pool.query<{ id: number }>(
-      `SELECT id FROM production_lines WHERE line_number = 'L-INT-01'`
+      `SELECT id FROM production_lines WHERE line_number = $1`,
+      [INTEGRATION_LINE_NUMBER]
     );
     lineId = rows[0].id;
   } else {
@@ -103,14 +111,14 @@ beforeAll(async () => {
 
   await pool.query(
     `UPDATE production_lines
-     SET line_number = 'L-INT-01',
-         machine_sequence = $2::jsonb,
+     SET line_number = $2,
+         machine_sequence = $3::jsonb,
          is_active = TRUE,
          is_deleted = FALSE,
          deleted_at = NULL,
          updated_at = NOW()
      WHERE id = $1`,
-    [lineId, JSON.stringify(integrationMachines)]
+    [lineId, INTEGRATION_LINE_NUMBER, JSON.stringify(integrationMachines)]
   );
   await pool.query('DELETE FROM line_audit_events WHERE target_line_id = $1', [lineId]);
 
@@ -126,22 +134,22 @@ beforeAll(async () => {
     return rows[0].id;
   };
 
-  operatorId = await upsertUser('OP-INT-01', 'OPERATOR');
-  maintenanceId = await upsertUser('MA-INT-01', 'MAINTENANCE');
-  responsableId = await upsertUser('RE-INT-01', 'RESPONSABLE');
+  operatorId = await upsertUser(OPERATOR_BADGE, 'OPERATOR');
+  maintenanceId = await upsertUser(MAINTENANCE_BADGE, 'MAINTENANCE');
+  responsableId = await upsertUser(RESPONSABLE_BADGE, 'RESPONSABLE');
 }, 30_000);
 
 afterEach(async () => {
   await pool.query(
     `UPDATE production_lines
-     SET line_number = 'L-INT-01',
-         machine_sequence = $2::jsonb,
+     SET line_number = $2,
+         machine_sequence = $3::jsonb,
          is_active = TRUE,
          is_deleted = FALSE,
          deleted_at = NULL,
          updated_at = NOW()
      WHERE id = $1`,
-    [lineId, JSON.stringify(integrationMachines)]
+    [lineId, INTEGRATION_LINE_NUMBER, JSON.stringify(integrationMachines)]
   );
   await pool.query('DELETE FROM line_audit_events WHERE target_line_id = $1', [lineId]);
 
@@ -163,12 +171,10 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  // Nettoyage chirurgical : uniquement les badges de CE fichier (préfixe de
-  // deux lettres + « -INT- », ex. OP-INT-01). On évite « %-INT-% » qui
-  // attraperait aussi les fixtures d'autres suites (ex. RGPD-INT-01) lorsque
-  // les fichiers d'intégration s'exécutent en parallèle.
   await pool.query('DELETE FROM line_audit_events WHERE target_line_id = $1', [lineId]);
-  await pool.query(`DELETE FROM sentinel_users WHERE badge_number LIKE '__-INT-%'`);
+  await pool.query('DELETE FROM sentinel_users WHERE badge_number = ANY($1::varchar[])', [
+    [OPERATOR_BADGE, MAINTENANCE_BADGE, RESPONSABLE_BADGE, OTHER_MAINTENANCE_BADGE],
+  ]);
   await pool.query('DELETE FROM production_lines WHERE id = $1', [lineId]);
   if (adminFixture) await releaseIntegrationAdminFixture(pool, adminFixture);
   await pool.end();
@@ -582,7 +588,7 @@ describe('Active line structural freeze (real DB)', () => {
         [lineId]
       );
       expect(rows[0]).toEqual({
-        line_number: 'L-INT-01',
+        line_number: INTEGRATION_LINE_NUMBER,
         machine_sequence: integrationMachines,
         is_active: true,
       });
@@ -625,14 +631,14 @@ describe('Active line structural freeze (real DB)', () => {
       )
     );
 
-    const result = await updateLineService(lineId, { lineNumber: 'L-INT-RENAMED' }, adminId);
+    const result = await updateLineService(lineId, { lineNumber: RENAMED_LINE_NUMBER }, adminId);
 
     expect(result.ok).toBe(true);
     const { rows } = await pool.query<{ line_number: string }>(
       'SELECT line_number FROM workshop_incidents WHERE id = $1',
       [created.id]
     );
-    expect(rows[0].line_number).toBe('L-INT-01');
+    expect(rows[0].line_number).toBe(INTEGRATION_LINE_NUMBER);
   });
 });
 
@@ -677,10 +683,10 @@ describe('Policy enforcement through service layer (real DB)', () => {
     const hash = await hashWorkshopPassword('test_pass_99');
     const { rows } = await pool.query<{ id: number }>(
       `INSERT INTO sentinel_users (first_name, last_name, badge_number, role, is_active, is_deleted, password_hash)
-       VALUES ('Other', 'Maint', 'MA-INT-02', 'MAINTENANCE', TRUE, FALSE, $1)
+       VALUES ('Other', 'Maint', $2, 'MAINTENANCE', TRUE, FALSE, $1)
        ON CONFLICT (badge_number) WHERE is_deleted = FALSE DO UPDATE SET password_hash = EXCLUDED.password_hash
        RETURNING id`,
-      [hash]
+      [hash, OTHER_MAINTENANCE_BADGE]
     );
     const otherMaintenanceId = rows[0].id;
 
@@ -695,7 +701,7 @@ describe('Policy enforcement through service layer (real DB)', () => {
     );
     expect(result.ok).toBe(true);
     expect(await getIncidentStatus(incidentId)).toBe('CLOSED');
-    // MA-INT-02 user is cleaned up in afterAll via the badge pattern '%-INT-%'
+    // Le compte secondaire est supprimé avec les autres badges réservés à cette suite.
   });
 
   it('RESPONSABLE cannot take an incident', async () => {
@@ -743,8 +749,8 @@ describe('DB constraints (real DB)', () => {
         `INSERT INTO workshop_incidents
            (user_id, line_id, line_number, machine_id, machine_brand,
             robot_label, head_number, state, status, display_order)
-         VALUES ($1, $2, 'L-INT-01', 'M-INT-01', 'Fanuc', 'R01', 1, 'DEGRADEE', 'INVALID_STATUS', 0)`,
-        [operatorId, lineId]
+         VALUES ($1, $2, $3, 'M-INT-01', 'Fanuc', 'R01', 1, 'DEGRADEE', 'INVALID_STATUS', 0)`,
+        [operatorId, lineId, INTEGRATION_LINE_NUMBER]
       )
     ).rejects.toThrow();
   });
@@ -754,7 +760,7 @@ describe('DB constraints (real DB)', () => {
     await expect(
       pool.query(
         `INSERT INTO sentinel_users (first_name, last_name, badge_number, role, is_active, is_deleted, password_hash)
-         VALUES ('Bad', 'Role', 'BR-TEST-01', 'INVALID_ROLE', TRUE, FALSE, $1)`,
+         VALUES ('Bad', 'Role', '9300199', 'INVALID_ROLE', TRUE, FALSE, $1)`,
         [hash]
       )
     ).rejects.toThrow();

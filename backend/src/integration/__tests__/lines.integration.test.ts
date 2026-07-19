@@ -2,7 +2,11 @@ import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 
 const DB_URL = process.env.DATABASE_URL!;
-const prefix = `INT-LINE-${process.pid}`;
+const prefix = `95${process.pid}${Date.now()}`;
+
+function fixtureLine(suffix: number): string {
+  return `${prefix}${suffix}`;
+}
 
 let pool: Pool;
 
@@ -37,12 +41,12 @@ describe('Production line integrity (real DB)', () => {
       pool.query(
         `INSERT INTO production_lines (line_number, machine_sequence, is_active)
          VALUES ($1, $2, TRUE)`,
-        [`${prefix}-A`, JSON.stringify([machine(`${prefix}-MACHINE`)])]
+        [fixtureLine(1), JSON.stringify([machine(`${prefix}-MACHINE`)])]
       ),
       pool.query(
         `INSERT INTO production_lines (line_number, machine_sequence, is_active)
          VALUES ($1, $2, TRUE)`,
-        [`${prefix}-B`, JSON.stringify([machine(`${prefix}-machine`)])]
+        [fixtureLine(2), JSON.stringify([machine(`${prefix}-machine`)])]
       ),
     ]);
 
@@ -56,22 +60,22 @@ describe('Production line integrity (real DB)', () => {
     });
   });
 
-  it('refuse les numéros de ligne équivalents après normalisation', async () => {
+  it('refuse deux numéros de ligne numériques identiques', async () => {
+    const duplicateLine = fixtureLine(3);
     await pool.query(
       `INSERT INTO production_lines (line_number, machine_sequence, is_active)
        VALUES ($1, $2, TRUE)`,
-      [`${prefix}-NORMALIZED`, JSON.stringify([machine(`${prefix}-M-2`)])]
+      [duplicateLine, JSON.stringify([machine(`${prefix}-M-2`)])]
     );
 
     await expect(
       pool.query(
         `INSERT INTO production_lines (line_number, machine_sequence, is_active)
          VALUES ($1, $2, TRUE)`,
-        [`  ${prefix.toLowerCase()}-normalized  `, JSON.stringify([machine(`${prefix}-M-3`)])]
+        [duplicateLine, JSON.stringify([machine(`${prefix}-M-3`)])]
       )
     ).rejects.toMatchObject({
       code: '23505',
-      constraint: 'idx_production_lines_normalized_number_active',
     });
   });
 
@@ -81,7 +85,7 @@ describe('Production line integrity (real DB)', () => {
         `INSERT INTO production_lines (line_number, machine_sequence, is_active)
          VALUES ($1, $2, TRUE)`,
         [
-          `${prefix}-INVALID`,
+          fixtureLine(4),
           JSON.stringify([{ machineId: `${prefix}-M-4`, brand: 'X', hasDoubleRobot: false }]),
         ]
       )
@@ -94,7 +98,7 @@ describe('Production line integrity (real DB)', () => {
       `INSERT INTO production_lines (line_number, machine_sequence, is_active)
        VALUES ($1, $2, TRUE)
        RETURNING id`,
-      [`${prefix}-ARCHIVE`, JSON.stringify([machine(machineId)])]
+      [fixtureLine(5), JSON.stringify([machine(machineId)])]
     );
     await pool.query('UPDATE production_lines SET is_deleted = TRUE WHERE id = $1', [rows[0].id]);
 
@@ -102,7 +106,7 @@ describe('Production line integrity (real DB)', () => {
       pool.query(
         `INSERT INTO production_lines (line_number, machine_sequence, is_active)
          VALUES ($1, $2, TRUE)`,
-        [`${prefix}-REUSE`, JSON.stringify([machine(machineId)])]
+        [fixtureLine(6), JSON.stringify([machine(machineId)])]
       )
     ).resolves.toBeDefined();
   });

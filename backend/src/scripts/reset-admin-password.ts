@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { Pool, PoolClient } from 'pg';
 import { hashAdminPassword } from '../auth/bcrypt';
+import { normalizeAdminUsername } from '../domain/identifiers';
 
 config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -30,7 +31,9 @@ async function main(): Promise<void> {
   try {
     client = await pool.connect();
     await client.query('BEGIN');
-    const configuredUsername = process.env.ADMIN_USERNAME?.trim();
+    const configuredUsername = process.env.ADMIN_USERNAME
+      ? normalizeAdminUsername(process.env.ADMIN_USERNAME)
+      : undefined;
     const { rows } = await client.query<{ id: number; username: string }>(
       configuredUsername
         ? 'SELECT id, username FROM admin_accounts WHERE username = $1 FOR UPDATE'

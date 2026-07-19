@@ -1,4 +1,5 @@
 import { LineMachine } from '../types';
+import { isDigitsOnly } from './identifiers';
 
 export interface LineMachineFormData {
   lineNumber: string;
@@ -80,7 +81,11 @@ export function validateMachine(machine: LineMachine, label = 'Machine'): string
 export function validateLineForm(form: LineMachineFormData): string[] {
   const issues: string[] = [];
 
-  if (!form.lineNumber.trim()) issues.push('Le numéro de ligne est obligatoire.');
+  const lineNumber = form.lineNumber.trim();
+  if (!lineNumber) issues.push('Le numéro de ligne est obligatoire.');
+  else if (!isDigitsOnly(lineNumber)) {
+    issues.push('Le numéro de ligne doit contenir uniquement des chiffres.');
+  }
   if (form.machines.length < 1) issues.push('Ajoutez au moins une machine.');
   if (form.machines.length > 10) issues.push('Une ligne ne peut pas dépasser 10 machines.');
 

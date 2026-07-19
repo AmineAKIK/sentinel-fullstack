@@ -3,6 +3,8 @@ import { Response } from 'express';
 export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
+  | 'REAUTHENTICATION_FAILED'
+  | 'SESSION_REVOKED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'BADGE_ALREADY_EXISTS'

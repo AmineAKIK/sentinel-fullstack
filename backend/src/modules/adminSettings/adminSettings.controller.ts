@@ -23,22 +23,7 @@ import { FIELD_LIMITS } from '../../domain/constants';
 import { withTransaction } from '../../db/transaction';
 import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
 import { reauthenticateAdmin } from '../adminSecurity/adminReauthentication.service';
-
-function sendReauthenticationFailure(
-  res: Response,
-  reason: 'ACCOUNT_MISSING' | 'INVALID_PASSWORD' | 'SESSION_REVOKED'
-): void {
-  if (reason === 'ACCOUNT_MISSING') {
-    sendUnauthenticated(res);
-    return;
-  }
-  if (reason === 'SESSION_REVOKED') {
-    clearAuthCookie(res, ADMIN_AUTH_COOKIE);
-    sendError(res, 401, 'UNAUTHORIZED', 'Session révoquée après trop de tentatives incorrectes.');
-    return;
-  }
-  sendError(res, 401, 'UNAUTHORIZED', 'Mot de passe incorrect.');
-}
+import { sendAdminReauthenticationFailure } from '../adminSecurity/adminReauthentication.http';
 
 const BOARD_CODE_MIN = 4;
 
@@ -129,7 +114,7 @@ export async function patchBoardToggle(req: Request, res: Response): Promise<voi
   try {
     const authentication = await reauthenticateAdmin(req.admin.adminId, currentPassword);
     if (!authentication.ok) {
-      sendReauthenticationFailure(res, authentication.reason);
+      sendAdminReauthenticationFailure(res, authentication.reason);
       return;
     }
 
@@ -185,7 +170,7 @@ export async function patchBoardCode(req: Request, res: Response): Promise<void>
   try {
     const authentication = await reauthenticateAdmin(req.admin.adminId, currentPassword);
     if (!authentication.ok) {
-      sendReauthenticationFailure(res, authentication.reason);
+      sendAdminReauthenticationFailure(res, authentication.reason);
       return;
     }
     const boardCodeHash = await hashBoardCode(trimmed);
@@ -314,7 +299,7 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
         body.currentPassword as string
       );
       if (!authentication.ok) {
-        sendReauthenticationFailure(res, authentication.reason);
+        sendAdminReauthenticationFailure(res, authentication.reason);
         return;
       }
     }

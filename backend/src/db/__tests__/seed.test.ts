@@ -86,6 +86,15 @@ describe('seedAdminAccount', () => {
     expect(infoMock).toHaveBeenCalledWith({ username: 'jury-admin' }, 'Admin account created');
   });
 
+  it('refuse un username admin purement numérique sur une base vide', async () => {
+    process.env.ADMIN_USERNAME = '0012';
+    process.env.ADMIN_PASSWORD = 'mot-de-passe-temporaire-solide';
+    queryMock.mockResolvedValueOnce({ rows: [] });
+
+    await expect(seedAdminAccount()).rejects.toThrow('uniquement numérique');
+    expect(hashAdminPasswordMock).not.toHaveBeenCalled();
+  });
+
   it('tolère deux démarrages concurrents grâce à la contrainte singleton', async () => {
     process.env.ADMIN_USERNAME = 'jury-admin';
     process.env.ADMIN_PASSWORD = 'mot-de-passe-temporaire-solide';

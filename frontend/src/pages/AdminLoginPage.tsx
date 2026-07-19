@@ -5,6 +5,7 @@ import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { isDigitsOnly } from '../utils/identifiers';
 
 export default function AdminLoginPage() {
   usePageTitle('Connexion administration');
@@ -25,6 +26,10 @@ export default function AdminLoginPage() {
 
     if (!identifier.trim()) {
       setError('Renseignez votre identifiant.');
+      return;
+    }
+    if (isDigitsOnly(identifier.trim())) {
+      setError('Identifiant ou mot de passe incorrect.');
       return;
     }
 
