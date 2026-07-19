@@ -2,7 +2,7 @@ import { loginWorkshopUserService } from '../workshopCredentials.service';
 
 jest.mock('../workshopCredentials.repository', () => ({
   findWorkshopUserByBadge: jest.fn(),
-  setWorkshopUserPassword: jest.fn(),
+  consumeWorkshopPasswordSetupCode: jest.fn(),
 }));
 
 jest.mock('../../../auth/bcrypt', () => ({
@@ -37,6 +37,7 @@ function mockUser(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(repo.consumeWorkshopPasswordSetupCode).mockResolvedValue(mockUser());
 });
 
 describe('loginWorkshopUserService – setup initial', () => {
@@ -111,7 +112,7 @@ describe('loginWorkshopUserService – setup initial', () => {
     const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'WRONG');
 
     expect(result).toEqual({ kind: 'invalid_setup_code' });
-    expect(repo.setWorkshopUserPassword).not.toHaveBeenCalled();
+    expect(repo.consumeWorkshopPasswordSetupCode).not.toHaveBeenCalled();
   });
 
   it('définit le mot de passe puis retourne la session si le code est valide', async () => {
@@ -132,7 +133,66 @@ describe('loginWorkshopUserService – setup initial', () => {
       },
     });
     expect(bcrypt.hashWorkshopPassword).toHaveBeenCalledWith('secret1');
-    expect(repo.setWorkshopUserPassword).toHaveBeenCalledWith(1, 'hashed-password');
+    expect(repo.consumeWorkshopPasswordSetupCode).toHaveBeenCalledWith({
+      userId: 1,
+      passwordHash: 'hashed-password',
+      expectedSetupTokenHash: 'hashed-setup-code',
+    });
+  });
+
+  it("ne retourne pas de session lorsqu'une requête concurrente a déjà consommé le code", async () => {
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValueOnce(mockUser())
+      .mockResolvedValueOnce(
+        mockUser({
+          password_hash: 'winning-password-hash',
+          password_setup_token_hash: null,
+          password_setup_expires_at: null,
+        })
+      );
+    jest.mocked(setupCode.verifyWorkshopPasswordSetupCode).mockResolvedValue(true);
+    jest.mocked(repo.consumeWorkshopPasswordSetupCode).mockResolvedValue(null);
+
+    const result = await loginWorkshopUserService(
+      '3002',
+      undefined,
+      'losing-password',
+      'ABCD234567'
+    );
+
+    expect(result).toEqual({ kind: 'requires_password', badgeNumber: '3002' });
+  });
+
+  it.each([
+    ['un compte supprimé', null, { kind: 'invalid_badge' }],
+    ['un compte désactivé', mockUser({ is_active: false }), { kind: 'account_disabled' }],
+    [
+      'un code supprimé',
+      mockUser({ password_setup_token_hash: null, password_setup_expires_at: null }),
+      { kind: 'expired_setup_code' },
+    ],
+    [
+      'un code remplacé',
+      mockUser({ password_setup_token_hash: 'replacement-setup-hash' }),
+      { kind: 'invalid_setup_code' },
+    ],
+  ])('reclasse sans succès %s pendant la consommation', async (_label, currentUser, expected) => {
+    jest
+      .mocked(repo.findWorkshopUserByBadge)
+      .mockResolvedValueOnce(mockUser())
+      .mockResolvedValueOnce(currentUser);
+    jest.mocked(setupCode.verifyWorkshopPasswordSetupCode).mockResolvedValue(true);
+    jest.mocked(repo.consumeWorkshopPasswordSetupCode).mockResolvedValue(null);
+
+    const result = await loginWorkshopUserService(
+      '3002',
+      undefined,
+      'losing-password',
+      'ABCD234567'
+    );
+
+    expect(result).toEqual(expected);
   });
 });
 

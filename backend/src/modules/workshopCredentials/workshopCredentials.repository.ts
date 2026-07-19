@@ -17,6 +17,11 @@ export type WorkshopSessionUser = Pick<
   'id' | 'first_name' | 'last_name' | 'badge_number' | 'role'
 >;
 
+export type WorkshopLoginUser = Pick<
+  WorkshopCredentialUser,
+  'id' | 'first_name' | 'last_name' | 'badge_number' | 'role' | 'session_version'
+>;
+
 export async function findWorkshopUserByBadge(
   badgeNumber: string
 ): Promise<(WorkshopCredentialUser & { is_active: boolean }) | null> {
@@ -31,16 +36,28 @@ export async function findWorkshopUserByBadge(
   return rows[0] ?? null;
 }
 
-export async function setWorkshopUserPassword(userId: number, passwordHash: string): Promise<void> {
-  await pool.query(
+export async function consumeWorkshopPasswordSetupCode(input: {
+  userId: number;
+  passwordHash: string;
+  expectedSetupTokenHash: string;
+}): Promise<WorkshopLoginUser | null> {
+  const { rows } = await pool.query<WorkshopLoginUser>(
     `UPDATE sentinel_users
-     SET password_hash = $1,
+     SET password_hash = $2,
          password_setup_token_hash = NULL,
          password_setup_expires_at = NULL,
          updated_at = NOW()
-     WHERE id = $2`,
-    [passwordHash, userId]
+     WHERE id = $1
+       AND is_active = TRUE
+       AND is_deleted = FALSE
+       AND password_hash IS NULL
+       AND password_setup_token_hash = $3
+       AND password_setup_expires_at > NOW()
+     RETURNING id, first_name, last_name, badge_number, role, session_version`,
+    [input.userId, input.passwordHash, input.expectedSetupTokenHash]
   );
+
+  return rows[0] ?? null;
 }
 
 export async function findActiveWorkshopUserBySession(input: {
