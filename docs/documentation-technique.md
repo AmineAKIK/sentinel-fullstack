@@ -239,8 +239,11 @@ COMMIT
 Les violations concurrentes (`23505`, `23503`, `23514`) sont reconnues par des
 helpers et traduites en résultats métier sans exposer le SQL.
 
-Les mises à jour vides sont détectées avant l'écriture afin d'éviter un
-`updated_at` ou un événement d'audit sans changement réel.
+Les éditions directes sans écart réel sont court-circuitées avant toute écriture,
+journalisation ou création implicite de suivi. Pour une demande de correction,
+le service compare sous verrou les sept champs éditables, ne conserve que les
+écarts et répond `400 NO_CHANGES` si la demande est identique. Un commentaire vide
+et un commentaire `NULL` sont équivalents pour cette comparaison.
 
 ## 8. Authentification
 

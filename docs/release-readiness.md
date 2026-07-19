@@ -111,8 +111,8 @@ commit audité au démarrage de cette branche.
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
 | `SEC-01` | P0 | 1 | Code temporaire vérifié puis supprimé par opérations séparées. | Test PostgreSQL concurrent : un seul succès. | VERIFIED |
-| `AUD-01` | P0 | 2 | Une édition directe identique écrit `INCIDENT_UPDATED` vide. | Test service + intégration sur le nombre d'événements. | OPEN |
-| `AUD-02` | P0 | 2 | Une demande identique peut ouvrir un arbitrage. | Réponse `NO_CHANGES`, aucun cas ni événement créé. | OPEN |
+| `AUD-01` | P0 | 2 | Une édition directe identique écrit `INCIDENT_UPDATED` vide. | Test service + intégration sur le nombre d'événements. | IMPLEMENTED |
+| `AUD-02` | P0 | 2 | Une demande identique peut ouvrir un arbitrage. | Réponse `NO_CHANGES`, aucun cas ni événement créé. | IMPLEMENTED |
 | `CON-01` | P0 | 3 | Création validée avant transaction contre archivage/modification de ligne. | Test concurrent création/archivage et invariant final. | OPEN |
 | `CON-02` | P0 | 3 | Validation ligne/machine d'une édition utilise le pool hors transaction. | Ligne verrouillée et sélection revalidée avec le même client. | OPEN |
 | `CON-03` | P0 | 3 | Une ligne utilisée peut être renommée ou reconfigurée. | `409 RESOURCE_IN_USE` et tests de chaque champ structurel. | OPEN |
@@ -211,7 +211,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | ---: | --- | --- | --- | --- |
 | `0` | Geler la baseline, les décisions, le registre et les portes qualité. | Gouvernance du chantier | Aucun | VERIFIED |
 | `1` | Rendre le premier accès atomique. | `SEC-01` | Lot 0 | VERIFIED |
-| `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | OPEN |
+| `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | IMPLEMENTED |
 | `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | OPEN |
 | `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | OPEN |
 | `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | OPEN |

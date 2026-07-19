@@ -26,6 +26,7 @@ import {
   closeIncidentService,
   cancelIncidentService,
   invalidateIncidentService,
+  updateIncidentService,
 } from '../../modules/workshop/workshop.service';
 
 const DB_URL = process.env.DATABASE_URL!;
@@ -91,6 +92,10 @@ afterEach(async () => {
   // Clear all incidents on the integration test line between tests to avoid
   // the unique constraint on active incidents per machine.
   await pool.query(
+    `DELETE FROM workshop_arbitration_cases WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`,
+    [lineId]
+  );
+  await pool.query(
     `DELETE FROM workshop_incident_events WHERE incident_id IN (SELECT id FROM workshop_incidents WHERE line_id = $1)`,
     [lineId]
   );
@@ -141,6 +146,25 @@ async function getIncidentStatus(incidentId: number): Promise<string | null> {
     [incidentId]
   );
   return rows[0]?.status ?? null;
+}
+
+async function getIncidentMutationSnapshot(incidentId: number): Promise<{
+  updated_at: Date;
+  edit_request: Record<string, unknown> | null;
+}> {
+  const { rows } = await pool.query<{
+    updated_at: Date;
+    edit_request: Record<string, unknown> | null;
+  }>('SELECT updated_at, edit_request FROM workshop_incidents WHERE id = $1', [incidentId]);
+  return rows[0];
+}
+
+async function countArbitrationCases(incidentId: number): Promise<number> {
+  const { rows } = await pool.query<{ count: number }>(
+    'SELECT COUNT(*)::int AS count FROM workshop_arbitration_cases WHERE incident_id = $1',
+    [incidentId]
+  );
+  return rows[0].count;
 }
 
 // ── Full lifecycle ─────────────────────────────────────────────────────────────
@@ -231,6 +255,60 @@ describe('Incident lifecycle (real DB)', () => {
       incidentId,
     ]);
     expect(rows.length).toBe(1);
+  });
+});
+
+describe('No-op incident mutations (real DB)', () => {
+  it('preserves the incident timestamp and audit trail after an identical direct edit', async () => {
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
+    const before = await getIncidentMutationSnapshot(created.id);
+    const eventsBefore = await getEventTypes(created.id);
+    await pool.query('SELECT pg_sleep(0.02)');
+
+    const result = await updateIncidentService(
+      created.id,
+      { ...validInput(), comment: '' },
+      responsableId,
+      'RESPONSABLE'
+    );
+
+    expect(result.ok).toBe(true);
+    const after = await getIncidentMutationSnapshot(created.id);
+    expect(after.updated_at.toISOString()).toBe(before.updated_at.toISOString());
+    expect(await getEventTypes(created.id)).toEqual(eventsBefore);
+
+    const { rows: followerRows } = await pool.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count
+       FROM workshop_incident_followers
+       WHERE incident_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+      [created.id, responsableId]
+    );
+    expect(followerRows[0].count).toBe(0);
+  });
+
+  it('rejects an identical operator request without updating or opening arbitration', async () => {
+    const created = assertOk(await createIncidentService(validInput(), operatorId, 'OPERATOR')) as {
+      id: number;
+    };
+    const before = await getIncidentMutationSnapshot(created.id);
+    const eventsBefore = await getEventTypes(created.id);
+    await pool.query('SELECT pg_sleep(0.02)');
+
+    const result = await updateIncidentService(
+      created.id,
+      { requestOnly: true, ...validInput(), comment: '' },
+      operatorId,
+      'OPERATOR'
+    );
+
+    expect(result).toMatchObject({ ok: false, status: 400, code: 'NO_CHANGES' });
+    const after = await getIncidentMutationSnapshot(created.id);
+    expect(after.updated_at.toISOString()).toBe(before.updated_at.toISOString());
+    expect(after.edit_request).toBeNull();
+    expect(await getEventTypes(created.id)).toEqual(eventsBefore);
+    expect(await countArbitrationCases(created.id)).toBe(0);
   });
 });
 
