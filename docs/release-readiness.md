@@ -266,8 +266,21 @@ Preuves des lots clos :
   exécutés : `format:check`, `lint`, `typecheck:scripts`, `build` et `test`
   backend (425/425) et frontend (359/359) verts sur les deux périmètres. Run CI
   distant à confirmer après push.
+- lot 5A : commit `9691dad6f526b3b6b563a0bd4b33fae8646fe072`, migration
+  PostgreSQL `047`. Contrôles locaux verts : backend 431/431 (unitaire),
+  79/79 (intégration réelle sur base jetable, migrations idempotentes deux
+  fois de suite), frontend 359/359.
+- lot 5B : commit `bc56b423ff2199f763fa74c80ef2cd918fecdf06`, migration
+  PostgreSQL `048`. Contrôles locaux verts : backend 436/436 (unitaire),
+  82/82 (intégration réelle, migrations idempotentes deux fois de suite),
+  frontend 359/359. Un bug d'ambiguïté de typage SQL sur
+  `retryOrFailNotificationOutboxItem` (paramètre `$2` utilisé à la fois comme
+  valeur et comme comparaison) n'a été détecté que par la suite d'intégration
+  réelle, jamais par les tests unitaires mockés — corrigé par des casts
+  explicites (`::varchar`, `::int`).
 
-Les cinq jobs de chaque preuve sont verts.
+Les cinq jobs de chaque preuve sont verts, à l'exception des lots 5A et 5B dont
+le run CI distant reste à confirmer après push.
 
 ### Porte A — intégrité métier
 
@@ -286,6 +299,13 @@ et les deux arbitrages mobiles.
 
 Lots `4` et `5`. Elle exige les contrats HTTP partagés, les sessions révocables,
 des cookies altérés refusés et une outbox récupérable/testée avec panne partielle.
+
+**État : constats fermés localement (lots 4 et 5 tous `VERIFIED`), CI distante
+à confirmer.** L'outbox récupère désormais ses leases à chaque cycle de poll,
+distingue `COMPLETED`/`SKIPPED_DISABLED`/`SKIPPED_NO_RECIPIENT` et isole ses
+reprises par destinataire et par canal (`delivered_recipients`, migrations
+`047` et `048`). La porte ne passe formellement qu'une fois le run CI complet
+confirmé vert sur le commit `bc56b42`.
 
 ### Porte C — cohérence produit
 
