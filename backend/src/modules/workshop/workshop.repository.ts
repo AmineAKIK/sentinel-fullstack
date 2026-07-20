@@ -314,7 +314,7 @@ function buildHistoryEventFilters(query: QueryParams): {
   params: Array<string | number>;
   limit: number;
 } {
-  const { q, eventType, limit } = query;
+  const { q, eventType, limit, start, end } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
   const safeLimit = boundedInt(limit, INCIDENT_LIST_DEFAULT_LIMIT, 1, INCIDENT_LIST_MAX_LIMIT);
@@ -327,6 +327,14 @@ function buildHistoryEventFilters(query: QueryParams): {
   }
   if (q && String(q).trim()) {
     filters.push(buildFullTextFilter(String(q).trim(), params, HISTORY_EVENT_SEARCH_COLS));
+  }
+  if (start) {
+    params.push(String(start));
+    filters.push(`we.created_at >= $${params.length}`);
+  }
+  if (end) {
+    params.push(String(end));
+    filters.push(`we.created_at <= $${params.length}`);
   }
 
   return {

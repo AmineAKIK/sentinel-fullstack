@@ -30,6 +30,13 @@ export const FIELD_LIMITS = {
 export const ANALYTICS_DEFAULT_WINDOW_DAYS = 90;
 
 /**
+ * Fenêtre maximale autorisée pour une requête analytique explicite
+ * (DR-10) — même borne que le calendrier d'une année, quel que soit le
+ * fuseau ou une éventuelle année bissextile.
+ */
+export const ANALYTICS_MAX_WINDOW_DAYS = 366;
+
+/**
  * Limites de pagination des listes d'incidents/événements (historique,
  * connaissance, journal). Partagées entre la validation Zod et le
  * bornage appliqué côté repository.

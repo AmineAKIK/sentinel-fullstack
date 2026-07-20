@@ -29,6 +29,7 @@ import {
   createIncidentSchema,
   arbitrationConsultationSchema,
   incidentWorkspaceQuerySchema,
+  journalEventQuerySchema,
   updateIncidentSchema,
   workshopAnalyticsQuerySchema,
 } from './workshop.validation';
@@ -119,7 +120,7 @@ export async function getKnowledgeIncident(req: Request, res: Response): Promise
 
 export async function listHistoryEvents(req: Request, res: Response): Promise<void> {
   try {
-    const parsed = incidentWorkspaceQuerySchema.safeParse(req.query);
+    const parsed = journalEventQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;

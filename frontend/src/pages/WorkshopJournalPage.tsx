@@ -65,6 +65,9 @@ export default function WorkshopJournalPage() {
     machineFilter,
     stateFilter,
     eventTypeFilter,
+    startFilter,
+    endFilter,
+    periodError,
     sortCol,
     sortDir,
     setQuery,
@@ -74,6 +77,8 @@ export default function WorkshopJournalPage() {
     setEventTypeFilter,
     updateSearchFilter,
     updateLineFilter,
+    updateStartFilter,
+    updateEndFilter,
     clearFilters,
     handleSort,
   } = useJournalData();
@@ -104,6 +109,18 @@ export default function WorkshopJournalPage() {
       setStateFilter('all');
       updateSearchFilter('state', 'all');
     }),
+    ...(startFilter || endFilter
+      ? [
+          {
+            key: 'period',
+            label: `Période : ${startFilter || '…'} → ${endFilter || '…'}`,
+            onRemove: () => {
+              updateStartFilter('');
+              updateEndFilter('');
+            },
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -124,6 +141,7 @@ export default function WorkshopJournalPage() {
         </div>
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
+        {periodError && <ErrorBanner style={{ marginBottom: 16 }}>{periodError}</ErrorBanner>}
 
         <WorkshopFilterCard
           searchInputId="journal-search"
@@ -178,6 +196,18 @@ export default function WorkshopJournalPage() {
                   </option>
                 ))}
               </select>
+              <input
+                type="date"
+                aria-label="Depuis le"
+                value={startFilter}
+                onChange={(e) => updateStartFilter(e.target.value)}
+              />
+              <input
+                type="date"
+                aria-label="Jusqu'au"
+                value={endFilter}
+                onChange={(e) => updateEndFilter(e.target.value)}
+              />
               {eventTypeFilter !== 'all' && (
                 <button
                   type="button"

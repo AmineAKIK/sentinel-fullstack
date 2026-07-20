@@ -149,12 +149,12 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `ANA-01` | P1 | 6 | Rôles Pilotage contradictoires entre cadrage, routes et doctrine. | Contrat `DR-08` identique partout. | OPEN |
-| `ANA-02` | P1 | 6 | Produits et synthèse textuelle promis sans contrat livré. | Fonction livrée et testée, ou promesse retirée. | OPEN |
-| `ANA-03` | P1 | 6 | Journal annoncé filtrable par période sans bornes de date. | Contrôles et API de période cohérents. | OPEN |
-| `ANA-04` | P1 | 6 | Cohorte de créations mélangée avec clôtures hors période. | Modèle flux/cohorte `DR-09` testé. | OPEN |
-| `ANA-05` | P1 | 6 | Fenêtres invalides/non bornées et fuseau incohérent. | Validation backend et tests Europe/Paris. | OPEN |
-| `ANA-06` | P2 | 6 | Tendance SQL effectue un produit jours × incidents. | Plan SQL borné et test volumétrique. | OPEN |
+| `ANA-01` | P1 | 6 | Rôles Pilotage contradictoires entre cadrage, routes et doctrine. | Contrat `DR-08` identique partout. | VERIFIED |
+| `ANA-02` | P1 | 6 | Produits et synthèse textuelle promis sans contrat livré. | Fonction livrée et testée, ou promesse retirée. | VERIFIED |
+| `ANA-03` | P1 | 6 | Journal annoncé filtrable par période sans bornes de date. | Contrôles et API de période cohérents. | VERIFIED |
+| `ANA-04` | P1 | 6 | Cohorte de créations mélangée avec clôtures hors période. | Modèle flux/cohorte `DR-09` testé. | VERIFIED |
+| `ANA-05` | P1 | 6 | Fenêtres invalides/non bornées et fuseau incohérent. | Validation backend et tests Europe/Paris. | VERIFIED |
+| `ANA-06` | P2 | 6 | Tendance SQL effectue un produit jours × incidents. | Plan SQL borné et test volumétrique. | VERIFIED |
 | `LIST-01` | P1 | 7 | Historique limité à 250 mais présenté comme complet. | Pagination stable et libellé exact. | OPEN |
 | `LIST-02` | P1 | 7 | Connaissance limitée à 300 mais présentée comme complète. | Pagination stable et libellé exact. | OPEN |
 | `LIST-03` | P1 | 7 | Journal limité à 80 sans navigation vers la suite. | Pagination conservant filtres et tri. | OPEN |
@@ -216,7 +216,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | VERIFIED |
 | `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | VERIFIED |
 | `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | VERIFIED |
-| `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | OPEN |
+| `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | VERIFIED |
 | `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | OPEN |
 | `8` | Corriger la sémantique et prouver les parcours accessibles. | `A11Y-01` à `A11Y-06` | Lots 4 et 7 | OPEN |
 | `9` | Durcir et exercer sauvegarde/restauration. | `OPS-01` à `OPS-04` | Lot 3 | OPEN |
@@ -312,6 +312,14 @@ confirmé vert sur le commit `bc56b42`.
 Lots `6` à `10`. Elle exige les périodes et listes non ambiguës, les parcours
 accessibles, la restauration démontrée et une couverture comportementale des
 flux critiques.
+
+**Lot 6 clos localement, CI distante à confirmer.** Les cohortes créés/clôturés
+sont désormais indépendantes (`DR-09`), la tendance journalière ne produit plus
+de plan cartésien et tronque le jour en Europe/Paris explicite (`DR-10`), la
+fenêtre analytique refuse `start > end` et toute plage supérieure à 366 jours,
+et le Journal accepte enfin un filtre période avec le même contrat de bornage.
+Le cadrage fonctionnel a été aligné sur le code (accès Pilotage aux trois rôles,
+retrait de la promesse non livrée de classement produits/synthèse textuelle).
 
 ### Porte D — certification
 

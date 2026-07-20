@@ -1,0 +1,118 @@
+import React from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import WorkshopJournalPage from '../WorkshopJournalPage';
+import { useJournalData } from '../../hooks/useJournalData';
+
+vi.mock('../../hooks/useJournalData', () => ({
+  useJournalData: vi.fn(),
+}));
+
+vi.mock('../../routes/AppAuthContext', () => ({
+  useAppAuth: () => ({
+    session: {
+      accountType: 'workshop',
+      user: {
+        id: 3,
+        first_name: 'Eden',
+        last_name: 'AKIK',
+        badge_number: 'RE-01',
+        role: 'RESPONSABLE',
+      },
+    },
+    loading: false,
+    setSession: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
+function baseJournalData(overrides: Partial<ReturnType<typeof useJournalData>> = {}) {
+  return {
+    lines: [],
+    historyEvents: [],
+    sortedEvents: [],
+    historyEventsLoading: false,
+    historyEventsLimit: 80,
+    error: '',
+    query: '',
+    statusFilter: 'all',
+    lineFilter: 'all',
+    machineFilter: 'all',
+    stateFilter: 'all',
+    eventTypeFilter: 'all',
+    startFilter: '',
+    endFilter: '',
+    periodError: '',
+    sortCol: 'date' as const,
+    sortDir: 'desc' as const,
+    setQuery: vi.fn(),
+    setStatusFilter: vi.fn(),
+    setMachineFilter: vi.fn(),
+    setStateFilter: vi.fn(),
+    setEventTypeFilter: vi.fn(),
+    updateSearchFilter: vi.fn(),
+    updateLineFilter: vi.fn(),
+    updateStartFilter: vi.fn(),
+    updateEndFilter: vi.fn(),
+    clearFilters: vi.fn(),
+    handleSort: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderJournalPage(overrides: Partial<ReturnType<typeof useJournalData>> = {}) {
+  vi.mocked(useJournalData).mockReturnValue(baseJournalData(overrides) as never);
+  return render(
+    <MemoryRouter>
+      <WorkshopJournalPage />
+    </MemoryRouter>
+  );
+}
+
+describe('WorkshopJournalPage — filtre période (lot 6, ANA-03)', () => {
+  it('affiche deux champs de date accessibles pour filtrer par période', () => {
+    renderJournalPage();
+
+    expect(screen.getByLabelText('Depuis le')).toBeInTheDocument();
+    expect(screen.getByLabelText("Jusqu'au")).toBeInTheDocument();
+  });
+
+  it('appelle updateStartFilter/updateEndFilter quand les dates changent', () => {
+    const updateStartFilter = vi.fn();
+    const updateEndFilter = vi.fn();
+    renderJournalPage({ updateStartFilter, updateEndFilter });
+
+    fireEvent.change(screen.getByLabelText('Depuis le'), { target: { value: '2026-03-01' } });
+    fireEvent.change(screen.getByLabelText("Jusqu'au"), { target: { value: '2026-03-31' } });
+
+    expect(updateStartFilter).toHaveBeenCalledWith('2026-03-01');
+    expect(updateEndFilter).toHaveBeenCalledWith('2026-03-31');
+  });
+
+  it('affiche le message d’erreur de période quand la borne est invalide', () => {
+    renderJournalPage({ periodError: 'La date de début doit être antérieure à la date de fin.' });
+
+    expect(
+      screen.getByText('La date de début doit être antérieure à la date de fin.')
+    ).toBeInTheDocument();
+  });
+
+  it('affiche un chip de période retirable qui efface les deux bornes', () => {
+    const updateStartFilter = vi.fn();
+    const updateEndFilter = vi.fn();
+    renderJournalPage({
+      startFilter: '2026-03-01',
+      endFilter: '2026-03-31',
+      updateStartFilter,
+      updateEndFilter,
+    });
+
+    expect(screen.getByText(/Période : 2026-03-01 → 2026-03-31/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/Retirer le filtre Période/i));
+
+    expect(updateStartFilter).toHaveBeenCalledWith('');
+    expect(updateEndFilter).toHaveBeenCalledWith('');
+  });
+});

@@ -1265,6 +1265,7 @@ describe('getWorkshopAnalyticsService', () => {
       total: 10,
       open: 5,
       pending: 2,
+      created: 10,
       closed: 3,
       priority: 1,
       active: 7,

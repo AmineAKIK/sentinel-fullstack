@@ -8,6 +8,7 @@ import {
   withWorkshopLineFilter,
   withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
+import { dayEndIso, dayStartIso } from '../utils/workshopAnalytics';
 import { readHistoryStatusFilter, HistoryStatusFilter } from './useHistoryData';
 import { useDebouncedValue } from './useDebouncedValue';
 
@@ -33,6 +34,9 @@ export function useJournalData() {
   const [machineFilter, setMachineFilter] = useState(searchParams.get('machine') ?? 'all');
   const [stateFilter, setStateFilter] = useState(searchParams.get('state') ?? 'all');
   const [eventTypeFilter, setEventTypeFilter] = useState(searchParams.get('event') ?? 'all');
+  const [startFilter, setStartFilter] = useState(searchParams.get('start') ?? '');
+  const [endFilter, setEndFilter] = useState(searchParams.get('end') ?? '');
+  const [periodError, setPeriodError] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -49,6 +53,13 @@ export function useJournalData() {
   }, []);
 
   useEffect(() => {
+    if (startFilter && endFilter && startFilter > endFilter) {
+      setHistoryEventsLoading(false);
+      setPeriodError('La date de début doit être antérieure à la date de fin.');
+      return undefined;
+    }
+    setPeriodError('');
+
     const controller = new AbortController();
     const params = buildIncidentWorkspaceParams({
       query: debouncedQuery,
@@ -57,6 +68,8 @@ export function useJournalData() {
       lineFilter,
       machineFilter,
       eventTypeFilter,
+      startFilter: startFilter ? dayStartIso(startFilter) : undefined,
+      endFilter: endFilter ? dayEndIso(endFilter) : undefined,
       limit: JOURNAL_EVENTS_LIMIT,
     });
     setHistoryEventsLoading(true);
@@ -73,7 +86,16 @@ export function useJournalData() {
         if (!controller.signal.aborted) setHistoryEventsLoading(false);
       });
     return () => controller.abort();
-  }, [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter, eventTypeFilter]);
+  }, [
+    debouncedQuery,
+    statusFilter,
+    stateFilter,
+    lineFilter,
+    machineFilter,
+    eventTypeFilter,
+    startFilter,
+    endFilter,
+  ]);
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
     setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
@@ -85,6 +107,16 @@ export function useJournalData() {
     setSearchParams(withWorkshopLineFilter(searchParams, value));
   }
 
+  function updateStartFilter(value: string): void {
+    setStartFilter(value);
+    setSearchParams(withWorkshopUrlFilter(searchParams, 'start', value, ''));
+  }
+
+  function updateEndFilter(value: string): void {
+    setEndFilter(value);
+    setSearchParams(withWorkshopUrlFilter(searchParams, 'end', value, ''));
+  }
+
   function clearFilters(): void {
     setQuery('');
     setStatusFilter('all');
@@ -92,6 +124,8 @@ export function useJournalData() {
     setMachineFilter('all');
     setStateFilter('all');
     setEventTypeFilter('all');
+    setStartFilter('');
+    setEndFilter('');
     setSearchParams(new URLSearchParams());
   }
 
@@ -145,6 +179,9 @@ export function useJournalData() {
     machineFilter,
     stateFilter,
     eventTypeFilter,
+    startFilter,
+    endFilter,
+    periodError,
     sortCol,
     sortDir,
     historyEventsLimit: JOURNAL_EVENTS_LIMIT,
@@ -155,6 +192,8 @@ export function useJournalData() {
     setEventTypeFilter,
     updateSearchFilter,
     updateLineFilter,
+    updateStartFilter,
+    updateEndFilter,
     clearFilters,
     handleSort,
   };

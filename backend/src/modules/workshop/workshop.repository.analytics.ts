@@ -18,6 +18,26 @@ const INCIDENT_RECENT_AGE = `'24 hours'`;
 
 export async function getWorkshopAnalytics(query: QueryParams) {
   const { start, end, lineId, machineId } = query;
+
+  // Deux cohortes indépendantes sur la même fenêtre (DR-09) : « créés sur la
+  // période » filtre par date de création, « clôturés sur la période » par
+  // date de clôture. Elles partagent les mêmes filtres périmètre (ligne,
+  // machine, statut non terminal rejeté) mais jamais la même colonne de date.
+  const scopeFilters: string[] = [nonTerminalRejectedWorkshopIncidentStatusSql];
+  const scopeParams: Array<string | number> = [];
+  if (lineId) {
+    const parsedLine = parseOptionalInt(lineId);
+    if (parsedLine !== null) {
+      scopeParams.push(parsedLine);
+      scopeFilters.push(`wi.line_id = $${scopeParams.length}`);
+    }
+  }
+  if (machineId) {
+    scopeParams.push(String(machineId));
+    scopeFilters.push(`wi.machine_id = $${scopeParams.length}`);
+  }
+  const scopeClause = scopeFilters.join(' AND ');
+
   const filters: string[] = [nonTerminalRejectedWorkshopIncidentStatusSql];
   const params: Array<string | number> = [];
 
@@ -43,13 +63,29 @@ export async function getWorkshopAnalytics(query: QueryParams) {
 
   const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
 
+  // Cohorte « clôturés sur la période », indépendante de la date de création
+  // de l'incident : mêmes filtres périmètre, mais bornage sur we.created_at
+  // (date de l'événement INCIDENT_CLOSED), pas sur wi.created_at.
+  const closedScopeFilters: string[] = [scopeClause];
+  const closedScopeParams: Array<string | number> = [...scopeParams];
+  if (start) {
+    closedScopeParams.push(String(start));
+    closedScopeFilters.push(`we.created_at >= $${closedScopeParams.length}`);
+  }
+  if (end) {
+    closedScopeParams.push(String(end));
+    closedScopeFilters.push(`we.created_at <= $${closedScopeParams.length}`);
+  }
+  const closedWhereClause = `WHERE ${closedScopeFilters.join(' AND ')}`;
+
   const [
     { rows: totalsRows },
     { rows: stateRows },
     { rows: lineRows },
     { rows: machineRows },
     { rows: closeRows },
-    { rows: trendRows },
+    { rows: createdTrendRows },
+    { rows: closedTrendRows },
   ] = await Promise.all([
     pool.query(
       `SELECT
@@ -112,81 +148,108 @@ export async function getWorkshopAnalytics(query: QueryParams) {
        ORDER BY count DESC`,
       params
     ),
+    // Durée de clôture : jointe directement sur sa propre cohorte
+    // (« clôturés sur la période »), indépendante de la date de création.
     pool.query(
-      `WITH filtered_incidents AS (
-         SELECT wi.id, wi.created_at
-         FROM workshop_incidents wi
-         ${whereClause}
-       ),
-       closed_events AS (
-         SELECT we.incident_id, MIN(we.created_at) AS closed_at
-         FROM workshop_incident_events we
-         WHERE we.event_type = 'INCIDENT_CLOSED'
-         GROUP BY we.incident_id
-       )
-       SELECT
+      `SELECT
          percentile_cont(0.5) WITHIN GROUP (
-           ORDER BY EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))
+           ORDER BY EXTRACT(EPOCH FROM (we.created_at - wi.created_at))
          ) AS median_close_seconds,
-         AVG(EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))) AS avg_close_seconds
-       FROM filtered_incidents fi
-       JOIN closed_events ce ON ce.incident_id = fi.id`,
-      params
+         AVG(EXTRACT(EPOCH FROM (we.created_at - wi.created_at))) AS avg_close_seconds,
+         COUNT(*)::int AS closed_in_window_count
+       FROM (
+         SELECT incident_id, MIN(created_at) AS created_at
+         FROM workshop_incident_events
+         WHERE event_type = 'INCIDENT_CLOSED'
+         GROUP BY incident_id
+       ) we
+       JOIN workshop_incidents wi ON wi.id = we.incident_id
+       ${closedWhereClause}`,
+      closedScopeParams
     ),
+    // Créés sur la période, par jour — sans jointure sur les clôtures : pas
+    // de produit cartésien, agrégation directe groupée par jour (ANA-06). Le
+    // jour métier est tronqué explicitement en Europe/Paris (DR-10) : ne
+    // dépend jamais du fuseau de session PostgreSQL ambiant.
     pool.query(
-      `WITH filtered_incidents AS (
-       SELECT wi.id, wi.created_at, wi.taken_at, wi.is_priority
+      `SELECT date_trunc('day', wi.created_at AT TIME ZONE 'Europe/Paris')::date::text AS day,
+              COUNT(*)::int AS created_count,
+              COUNT(*) FILTER (WHERE wi.is_priority = TRUE)::int AS priority_count,
+              percentile_cont(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (wi.taken_at - wi.created_at))
+              ) FILTER (WHERE wi.taken_at IS NOT NULL) AS median_take_seconds
        FROM workshop_incidents wi
        ${whereClause}
-     ),
-     closed_events AS (
-       SELECT we.incident_id, MIN(we.created_at) AS closed_at
-       FROM workshop_incident_events we
-       WHERE we.event_type = 'INCIDENT_CLOSED'
-       GROUP BY we.incident_id
-     ),
-     day_keys AS (
-       SELECT date_trunc('day', created_at)::date AS day FROM filtered_incidents
-       UNION
-       SELECT date_trunc('day', closed_at)::date AS day FROM closed_events ce
-       JOIN filtered_incidents fi ON fi.id = ce.incident_id
-     )
-     SELECT
-       dk.day::text AS day,
-       COUNT(fi.id) FILTER (WHERE date_trunc('day', fi.created_at)::date = dk.day)::int AS created_count,
-       COUNT(ce.incident_id) FILTER (WHERE date_trunc('day', ce.closed_at)::date = dk.day)::int AS closed_count,
-       COUNT(fi.id) FILTER (
-         WHERE date_trunc('day', fi.created_at)::date = dk.day
-           AND fi.is_priority = TRUE
-       )::int AS priority_count,
-       percentile_cont(0.5) WITHIN GROUP (
-         ORDER BY EXTRACT(EPOCH FROM (fi.taken_at - fi.created_at))
-       ) FILTER (
-         WHERE date_trunc('day', fi.created_at)::date = dk.day
-           AND fi.taken_at IS NOT NULL
-       ) AS median_take_seconds,
-       percentile_cont(0.5) WITHIN GROUP (
-         ORDER BY EXTRACT(EPOCH FROM (ce.closed_at - fi.created_at))
-       ) FILTER (
-         WHERE date_trunc('day', ce.closed_at)::date = dk.day
-       ) AS median_close_seconds
-       FROM day_keys dk
-       LEFT JOIN filtered_incidents fi ON TRUE
-       LEFT JOIN closed_events ce ON ce.incident_id = fi.id
-       GROUP BY dk.day
-       ORDER BY dk.day ASC`,
+       GROUP BY date_trunc('day', wi.created_at AT TIME ZONE 'Europe/Paris')::date`,
       params
+    ),
+    // Clôturés sur la période, par jour — même principe, agrégation directe
+    // groupée par jour de clôture, jamais de produit cartésien, jour métier
+    // explicitement Europe/Paris (DR-10).
+    pool.query(
+      `SELECT date_trunc('day', we.created_at AT TIME ZONE 'Europe/Paris')::date::text AS day,
+              COUNT(*)::int AS closed_count,
+              percentile_cont(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (we.created_at - wi.created_at))
+              ) AS median_close_seconds
+       FROM (
+         SELECT incident_id, MIN(created_at) AS created_at
+         FROM workshop_incident_events
+         WHERE event_type = 'INCIDENT_CLOSED'
+         GROUP BY incident_id
+       ) we
+       JOIN workshop_incidents wi ON wi.id = we.incident_id
+       ${closedWhereClause}
+       GROUP BY date_trunc('day', we.created_at AT TIME ZONE 'Europe/Paris')::date`,
+      closedScopeParams
     ),
   ]);
 
   const totals = totalsRows[0] || {};
   const closeStats = closeRows[0] || {};
 
+  const createdByDay = new Map(
+    createdTrendRows.map((row) => [
+      row.day,
+      {
+        created: row.created_count,
+        priority: row.priority_count,
+        medianTake: row.median_take_seconds,
+      },
+    ])
+  );
+  const closedByDay = new Map(
+    closedTrendRows.map((row) => [
+      row.day,
+      { closed: row.closed_count, medianClose: row.median_close_seconds },
+    ])
+  );
+  const allDays = Array.from(new Set([...createdByDay.keys(), ...closedByDay.keys()])).sort();
+  const trend = allDays.map((day) => {
+    const created = createdByDay.get(day);
+    const closed = closedByDay.get(day);
+    return {
+      day,
+      created: created?.created ?? 0,
+      closed: closed?.closed ?? 0,
+      priority: created?.priority ?? 0,
+      median_take_seconds: created?.medianTake ? Number(created.medianTake) : null,
+      median_close_seconds: closed?.medianClose ? Number(closed.medianClose) : null,
+    };
+  });
+
   return {
     total: totals.total ?? 0,
     open: totals.open_count ?? 0,
     pending: totals.pending_count ?? 0,
-    closed: totals.closed_count ?? 0,
+    // Cohortes DR-09 : « créés sur la période » (wi.created_at dans la
+    // fenêtre) et « clôturés sur la période » (événement INCIDENT_CLOSED
+    // dans la fenêtre) sont deux populations indépendantes, jamais mélangées.
+    // `created` réutilise `total`, qui est déjà filtré sur wi.created_at par
+    // whereClause ; `closed` compte désormais les clôtures dans la fenêtre,
+    // quelle que soit la date de création de l'incident concerné.
+    created: totals.total ?? 0,
+    closed: closeStats.closed_in_window_count ?? 0,
     priority: totals.priority_count ?? 0,
     active: totals.active_count ?? 0,
     not_taken: totals.not_taken_count ?? 0,
@@ -206,13 +269,6 @@ export async function getWorkshopAnalytics(query: QueryParams) {
     by_state: stateRows.map((row) => ({ state: row.state, count: row.count })),
     by_line: lineRows.map((row) => ({ line_number: row.line_number, count: row.count })),
     by_machine: machineRows.map((row) => ({ machine_id: row.machine_id, count: row.count })),
-    trend: trendRows.map((row) => ({
-      day: row.day,
-      created: row.created_count,
-      closed: row.closed_count,
-      priority: row.priority_count,
-      median_take_seconds: row.median_take_seconds ? Number(row.median_take_seconds) : null,
-      median_close_seconds: row.median_close_seconds ? Number(row.median_close_seconds) : null,
-    })),
+    trend,
   };
 }

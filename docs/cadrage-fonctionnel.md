@@ -70,7 +70,9 @@ Compte système unique, hors rôles Atelier.
 - annule un incident non pris ou reprend le contrôle d'un incident en attente ;
 - invalide une clôture avec motif ;
 - suit des incidents ;
-- accède au journal transverse et au pilotage.
+- accède seul au journal transverse (le Pilotage, comme le Dashboard et la
+  Connaissance, est accessible aux trois rôles Atelier — voir `doctrine-ux.md`
+  §4.3 et `DR-08`).
 
 ## 4. Authentification
 
@@ -293,15 +295,19 @@ base de connaissance.
 
 ## 13. Pilotage
 
-Le responsable choisit période, ligne et machine. La page calcule :
+Accessible aux trois rôles Atelier (`DR-08`). Chacun choisit période, ligne et
+machine. La page calcule :
 
-- volumes créés, clôturés, actifs, urgents et non pris ;
+- volumes créés sur la période et clôturés sur la période — deux populations
+  indépendantes, jamais mélangées (`DR-09`) ;
+- volumes actifs, urgents et non pris ;
 - taux de clôture et ancienneté maximale ;
-- tendances journalières ;
-- classements de lignes, machines, types et produits ;
-- synthèse textuelle à partir des indicateurs.
+- tendances journalières, bornées à la journée métier Europe/Paris (`DR-10`) ;
+- classements de lignes, machines et types d'anomalie.
 
 Les statuts `CANCELED` et `INVALIDATED` sont exclus des KPI opérationnels actifs.
+Aucun classement par produit ni synthèse textuelle générée n'est livré dans
+cette version : ce sont des évolutions possibles, pas un contrat actuel.
 
 ## 14. Support
 
