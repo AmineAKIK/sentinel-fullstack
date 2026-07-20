@@ -138,8 +138,8 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `OUT-01` | P1 | 5 | Les leases `PROCESSING` périmés ne sont récupérés qu'au démarrage. | Test de récupération pendant le même processus. | OPEN |
-| `OUT-02` | P1 | 5 | SMTP absent mène à `COMPLETED`. | État `SKIPPED_DISABLED` et métrique/log associés. | OPEN |
+| `OUT-01` | P1 | 5 | Les leases `PROCESSING` périmés ne sont récupérés qu'au démarrage. | Test de récupération pendant le même processus. | VERIFIED |
+| `OUT-02` | P1 | 5 | SMTP absent mène à `COMPLETED`. | État `SKIPPED_DISABLED` et métrique/log associés. | VERIFIED |
 | `OUT-03` | P1 | 5 | Un échec partiel renvoie les destinataires déjà servis. | Reprise ciblée par destinataire. | OPEN |
 | `OUT-04` | P1 | 5 | Plusieurs groupes déjà servis sont rejoués si le dernier échoue. | Livraisons indépendantes et idempotence testée. | OPEN |
 | `OUT-05` | P1 | 5 | Destinataires/noms recalculés et préférence followers ambiguë. | Snapshot déterministe et préférence explicitement nommée. | OPEN |
@@ -238,7 +238,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 | `4A` | Signer les cookies, refuser leur altération et empêcher le cache des API authentifiées. | `HTTP-01`, `HTTP-02` | VERIFIED |
 | `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | VERIFIED |
 | `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | VERIFIED |
-| `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | OPEN |
+| `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | VERIFIED |
 | `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | OPEN |
 
 Preuves des lots clos :
