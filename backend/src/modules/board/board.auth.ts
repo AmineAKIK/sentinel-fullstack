@@ -14,8 +14,7 @@ import {
 } from '../../auth/authResponses';
 import { getJwtSecret, isJwtSessionError, signAuthToken, verifyAuthToken } from '../../auth/jwt';
 import { isBoardSessionPayload, isWorkshopSessionPayload } from '../../auth/sessionPayloads';
-import { BCRYPT_ROUNDS_WORKSHOP, verifyPassword } from '../../auth/bcrypt';
-import bcrypt from 'bcrypt';
+import { hashWorkshopPassword, isWithinBcryptByteLimit, verifyPassword } from '../../auth/bcrypt';
 import pool from '../../db/pool';
 import { sendError } from '../../utils/errors';
 import { getBoardData } from '../workshop/workshop.controller';
@@ -31,7 +30,7 @@ import {
 const BOARD_AUTH_COOKIE = 'sentinel_board_token';
 
 export function hashBoardCode(code: string): Promise<string> {
-  return bcrypt.hash(code.trim(), BCRYPT_ROUNDS_WORKSHOP);
+  return hashWorkshopPassword(code.trim());
 }
 
 function timingSafeHashEquals(left: string, right: string): boolean {
@@ -43,6 +42,7 @@ function timingSafeHashEquals(left: string, right: string): boolean {
 }
 
 export async function verifyBoardCode(code: string, storedHash: string): Promise<boolean> {
+  if (!isWithinBcryptByteLimit(code.trim())) return false;
   if (storedHash.startsWith('$2')) {
     return verifyPassword(code.trim(), storedHash);
   }
@@ -219,7 +219,7 @@ boardRouter.post('/session', async (req, res) => {
     }
 
     const code = typeof req.body?.code === 'string' ? req.body.code : '';
-    if (!code.trim() || code.length > FIELD_LIMITS.CODE) {
+    if (!code.trim() || code.length > FIELD_LIMITS.CODE || !isWithinBcryptByteLimit(code.trim())) {
       sendError(res, 400, 'VALIDATION_ERROR', 'Code board requis.');
       return;
     }

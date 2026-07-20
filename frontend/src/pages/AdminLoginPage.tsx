@@ -6,6 +6,7 @@ import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { isDigitsOnly } from '../utils/identifiers';
+import { isWithinBcryptByteLimit } from '../utils/passwordPolicy';
 
 export default function AdminLoginPage() {
   usePageTitle('Connexion administration');
@@ -53,6 +54,10 @@ export default function AdminLoginPage() {
 
     if (!password) {
       setError('Renseignez votre mot de passe.');
+      return;
+    }
+    if (!isWithinBcryptByteLimit(password)) {
+      setError('Identifiant ou mot de passe incorrect.');
       return;
     }
 

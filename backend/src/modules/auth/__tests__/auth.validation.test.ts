@@ -1,6 +1,6 @@
 import { loginSchema } from '../auth.validation';
 import { FIELD_LIMITS } from '../../../domain/constants';
-import { MAX_PASSWORD_LENGTH } from '../../../auth/bcrypt';
+import { MAX_PASSWORD_BYTES } from '../../../auth/bcrypt';
 
 describe('loginSchema', () => {
   it('accepts a minimal payload with only an identifier', () => {
@@ -27,7 +27,7 @@ describe('loginSchema', () => {
   it('rejects a password longer than the max', () => {
     const result = loginSchema.safeParse({
       identifier: 'admin',
-      password: 'a'.repeat(MAX_PASSWORD_LENGTH + 1),
+      password: 'a'.repeat(MAX_PASSWORD_BYTES + 1),
     });
     expect(result.success).toBe(false);
   });
@@ -35,9 +35,18 @@ describe('loginSchema', () => {
   it('accepts a password at the max length', () => {
     const result = loginSchema.safeParse({
       identifier: 'admin',
-      password: 'a'.repeat(MAX_PASSWORD_LENGTH),
+      password: 'a'.repeat(MAX_PASSWORD_BYTES),
     });
     expect(result.success).toBe(true);
+  });
+
+  it('applies the max to UTF-8 bytes rather than JavaScript characters', () => {
+    expect(loginSchema.safeParse({ identifier: 'admin', password: 'é'.repeat(36) }).success).toBe(
+      true
+    );
+    expect(
+      loginSchema.safeParse({ identifier: 'admin', password: `${'é'.repeat(36)}a` }).success
+    ).toBe(false);
   });
 
   it('rejects an oversized setupCode', () => {

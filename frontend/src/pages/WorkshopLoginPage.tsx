@@ -6,6 +6,12 @@ import { ApiResponseError } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import ConfirmModal from '../components/ConfirmModal';
+import {
+  hasMinimumPasswordLength,
+  isWithinBcryptByteLimit,
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH_WORKSHOP,
+} from '../utils/passwordPolicy';
 
 type Mode = 'identifier' | 'password' | 'setup';
 
@@ -92,6 +98,10 @@ export default function WorkshopLoginPage() {
         setError('Renseignez votre mot de passe.');
         return;
       }
+      if (!isWithinBcryptByteLimit(password)) {
+        setError('Identifiant ou mot de passe incorrect.');
+        return;
+      }
       setLoading(true);
       try {
         const response = await unifiedLogin(identifier.trim(), password);
@@ -134,8 +144,14 @@ export default function WorkshopLoginPage() {
         setError('Renseignez le code temporaire.');
         return;
       }
-      if (newPassword.length < 6) {
-        setError('Le mot de passe doit contenir au moins 6 caractères.');
+      if (!hasMinimumPasswordLength(newPassword, MIN_PASSWORD_LENGTH_WORKSHOP)) {
+        setError(
+          `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH_WORKSHOP} caractères.`
+        );
+        return;
+      }
+      if (!isWithinBcryptByteLimit(newPassword)) {
+        setError(`Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
         return;
       }
       if (newPassword !== confirmPassword) {

@@ -9,6 +9,13 @@ interface State {
   error: Error | null;
 }
 
+export const PRODUCTION_ERROR_MESSAGE =
+  "L'application a rencontré un problème. Rechargez la page pour continuer.";
+
+export function errorBoundaryMessage(error: Error | null, production: boolean): string {
+  return production ? PRODUCTION_ERROR_MESSAGE : (error?.message ?? 'Erreur inconnue');
+}
+
 export default class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -20,7 +27,8 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    console.error('[ErrorBoundary]', error, info.componentStack);
+    if (import.meta.env.DEV) console.error('[ErrorBoundary]', error, info.componentStack);
+    else console.error('[ErrorBoundary] Unexpected render failure.');
   }
 
   override render() {
@@ -33,7 +41,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
         >
           <h1>Une erreur inattendue est survenue</h1>
           <p style={{ color: 'var(--color-danger, #c0392b)', marginBottom: '1.5rem' }}>
-            {this.state.error?.message ?? 'Erreur inconnue'}
+            {errorBoundaryMessage(this.state.error, import.meta.env.PROD)}
           </p>
           <button
             type="button"

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { verifyAdminPassword } from '../api/adminSecurity';
 import { ApiResponseError } from '../api/client';
 import ConfirmModal from './ConfirmModal';
+import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../utils/passwordPolicy';
 
 type AdminPasswordConfirmModalProps = {
   title: string;
@@ -35,6 +36,10 @@ export default function AdminPasswordConfirmModal({
 
     if (!password.trim()) {
       setPasswordError('Mot de passe administrateur requis.');
+      return;
+    }
+    if (!isWithinBcryptByteLimit(password)) {
+      setPasswordError(`Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
 
@@ -83,6 +88,7 @@ export default function AdminPasswordConfirmModal({
           onChange={(event) => setPassword(event.target.value)}
           disabled={loading}
           autoComplete="current-password"
+          maxLength={MAX_PASSWORD_BYTES}
         />
         {passwordError && <div className="field-error">{passwordError}</div>}
       </div>

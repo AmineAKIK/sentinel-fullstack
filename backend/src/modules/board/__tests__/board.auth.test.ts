@@ -15,4 +15,11 @@ describe('board code hashing', () => {
     await expect(verifyBoardCode('1234', legacy)).resolves.toBe(true);
     await expect(verifyBoardCode('4321', legacy)).resolves.toBe(false);
   });
+
+  it('refuses values beyond the 72-byte bcrypt boundary', async () => {
+    const tooLong = `${'é'.repeat(36)}a`;
+
+    await expect(hashBoardCode(tooLong)).rejects.toThrow('72 octets UTF-8');
+    await expect(verifyBoardCode(tooLong, '$2b$10$invalid')).resolves.toBe(false);
+  });
 });

@@ -128,11 +128,11 @@ commit audité au démarrage de cette branche.
 | `HTTP-03` | P1 | 4 | Réauthentification backend à cinq, frontend annoncé à trois et couplé au texte. | Code `SESSION_REVOKED` et parcours frontend dédié. | VERIFIED |
 | `HTTP-04` | P1 | 4 | Un username admin peut masquer un badge Atelier identique. | Contrat de namespace et tests de création/login. | VERIFIED |
 | `HTTP-05` | P1 | 4 | Identifiants numériques côté UI, chaînes libres côté API. | Validation partagée et migration avec préflight. | VERIFIED |
-| `HTTP-06` | P1 | 4 | Timeout annulé avant lecture du corps HTTP. | Test d'un corps bloqué après réception des headers. | OPEN |
-| `HTTP-07` | P1 | 4 | Maximum bcrypt exprimé en caractères au-delà de 72 octets. | Tests ASCII et multioctets aux frontières. | OPEN |
-| `HTTP-08` | P2 | 4 | Politique Atelier/Board trop faible pour la cible annoncée. | Minimums `DR-17` documentés et testés. | OPEN |
-| `HTTP-09` | P2 | 4 | `ErrorBoundary` affiche le message JavaScript brut. | Message générique en production, détail réservé au développement. | OPEN |
-| `HTTP-10` | P2 | 4 | Rate limits en mémoire, non partageables entre répliques. | Limite mono-réplique documentée selon `DR-18`. | OPEN |
+| `HTTP-06` | P1 | 4 | Timeout annulé avant lecture du corps HTTP. | Test d'un corps bloqué après réception des headers. | VERIFIED |
+| `HTTP-07` | P1 | 4 | Maximum bcrypt exprimé en caractères au-delà de 72 octets. | Tests ASCII et multioctets aux frontières. | VERIFIED |
+| `HTTP-08` | P2 | 4 | Politique Atelier/Board trop faible pour la cible annoncée. | Minimums `DR-17` documentés et testés. | VERIFIED |
+| `HTTP-09` | P2 | 4 | `ErrorBoundary` affiche le message JavaScript brut. | Message générique en production, détail réservé au développement. | VERIFIED |
+| `HTTP-10` | P2 | 4 | Rate limits en mémoire, non partageables entre répliques. | Limite mono-réplique documentée selon `DR-18`. | VERIFIED |
 
 ### Notifications
 
@@ -213,7 +213,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `1` | Rendre le premier accès atomique. | `SEC-01` | Lot 0 | VERIFIED |
 | `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | VERIFIED |
 | `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | VERIFIED |
-| `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | OPEN |
+| `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | VERIFIED |
 | `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | OPEN |
 | `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | OPEN |
 | `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | OPEN |
@@ -237,7 +237,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 | --- | --- | --- | --- |
 | `4A` | Signer les cookies, refuser leur altération et empêcher le cache des API authentifiées. | `HTTP-01`, `HTTP-02` | VERIFIED |
 | `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | VERIFIED |
-| `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | OPEN |
+| `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | VERIFIED |
 | `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | OPEN |
 | `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | OPEN |
 

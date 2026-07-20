@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { FIELD_LIMITS } from '../../domain/constants';
-import { MAX_PASSWORD_LENGTH } from '../../auth/bcrypt';
+import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../../auth/bcrypt';
+
+const passwordInputSchema = z
+  .string()
+  .refine(
+    isWithinBcryptByteLimit,
+    `Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`
+  );
 
 /**
  * Schéma de connexion unifiée (admin / atelier).
@@ -14,8 +21,8 @@ export const loginSchema = z.object({
     .trim()
     .min(1, 'Identifiant requis.')
     .max(FIELD_LIMITS.IDENTIFIER, 'Identifiant trop long.'),
-  password: z.string().max(MAX_PASSWORD_LENGTH, 'Mot de passe trop long.').optional(),
-  newPassword: z.string().max(MAX_PASSWORD_LENGTH, 'Mot de passe trop long.').optional(),
+  password: passwordInputSchema.optional(),
+  newPassword: passwordInputSchema.optional(),
   setupCode: z
     .string()
     .trim()

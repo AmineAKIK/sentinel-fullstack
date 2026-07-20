@@ -541,6 +541,10 @@ nettoie la base temporaire et tente le retour arrière si la bascule est incompl
 - Sentinel est un monolithe mono-instance dans le Compose fourni ; l'outbox et le
   verrou de migration tolèrent plusieurs workers, mais un déploiement horizontal
   demanderait une stratégie explicite de sessions, santé et orchestration ;
+- le rate limiting (`backend/src/utils/inMemoryRateLimit.ts`) est un compteur en
+  mémoire de processus ; il protège correctement une réplique unique mais ne
+  partage aucun état entre instances. Tout passage à plusieurs répliques exige un
+  stockage partagé (Redis ou équivalent) avant déploiement ;
 - les migrations sont forward-only ; le rollback de schéma passe par une
   migration corrective ou une restauration ;
 - l'observabilité repose sur logs et healthcheck, sans stack métrique fournie ;

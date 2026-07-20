@@ -6,7 +6,9 @@ jest.mock('../workshopCredentials.repository', () => ({
 }));
 
 jest.mock('../../../auth/bcrypt', () => ({
-  MIN_PASSWORD_LENGTH_WORKSHOP: 6,
+  MIN_PASSWORD_LENGTH_WORKSHOP: 10,
+  hasMinimumPasswordLength: (value: string, minimum: number) => Array.from(value).length >= minimum,
+  isWithinBcryptByteLimit: (value: string) => Buffer.byteLength(value, 'utf8') <= 72,
   hashWorkshopPassword: jest.fn(() => Promise.resolve('hashed-password')),
   verifyPassword: jest.fn(),
 }));
@@ -77,7 +79,7 @@ describe('loginWorkshopUserService – setup initial', () => {
   it('demande le setup si le code temporaire est absent', async () => {
     jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
 
-    const result = await loginWorkshopUserService('3002', undefined, 'secret1', undefined);
+    const result = await loginWorkshopUserService('3002', undefined, 'secret1234', undefined);
 
     expect(result).toEqual({ kind: 'requires_password_setup', badgeNumber: '3002' });
     expect(setupCode.verifyWorkshopPasswordSetupCode).not.toHaveBeenCalled();
@@ -90,7 +92,7 @@ describe('loginWorkshopUserService – setup initial', () => {
         mockUser({ password_setup_token_hash: null, password_setup_expires_at: null })
       );
 
-    const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'ABCD234567');
+    const result = await loginWorkshopUserService('3002', undefined, 'secret1234', 'ABCD234567');
 
     expect(result).toEqual({ kind: 'expired_setup_code' });
   });
@@ -100,7 +102,7 @@ describe('loginWorkshopUserService – setup initial', () => {
       .mocked(repo.findWorkshopUserByBadge)
       .mockResolvedValue(mockUser({ password_setup_expires_at: new Date('2000-01-01T00:00:00Z') }));
 
-    const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'ABCD234567');
+    const result = await loginWorkshopUserService('3002', undefined, 'secret1234', 'ABCD234567');
 
     expect(result).toEqual({ kind: 'expired_setup_code' });
   });
@@ -109,7 +111,7 @@ describe('loginWorkshopUserService – setup initial', () => {
     jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
     jest.mocked(setupCode.verifyWorkshopPasswordSetupCode).mockResolvedValue(false);
 
-    const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'WRONG');
+    const result = await loginWorkshopUserService('3002', undefined, 'secret1234', 'WRONG');
 
     expect(result).toEqual({ kind: 'invalid_setup_code' });
     expect(repo.consumeWorkshopPasswordSetupCode).not.toHaveBeenCalled();
@@ -119,7 +121,7 @@ describe('loginWorkshopUserService – setup initial', () => {
     jest.mocked(repo.findWorkshopUserByBadge).mockResolvedValue(mockUser());
     jest.mocked(setupCode.verifyWorkshopPasswordSetupCode).mockResolvedValue(true);
 
-    const result = await loginWorkshopUserService('3002', undefined, 'secret1', 'ABCD234567');
+    const result = await loginWorkshopUserService('3002', undefined, 'secret1234', 'ABCD234567');
 
     expect(result).toEqual({
       kind: 'success',
@@ -132,7 +134,7 @@ describe('loginWorkshopUserService – setup initial', () => {
         sessionVersion: 0,
       },
     });
-    expect(bcrypt.hashWorkshopPassword).toHaveBeenCalledWith('secret1');
+    expect(bcrypt.hashWorkshopPassword).toHaveBeenCalledWith('secret1234');
     expect(repo.consumeWorkshopPasswordSetupCode).toHaveBeenCalledWith({
       userId: 1,
       passwordHash: 'hashed-password',

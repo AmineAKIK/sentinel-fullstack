@@ -119,4 +119,31 @@ describe('API client', () => {
     await vi.advanceTimersByTimeAsync(15_000);
     await assertion;
   });
+
+  it('maintient le timeout pendant la lecture du corps JSON', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url, init) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () =>
+                reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+              );
+            }),
+        } as Response)
+      )
+    );
+
+    const assertion = expect(api.get('/api/slow-body')).rejects.toMatchObject({
+      code: 'REQUEST_TIMEOUT',
+      status: 408,
+    });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await assertion;
+  });
 });
