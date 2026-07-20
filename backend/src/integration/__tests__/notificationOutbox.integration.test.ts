@@ -11,6 +11,7 @@ import {
   claimNotificationOutboxItems,
   completeNotificationOutboxItem,
   recoverStaleNotificationOutboxItems,
+  retryOrFailNotificationOutboxItem,
 } from '../../modules/notifications/notificationOutbox.repository';
 
 const DB_URL = process.env.DATABASE_URL!;
@@ -152,5 +153,73 @@ describe('notification outbox — preuves PostgreSQL (lot 5A)', () => {
     await expect(
       pool.query(`UPDATE notification_outbox SET status = 'SENT_MAYBE' WHERE id = $1`, [id])
     ).rejects.toThrow(/notification_outbox_status_check/);
+  });
+});
+
+describe('notification outbox — preuves PostgreSQL (lot 5B)', () => {
+  it('démarre avec un objet vide et persiste les destinataires livrés par canal lors d’une reprise (OUT-03, migration 048)', async () => {
+    const id = await insertPasswordResetOutboxItem();
+    const [claimed] = await claimNotificationOutboxItems(10, 5);
+    expect(claimed.id).toBe(id);
+    expect(claimed.delivered_recipients).toEqual({});
+
+    await retryOrFailNotificationOutboxItem(id, 1, 5, 'SMTP_DELIVERY_FAILED', {
+      admin_password_reset: ['ops@example.test'],
+    });
+
+    const { rows } = await pool.query<{ delivered_recipients: Record<string, string[]> }>(
+      `SELECT delivered_recipients FROM notification_outbox WHERE id = $1`,
+      [id]
+    );
+    expect(rows[0].delivered_recipients).toEqual({
+      admin_password_reset: ['ops@example.test'],
+    });
+  });
+
+  it('relit les destinataires déjà livrés lors de la reprise suivante (OUT-03)', async () => {
+    const id = await insertPasswordResetOutboxItem();
+    await claimNotificationOutboxItems(10, 5);
+    await retryOrFailNotificationOutboxItem(id, 1, 5, 'SMTP_DELIVERY_FAILED', {
+      admin_password_reset: ['ops@example.test'],
+    });
+
+    // retryOrFailNotificationOutboxItem retarde available_at (backoff) : on
+    // vérifie ici l'état persisté tel qu'un prochain cycle le relira, sans
+    // dépendre du délai réel avant la prochaine réclamation possible.
+    const { rows } = await pool.query<{ delivered_recipients: Record<string, string[]> }>(
+      `SELECT delivered_recipients FROM notification_outbox WHERE id = $1`,
+      [id]
+    );
+    expect(rows[0].delivered_recipients).toEqual({
+      admin_password_reset: ['ops@example.test'],
+    });
+
+    // Une fois la fenêtre de backoff passée, la réclamation lit bien le même état.
+    await pool.query(`UPDATE notification_outbox SET available_at = NOW() WHERE id = $1`, [id]);
+    const [reclaimed] = await claimNotificationOutboxItems(10, 5);
+    expect(reclaimed.id).toBe(id);
+    expect(reclaimed.delivered_recipients).toEqual({
+      admin_password_reset: ['ops@example.test'],
+    });
+  });
+
+  it('n’écrase pas les destinataires déjà connus quand une reprise échoue sans en signaler de nouveaux (OUT-04)', async () => {
+    const id = await insertPasswordResetOutboxItem();
+    await claimNotificationOutboxItems(10, 5);
+    await retryOrFailNotificationOutboxItem(id, 1, 5, 'SMTP_DELIVERY_FAILED', {
+      admin_password_reset: ['ops@example.test'],
+    });
+
+    // Un appelant qui omet le cinquième argument (aucune nouvelle info) ne
+    // doit jamais effacer ce qui a déjà été confirmé.
+    await retryOrFailNotificationOutboxItem(id, 2, 5, 'SMTP_TIMEOUT');
+
+    const { rows } = await pool.query<{ delivered_recipients: Record<string, string[]> }>(
+      `SELECT delivered_recipients FROM notification_outbox WHERE id = $1`,
+      [id]
+    );
+    expect(rows[0].delivered_recipients).toEqual({
+      admin_password_reset: ['ops@example.test'],
+    });
   });
 });

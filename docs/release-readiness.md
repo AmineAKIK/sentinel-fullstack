@@ -103,6 +103,7 @@ commit audité au démarrage de cette branche.
 | `DR-20` | Backup et restauration utilisent un verrou commun et une intégrité obligatoire. | Checksum exigé, ledger validé, restauration jetable chronométrée et RTO consigné. |
 | `DR-21` | Les faits du dossier sont générés depuis le candidat. | Aucun nombre durable n'est saisi en dur ; Markdown suivi comme source de vérité, sorties personnelles ignorées. |
 | `DR-22` | Une release désigne un commit et des images immuables. | Tag, SHA de santé, labels OCI, digests déployés et recette désignent le même candidat. |
+| `DR-23` | `notif_operateurs` reste une préférence groupée couvrant followers, déclarant et opérateurs ; aucune préférence `notif_followers` dédiée n'est introduite par ce chantier. | Décision produit préexistante au lot 5, hors périmètre robustesse ; réouvrable si un besoin business explicite de désolidariser ces audiences apparaît. |
 
 ## 4. Registre des constats
 
@@ -140,9 +141,9 @@ commit audité au démarrage de cette branche.
 | --- | --- | ---: | --- | --- | --- |
 | `OUT-01` | P1 | 5 | Les leases `PROCESSING` périmés ne sont récupérés qu'au démarrage. | Test de récupération pendant le même processus. | VERIFIED |
 | `OUT-02` | P1 | 5 | SMTP absent mène à `COMPLETED`. | État `SKIPPED_DISABLED` et métrique/log associés. | VERIFIED |
-| `OUT-03` | P1 | 5 | Un échec partiel renvoie les destinataires déjà servis. | Reprise ciblée par destinataire. | OPEN |
-| `OUT-04` | P1 | 5 | Plusieurs groupes déjà servis sont rejoués si le dernier échoue. | Livraisons indépendantes et idempotence testée. | OPEN |
-| `OUT-05` | P1 | 5 | Destinataires/noms recalculés et préférence followers ambiguë. | Snapshot déterministe et préférence explicitement nommée. | OPEN |
+| `OUT-03` | P1 | 5 | Un échec partiel renvoie les destinataires déjà servis. | Reprise ciblée par destinataire. | VERIFIED |
+| `OUT-04` | P1 | 5 | Plusieurs groupes déjà servis sont rejoués si le dernier échoue. | Livraisons indépendantes et idempotence testée. | VERIFIED |
+| `OUT-05` | P1 | 5 | Destinataires/noms recalculés et préférence followers ambiguë. | Snapshot déterministe par canal (`delivered_recipients`) ; nommage de préférence groupée accepté selon `DR-23`. | VERIFIED |
 
 ### Pilotage et listes
 
@@ -214,7 +215,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `2` | Garantir qu'un no-op ne produit aucune trace ni arbitrage. | `AUD-01`, `AUD-02` | Lot 0 | VERIFIED |
 | `3` | Aligner verrous, revalidations et invariants ligne/utilisateur/incident. | `CON-01` à `CON-04`, `AUTH-01` | Lots 1 et 2 | VERIFIED |
 | `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | VERIFIED |
-| `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | OPEN |
+| `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | VERIFIED |
 | `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | OPEN |
 | `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | OPEN |
 | `8` | Corriger la sémantique et prouver les parcours accessibles. | `A11Y-01` à `A11Y-06` | Lots 4 et 7 | OPEN |
@@ -239,7 +240,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 | `4B` | Unifier révocation, réauthentification et identifiants. | `HTTP-03` à `HTTP-05` | VERIFIED |
 | `4C` | Durcir le client HTTP, les secrets bcrypt et les erreurs frontend. | `HTTP-06` à `HTTP-10` | VERIFIED |
 | `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | VERIFIED |
-| `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | OPEN |
+| `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | VERIFIED |
 
 Preuves des lots clos :
 

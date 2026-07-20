@@ -2,13 +2,14 @@ import logger from '../../logger';
 import {
   claimNotificationOutboxItems,
   completeNotificationOutboxItem,
+  DeliveredRecipientsByChannel,
   NotificationOutboxCompletionStatus,
   NotificationOutboxItem,
   recoverStaleNotificationOutboxItems,
   retryOrFailNotificationOutboxItem,
 } from './notificationOutbox.repository';
 import {
-  DeliveryOutcome,
+  DeliveryResult,
   notifyAdminPasswordResetRequested,
   notifyDeclarantCancelApproved,
   notifyDeclarantCancelRejected,
@@ -53,9 +54,67 @@ function permanentError(code: string): Error & { code: string; permanent: true }
   });
 }
 
+// Exécute chaque canal de notification d'un item, en excluant les
+// destinataires déjà confirmés lors d'une tentative précédente (OUT-03).
+// Un canal en échec n'interrompt jamais les canaux suivants du même item :
+// sinon, un groupe déjà livré avec succès (ex. le déclarant d'INCIDENT_TAKEN)
+// ne serait jamais rejoué alors qu'un autre canal du même item vient
+// d'échouer pour la première fois (OUT-04). L'échec global n'est signalé
+// qu'une fois tous les canaux tentés, avec l'état déjà livré consolidé.
+type ChannelError = Error & {
+  delivered?: string[];
+  deliveredRecipients?: DeliveredRecipientsByChannel;
+};
+
+class ChannelRunner {
+  readonly delivered: DeliveredRecipientsByChannel;
+  readonly outcomes: DeliveryResult['outcome'][] = [];
+  private firstFailure: ChannelError | undefined;
+
+  constructor(private readonly baseline: DeliveredRecipientsByChannel) {
+    this.delivered = { ...baseline };
+  }
+
+  async run(
+    channel: string,
+    task: (alreadyDelivered: ReadonlySet<string>) => Promise<DeliveryResult>
+  ) {
+    const alreadyDelivered = new Set(this.baseline[channel] ?? []);
+    try {
+      const result = await task(alreadyDelivered);
+      this.merge(channel, result.delivered);
+      this.outcomes.push(result.outcome);
+    } catch (error) {
+      const channelError: ChannelError = error instanceof Error ? error : new Error(String(error));
+      if (Array.isArray(channelError.delivered)) {
+        this.merge(channel, channelError.delivered);
+      }
+      this.firstFailure ??= channelError;
+    }
+  }
+
+  private merge(channel: string, newlyDelivered: string[]): void {
+    if (newlyDelivered.length === 0) return;
+    const existing = new Set(this.delivered[channel] ?? []);
+    for (const recipient of newlyDelivered) existing.add(recipient);
+    this.delivered[channel] = Array.from(existing);
+  }
+
+  throwIfFailed(): void {
+    if (!this.firstFailure) return;
+    // Porté sur l'erreur : deliverNotificationOutboxItem se termine par un
+    // throw, donc processNotificationOutboxBatch n'a accès à l'état consolidé
+    // que via cette propriété pour persister ce qui a déjà été livré (OUT-04).
+    this.firstFailure.deliveredRecipients = this.delivered;
+    throw this.firstFailure;
+  }
+}
+
 export async function deliverNotificationOutboxItem(
   item: NotificationOutboxItem
-): Promise<DeliveryOutcome[]> {
+): Promise<ChannelRunner> {
+  const runner = new ChannelRunner(item.delivered_recipients ?? {});
+
   if (item.source === 'PASSWORD_RESET') {
     if (
       !item.reset_first_name ||
@@ -65,14 +124,19 @@ export async function deliverNotificationOutboxItem(
     ) {
       throw permanentError('PASSWORD_RESET_SOURCE_MISSING');
     }
-    return [
-      await notifyAdminPasswordResetRequested({
-        firstName: item.reset_first_name,
-        lastName: item.reset_last_name,
-        badgeNumber: item.reset_badge_number,
-        requestedAt: item.reset_requested_at,
-      }),
-    ];
+    await runner.run('admin_password_reset', (alreadyDelivered) =>
+      notifyAdminPasswordResetRequested(
+        {
+          firstName: item.reset_first_name!,
+          lastName: item.reset_last_name!,
+          badgeNumber: item.reset_badge_number!,
+          requestedAt: item.reset_requested_at!,
+        },
+        alreadyDelivered
+      )
+    );
+    runner.throwIfFailed();
+    return runner;
   }
 
   if (!item.incident_id || !item.event_type || !item.actor_user_id) {
@@ -83,76 +147,115 @@ export async function deliverNotificationOutboxItem(
   const actorUserId = item.actor_user_id;
   switch (item.event_type) {
     case 'EDIT_REQUESTED':
-      return [
-        await notifyResponsablesEditRequested(incidentId, actorUserId, payloadFields(item.payload)),
-      ];
+      await runner.run('responsables_edit_requested', (alreadyDelivered) =>
+        notifyResponsablesEditRequested(
+          incidentId,
+          actorUserId,
+          payloadFields(item.payload),
+          alreadyDelivered
+        )
+      );
+      break;
     case 'CANCEL_REQUESTED':
-      return [
-        await notifyResponsablesCancelRequested(
+      await runner.run('responsables_cancel_requested', (alreadyDelivered) =>
+        notifyResponsablesCancelRequested(
           incidentId,
           actorUserId,
-          payloadString(item.payload, 'reason')
-        ),
-      ];
+          payloadString(item.payload, 'reason'),
+          alreadyDelivered
+        )
+      );
+      break;
     case 'INCIDENT_TAKEN':
-      return [
-        await notifyFollowersIncidentTaken(incidentId, actorUserId),
-        await notifyDeclarantIncidentTaken(incidentId, actorUserId),
-      ];
+      await runner.run('followers_incident_taken', (alreadyDelivered) =>
+        notifyFollowersIncidentTaken(incidentId, actorUserId, alreadyDelivered)
+      );
+      await runner.run('declarant_incident_taken', (alreadyDelivered) =>
+        notifyDeclarantIncidentTaken(incidentId, actorUserId, alreadyDelivered)
+      );
+      break;
     case 'INCIDENT_SET_PENDING':
-      return [
-        await notifyFollowersIncidentSetPending(
+      await runner.run('followers_incident_set_pending', (alreadyDelivered) =>
+        notifyFollowersIncidentSetPending(
           incidentId,
           actorUserId,
-          payloadString(item.payload, 'diagnostic')
-        ),
-      ];
+          payloadString(item.payload, 'diagnostic'),
+          alreadyDelivered
+        )
+      );
+      break;
     case 'INCIDENT_CLOSED':
-      return [await notifyFollowersIncidentClosed(incidentId, actorUserId)];
-    case 'INCIDENT_CANCELED': {
-      const outcomes = [
-        await notifyFollowersIncidentCanceled(incidentId, actorUserId),
-        await notifyTechnicianIncidentCanceled(incidentId, actorUserId),
-      ];
+      await runner.run('followers_incident_closed', (alreadyDelivered) =>
+        notifyFollowersIncidentClosed(incidentId, actorUserId, alreadyDelivered)
+      );
+      break;
+    case 'INCIDENT_CANCELED':
+      await runner.run('followers_incident_canceled', (alreadyDelivered) =>
+        notifyFollowersIncidentCanceled(incidentId, actorUserId, alreadyDelivered)
+      );
+      await runner.run('technician_incident_canceled', (alreadyDelivered) =>
+        notifyTechnicianIncidentCanceled(incidentId, actorUserId, alreadyDelivered)
+      );
       if (payloadString(item.payload, 'mode') === 'request_approved') {
-        outcomes.push(await notifyDeclarantCancelApproved(incidentId, actorUserId));
+        await runner.run('declarant_cancel_approved', (alreadyDelivered) =>
+          notifyDeclarantCancelApproved(incidentId, actorUserId, alreadyDelivered)
+        );
       }
-      return outcomes;
-    }
+      break;
     case 'INCIDENT_INVALIDATED':
-      return [
-        await notifyTechnicianIncidentInvalidated(
+      await runner.run('technician_incident_invalidated', (alreadyDelivered) =>
+        notifyTechnicianIncidentInvalidated(
           incidentId,
           actorUserId,
-          payloadString(item.payload, 'reason')
-        ),
-      ];
+          payloadString(item.payload, 'reason'),
+          alreadyDelivered
+        )
+      );
+      break;
     case 'PRIORITY_CHANGED':
       if (item.payload?.to === true) {
-        return [await notifyMaintenanceIncidentUrgent(incidentId, actorUserId)];
+        await runner.run('maintenance_incident_urgent', (alreadyDelivered) =>
+          notifyMaintenanceIncidentUrgent(incidentId, actorUserId, alreadyDelivered)
+        );
+      } else {
+        runner.outcomes.push('SKIPPED_NO_RECIPIENT');
       }
-      return ['SKIPPED_NO_RECIPIENT'];
+      break;
     case 'RESPONSIBLE_COMMENT_UPDATED':
-      return [
-        await notifyTechnicianResponsibleComment(
+      await runner.run('technician_responsible_comment', (alreadyDelivered) =>
+        notifyTechnicianResponsibleComment(
           incidentId,
           actorUserId,
-          payloadString(item.payload, 'to')
-        ),
-      ];
+          payloadString(item.payload, 'to'),
+          alreadyDelivered
+        )
+      );
+      break;
     case 'EDIT_APPLIED':
-      return [await notifyDeclarantEditApproved(incidentId, actorUserId)];
+      await runner.run('declarant_edit_approved', (alreadyDelivered) =>
+        notifyDeclarantEditApproved(incidentId, actorUserId, alreadyDelivered)
+      );
+      break;
     case 'EDIT_REJECTED':
-      return [await notifyDeclarantEditRejected(incidentId, actorUserId)];
+      await runner.run('declarant_edit_rejected', (alreadyDelivered) =>
+        notifyDeclarantEditRejected(incidentId, actorUserId, alreadyDelivered)
+      );
+      break;
     case 'CANCEL_REQUEST_REJECTED':
-      return [await notifyDeclarantCancelRejected(incidentId, actorUserId)];
+      await runner.run('declarant_cancel_rejected', (alreadyDelivered) =>
+        notifyDeclarantCancelRejected(incidentId, actorUserId, alreadyDelivered)
+      );
+      break;
     default:
       throw permanentError('UNSUPPORTED_NOTIFICATION_EVENT');
   }
+
+  runner.throwIfFailed();
+  return runner;
 }
 
 export function summarizeDeliveryOutcomes(
-  outcomes: DeliveryOutcome[]
+  outcomes: DeliveryResult['outcome'][]
 ): NotificationOutboxCompletionStatus {
   if (outcomes.some((outcome) => outcome === 'SENT')) return 'COMPLETED';
   if (outcomes.every((outcome) => outcome === 'SKIPPED_DISABLED')) return 'SKIPPED_DISABLED';
@@ -175,18 +278,21 @@ export async function processNotificationOutboxBatch(
   const items = await claimNotificationOutboxItems(batchSize, maxAttempts);
   for (const item of items) {
     try {
-      const outcomes = await deliverNotificationOutboxItem(item);
-      await completeNotificationOutboxItem(item.id, summarizeDeliveryOutcomes(outcomes));
+      const runner = await deliverNotificationOutboxItem(item);
+      await completeNotificationOutboxItem(item.id, summarizeDeliveryOutcomes(runner.outcomes));
     } catch (error) {
       const permanent =
         typeof error === 'object' &&
         error !== null &&
         (error as { permanent?: unknown }).permanent === true;
+      const deliveredRecipients = (error as { deliveredRecipients?: DeliveredRecipientsByChannel })
+        .deliveredRecipients;
       await retryOrFailNotificationOutboxItem(
         item.id,
         permanent ? maxAttempts : item.attempt_count,
         maxAttempts,
-        safeErrorCode(error)
+        safeErrorCode(error),
+        deliveredRecipients
       );
       logger.error(
         {

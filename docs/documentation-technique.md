@@ -549,7 +549,12 @@ nettoie la base temporaire et tente le retour arrière si la bascule est incompl
   migration corrective ou une restauration ;
 - l'observabilité repose sur logs et healthcheck, sans stack métrique fournie ;
 - SMTP et DeepSeek sont des intégrations optionnelles à superviser séparément ;
-- l'outbox déduplique la source et livre au moins une fois ; un crash entre
-  l'acceptation SMTP et l'acquittement local peut donc déclencher un nouvel envoi ;
+- l'outbox déduplique la source et livre au moins une fois, par destinataire :
+  chaque canal de notification (`delivered_recipients`, migration 048) mémorise
+  les adresses déjà confirmées et les exclut des tentatives suivantes ; un crash
+  entre l'acceptation SMTP d'une adresse précise et l'acquittement local de
+  cette même adresse peut donc encore déclencher un renvoi à cette adresse
+  précise, mais jamais aux adresses déjà confirmées d'un même item ou d'un
+  canal frère du même événement ;
 - les tests de charge et audits de navigateur assistés restent des campagnes de
   recette, pas des preuves permanentes de la CI standard.
