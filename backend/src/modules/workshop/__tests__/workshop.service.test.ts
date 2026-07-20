@@ -1006,6 +1006,7 @@ import {
   getIncidentMetricsService,
   getWorkshopAnalyticsService,
 } from '../workshop.service';
+import { encodeCursor } from '../../../utils/cursor';
 
 describe('getBoardDataService', () => {
   it('retourne les données du board', async () => {
@@ -1117,18 +1118,42 @@ describe('getKnowledgeIncidentService', () => {
 
 describe('listHistoryEventsService', () => {
   it('transmet la query au repository pour un RESPONSABLE', async () => {
-    const events_data = [{ id: 1, event_type: 'INCIDENT_CREATED' }];
-    jest.mocked(repo.listHistoryEvents).mockResolvedValue(events_data);
+    const page = { items: [{ id: 1, event_type: 'INCIDENT_CREATED' }], nextCursor: null };
+    jest.mocked(repo.listHistoryEvents).mockResolvedValue(page);
     const result = await listHistoryEventsService({ lineId: '1' }, 'RESPONSABLE');
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data).toEqual(events_data);
-    expect(repo.listHistoryEvents).toHaveBeenCalledWith({ lineId: '1' });
+    if (result.ok) expect(result.data).toEqual(page);
+    expect(repo.listHistoryEvents).toHaveBeenCalledWith({ lineId: '1', cursor: undefined });
   });
 
   it('retourne FORBIDDEN pour un rôle non RESPONSABLE', async () => {
     const result = await listHistoryEventsService({ lineId: '1' }, 'MAINTENANCE');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('FORBIDDEN');
+    expect(repo.listHistoryEvents).not.toHaveBeenCalled();
+  });
+
+  it('décode un curseur valide avant de le transmettre au repository (lot 7)', async () => {
+    const page = { items: [], nextCursor: null };
+    jest.mocked(repo.listHistoryEvents).mockResolvedValue(page);
+    const cursor = encodeCursor({ sortValue: '2026-03-15T10:00:00.000Z', id: 42 });
+
+    await listHistoryEventsService({ lineId: '1', cursor }, 'RESPONSABLE');
+
+    expect(repo.listHistoryEvents).toHaveBeenCalledWith({
+      lineId: '1',
+      cursor: { sortValue: '2026-03-15T10:00:00.000Z', id: 42 },
+    });
+  });
+
+  it('rejette un curseur illisible sans appeler le repository', async () => {
+    const result = await listHistoryEventsService(
+      { lineId: '1', cursor: 'not-a-valid-cursor' },
+      'RESPONSABLE'
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
     expect(repo.listHistoryEvents).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 import runMigrations from '../../db/migrate';
 import { hashWorkshopPassword } from '../../auth/bcrypt';
 import { listHistoryEvents } from '../../modules/workshop/workshop.repository';
+import { decodeCursor } from '../../utils/cursor';
 
 const DB_URL = process.env.DATABASE_URL!;
 const fixtureSuffix = `${process.pid}${Date.now()}`;
@@ -84,37 +85,88 @@ describe('journal — filtre par période (lot 6, ANA-03)', () => {
     await insertEvent('INCIDENT_CLOSED', '2026-03-15T10:00:00Z');
     await insertEvent('INCIDENT_CANCELED', '2026-04-01T10:00:00Z');
 
-    const rows = await listHistoryEvents({
+    const page = await listHistoryEvents({
       lineId,
       start: '2026-03-01T00:00:00Z',
       end: '2026-03-31T23:59:59Z',
     });
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].event_type).toBe('INCIDENT_CLOSED');
+    expect(page.items).toHaveLength(1);
+    expect((page.items[0] as { event_type: string }).event_type).toBe('INCIDENT_CLOSED');
   });
 
   it('retourne tous les événements du périmètre quand aucune période n’est fournie', async () => {
     await insertEvent('INCIDENT_TAKEN', '2026-02-01T10:00:00Z');
     await insertEvent('INCIDENT_CLOSED', '2026-03-15T10:00:00Z');
 
-    const rows = await listHistoryEvents({ lineId });
+    const page = await listHistoryEvents({ lineId });
 
-    expect(rows).toHaveLength(2);
+    expect(page.items).toHaveLength(2);
   });
 
   it('combine le filtre période avec le filtre type d’événement existant', async () => {
     await insertEvent('INCIDENT_TAKEN', '2026-03-05T10:00:00Z');
     await insertEvent('INCIDENT_CLOSED', '2026-03-15T10:00:00Z');
 
-    const rows = await listHistoryEvents({
+    const page = await listHistoryEvents({
       lineId,
       eventType: 'INCIDENT_CLOSED',
       start: '2026-03-01T00:00:00Z',
       end: '2026-03-31T23:59:59Z',
     });
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].event_type).toBe('INCIDENT_CLOSED');
+    expect(page.items).toHaveLength(1);
+    expect((page.items[0] as { event_type: string }).event_type).toBe('INCIDENT_CLOSED');
+  });
+});
+
+describe('journal — pagination par curseur (lot 7, LIST-03)', () => {
+  it('retourne nextCursor null quand tout tient dans une page', async () => {
+    await insertEvent('INCIDENT_TAKEN', '2026-03-01T10:00:00Z');
+    await insertEvent('INCIDENT_CLOSED', '2026-03-02T10:00:00Z');
+
+    const page = await listHistoryEvents({ lineId, limit: '10' });
+
+    expect(page.items).toHaveLength(2);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('pagine sans perte ni doublon sur plusieurs pages', async () => {
+    // 5 événements strictement ordonnés, page de taille 2 : doit produire
+    // 3 pages (2, 2, 1) couvrant exactement les 5 événements, dans l'ordre.
+    for (let i = 0; i < 5; i += 1) {
+      await insertEvent('INCIDENT_TAKEN', `2026-03-0${i + 1}T10:00:00Z`);
+    }
+
+    const seen: unknown[] = [];
+    let cursor: { sortValue: string; id: number } | undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const result = await listHistoryEvents({ lineId, limit: '2', cursor });
+      seen.push(...result.items);
+      if (!result.nextCursor) break;
+      cursor = decodeCursor(result.nextCursor) ?? undefined;
+    }
+
+    expect(seen).toHaveLength(5);
+    const ids = seen.map((row) => (row as { id: number }).id);
+    expect(new Set(ids).size).toBe(5);
+  });
+
+  it('départage deux événements à la même milliseconde grâce au tie-breaker id', async () => {
+    const sameInstant = '2026-03-10T10:00:00.000Z';
+    await insertEvent('INCIDENT_TAKEN', sameInstant);
+    await insertEvent('INCIDENT_CLOSED', sameInstant);
+
+    const firstPage = await listHistoryEvents({ lineId, limit: '1' });
+    expect(firstPage.items).toHaveLength(1);
+    expect(firstPage.nextCursor).not.toBeNull();
+
+    const cursor = decodeCursor(firstPage.nextCursor!)!;
+    const secondPage = await listHistoryEvents({ lineId, limit: '1', cursor });
+
+    expect(secondPage.items).toHaveLength(1);
+    const firstId = (firstPage.items[0] as { id: number }).id;
+    const secondId = (secondPage.items[0] as { id: number }).id;
+    expect(secondId).not.toBe(firstId);
   });
 });

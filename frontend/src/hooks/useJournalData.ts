@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { listWorkshopHistoryEvents, listWorkshopLines } from '../api/workshop';
 import { ProductionLine, WorkshopHistoryEvent } from '../types';
@@ -15,7 +15,9 @@ import { useDebouncedValue } from './useDebouncedValue';
 export type SortCol = 'date' | 'action' | 'incident' | 'actor';
 export type SortDir = 'asc' | 'desc';
 
-const JOURNAL_EVENTS_LIMIT = 80;
+// Taille de page, pas plafond total : LIST-03 remplace la limite fixe par
+// une pagination par curseur (lot 7).
+const JOURNAL_EVENTS_PAGE_SIZE = 80;
 
 export function useJournalData() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,7 +25,10 @@ export function useJournalData() {
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [historyEvents, setHistoryEvents] = useState<WorkshopHistoryEvent[]>([]);
   const [historyEventsLoading, setHistoryEventsLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const loadMoreControllerRef = useRef<AbortController | null>(null);
 
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const debouncedQuery = useDebouncedValue(query);
@@ -52,16 +57,8 @@ export function useJournalData() {
     return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    if (startFilter && endFilter && startFilter > endFilter) {
-      setHistoryEventsLoading(false);
-      setPeriodError('La date de début doit être antérieure à la date de fin.');
-      return undefined;
-    }
-    setPeriodError('');
-
-    const controller = new AbortController();
-    const params = buildIncidentWorkspaceParams({
+  const baseParams = useMemo(
+    () => ({
       query: debouncedQuery,
       statusFilter,
       stateFilter,
@@ -70,13 +67,39 @@ export function useJournalData() {
       eventTypeFilter,
       startFilter: startFilter ? dayStartIso(startFilter) : undefined,
       endFilter: endFilter ? dayEndIso(endFilter) : undefined,
-      limit: JOURNAL_EVENTS_LIMIT,
-    });
+      limit: JOURNAL_EVENTS_PAGE_SIZE,
+    }),
+    [
+      debouncedQuery,
+      statusFilter,
+      stateFilter,
+      lineFilter,
+      machineFilter,
+      eventTypeFilter,
+      startFilter,
+      endFilter,
+    ]
+  );
+
+  useEffect(() => {
+    // Un changement de filtre repart de la première page : le curseur d'une
+    // page précédente n'a plus de sens sous un nouveau périmètre de données.
+    loadMoreControllerRef.current?.abort();
+    if (startFilter && endFilter && startFilter > endFilter) {
+      setHistoryEventsLoading(false);
+      setPeriodError('La date de début doit être antérieure à la date de fin.');
+      return undefined;
+    }
+    setPeriodError('');
+
+    const controller = new AbortController();
     setHistoryEventsLoading(true);
     setError('');
-    void listWorkshopHistoryEvents(params, controller.signal)
-      .then((eventData) => {
-        if (!controller.signal.aborted) setHistoryEvents(eventData);
+    void listWorkshopHistoryEvents(buildIncidentWorkspaceParams(baseParams), controller.signal)
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setHistoryEvents(page.items);
+        setNextCursor(page.nextCursor);
       })
       .catch(() => {
         if (controller.signal.aborted) return;
@@ -86,16 +109,30 @@ export function useJournalData() {
         if (!controller.signal.aborted) setHistoryEventsLoading(false);
       });
     return () => controller.abort();
-  }, [
-    debouncedQuery,
-    statusFilter,
-    stateFilter,
-    lineFilter,
-    machineFilter,
-    eventTypeFilter,
-    startFilter,
-    endFilter,
-  ]);
+  }, [baseParams, startFilter, endFilter]);
+
+  const loadMore = useCallback((): void => {
+    if (!nextCursor || loadingMore) return;
+    const controller = new AbortController();
+    loadMoreControllerRef.current = controller;
+    setLoadingMore(true);
+    void listWorkshopHistoryEvents(
+      buildIncidentWorkspaceParams({ ...baseParams, cursor: nextCursor }),
+      controller.signal
+    )
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setHistoryEvents((current) => [...current, ...page.items]);
+        setNextCursor(page.nextCursor);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setError('Impossible de charger la suite du journal atelier.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingMore(false);
+      });
+  }, [baseParams, nextCursor, loadingMore]);
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
     setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
@@ -172,6 +209,9 @@ export function useJournalData() {
     historyEvents,
     sortedEvents,
     historyEventsLoading,
+    loadingMore,
+    hasMore: nextCursor !== null,
+    loadMore,
     error,
     query,
     statusFilter,
@@ -184,7 +224,6 @@ export function useJournalData() {
     periodError,
     sortCol,
     sortDir,
-    historyEventsLimit: JOURNAL_EVENTS_LIMIT,
     setQuery,
     setStatusFilter,
     setMachineFilter,

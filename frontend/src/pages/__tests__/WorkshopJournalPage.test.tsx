@@ -33,7 +33,9 @@ function baseJournalData(overrides: Partial<ReturnType<typeof useJournalData>> =
     historyEvents: [],
     sortedEvents: [],
     historyEventsLoading: false,
-    historyEventsLimit: 80,
+    loadingMore: false,
+    hasMore: false,
+    loadMore: vi.fn(),
     error: '',
     query: '',
     statusFilter: 'all',
@@ -114,5 +116,35 @@ describe('WorkshopJournalPage — filtre période (lot 6, ANA-03)', () => {
 
     expect(updateStartFilter).toHaveBeenCalledWith('');
     expect(updateEndFilter).toHaveBeenCalledWith('');
+  });
+});
+
+describe('WorkshopJournalPage — pagination par curseur (lot 7, LIST-03)', () => {
+  it('n’affiche aucun bouton de suite quand hasMore est faux', () => {
+    renderJournalPage({ hasMore: false });
+
+    expect(screen.queryByRole('button', { name: /charger la suite/i })).not.toBeInTheDocument();
+  });
+
+  it('affiche un bouton "Charger la suite" quand une page suivante existe', () => {
+    renderJournalPage({ hasMore: true });
+
+    expect(screen.getByRole('button', { name: /charger la suite/i })).toBeInTheDocument();
+  });
+
+  it('appelle loadMore au clic sur le bouton', () => {
+    const loadMore = vi.fn();
+    renderJournalPage({ hasMore: true, loadMore });
+
+    fireEvent.click(screen.getByRole('button', { name: /charger la suite/i }));
+
+    expect(loadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('désactive le bouton et affiche un état de chargement pendant loadingMore', () => {
+    renderJournalPage({ hasMore: true, loadingMore: true });
+
+    const button = screen.getByRole('button', { name: /chargement/i });
+    expect(button).toBeDisabled();
   });
 });

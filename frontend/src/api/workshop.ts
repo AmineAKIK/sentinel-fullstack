@@ -39,7 +39,15 @@ export type IncidentWorkspaceParams = {
   // Filtre période — supporté uniquement par /workshop/history/events (Journal, ANA-03).
   start?: string;
   end?: string;
+  // Pagination par curseur — supporté uniquement par /workshop/history/events
+  // (Journal, LIST-03). Jeton opaque renvoyé par la page précédente.
+  cursor?: string;
 };
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
 
 export async function listWorkshopHistoryIncidents(
   params: IncidentWorkspaceParams = {},
@@ -61,8 +69,8 @@ export async function getWorkshopHistoryIncident(
 export async function listWorkshopHistoryEvents(
   params: IncidentWorkspaceParams = {},
   signal?: AbortSignal
-): Promise<WorkshopHistoryEvent[]> {
-  return api.get<WorkshopHistoryEvent[]>(
+): Promise<CursorPage<WorkshopHistoryEvent>> {
+  return api.get<CursorPage<WorkshopHistoryEvent>>(
     `/api/workshop/history/events${buildQuery(params)}`,
     signal
   );

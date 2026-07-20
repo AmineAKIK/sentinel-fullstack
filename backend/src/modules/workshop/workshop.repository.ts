@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import pool from '../../db/pool';
 import { boundedInt, parseOptionalInt, statusEqualsSql, statusInSql } from '../../db/sql';
+import { encodeCursor } from '../../utils/cursor';
 import {
   ACTIVE_INCIDENT_STATUSES,
   INCIDENT_LIST_DEFAULT_LIMIT,
@@ -314,9 +315,12 @@ function buildHistoryEventFilters(query: QueryParams): {
   params: Array<string | number>;
   limit: number;
 } {
-  const { q, eventType, limit, start, end } = query;
+  const { q, eventType, limit, start, end, cursor } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
+  // Le curseur borne la limite de page à INCIDENT_LIST_MAX_LIMIT (jamais
+  // INCIDENT_LIST_DEFAULT_LIMIT) : une page de suite garde la taille demandée
+  // par l'appelant, elle n'est pas replafonnée à la valeur par défaut.
   const safeLimit = boundedInt(limit, INCIDENT_LIST_DEFAULT_LIMIT, 1, INCIDENT_LIST_MAX_LIMIT);
 
   appendScalarIncidentFilters(query, filters, params);
@@ -335,6 +339,19 @@ function buildHistoryEventFilters(query: QueryParams): {
   if (end) {
     params.push(String(end));
     filters.push(`we.created_at <= $${params.length}`);
+  }
+  if (cursor && typeof cursor === 'object') {
+    const decoded = cursor as { sortValue: string; id: number };
+    params.push(decoded.sortValue);
+    const sortParamIndex = params.length;
+    params.push(decoded.id);
+    const idParamIndex = params.length;
+    // Tuple strictement décroissant : we.created_at n'étant pas unique, l'id
+    // départage les événements à la même milliseconde sans jamais en sauter
+    // ni en répéter d'une page à l'autre.
+    filters.push(
+      `(we.created_at, we.id) < ($${sortParamIndex}::timestamptz, $${idParamIndex}::int)`
+    );
   }
 
   return {
@@ -846,8 +863,15 @@ export async function updateIncidentData(
   return rows[0]?.id ?? null;
 }
 
-export async function listHistoryEvents(query: QueryParams) {
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export async function listHistoryEvents(query: QueryParams): Promise<CursorPage<unknown>> {
   const { whereClause, params, limit } = buildHistoryEventFilters(query);
+  // Demande une ligne de plus que la page : sa présence indique qu'il existe
+  // une suite, sans exécuter un second COUNT(*) coûteux sur la même fenêtre.
   const { rows } = await pool.query(
     `SELECT we.id, we.incident_id, we.event_type, we.payload, we.created_at,
             wi.line_id, wi.line_number, wi.machine_id, wi.robot_label, wi.head_number,
@@ -860,12 +884,20 @@ export async function listHistoryEvents(query: QueryParams) {
      JOIN workshop_incidents wi ON wi.id = we.incident_id
      LEFT JOIN sentinel_users su ON su.id = we.actor_user_id
      ${whereClause}
-     ORDER BY we.created_at DESC
+     ORDER BY we.created_at DESC, we.id DESC
      LIMIT $${params.length + 1}`,
-    [...params, limit]
+    [...params, limit + 1]
   );
 
-  return rows;
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const last = items[items.length - 1] as { created_at: Date; id: number } | undefined;
+  const nextCursor =
+    hasMore && last
+      ? encodeCursor({ sortValue: new Date(last.created_at).toISOString(), id: last.id })
+      : null;
+
+  return { items, nextCursor };
 }
 
 export async function listIncidentEvents(incidentId: number) {

@@ -45,6 +45,7 @@ export function buildIncidentWorkspaceParams(filters: {
   eventTypeFilter?: string;
   startFilter?: string;
   endFilter?: string;
+  cursor?: string;
 }): IncidentWorkspaceParams {
   const params: IncidentWorkspaceParams = { limit: filters.limit };
   const trimmedQuery = filters.query.trim();
@@ -62,6 +63,7 @@ export function buildIncidentWorkspaceParams(filters: {
     params.eventType = filters.eventTypeFilter;
   if (filters.startFilter) params.start = filters.startFilter;
   if (filters.endFilter) params.end = filters.endFilter;
+  if (filters.cursor) params.cursor = filters.cursor;
 
   return params;
 }

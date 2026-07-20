@@ -15,7 +15,10 @@ export function statusNotEqualsSql(column: string, status: string): string {
 }
 
 export function boundedInt(value: unknown, defaultValue: number, min: number, max: number): number {
-  const parsed = Number.parseInt(typeof value === 'string' ? value : '', 10);
+  const parsed = Number.parseInt(
+    typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '',
+    10
+  );
   return Number.isInteger(parsed) ? Math.min(Math.max(parsed, min), max) : defaultValue;
 }
 

@@ -1,6 +1,7 @@
 import { badRequest, forbidden, notFound, ok, ServiceResult } from '../../utils/serviceResult';
 import { ANALYTICS_DEFAULT_WINDOW_DAYS } from '../../domain/constants';
 import { withTransaction } from '../../db/transaction';
+import { Cursor, decodeCursor } from '../../utils/cursor';
 import * as workshopRepository from './workshop.repository';
 import * as arbitrationRepository from './workshop.arbitration.repository';
 import type { ArbitrationRequestType } from './workshop.arbitration.repository';
@@ -109,7 +110,14 @@ export async function listHistoryEventsService(
   if (role !== 'RESPONSABLE') {
     return forbidden('Réservé au responsable atelier.');
   }
-  return ok(await workshopRepository.listHistoryEvents(query));
+  const { cursor: cursorToken, ...rest } = query;
+  let cursor: Cursor | undefined;
+  if (typeof cursorToken === 'string' && cursorToken) {
+    const decoded = decodeCursor(cursorToken);
+    if (!decoded) return badRequest('Curseur de pagination invalide.');
+    cursor = decoded;
+  }
+  return ok(await workshopRepository.listHistoryEvents({ ...rest, cursor }));
 }
 
 export async function listIncidentEventsService(id: number): Promise<ServiceResult<unknown>> {
