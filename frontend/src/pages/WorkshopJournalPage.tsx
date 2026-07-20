@@ -57,7 +57,9 @@ export default function WorkshopJournalPage() {
     sortedEvents,
     historyEvents,
     historyEventsLoading,
-    historyEventsLimit,
+    loadingMore,
+    hasMore,
+    loadMore,
     error,
     query,
     statusFilter,
@@ -225,11 +227,6 @@ export default function WorkshopJournalPage() {
               <span className="history-event-count muted">
                 {historyEventsLoading ? 'Chargement…' : `${historyEvents.length} action(s)`}
               </span>
-              {!historyEventsLoading && historyEvents.length >= historyEventsLimit && (
-                <span className="history-limit-notice">
-                  Limite de {historyEventsLimit} — affinez les filtres.
-                </span>
-              )}
             </div>
 
             {/* Tableau desktop */}
@@ -354,6 +351,19 @@ export default function WorkshopJournalPage() {
                 })
               )}
             </div>
+
+            {hasMore && (
+              <div className="journal-load-more">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Chargement…' : 'Charger la suite'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>

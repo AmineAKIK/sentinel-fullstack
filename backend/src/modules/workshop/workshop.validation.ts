@@ -103,6 +103,7 @@ export const journalEventQuerySchema = withBoundedWindow(
   incidentWorkspaceQuerySchema.extend({
     start: isoDateTimeSchema.optional(),
     end: isoDateTimeSchema.optional(),
+    cursor: z.string().trim().max(200).optional(),
   })
 );
 
