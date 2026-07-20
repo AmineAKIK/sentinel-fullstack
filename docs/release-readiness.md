@@ -261,6 +261,10 @@ Preuves des lots clos :
 - lot 4B : commit `4f35a5b93dc4fd3d1011742714fe03b436936388` et
   [run CI 256](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/29706833863),
   avec migration PostgreSQL `046` et neuf parcours Playwright.
+- lot 4C : commit `424f5ab78dc9cb8a4e5a647efaa0e356134de3a2`. Contrôles locaux
+  exécutés : `format:check`, `lint`, `typecheck:scripts`, `build` et `test`
+  backend (425/425) et frontend (359/359) verts sur les deux périmètres. Run CI
+  distant à confirmer après push.
 
 Les cinq jobs de chaque preuve sont verts.
 
