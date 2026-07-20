@@ -6,6 +6,14 @@ import * as adminResetTemplate from './templates/admin-password-reset-requested'
 import * as actionRequiredTemplate from './templates/responsable-action-required';
 import * as incidentUpdateTemplate from './templates/incident-update';
 
+// ─── Résultat de livraison ─────────────────────────────────────────────────────
+//
+// Un envoi SMTP réussi n'est pas la seule issue légitime : la préférence peut
+// être désactivée, ou aucun destinataire actif ne peut être résolu. Ces deux
+// cas ne sont pas des échecs — mais ce ne sont pas non plus des succès d'envoi.
+// L'outbox a besoin de cette distinction pour ne jamais les confondre (DR-14).
+export type DeliveryOutcome = 'SENT' | 'SKIPPED_DISABLED' | 'SKIPPED_NO_RECIPIENT';
+
 // ─── Helpers DB ───────────────────────────────────────────────────────────────
 
 async function getResponsablesEmails(): Promise<string[]> {
@@ -75,14 +83,18 @@ async function resolveActorName(actorUserId: number): Promise<string> {
 
 // ─── Envoi bas niveau ────────────────────────────────────────────────────────
 
-async function sendMail(to: string | string[], subject: string, html: string): Promise<void> {
+async function sendMail(
+  to: string | string[],
+  subject: string,
+  html: string
+): Promise<DeliveryOutcome> {
   const mailer = getMailer();
-  if (!mailer) return;
+  if (!mailer) return 'SKIPPED_DISABLED';
 
   const recipients = Array.from(
     new Set((Array.isArray(to) ? to : [to]).map((recipient) => recipient.trim()).filter(Boolean))
   );
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return 'SKIPPED_NO_RECIPIENT';
 
   // Un message par destinataire : aucune adresse professionnelle n'est
   // divulguée aux autres personnes notifiées via l'en-tête To.
@@ -120,6 +132,7 @@ async function sendMail(to: string | string[], subject: string, html: string): P
     error.code = 'SMTP_DELIVERY_FAILED';
     throw error;
   }
+  return 'SENT';
 }
 
 function clientOrigin(): string {
@@ -133,11 +146,11 @@ export async function notifyAdminPasswordResetRequested(data: {
   lastName: string;
   badgeNumber: string;
   requestedAt: Date;
-}): Promise<void> {
-  if (!(await getAdminNotifPref('notif_admin'))) return;
+}): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_admin'))) return 'SKIPPED_DISABLED';
   const adminEmail = await getAdminEmail();
-  if (!adminEmail) return;
-  await sendMail(
+  if (!adminEmail) return 'SKIPPED_NO_RECIPIENT';
+  return sendMail(
     adminEmail,
     adminResetTemplate.subject(),
     adminResetTemplate.html({
@@ -153,16 +166,16 @@ export async function notifyResponsablesEditRequested(
   incidentId: number,
   actorUserId: number,
   detail: string
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_responsables'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_responsables'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getResponsablesEmails(),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     actionRequiredTemplate.subjectActionRequired('Demande de correction', incidentId),
     actionRequiredTemplate.htmlActionRequired({
@@ -181,16 +194,16 @@ export async function notifyResponsablesCancelRequested(
   incidentId: number,
   actorUserId: number,
   reason: string
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_responsables'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_responsables'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getResponsablesEmails(),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     actionRequiredTemplate.subjectActionRequired("Demande d'annulation", incidentId),
     actionRequiredTemplate.htmlActionRequired({
@@ -210,16 +223,16 @@ export async function notifyResponsablesCancelRequested(
 export async function notifyFollowersIncidentTaken(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Pris en charge', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -238,16 +251,16 @@ export async function notifyFollowersIncidentSetPending(
   incidentId: number,
   actorUserId: number,
   diagnostic: string
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Suspendu', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -265,16 +278,16 @@ export async function notifyFollowersIncidentSetPending(
 export async function notifyFollowersIncidentClosed(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Clôturé', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -292,16 +305,16 @@ export async function notifyFollowersIncidentClosed(
 export async function notifyFollowersIncidentCanceled(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getFollowersEmails(incidentId),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('Annulé', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -321,16 +334,16 @@ export async function notifyFollowersIncidentCanceled(
 export async function notifyMaintenanceIncidentUrgent(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_techniciens'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return 'SKIPPED_DISABLED';
   const [emails, incident, actorName] = await Promise.all([
     getMaintenanceEmails(),
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (emails.length === 0 || !incident) return;
+  if (emails.length === 0 || !incident) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     emails,
     incidentUpdateTemplate.subjectIncidentUpdate('URGENT', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -349,18 +362,18 @@ export async function notifyTechnicianResponsibleComment(
   incidentId: number,
   actorUserId: number,
   comment: string
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_techniciens'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident?.taken_by_user_id) return;
+  if (!incident?.taken_by_user_id) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.taken_by_user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Consigne responsable', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -378,18 +391,18 @@ export async function notifyTechnicianResponsibleComment(
 export async function notifyTechnicianIncidentCanceled(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_techniciens'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident?.taken_by_user_id) return;
+  if (!incident?.taken_by_user_id) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.taken_by_user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Annulé', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -408,18 +421,18 @@ export async function notifyTechnicianIncidentInvalidated(
   incidentId: number,
   actorUserId: number,
   reason: string
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_techniciens'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_techniciens'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident?.taken_by_user_id) return;
+  if (!incident?.taken_by_user_id) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.taken_by_user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Clôture invalidée', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -439,18 +452,18 @@ export async function notifyTechnicianIncidentInvalidated(
 export async function notifyDeclarantIncidentTaken(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident) return;
+  if (!incident) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Pris en charge', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -468,18 +481,18 @@ export async function notifyDeclarantIncidentTaken(
 export async function notifyDeclarantEditApproved(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident) return;
+  if (!incident) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Correction approuvée', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -497,18 +510,18 @@ export async function notifyDeclarantEditApproved(
 export async function notifyDeclarantEditRejected(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident) return;
+  if (!incident) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Correction refusée', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -526,18 +539,18 @@ export async function notifyDeclarantEditRejected(
 export async function notifyDeclarantCancelApproved(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident) return;
+  if (!incident) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate("Demande d'annulation approuvée", incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
@@ -555,18 +568,18 @@ export async function notifyDeclarantCancelApproved(
 export async function notifyDeclarantCancelRejected(
   incidentId: number,
   actorUserId: number
-): Promise<void> {
-  if (!(await getAdminNotifPref('notif_operateurs'))) return;
+): Promise<DeliveryOutcome> {
+  if (!(await getAdminNotifPref('notif_operateurs'))) return 'SKIPPED_DISABLED';
   const [incident, actorName] = await Promise.all([
     getIncidentSnapshot(incidentId),
     resolveActorName(actorUserId),
   ]);
-  if (!incident) return;
+  if (!incident) return 'SKIPPED_NO_RECIPIENT';
 
   const email = await getUserEmail(incident.user_id);
-  if (!email) return;
+  if (!email) return 'SKIPPED_NO_RECIPIENT';
 
-  await sendMail(
+  return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate("Demande d'annulation refusée", incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({

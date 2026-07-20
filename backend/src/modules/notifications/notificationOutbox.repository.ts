@@ -111,13 +111,19 @@ export async function claimNotificationOutboxItems(
   });
 }
 
-export async function completeNotificationOutboxItem(id: string): Promise<void> {
+export type NotificationOutboxCompletionStatus =
+  'COMPLETED' | 'SKIPPED_DISABLED' | 'SKIPPED_NO_RECIPIENT';
+
+export async function completeNotificationOutboxItem(
+  id: string,
+  status: NotificationOutboxCompletionStatus = 'COMPLETED'
+): Promise<void> {
   await pool.query(
     `UPDATE notification_outbox
-     SET status = 'COMPLETED', completed_at = NOW(), locked_at = NULL,
+     SET status = $2, completed_at = NOW(), locked_at = NULL,
          updated_at = NOW(), last_error_code = NULL
      WHERE id = $1 AND status = 'PROCESSING'`,
-    [id]
+    [id, status]
   );
 }
 

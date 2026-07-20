@@ -34,6 +34,8 @@ import * as notifications from '../notifications.service';
 import {
   deliverNotificationOutboxItem,
   processNotificationOutboxBatch,
+  startNotificationOutboxWorker,
+  summarizeDeliveryOutcomes,
 } from '../notificationOutbox.worker';
 import type { NotificationOutboxItem } from '../notificationOutbox.repository';
 
@@ -58,18 +60,18 @@ describe('notification outbox worker', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     for (const candidate of Object.values(notifications)) {
-      if (jest.isMockFunction(candidate)) candidate.mockResolvedValue(undefined);
+      if (jest.isMockFunction(candidate)) candidate.mockResolvedValue('SENT');
     }
   });
 
-  it('livre toutes les audiences prévues puis clôture la tâche', async () => {
+  it('livre toutes les audiences prévues puis clôture la tâche en COMPLETED', async () => {
     jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([incidentItem()]);
 
     await expect(processNotificationOutboxBatch(10, 5)).resolves.toBe(1);
 
     expect(notifications.notifyFollowersIncidentTaken).toHaveBeenCalledWith(42, 7);
     expect(notifications.notifyDeclarantIncidentTaken).toHaveBeenCalledWith(42, 7);
-    expect(outboxRepository.completeNotificationOutboxItem).toHaveBeenCalledWith('1');
+    expect(outboxRepository.completeNotificationOutboxItem).toHaveBeenCalledWith('1', 'COMPLETED');
     expect(outboxRepository.retryOrFailNotificationOutboxItem).not.toHaveBeenCalled();
   });
 
@@ -125,6 +127,83 @@ describe('notification outbox worker', () => {
       5,
       5,
       'INCIDENT_EVENT_SOURCE_MISSING'
+    );
+  });
+
+  it('récupère les leases périmés à chaque cycle, pas seulement au démarrage (OUT-01)', async () => {
+    jest.useFakeTimers();
+    try {
+      const batchSize = 10;
+      // Un batch plein déclenche un second cycle immédiat (schedule(0)) : le
+      // worker ne doit pas se contenter de la récupération faite au démarrage.
+      jest
+        .mocked(outboxRepository.claimNotificationOutboxItems)
+        .mockResolvedValueOnce(Array.from({ length: batchSize }, () => incidentItem()))
+        .mockResolvedValue([]);
+      jest
+        .mocked(outboxRepository.recoverStaleNotificationOutboxItems)
+        .mockResolvedValue(undefined);
+      process.env.NOTIFICATION_BATCH_SIZE = String(batchSize);
+
+      const worker = startNotificationOutboxWorker();
+      // Premier cycle (démarrage) : laisse les microtasks de la promesse initiale se résoudre.
+      await jest.advanceTimersByTimeAsync(0);
+      // Le premier cycle a traité un batch plein : schedule(0) arme un second
+      // cycle immédiat, qu'il faut avancer explicitement pour l'observer.
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(
+        jest.mocked(outboxRepository.recoverStaleNotificationOutboxItems).mock.calls.length
+      ).toBeGreaterThanOrEqual(2);
+
+      await worker.stop();
+      delete process.env.NOTIFICATION_BATCH_SIZE;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  describe('summarizeDeliveryOutcomes (OUT-02, OUT-05)', () => {
+    it('retourne COMPLETED dès qu’au moins un envoi réel a eu lieu', () => {
+      expect(summarizeDeliveryOutcomes(['SENT'])).toBe('COMPLETED');
+      expect(summarizeDeliveryOutcomes(['SKIPPED_NO_RECIPIENT', 'SENT'])).toBe('COMPLETED');
+      expect(summarizeDeliveryOutcomes(['SKIPPED_DISABLED', 'SENT'])).toBe('COMPLETED');
+    });
+
+    it('retourne SKIPPED_DISABLED seulement si toutes les audiences sont désactivées', () => {
+      expect(summarizeDeliveryOutcomes(['SKIPPED_DISABLED'])).toBe('SKIPPED_DISABLED');
+      expect(summarizeDeliveryOutcomes(['SKIPPED_DISABLED', 'SKIPPED_DISABLED'])).toBe(
+        'SKIPPED_DISABLED'
+      );
+    });
+
+    it('retourne SKIPPED_NO_RECIPIENT si aucune audience désactivée n’explique l’absence d’envoi', () => {
+      expect(summarizeDeliveryOutcomes(['SKIPPED_NO_RECIPIENT'])).toBe('SKIPPED_NO_RECIPIENT');
+      expect(summarizeDeliveryOutcomes(['SKIPPED_DISABLED', 'SKIPPED_NO_RECIPIENT'])).toBe(
+        'SKIPPED_NO_RECIPIENT'
+      );
+    });
+  });
+
+  it('ne notifie personne pour un changement de priorité qui redescend (pas de destinataire prévu)', async () => {
+    const outcomes = await deliverNotificationOutboxItem(
+      incidentItem({ event_type: 'PRIORITY_CHANGED', payload: { to: false } })
+    );
+
+    expect(notifications.notifyMaintenanceIncidentUrgent).not.toHaveBeenCalled();
+    expect(outcomes).toEqual(['SKIPPED_NO_RECIPIENT']);
+  });
+
+  it('marque SKIPPED_DISABLED quand la seule audience a désactivé ses notifications (OUT-02)', async () => {
+    jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([incidentItem()]);
+    jest.mocked(notifications.notifyFollowersIncidentTaken).mockResolvedValue('SKIPPED_DISABLED');
+    jest.mocked(notifications.notifyDeclarantIncidentTaken).mockResolvedValue('SKIPPED_DISABLED');
+
+    await processNotificationOutboxBatch(10, 5);
+
+    expect(outboxRepository.completeNotificationOutboxItem).toHaveBeenCalledWith(
+      '1',
+      'SKIPPED_DISABLED'
     );
   });
 });
