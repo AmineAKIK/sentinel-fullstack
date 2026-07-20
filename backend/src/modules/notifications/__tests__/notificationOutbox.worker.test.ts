@@ -37,7 +37,12 @@ import {
   startNotificationOutboxWorker,
   summarizeDeliveryOutcomes,
 } from '../notificationOutbox.worker';
+import type { DeliveryResult } from '../notifications.service';
 import type { NotificationOutboxItem } from '../notificationOutbox.repository';
+
+function sent(delivered: string[] = ['x@example.test']): DeliveryResult {
+  return { outcome: 'SENT', delivered };
+}
 
 function incidentItem(overrides: Partial<NotificationOutboxItem> = {}): NotificationOutboxItem {
   return {
@@ -52,6 +57,7 @@ function incidentItem(overrides: Partial<NotificationOutboxItem> = {}): Notifica
     reset_last_name: null,
     reset_badge_number: null,
     reset_requested_at: null,
+    delivered_recipients: {},
     ...overrides,
   };
 }
@@ -60,7 +66,7 @@ describe('notification outbox worker', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     for (const candidate of Object.values(notifications)) {
-      if (jest.isMockFunction(candidate)) candidate.mockResolvedValue('SENT');
+      if (jest.isMockFunction(candidate)) candidate.mockResolvedValue(sent());
     }
   });
 
@@ -69,25 +75,30 @@ describe('notification outbox worker', () => {
 
     await expect(processNotificationOutboxBatch(10, 5)).resolves.toBe(1);
 
-    expect(notifications.notifyFollowersIncidentTaken).toHaveBeenCalledWith(42, 7);
-    expect(notifications.notifyDeclarantIncidentTaken).toHaveBeenCalledWith(42, 7);
+    expect(notifications.notifyFollowersIncidentTaken).toHaveBeenCalledWith(42, 7, new Set());
+    expect(notifications.notifyDeclarantIncidentTaken).toHaveBeenCalledWith(42, 7, new Set());
     expect(outboxRepository.completeNotificationOutboxItem).toHaveBeenCalledWith('1', 'COMPLETED');
     expect(outboxRepository.retryOrFailNotificationOutboxItem).not.toHaveBeenCalled();
   });
 
-  it('programme une nouvelle tentative avec un code technique assaini', async () => {
+  it('programme une nouvelle tentative avec un code technique assaini, sans perdre les canaux déjà livrés (OUT-04)', async () => {
     jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([incidentItem()]);
     jest
       .mocked(notifications.notifyFollowersIncidentTaken)
       .mockRejectedValue(Object.assign(new Error('private SMTP details'), { code: 'ECONNECTION' }));
+    // notifyDeclarantIncidentTaken reste sur le succès par défaut du beforeEach :
+    // ce canal indépendant doit être tenté et son succès conservé malgré
+    // l'échec du canal followers.
 
     await processNotificationOutboxBatch(10, 5);
 
+    expect(notifications.notifyDeclarantIncidentTaken).toHaveBeenCalled();
     expect(outboxRepository.retryOrFailNotificationOutboxItem).toHaveBeenCalledWith(
       '1',
       1,
       5,
-      'ECONNECTION'
+      'ECONNECTION',
+      expect.objectContaining({ declarant_incident_taken: expect.any(Array) })
     );
     expect(outboxRepository.completeNotificationOutboxItem).not.toHaveBeenCalled();
   });
@@ -107,12 +118,15 @@ describe('notification outbox worker', () => {
       })
     );
 
-    expect(notifications.notifyAdminPasswordResetRequested).toHaveBeenCalledWith({
-      firstName: 'Léa',
-      lastName: 'Martin',
-      badgeNumber: 'B-12',
-      requestedAt,
-    });
+    expect(notifications.notifyAdminPasswordResetRequested).toHaveBeenCalledWith(
+      {
+        firstName: 'Léa',
+        lastName: 'Martin',
+        badgeNumber: 'B-12',
+        requestedAt,
+      },
+      new Set()
+    );
   });
 
   it('classe immédiatement une source incohérente en échec permanent', async () => {
@@ -126,7 +140,8 @@ describe('notification outbox worker', () => {
       '1',
       5,
       5,
-      'INCIDENT_EVENT_SOURCE_MISSING'
+      'INCIDENT_EVENT_SOURCE_MISSING',
+      undefined
     );
   });
 
@@ -186,18 +201,22 @@ describe('notification outbox worker', () => {
   });
 
   it('ne notifie personne pour un changement de priorité qui redescend (pas de destinataire prévu)', async () => {
-    const outcomes = await deliverNotificationOutboxItem(
+    const runner = await deliverNotificationOutboxItem(
       incidentItem({ event_type: 'PRIORITY_CHANGED', payload: { to: false } })
     );
 
     expect(notifications.notifyMaintenanceIncidentUrgent).not.toHaveBeenCalled();
-    expect(outcomes).toEqual(['SKIPPED_NO_RECIPIENT']);
+    expect(runner.outcomes).toEqual(['SKIPPED_NO_RECIPIENT']);
   });
 
   it('marque SKIPPED_DISABLED quand la seule audience a désactivé ses notifications (OUT-02)', async () => {
     jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([incidentItem()]);
-    jest.mocked(notifications.notifyFollowersIncidentTaken).mockResolvedValue('SKIPPED_DISABLED');
-    jest.mocked(notifications.notifyDeclarantIncidentTaken).mockResolvedValue('SKIPPED_DISABLED');
+    jest
+      .mocked(notifications.notifyFollowersIncidentTaken)
+      .mockResolvedValue({ outcome: 'SKIPPED_DISABLED', delivered: [] });
+    jest
+      .mocked(notifications.notifyDeclarantIncidentTaken)
+      .mockResolvedValue({ outcome: 'SKIPPED_DISABLED', delivered: [] });
 
     await processNotificationOutboxBatch(10, 5);
 
@@ -205,5 +224,120 @@ describe('notification outbox worker', () => {
       '1',
       'SKIPPED_DISABLED'
     );
+  });
+
+  describe('reprises isolées par destinataire (lot 5B)', () => {
+    it('exclut les destinataires déjà confirmés lors d’une tentative précédente du même canal (OUT-03)', async () => {
+      const item = incidentItem({
+        event_type: 'INCIDENT_CLOSED',
+        delivered_recipients: { followers_incident_closed: ['already@example.test'] },
+      });
+      jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([item]);
+
+      await processNotificationOutboxBatch(10, 5);
+
+      expect(notifications.notifyFollowersIncidentClosed).toHaveBeenCalledWith(
+        42,
+        7,
+        new Set(['already@example.test'])
+      );
+    });
+
+    it('fusionne les nouveaux succès avec les destinataires déjà confirmés sans en perdre aucun (OUT-03)', async () => {
+      const item = incidentItem({
+        event_type: 'INCIDENT_CLOSED',
+        delivered_recipients: { followers_incident_closed: ['already@example.test'] },
+      });
+      jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([item]);
+      jest
+        .mocked(notifications.notifyFollowersIncidentClosed)
+        .mockResolvedValue(sent(['new@example.test']));
+
+      const runner = await deliverNotificationOutboxItem(item);
+
+      expect(runner.delivered.followers_incident_closed).toEqual(
+        expect.arrayContaining(['already@example.test', 'new@example.test'])
+      );
+    });
+
+    it('un canal déjà servi exclut ses destinataires confirmés même si un autre canal du même item échoue (OUT-04)', async () => {
+      // INCIDENT_TAKEN a deux canaux indépendants : followers et déclarant.
+      // Le déclarant a déjà réussi une adresse lors d'une tentative
+      // précédente ; l'échec du canal followers ne doit ni l'empêcher d'être
+      // tenté à nouveau (idempotent grâce à l'exclusion), ni lui faire perdre
+      // le destinataire déjà confirmé.
+      const item = incidentItem({
+        event_type: 'INCIDENT_TAKEN',
+        delivered_recipients: { declarant_incident_taken: ['declarant@example.test'] },
+      });
+      jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([item]);
+      jest
+        .mocked(notifications.notifyFollowersIncidentTaken)
+        .mockRejectedValue(
+          Object.assign(new Error('smtp down'), { code: 'ECONNECTION', delivered: [] })
+        );
+      jest.mocked(notifications.notifyDeclarantIncidentTaken).mockResolvedValue(sent([]));
+
+      await processNotificationOutboxBatch(10, 5);
+
+      expect(notifications.notifyDeclarantIncidentTaken).toHaveBeenCalledWith(
+        42,
+        7,
+        new Set(['declarant@example.test'])
+      );
+      expect(outboxRepository.retryOrFailNotificationOutboxItem).toHaveBeenCalledWith(
+        '1',
+        1,
+        5,
+        'ECONNECTION',
+        expect.objectContaining({ declarant_incident_taken: ['declarant@example.test'] })
+      );
+    });
+
+    it('persiste les destinataires confirmés par un canal avant qu’un canal suivant échoue (OUT-04)', async () => {
+      const item = incidentItem({ event_type: 'INCIDENT_TAKEN' });
+      jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([item]);
+      jest
+        .mocked(notifications.notifyFollowersIncidentTaken)
+        .mockResolvedValue(sent(['followers@example.test']));
+      jest
+        .mocked(notifications.notifyDeclarantIncidentTaken)
+        .mockRejectedValue(
+          Object.assign(new Error('smtp down'), { code: 'ECONNECTION', delivered: [] })
+        );
+
+      await processNotificationOutboxBatch(10, 5);
+
+      expect(outboxRepository.retryOrFailNotificationOutboxItem).toHaveBeenCalledWith(
+        '1',
+        1,
+        5,
+        'ECONNECTION',
+        expect.objectContaining({ followers_incident_taken: ['followers@example.test'] })
+      );
+    });
+
+    it('persiste les destinataires déjà livrés par sendMail même quand un envoi partiel échoue (OUT-03)', async () => {
+      const item = incidentItem({ event_type: 'INCIDENT_CLOSED' });
+      jest.mocked(outboxRepository.claimNotificationOutboxItems).mockResolvedValue([item]);
+      jest.mocked(notifications.notifyFollowersIncidentClosed).mockRejectedValue(
+        Object.assign(new Error('one recipient failed'), {
+          code: 'SMTP_DELIVERY_FAILED',
+          delivered: ['succeeded@example.test'],
+        })
+      );
+
+      await processNotificationOutboxBatch(10, 5);
+
+      expect(outboxRepository.retryOrFailNotificationOutboxItem).toHaveBeenCalledWith(
+        '1',
+        1,
+        5,
+        'SMTP_DELIVERY_FAILED',
+        expect.objectContaining({
+          followers_incident_closed: ['succeeded@example.test'],
+        })
+      );
+    });
   });
 });

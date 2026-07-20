@@ -18,6 +18,9 @@ const NOTIFIABLE_INCIDENT_EVENTS = new Set<IncidentEventType>([
   'RESPONSIBLE_COMMENT_UPDATED',
 ]);
 
+// Canal (nom de fonction notify*) -> adresses déjà confirmées livrées.
+export type DeliveredRecipientsByChannel = Record<string, string[]>;
+
 export interface NotificationOutboxItem {
   id: string;
   source: 'INCIDENT_EVENT' | 'PASSWORD_RESET';
@@ -30,6 +33,7 @@ export interface NotificationOutboxItem {
   reset_last_name: string | null;
   reset_badge_number: string | null;
   reset_requested_at: Date | null;
+  delivered_recipients: DeliveredRecipientsByChannel;
 }
 
 export async function enqueueIncidentNotification(
@@ -99,7 +103,8 @@ export async function claimNotificationOutboxItems(
               user_account.first_name AS reset_first_name,
               user_account.last_name AS reset_last_name,
               reset.badge_number AS reset_badge_number,
-              reset.requested_at AS reset_requested_at
+              reset.requested_at AS reset_requested_at,
+              claimed.delivered_recipients
        FROM claimed
        LEFT JOIN workshop_incident_events event ON event.id = claimed.source_event_id
        LEFT JOIN password_reset_requests reset ON reset.id = claimed.password_reset_request_id
@@ -131,21 +136,29 @@ export async function retryOrFailNotificationOutboxItem(
   id: string,
   attemptCount: number,
   maxAttempts: number,
-  errorCode: string
+  errorCode: string,
+  deliveredRecipients?: DeliveredRecipientsByChannel
 ): Promise<void> {
   const exhausted = attemptCount >= maxAttempts;
   const delaySeconds = Math.min(3600, 30 * 2 ** Math.max(0, attemptCount - 1));
   await pool.query(
     `UPDATE notification_outbox
-     SET status = $2,
-         available_at = CASE WHEN $2 = 'PENDING'
-                             THEN NOW() + ($3 * INTERVAL '1 second')
+     SET status = $2::varchar,
+         available_at = CASE WHEN $2::varchar = 'PENDING'
+                             THEN NOW() + ($3::int * INTERVAL '1 second')
                              ELSE available_at END,
          locked_at = NULL,
          updated_at = NOW(),
-         last_error_code = $4
+         last_error_code = $4::varchar,
+         delivered_recipients = COALESCE($5::jsonb, delivered_recipients)
      WHERE id = $1 AND status = 'PROCESSING'`,
-    [id, exhausted ? 'FAILED' : 'PENDING', delaySeconds, errorCode.slice(0, 80)]
+    [
+      id,
+      exhausted ? 'FAILED' : 'PENDING',
+      delaySeconds,
+      errorCode.slice(0, 80),
+      deliveredRecipients ? JSON.stringify(deliveredRecipients) : null,
+    ]
   );
 }
 
