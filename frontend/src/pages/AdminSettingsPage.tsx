@@ -21,9 +21,13 @@ import SuccessBanner from '../components/ui/SuccessBanner';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import BoardToggleConfirmModal from '../components/BoardToggleConfirmModal';
 import RevokeSessionsConfirmModal from '../components/RevokeSessionsConfirmModal';
-
-const MIN_PWD = 12;
-const MAX_PWD = 128;
+import {
+  hasMinimumPasswordLength,
+  isWithinBcryptByteLimit,
+  MAX_PASSWORD_BYTES,
+  MIN_BOARD_CODE_LENGTH,
+  MIN_PASSWORD_LENGTH_ADMIN,
+} from '../utils/passwordPolicy';
 
 function normalizeAppSettings(raw: AppSettings): AppSettings {
   return {
@@ -137,10 +141,12 @@ export default function AdminSettingsPage() {
 
   function validatePassword(): string | null {
     if (!currentPassword) return 'Renseignez votre mot de passe actuel.';
-    if (newPassword.length < MIN_PWD)
-      return `Le nouveau mot de passe doit contenir au moins ${MIN_PWD} caractères.`;
-    if (newPassword.length > MAX_PWD)
-      return `Le mot de passe ne peut pas dépasser ${MAX_PWD} caractères.`;
+    if (!isWithinBcryptByteLimit(currentPassword))
+      return `Le mot de passe actuel ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`;
+    if (!hasMinimumPasswordLength(newPassword, MIN_PASSWORD_LENGTH_ADMIN))
+      return `Le nouveau mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH_ADMIN} caractères.`;
+    if (!isWithinBcryptByteLimit(newPassword))
+      return `Le nouveau mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`;
     if (newPassword === currentPassword)
       return "Le nouveau mot de passe doit être différent de l'actuel.";
     if (newPassword !== confirmPassword) return 'Les mots de passe ne correspondent pas.';
@@ -225,6 +231,10 @@ export default function AdminSettingsPage() {
     }
     if (!emailPassword) {
       setEmailError('Renseignez votre mot de passe.');
+      return;
+    }
+    if (!isWithinBcryptByteLimit(emailPassword)) {
+      setEmailError(`Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
     setEmailLoading(true);
@@ -346,8 +356,12 @@ export default function AdminSettingsPage() {
     e.preventDefault();
     setBoardError('');
     setBoardSuccess('');
-    if (boardNewCode.trim().length < 4) {
-      setBoardError('Le code board doit contenir au moins 4 caractères.');
+    if (!hasMinimumPasswordLength(boardNewCode.trim(), MIN_BOARD_CODE_LENGTH)) {
+      setBoardError(`Le code board doit contenir au moins ${MIN_BOARD_CODE_LENGTH} caractères.`);
+      return;
+    }
+    if (!isWithinBcryptByteLimit(boardNewCode.trim())) {
+      setBoardError(`Le code board ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
     if (boardNewCode.trim() !== boardConfirmCode.trim()) {
@@ -356,6 +370,10 @@ export default function AdminSettingsPage() {
     }
     if (!boardPassword) {
       setBoardError('Renseignez votre mot de passe.');
+      return;
+    }
+    if (!isWithinBcryptByteLimit(boardPassword)) {
+      setBoardError(`Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
     setBoardSubmitting(true);
@@ -522,7 +540,8 @@ export default function AdminSettingsPage() {
                   marginBottom: 20,
                 }}
               >
-                Minimum {MIN_PWD} caractères. Vous serez reconnecté après la modification.
+                Minimum {MIN_PASSWORD_LENGTH_ADMIN} caractères, maximum {MAX_PASSWORD_BYTES} octets
+                UTF-8. Vous serez reconnecté après la modification.
               </p>
               <form onSubmit={handlePasswordSubmit} noValidate autoComplete="off">
                 <div className="form-group">
@@ -542,7 +561,7 @@ export default function AdminSettingsPage() {
                     autoComplete="off"
                     readOnly={!currentPassword && !pwdLoading}
                     onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={MAX_PWD}
+                    maxLength={MAX_PASSWORD_BYTES}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(pwdError) || undefined}
                     aria-describedby={pwdError ? 'pwd-error' : undefined}
@@ -565,7 +584,7 @@ export default function AdminSettingsPage() {
                     autoComplete="off"
                     readOnly={!newPassword && !pwdLoading}
                     onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={MAX_PWD}
+                    maxLength={MAX_PASSWORD_BYTES}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(pwdError) || undefined}
                     aria-describedby={pwdError ? 'pwd-error' : undefined}
@@ -588,7 +607,7 @@ export default function AdminSettingsPage() {
                     autoComplete="off"
                     readOnly={!confirmPassword && !pwdLoading}
                     onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                    maxLength={MAX_PWD}
+                    maxLength={MAX_PASSWORD_BYTES}
                     placeholder="••••••••••••"
                     aria-invalid={Boolean(pwdError) || undefined}
                     aria-describedby={pwdError ? 'pwd-error' : undefined}
@@ -699,8 +718,8 @@ export default function AdminSettingsPage() {
                         autoComplete="off"
                         readOnly={!boardNewCode && !boardSubmitting}
                         onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                        maxLength={100}
-                        placeholder="Minimum 4 caractères"
+                        maxLength={MAX_PASSWORD_BYTES}
+                        placeholder={`Minimum ${MIN_BOARD_CODE_LENGTH} caractères`}
                       />
                     </div>
                     <div className="form-group">
@@ -720,7 +739,7 @@ export default function AdminSettingsPage() {
                         autoComplete="off"
                         readOnly={!boardConfirmCode && !boardSubmitting}
                         onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                        maxLength={100}
+                        maxLength={MAX_PASSWORD_BYTES}
                         placeholder="••••••••••••"
                       />
                     </div>
@@ -741,7 +760,7 @@ export default function AdminSettingsPage() {
                         autoComplete="off"
                         readOnly={!boardPassword && !boardSubmitting}
                         onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                        maxLength={128}
+                        maxLength={MAX_PASSWORD_BYTES}
                         placeholder="••••••••••••"
                       />
                     </div>
@@ -882,7 +901,7 @@ export default function AdminSettingsPage() {
                         autoComplete="off"
                         readOnly={!emailPassword && !emailLoading}
                         onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                        maxLength={MAX_PWD}
+                        maxLength={MAX_PASSWORD_BYTES}
                         placeholder="••••••••••••"
                         aria-invalid={Boolean(emailError) || undefined}
                         aria-describedby={emailError ? 'email-error' : undefined}

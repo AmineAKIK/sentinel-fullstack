@@ -49,16 +49,35 @@ async function request<T>(
     abortController.abort();
   }, requestTimeoutMs());
 
-  let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    const res = await fetch(`${API_URL}${path}`, {
       method,
       headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
       credentials: 'include',
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: abortController.signal,
     });
+
+    if (!res.ok) {
+      let code = 'SERVER_ERROR';
+      let message = 'Une erreur est survenue.';
+      try {
+        const data = (await res.json()) as { error?: { code?: string; message?: string } };
+        if (data?.error?.code) code = data.error.code;
+        if (data?.error?.message) message = data.error.message;
+      } catch (error) {
+        if (timedOut || signal?.aborted) throw error;
+        // Le contrat d'erreur de secours reste volontairement générique.
+      }
+      const error = new ApiResponseError(code, message, res.status);
+      if (res.status === 401 && code !== 'REAUTHENTICATION_FAILED') onUnauthorized?.(error);
+      throw error;
+    }
+
+    if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
+    return (await res.json()) as T;
   } catch (error) {
+    if (error instanceof ApiResponseError) throw error;
     if (timedOut) {
       throw new ApiResponseError(
         'REQUEST_TIMEOUT',
@@ -76,24 +95,6 @@ async function request<T>(
     window.clearTimeout(timeout);
     signal?.removeEventListener('abort', forwardAbort);
   }
-
-  if (!res.ok) {
-    let code = 'SERVER_ERROR';
-    let message = 'Une erreur est survenue.';
-    try {
-      const data = (await res.json()) as { error?: { code?: string; message?: string } };
-      if (data?.error?.code) code = data.error.code;
-      if (data?.error?.message) message = data.error.message;
-    } catch {
-      // Le contrat d'erreur de secours reste volontairement générique.
-    }
-    const error = new ApiResponseError(code, message, res.status);
-    if (res.status === 401 && code !== 'REAUTHENTICATION_FAILED') onUnauthorized?.(error);
-    throw error;
-  }
-
-  if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
-  return res.json() as Promise<T>;
 }
 
 export const api = {

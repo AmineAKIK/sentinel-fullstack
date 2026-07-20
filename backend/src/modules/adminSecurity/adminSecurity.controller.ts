@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import {
+  hasMinimumPasswordLength,
   hashAdminPassword,
+  isWithinBcryptByteLimit,
   MIN_PASSWORD_LENGTH_ADMIN,
-  MAX_PASSWORD_LENGTH,
+  MAX_PASSWORD_BYTES,
 } from '../../auth/bcrypt';
 import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
 import { sendUnauthenticated } from '../../auth/authResponses';
@@ -30,7 +32,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (
     !currentPassword ||
     typeof currentPassword !== 'string' ||
-    currentPassword.length > MAX_PASSWORD_LENGTH
+    !isWithinBcryptByteLimit(currentPassword)
   ) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
     return;
@@ -38,14 +40,14 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (
     !newPassword ||
     typeof newPassword !== 'string' ||
-    newPassword.length < MIN_PASSWORD_LENGTH_ADMIN ||
-    newPassword.length > MAX_PASSWORD_LENGTH
+    !hasMinimumPasswordLength(newPassword, MIN_PASSWORD_LENGTH_ADMIN) ||
+    !isWithinBcryptByteLimit(newPassword)
   ) {
     sendError(
       res,
       400,
       'VALIDATION_ERROR',
-      `Le nouveau mot de passe doit contenir entre ${MIN_PASSWORD_LENGTH_ADMIN} et ${MAX_PASSWORD_LENGTH} caractères.`
+      `Le nouveau mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH_ADMIN} caractères et au plus ${MAX_PASSWORD_BYTES} octets UTF-8.`
     );
     return;
   }
@@ -99,7 +101,11 @@ export async function updateEmail(req: Request, res: Response): Promise<void> {
 
   const { email, currentEmail, currentPassword } = req.body || {};
 
-  if (!currentPassword || typeof currentPassword !== 'string') {
+  if (
+    !currentPassword ||
+    typeof currentPassword !== 'string' ||
+    !isWithinBcryptByteLimit(currentPassword)
+  ) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
     return;
   }
@@ -157,7 +163,7 @@ export async function verifyPassword(req: Request, res: Response): Promise<void>
   }
 
   const { password } = req.body || {};
-  if (!password || typeof password !== 'string' || password.length > MAX_PASSWORD_LENGTH) {
+  if (!password || typeof password !== 'string' || !isWithinBcryptByteLimit(password)) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe requis.');
     return;
   }

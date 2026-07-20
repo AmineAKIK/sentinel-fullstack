@@ -13,7 +13,8 @@ export const FIELD_LIMITS = {
   LINE_NUMBER: 40,
   PRODUCT: 120,
   CODE: 100,
-  PASSWORD: 128,
+  // Attribut maxLength (caractères) complété par la borne bcrypt UTF-8 de 72 octets.
+  PASSWORD: 72,
   COMMENT: 500,
   NOTE: 1000,
   SEARCH: 120,

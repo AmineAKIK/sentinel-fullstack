@@ -72,6 +72,12 @@ describe('assertProductionConfig', () => {
     expect(() => assertProductionConfig()).toThrow('ADMIN_PASSWORD');
   });
 
+  it('rejects a bootstrap password beyond the bcrypt byte boundary', () => {
+    setProductionEnv({ ADMIN_PASSWORD: 'é'.repeat(37) });
+
+    expect(() => assertProductionConfig()).toThrow('ADMIN_PASSWORD');
+  });
+
   it('rejects a numeric-only administrator username', () => {
     setProductionEnv({ ADMIN_USERNAME: '0012' });
 

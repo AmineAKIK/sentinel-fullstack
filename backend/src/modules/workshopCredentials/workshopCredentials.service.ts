@@ -1,7 +1,8 @@
 import {
   hashWorkshopPassword,
+  hasMinimumPasswordLength,
+  isWithinBcryptByteLimit,
   MIN_PASSWORD_LENGTH_WORKSHOP,
-  MAX_PASSWORD_LENGTH,
   verifyPassword,
 } from '../../auth/bcrypt';
 import { verifyWorkshopPasswordSetupCode } from '../../auth/setupCode';
@@ -67,8 +68,8 @@ export async function loginWorkshopUserService(
     if (
       !newPassword ||
       typeof newPassword !== 'string' ||
-      newPassword.length < MIN_PASSWORD_LENGTH_WORKSHOP ||
-      newPassword.length > MAX_PASSWORD_LENGTH
+      !hasMinimumPasswordLength(newPassword, MIN_PASSWORD_LENGTH_WORKSHOP) ||
+      !isWithinBcryptByteLimit(newPassword)
     ) {
       return { kind: 'requires_password_setup', badgeNumber: user.badge_number };
     }

@@ -1,4 +1,5 @@
 import { normalizeAdminUsername } from '../domain/identifiers';
+import { isWithinBcryptByteLimit } from '../auth/bcrypt';
 
 const DEFAULT_SECRET_VALUES = new Set([
   'change_me_in_production',
@@ -126,7 +127,11 @@ export function assertProductionConfig(): void {
   const weakSecrets = ['COOKIE_SECRET', 'JWT_SECRET'].filter((name) =>
     isWeakSecret(process.env[name])
   );
-  if (process.env.ADMIN_PASSWORD && isWeakSecret(process.env.ADMIN_PASSWORD)) {
+  if (
+    process.env.ADMIN_PASSWORD &&
+    (isWeakSecret(process.env.ADMIN_PASSWORD) ||
+      !isWithinBcryptByteLimit(process.env.ADMIN_PASSWORD))
+  ) {
     weakSecrets.push('ADMIN_PASSWORD');
   }
   if (weakSecrets.length > 0) {

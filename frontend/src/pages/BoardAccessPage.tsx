@@ -4,7 +4,7 @@ import { createBoardSession, getBoardAccess } from '../api/board';
 import { ApiResponseError } from '../api/client';
 import WorkshopBoardPage from './WorkshopBoardPage';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../utils/passwordPolicy';
 
 type AccessState = 'checking' | 'locked' | 'ready';
 
@@ -34,6 +34,10 @@ export default function BoardAccessPage() {
 
     if (!code.trim()) {
       setError("Le code d'accès est requis.");
+      return;
+    }
+    if (!isWithinBcryptByteLimit(code.trim())) {
+      setError(`Le code ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
 
@@ -90,7 +94,7 @@ export default function BoardAccessPage() {
               autoComplete="off"
               autoFocus
               disabled={loading}
-              maxLength={FIELD_LIMITS.CODE}
+              maxLength={MAX_PASSWORD_BYTES}
               placeholder="Code d'accès"
               aria-invalid={Boolean(error) || undefined}
               aria-describedby={error ? 'board-access-error' : undefined}

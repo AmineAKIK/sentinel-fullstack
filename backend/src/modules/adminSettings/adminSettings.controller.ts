@@ -17,15 +17,18 @@ import {
   incrementAllWorkshopSessionVersions,
   AppSettings,
 } from '../adminCredentials/adminCredentials.repository';
-import { MAX_PASSWORD_LENGTH } from '../../auth/bcrypt';
+import {
+  isWithinBcryptByteLimit,
+  hasMinimumPasswordLength,
+  MAX_PASSWORD_BYTES,
+  MIN_BOARD_CODE_LENGTH,
+} from '../../auth/bcrypt';
 import { hashBoardCode } from '../board/board.auth';
 import { FIELD_LIMITS } from '../../domain/constants';
 import { withTransaction } from '../../db/transaction';
 import { ADMIN_AUTH_COOKIE, clearAuthCookie } from '../../auth/authCookies';
 import { reauthenticateAdmin } from '../adminSecurity/adminReauthentication.service';
 import { sendAdminReauthenticationFailure } from '../adminSecurity/adminReauthentication.http';
-
-const BOARD_CODE_MIN = 4;
 
 const PREF_KEYS: (keyof AdminNotifPrefs)[] = [
   'notif_admin',
@@ -106,7 +109,7 @@ export async function patchBoardToggle(req: Request, res: Response): Promise<voi
   if (
     !currentPassword ||
     typeof currentPassword !== 'string' ||
-    currentPassword.length > MAX_PASSWORD_LENGTH
+    !isWithinBcryptByteLimit(currentPassword)
   ) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
     return;
@@ -140,7 +143,7 @@ export async function patchBoardCode(req: Request, res: Response): Promise<void>
   if (
     !currentPassword ||
     typeof currentPassword !== 'string' ||
-    currentPassword.length > MAX_PASSWORD_LENGTH
+    !isWithinBcryptByteLimit(currentPassword)
   ) {
     sendError(res, 400, 'VALIDATION_ERROR', 'Mot de passe actuel requis.');
     return;
@@ -150,17 +153,22 @@ export async function patchBoardCode(req: Request, res: Response): Promise<void>
     return;
   }
   const trimmed = newCode.trim();
-  if (trimmed.length < BOARD_CODE_MIN) {
+  if (!hasMinimumPasswordLength(trimmed, MIN_BOARD_CODE_LENGTH)) {
     sendError(
       res,
       400,
       'VALIDATION_ERROR',
-      `Le code board doit contenir au moins ${BOARD_CODE_MIN} caractères.`
+      `Le code board doit contenir au moins ${MIN_BOARD_CODE_LENGTH} caractères.`
     );
     return;
   }
-  if (trimmed.length > FIELD_LIMITS.CODE) {
-    sendError(res, 400, 'VALIDATION_ERROR', 'Code board trop long.');
+  if (trimmed.length > FIELD_LIMITS.CODE || !isWithinBcryptByteLimit(trimmed)) {
+    sendError(
+      res,
+      400,
+      'VALIDATION_ERROR',
+      `Le code board ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`
+    );
     return;
   }
   if (trimmed !== (typeof confirmCode === 'string' ? confirmCode.trim() : '')) {
@@ -280,7 +288,7 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
     if (
       !currentPassword ||
       typeof currentPassword !== 'string' ||
-      currentPassword.length > MAX_PASSWORD_LENGTH
+      !isWithinBcryptByteLimit(currentPassword)
     ) {
       sendError(
         res,

@@ -16,7 +16,7 @@ export const FIELD_LIMITS = {
   LINE_NUMBER: 40, // numéro de ligne
   PRODUCT: 120, // produit en cours
   CODE: 100, // code d'accès board / code de configuration
-  // Pour les mots de passe, voir MAX_PASSWORD_LENGTH dans auth/bcrypt.ts (source d'autorité).
+  // Pour les mots de passe, voir MAX_PASSWORD_BYTES dans auth/bcrypt.ts (source d'autorité).
   COMMENT: 500, // commentaire incident, consigne responsable, motifs
   NOTE: 1000, // diagnostic, note d'intervention
   SEARCH: 120, // requêtes de recherche / filtres
