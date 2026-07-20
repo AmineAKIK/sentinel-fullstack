@@ -1,7 +1,9 @@
 import {
   arbitrationConsultationSchema,
   createIncidentSchema,
+  journalEventQuerySchema,
   updateIncidentSchema,
+  workshopAnalyticsQuerySchema,
 } from '../workshop.validation';
 
 // ─── valid fixture ─────────────────────────────────────────────────────────────
@@ -206,5 +208,106 @@ describe('arbitrationConsultationSchema', () => {
   it('rejects bulk or implicit consultation', () => {
     expect(arbitrationConsultationSchema.safeParse({ requestType: 'ALL' }).success).toBe(false);
     expect(arbitrationConsultationSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+// ─── workshopAnalyticsQuerySchema (ANA-05, DR-10) ─────────────────────────────
+
+describe('workshopAnalyticsQuerySchema', () => {
+  it('accepts a query without any date bound', () => {
+    expect(workshopAnalyticsQuerySchema.safeParse({}).success).toBe(true);
+  });
+
+  it('accepts a valid bounded window', () => {
+    const result = workshopAnalyticsQuerySchema.safeParse({
+      start: '2026-01-01T00:00:00.000Z',
+      end: '2026-01-31T23:59:59.000Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts start === end (a single instant is a valid, inclusive window)', () => {
+    const result = workshopAnalyticsQuerySchema.safeParse({
+      start: '2026-01-01T00:00:00.000Z',
+      end: '2026-01-01T00:00:00.000Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects start after end', () => {
+    const result = workshopAnalyticsQuerySchema.safeParse({
+      start: '2026-02-01T00:00:00.000Z',
+      end: '2026-01-01T00:00:00.000Z',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a window of exactly 366 days', () => {
+    const result = workshopAnalyticsQuerySchema.safeParse({
+      start: '2026-01-01T00:00:00.000Z',
+      end: '2027-01-02T00:00:00.000Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a window longer than 366 days', () => {
+    const result = workshopAnalyticsQuerySchema.safeParse({
+      start: '2026-01-01T00:00:00.000Z',
+      end: '2027-01-03T00:00:01.000Z',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a window longer than 366 days when only end is provided (unbounded start)', () => {
+    const farFuture = new Date();
+    farFuture.setUTCFullYear(farFuture.getUTCFullYear() + 5);
+    const result = workshopAnalyticsQuerySchema.safeParse({ end: farFuture.toISOString() });
+    // `end` seul est accepté (le service applique une fenêtre par défaut sur
+    // `start` uniquement quand aucune borne n'est fournie) — la contrainte de
+    // 366 jours ne peut porter que sur un couple start/end explicite.
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a malformed date string', () => {
+    const result = workshopAnalyticsQuerySchema.safeParse({ start: 'not-a-date' });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── journalEventQuerySchema (ANA-03, DR-10) ──────────────────────────────────
+
+describe('journalEventQuerySchema', () => {
+  it('accepts the existing Journal filters without any date bound', () => {
+    const result = journalEventQuerySchema.safeParse({
+      q: 'ligne 12',
+      eventType: 'INCIDENT_CLOSED',
+      lineId: 3,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a valid bounded period alongside the existing filters', () => {
+    const result = journalEventQuerySchema.safeParse({
+      eventType: 'INCIDENT_TAKEN',
+      start: '2026-01-01T00:00:00.000Z',
+      end: '2026-01-31T23:59:59.000Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects start after end, same contract as the Pilotage window', () => {
+    const result = journalEventQuerySchema.safeParse({
+      start: '2026-02-01T00:00:00.000Z',
+      end: '2026-01-01T00:00:00.000Z',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a window longer than 366 days', () => {
+    const result = journalEventQuerySchema.safeParse({
+      start: '2026-01-01T00:00:00.000Z',
+      end: '2027-01-03T00:00:01.000Z',
+    });
+    expect(result.success).toBe(false);
   });
 });

@@ -36,6 +36,9 @@ export type IncidentWorkspaceParams = {
   machineId?: string;
   eventType?: string;
   limit?: number;
+  // Filtre période — supporté uniquement par /workshop/history/events (Journal, ANA-03).
+  start?: string;
+  end?: string;
 };
 
 export async function listWorkshopHistoryIncidents(

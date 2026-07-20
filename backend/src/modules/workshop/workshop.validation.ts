@@ -4,6 +4,7 @@ import {
   INCIDENT_STATUSES,
   INCIDENT_LIST_MAX_LIMIT,
   FIELD_LIMITS,
+  ANALYTICS_MAX_WINDOW_DAYS,
 } from '../../domain/constants';
 
 export const IncidentStateEnum = z.enum(INCIDENT_STATES);
@@ -62,12 +63,48 @@ const isoDateTimeSchema = z
     message: 'Date invalide (format ISO 8601 attendu).',
   });
 
-export const workshopAnalyticsQuerySchema = z.object({
-  start: isoDateTimeSchema.optional(),
-  end: isoDateTimeSchema.optional(),
-  lineId: z.coerce.number().int().positive().optional(),
-  machineId: z.string().trim().max(120).optional(),
-});
+// Contrainte de fenêtre partagée (start <= end, span <= ANALYTICS_MAX_WINDOW_DAYS)
+// entre le Pilotage (DR-10) et le filtre période du Journal (ANA-03) : même
+// définition de « journée métier » bornée, pour ne pas diverger entre écrans.
+function withBoundedWindow<Shape extends { start?: string; end?: string }>(
+  schema: z.ZodType<Shape>
+) {
+  return schema
+    .refine(
+      (value) => !value.start || !value.end || Date.parse(value.start) <= Date.parse(value.end),
+      {
+        message: 'La date de début doit être antérieure ou égale à la date de fin.',
+        path: ['start'],
+      }
+    )
+    .refine(
+      (value) => {
+        if (!value.start || !value.end) return true;
+        const spanMs = Date.parse(value.end) - Date.parse(value.start);
+        return spanMs <= ANALYTICS_MAX_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      },
+      {
+        message: `La fenêtre analysée ne peut pas dépasser ${ANALYTICS_MAX_WINDOW_DAYS} jours.`,
+        path: ['end'],
+      }
+    );
+}
+
+export const workshopAnalyticsQuerySchema = withBoundedWindow(
+  z.object({
+    start: isoDateTimeSchema.optional(),
+    end: isoDateTimeSchema.optional(),
+    lineId: z.coerce.number().int().positive().optional(),
+    machineId: z.string().trim().max(120).optional(),
+  })
+);
+
+export const journalEventQuerySchema = withBoundedWindow(
+  incidentWorkspaceQuerySchema.extend({
+    start: isoDateTimeSchema.optional(),
+    end: isoDateTimeSchema.optional(),
+  })
+);
 
 export const arbitrationConsultationSchema = z.object({
   requestType: z.enum(['EDIT', 'CANCEL']),

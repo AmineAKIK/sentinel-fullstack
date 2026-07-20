@@ -153,6 +153,22 @@ describe('buildIncidentWorkspaceParams', () => {
     const result = buildIncidentWorkspaceParams({ ...baseFilters, stateFilter: 'DEGRADEE' });
     expect(result.state).toBe('DEGRADEE');
   });
+
+  it('includes start/end when provided (ANA-03)', () => {
+    const result = buildIncidentWorkspaceParams({
+      ...baseFilters,
+      startFilter: '2026-01-01T00:00:00.000Z',
+      endFilter: '2026-01-31T23:59:59.999Z',
+    });
+    expect(result.start).toBe('2026-01-01T00:00:00.000Z');
+    expect(result.end).toBe('2026-01-31T23:59:59.999Z');
+  });
+
+  it('omits start/end when absent', () => {
+    const result = buildIncidentWorkspaceParams(baseFilters);
+    expect(result.start).toBeUndefined();
+    expect(result.end).toBeUndefined();
+  });
 });
 
 // ─── filter chip helpers ──────────────────────────────────────────────────────

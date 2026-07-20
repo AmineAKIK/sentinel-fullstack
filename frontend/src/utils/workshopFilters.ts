@@ -43,6 +43,8 @@ export function buildIncidentWorkspaceParams(filters: {
   lineFilter: string;
   machineFilter: string;
   eventTypeFilter?: string;
+  startFilter?: string;
+  endFilter?: string;
 }): IncidentWorkspaceParams {
   const params: IncidentWorkspaceParams = { limit: filters.limit };
   const trimmedQuery = filters.query.trim();
@@ -58,6 +60,8 @@ export function buildIncidentWorkspaceParams(filters: {
   if (filters.machineFilter !== 'all') params.machineId = filters.machineFilter;
   if (filters.eventTypeFilter && filters.eventTypeFilter !== 'all')
     params.eventType = filters.eventTypeFilter;
+  if (filters.startFilter) params.start = filters.startFilter;
+  if (filters.endFilter) params.end = filters.endFilter;
 
   return params;
 }

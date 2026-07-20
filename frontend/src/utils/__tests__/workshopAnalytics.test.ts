@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildAnalyticsParams } from '../workshopAnalytics';
+import { buildAnalyticsParams, dayEndIso, dayStartIso } from '../workshopAnalytics';
 
 describe('buildAnalyticsParams', () => {
   beforeEach(() => {
@@ -39,5 +39,17 @@ describe('buildAnalyticsParams', () => {
 
   it('omits absent custom dates and all-value filters', () => {
     expect(buildAnalyticsParams('custom', '', '', 'all', 'all')).toEqual({});
+  });
+});
+
+describe('dayStartIso / dayEndIso (réutilisés par le filtre période du Journal, ANA-03)', () => {
+  it('dayStartIso does not shift a plain YYYY-MM-DD date (already midnight)', () => {
+    expect(dayStartIso('2026-03-15')).toBe(new Date('2026-03-15').toISOString());
+  });
+
+  it('dayEndIso sets the local end-of-day boundary', () => {
+    const expected = new Date('2026-03-15');
+    expected.setHours(23, 59, 59, 999);
+    expect(dayEndIso('2026-03-15')).toBe(expected.toISOString());
   });
 });

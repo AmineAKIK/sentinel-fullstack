@@ -1,6 +1,21 @@
 import { AnalyticsParams } from '../api/workshop';
 import { HistoryPeriod } from './workshopHistory';
 
+/**
+ * Borne de début de journée en ISO 8601. Une date sans heure (`YYYY-MM-DD`)
+ * est déjà interprétée à minuit par le moteur JS — aucun recalage nécessaire.
+ */
+export function dayStartIso(dateInput: string): string {
+  return new Date(dateInput).toISOString();
+}
+
+/** Borne de fin de journée (23:59:59.999, horloge locale) en ISO 8601. */
+export function dayEndIso(dateInput: string): string {
+  const date = new Date(dateInput);
+  date.setHours(23, 59, 59, 999);
+  return date.toISOString();
+}
+
 export function buildAnalyticsParams(
   period: HistoryPeriod,
   customStart: string,
@@ -24,12 +39,8 @@ export function buildAnalyticsParams(
     params.end = endDate.toISOString();
   }
   if (period === 'custom') {
-    if (customStart) params.start = new Date(customStart).toISOString();
-    if (customEnd) {
-      const customEndDate = new Date(customEnd);
-      customEndDate.setHours(23, 59, 59, 999);
-      params.end = customEndDate.toISOString();
-    }
+    if (customStart) params.start = dayStartIso(customStart);
+    if (customEnd) params.end = dayEndIso(customEnd);
   }
   if (lineFilter !== 'all') params.lineId = Number(lineFilter);
   if (machineFilter !== 'all') params.machineId = machineFilter;
