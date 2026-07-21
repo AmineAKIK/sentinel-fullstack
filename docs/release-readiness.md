@@ -104,6 +104,7 @@ commit audité au démarrage de cette branche.
 | `DR-21` | Les faits du dossier sont générés depuis le candidat. | Aucun nombre durable n'est saisi en dur ; Markdown suivi comme source de vérité, sorties personnelles ignorées. |
 | `DR-22` | Une release désigne un commit et des images immuables. | Tag, SHA de santé, labels OCI, digests déployés et recette désignent le même candidat. |
 | `DR-23` | `notif_operateurs` reste une préférence groupée couvrant followers, déclarant et opérateurs ; aucune préférence `notif_followers` dédiée n'est introduite par ce chantier. | Décision produit préexistante au lot 5, hors périmètre robustesse ; réouvrable si un besoin business explicite de désolidariser ces audiences apparaît. |
+| `DR-24` | Le module support (chat IA DeepSeek) n'a pas de suite d'intégration PostgreSQL dédiée : c'est un proxy HTTP stateless, sans donnée persistée à vérifier après coup. | Sa seule dépendance DB réelle (revalidation d'auth dans `adminAuthMiddleware`/`workshopAuthMiddleware`) est déjà couverte par `auth.integration.test.ts` ; réouvrable si le module gagne un jour une persistance de conversation. |
 
 ## 4. Registre des constats
 
@@ -191,7 +192,7 @@ commit audité au démarrage de cette branche.
 | `TEST-01` | P1 | 10 | Couverture partielle parfois présentée sans son périmètre. | Rapports et dossier parlent de couverture ciblée. | VERIFIED |
 | `TEST-02` | P1 | 10 | Contrôles de fiabilité surtout fondés sur des recherches de chaînes. | Contrats critiques couverts par comportement. | OPEN |
 | `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | OPEN |
-| `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | OPEN |
+| `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | VERIFIED |
 | `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | VERIFIED |
 | `DOC-01` | P0 | 11 | Dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | Faits générés depuis le candidat final. | OPEN |
 | `DOC-02` | P1 | 11 | `rebuildDossier.py` conserve des faits en dur. | Générateur sans nombres volatils codés en dur. | OPEN |
@@ -403,11 +404,29 @@ scénario de charge minimal (`scripts/load-test.js`, k6, débit constant sous
 le seuil de rate limiting nominal) documente désormais la volumétrie,
 manuel et volontairement hors CI. Le dossier jury précise maintenant que les
 seuils de couverture Jest portent sur le périmètre `collectCoverageFrom`
-configuré, jamais sur l'ensemble du code backend. `TEST-02` (checks textuels
-de `verifyReliability.js`), `TEST-03` (E2E cycle de vie incident, rôles
-OPERATOR/MAINTENANCE, Board, Pilotage, Admin) et `TEST-04` (intégration du
-worker outbox, du module support, et tests automatisés de `backup.sh`/
-`restore.sh`) restent à traiter.
+configuré, jamais sur l'ensemble du code backend.
+
+`TEST-04` clos. `scripts/test-backup-restore.sh` (nouveau) exerce
+`backup.sh`/`restore.sh` contre un PostgreSQL Docker Compose jetable avec les
+48 migrations réellement rejouées : sauvegarde nominale, restauration
+nominale avec bascule effective des données, exclusion mutuelle dans les deux
+sens, refus/franchissement du checksum, et rejet d'un dump hors schéma —
+dix assertions, exécutées deux fois de suite pour écarter un flake. Intégré
+en CI comme nouveau job dédié `Ops / Backup and restore drill`. Un nouveau
+`notificationOutboxWorker.integration.test.ts` exerce
+`processNotificationOutboxBatch` (le worker, pas seulement son repository déjà
+couvert) contre un incident réel créé puis pris en charge : réclamation,
+livraison multi-canal dégradée en `SKIPPED_NO_RECIPIENT` (SMTP absent en
+test), non-double-traitement, et classement `FAILED` en une tentative pour un
+`event_type` non géré — sans jamais laisser un item bloqué indéfiniment. Le
+module support (chat IA) reste volontairement sans suite d'intégration
+PostgreSQL dédiée : c'est un proxy HTTP stateless sans donnée à vérifier
+après coup, sa seule dépendance DB réelle (revalidation d'auth) étant déjà
+couverte ailleurs (`DR-24`).
+
+`TEST-02` (checks textuels de `verifyReliability.js`) et `TEST-03` (E2E cycle
+de vie incident, rôles OPERATOR/MAINTENANCE, Board, Pilotage, Admin) restent
+à traiter.
 
 ### Porte D — certification
 
