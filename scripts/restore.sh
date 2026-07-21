@@ -16,13 +16,30 @@ fi
 DB_NAME="${POSTGRES_DB:-sentinel}"
 DB_USER="${POSTGRES_USER:-sentinel}"
 COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.yml}"
+BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/backups}"
+ALLOW_UNVERIFIED=false
 
 compose() {
   docker compose --project-directory "$PROJECT_ROOT" -f "$COMPOSE_FILE" "$@"
 }
 
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --allow-unverified)
+      ALLOW_UNVERIFIED=true
+      shift
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${ARGS[@]}"
+
 if [[ $# -ne 1 ]]; then
-  echo "Usage : $0 <fichier_backup.sql.gz>" >&2
+  echo "Usage : $0 [--allow-unverified] <fichier_backup.sql.gz>" >&2
   exit 2
 fi
 
@@ -41,8 +58,19 @@ if [[ -f "${BACKUP_FILE}.sha256" ]]; then
     cd "$(dirname "$BACKUP_FILE")"
     sha256sum -c "$(basename "${BACKUP_FILE}.sha256")"
   )
+elif [[ "$ALLOW_UNVERIFIED" == true ]]; then
+  echo "[restore] AVERTISSEMENT AUDITÉ : restauration sans SHA-256 autorisée explicitement via --allow-unverified (fichier : $BACKUP_FILE)." >&2
 else
-  echo "[restore] AVERTISSEMENT : aucun fichier SHA-256 associé." >&2
+  echo "[restore] Refusé : aucun fichier SHA-256 associé à '$BACKUP_FILE'." >&2
+  echo "[restore] Relancez avec --allow-unverified pour forcer, en connaissance de cause." >&2
+  exit 1
+fi
+
+mkdir -p "$BACKUP_DIR"
+exec 9>"$BACKUP_DIR/.sentinel-backup.lock"
+if ! flock -n 9; then
+  echo "[restore] Une sauvegarde ou restauration est déjà en cours." >&2
+  exit 1
 fi
 
 if ! compose ps --status running --services 2>/dev/null | grep -qx 'postgres'; then
@@ -99,12 +127,53 @@ gunzip -c "$BACKUP_FILE" \
       psql -U "$DB_USER" -d "$TEMP_DB" --no-password --set=ON_ERROR_STOP=1 \
         --single-transaction --quiet
 
-VALIDATION="$(compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
+echo "[restore] Validation du schéma, du ledger de migrations et des données témoins..."
+VALIDATION_SQL="
+SELECT
+  to_regclass('public.schema_migrations') IS NOT NULL
+  AND to_regclass('public.sentinel_users') IS NOT NULL
+  AND to_regclass('public.admin_accounts') IS NOT NULL
+  AND to_regclass('public.production_lines') IS NOT NULL
+  AND to_regclass('public.production_line_machines') IS NOT NULL
+  AND to_regclass('public.workshop_incidents') IS NOT NULL
+  AND to_regclass('public.workshop_incident_events') IS NOT NULL
+  AND to_regclass('public.workshop_incident_followers') IS NOT NULL
+  AND to_regclass('public.workshop_arbitration_cases') IS NOT NULL
+  AND to_regclass('public.workshop_arbitration_consultations') IS NOT NULL
+  AND to_regclass('public.line_audit_events') IS NOT NULL
+  AND to_regclass('public.account_audit_events') IS NOT NULL
+  AND to_regclass('public.admin_system_audit_events') IS NOT NULL
+  AND to_regclass('public.password_reset_requests') IS NOT NULL
+  AND to_regclass('public.notification_outbox') IS NOT NULL
+;
+"
+SCHEMA_OK="$(compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
   psql -U "$DB_USER" -d "$TEMP_DB" --no-password --set=ON_ERROR_STOP=1 -Atq \
-  -c "SELECT to_regclass('public.schema_migrations') IS NOT NULL
-             AND to_regclass('public.workshop_incidents') IS NOT NULL
-             AND to_regclass('public.sentinel_users') IS NOT NULL;")"
-[[ "$VALIDATION" == "t" ]] || { echo "[restore] Le dump ne contient pas un schéma Sentinel valide." >&2; exit 1; }
+  -c "$VALIDATION_SQL" 2>/dev/null || echo f)"
+[[ "$SCHEMA_OK" == "t" ]] || {
+  echo "[restore] Le dump ne contient pas les tables attendues du schéma Sentinel." >&2
+  exit 1
+}
+
+LEDGER_SQL="
+SELECT
+  (SELECT count(*) FROM schema_migrations) > 0
+  AND (SELECT count(*) FROM schema_migrations WHERE checksum IS NULL) = 0
+  AND (SELECT count(*) FROM schema_migrations WHERE applied_at IS NULL) = 0
+  AND (SELECT count(*) FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'sentinel_users' AND column_name = 'badge_number') = 1
+  AND (SELECT count(*) FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'workshop_incidents' AND column_name = 'status') = 1
+  AND (SELECT count(*) FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'production_lines' AND column_name = 'line_number') = 1;
+"
+LEDGER_OK="$(compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
+  psql -U "$DB_USER" -d "$TEMP_DB" --no-password --set=ON_ERROR_STOP=1 -Atq \
+  -c "$LEDGER_SQL" 2>/dev/null || echo f)"
+[[ "$LEDGER_OK" == "t" ]] || {
+  echo "[restore] Le ledger de migrations ou les colonnes témoins sont incohérents." >&2
+  exit 1
+}
 
 if compose ps --status running --services 2>/dev/null | grep -qx 'backend'; then
   BACKEND_WAS_RUNNING=true
