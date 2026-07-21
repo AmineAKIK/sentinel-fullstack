@@ -155,7 +155,7 @@ commit audité au démarrage de cette branche.
 | `ANA-04` | P1 | 6 | Cohorte de créations mélangée avec clôtures hors période. | Modèle flux/cohorte `DR-09` testé. | VERIFIED |
 | `ANA-05` | P1 | 6 | Fenêtres invalides/non bornées et fuseau incohérent. | Validation backend et tests Europe/Paris. | VERIFIED |
 | `ANA-06` | P2 | 6 | Tendance SQL effectue un produit jours × incidents. | Plan SQL borné et test volumétrique. | VERIFIED |
-| `LIST-01` | P1 | 7 | Historique limité à 250 mais présenté comme complet. | Pagination stable et libellé exact. | OPEN |
+| `LIST-01` | P1 | 7 | Historique limité à 250 mais présenté comme complet. | Pagination stable et libellé exact. | VERIFIED |
 | `LIST-02` | P1 | 7 | Connaissance limitée à 300 mais présentée comme complète. | Pagination stable et libellé exact. | OPEN |
 | `LIST-03` | P1 | 7 | Journal limité à 80 sans navigation vers la suite. | Pagination conservant filtres et tri. | VERIFIED |
 | `LIST-04` | P1 | 7 | Dashboard recharge actifs et suivis résolus sans borne séparée. | Projection active complète + suivis terminaux paginés. | OPEN |
@@ -242,7 +242,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 | `5A` | Récupérer les leases et rendre chaque issue de livraison observable. | `OUT-01`, `OUT-02` | VERIFIED |
 | `5B` | Figer les destinataires et isoler leurs reprises. | `OUT-03` à `OUT-05` | VERIFIED |
 | `7A` | Paginer le Journal par curseur (tri stabilisé par `id`, bouton de suite). | `LIST-03` | VERIFIED |
-| `7B` | Paginer l'Historique par curseur. | `LIST-01` | OPEN |
+| `7B` | Paginer l'Historique par curseur. | `LIST-01` | VERIFIED |
 | `7C` | Paginer la Connaissance par curseur. | `LIST-02` | OPEN |
 | `7D` | Séparer les suivis résolus du Dashboard en liste paginée indépendante. | `LIST-04` | OPEN |
 

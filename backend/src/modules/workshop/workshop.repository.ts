@@ -281,11 +281,19 @@ const HISTORY_EVENT_SEARCH_COLS = [
   'su.last_name',
 ];
 
+// Colonne de tri principale par mode : Historique classe par création,
+// Connaissance par dernière mise à jour (une fiche enrichie remonte).
+// Non unique à elle seule — id est toujours le tie-breaker (lot 7).
+const WORKSPACE_SORT_COLUMN: Record<IncidentListMode, string> = {
+  history: 'wi.created_at',
+  knowledge: 'wi.updated_at',
+};
+
 function buildIncidentWorkspaceFilters(
   query: QueryParams,
   mode: IncidentListMode
 ): { whereClause: string; params: Array<string | number>; limit: number } {
-  const { q, limit } = query;
+  const { q, limit, cursor } = query;
   const filters: string[] = [];
   const params: Array<string | number> = [];
   const safeLimit = boundedInt(limit, INCIDENT_LIST_DEFAULT_LIMIT, 1, INCIDENT_LIST_MAX_LIMIT);
@@ -301,6 +309,18 @@ function buildIncidentWorkspaceFilters(
 
   if (q && String(q).trim()) {
     filters.push(buildFullTextFilter(String(q).trim(), params, INCIDENT_WORKSPACE_SEARCH_COLS));
+  }
+
+  if (cursor && typeof cursor === 'object') {
+    const decoded = cursor as { sortValue: string; id: number };
+    params.push(decoded.sortValue);
+    const sortParamIndex = params.length;
+    params.push(decoded.id);
+    const idParamIndex = params.length;
+    const sortColumn = WORKSPACE_SORT_COLUMN[mode];
+    filters.push(
+      `(${sortColumn}, wi.id) < ($${sortParamIndex}::timestamptz, $${idParamIndex}::int)`
+    );
   }
 
   return {
@@ -441,13 +461,15 @@ export async function listIncidents(userId: number, role: string) {
   return rows;
 }
 
-export async function listIncidentWorkspaceRows(query: QueryParams, mode: IncidentListMode) {
+export async function listIncidentWorkspaceRows(
+  query: QueryParams,
+  mode: IncidentListMode
+): Promise<CursorPage<unknown>> {
   const { whereClause, params, limit } = buildIncidentWorkspaceFilters(query, mode);
-  const orderBy =
-    mode === 'knowledge'
-      ? 'wi.updated_at DESC, wi.created_at DESC'
-      : 'wi.created_at DESC, wi.updated_at DESC';
+  const sortColumn = WORKSPACE_SORT_COLUMN[mode];
 
+  // Demande une ligne de plus que la page pour détecter une suite sans
+  // second COUNT(*) — même technique que le Journal (lot 7A).
   const { rows } = await pool.query(
     `SELECT ${INCIDENT_BASE_COLS},
             ${INCIDENT_ACTOR_COLS},
@@ -456,12 +478,24 @@ export async function listIncidentWorkspaceRows(query: QueryParams, mode: Incide
      ${INCIDENT_USER_JOINS}
      ${INCIDENT_ARBITRATION_JOINS}
      ${whereClause}
-     ORDER BY ${orderBy}
+     ORDER BY ${sortColumn} DESC, wi.id DESC
      LIMIT $${params.length + 1}`,
-    [...params, limit]
+    [...params, limit + 1]
   );
 
-  return rows;
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const last = items[items.length - 1] as Record<string, unknown> | undefined;
+  const sortField = mode === 'knowledge' ? 'updated_at' : 'created_at';
+  const nextCursor =
+    hasMore && last
+      ? encodeCursor({
+          sortValue: new Date(last[sortField] as Date).toISOString(),
+          id: last.id as number,
+        })
+      : null;
+
+  return { items, nextCursor };
 }
 
 export async function fetchIncidentWithUsers(incidentId: number, actorUserId?: number) {
