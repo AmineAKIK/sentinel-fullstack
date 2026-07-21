@@ -326,7 +326,8 @@ check('Workshop pilotage exposes period trend indicators', () => {
   ]);
   const styles = read('frontend/src/styles/pages/pilotage.css');
   return (
-    repository.includes('trendRows') &&
+    repository.includes('createdTrendRows') &&
+    repository.includes('closedTrendRows') &&
     repository.includes('created_count') &&
     repository.includes('closed_count') &&
     repository.includes('oldest_active_seconds') &&
