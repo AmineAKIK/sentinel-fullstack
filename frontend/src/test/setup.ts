@@ -9,3 +9,8 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   };
 }
+
+// jsdom fournit un window.scrollTo qui logue "Not implemented" plutôt que de
+// rester absent — Modal l'appelle pour restaurer le scroll verrouillé à la
+// fermeture, ce qui pollue chaque test. On le remplace inconditionnellement.
+window.scrollTo = () => {};

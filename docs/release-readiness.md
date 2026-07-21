@@ -188,11 +188,11 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `TEST-01` | P1 | 10 | Couverture partielle parfois présentée sans son périmètre. | Rapports et dossier parlent de couverture ciblée. | OPEN |
+| `TEST-01` | P1 | 10 | Couverture partielle parfois présentée sans son périmètre. | Rapports et dossier parlent de couverture ciblée. | VERIFIED |
 | `TEST-02` | P1 | 10 | Contrôles de fiabilité surtout fondés sur des recherches de chaînes. | Contrats critiques couverts par comportement. | OPEN |
 | `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | OPEN |
 | `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | OPEN |
-| `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | OPEN |
+| `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | VERIFIED |
 | `DOC-01` | P0 | 11 | Dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | Faits générés depuis le candidat final. | OPEN |
 | `DOC-02` | P1 | 11 | `rebuildDossier.py` conserve des faits en dur. | Générateur sans nombres volatils codés en dur. | OPEN |
 | `DOC-03` | P1 | 11 | Sources suivies avec marqueurs incomplets et anciens SHA. | Scan interdit sans résultat. | OPEN |
@@ -392,6 +392,22 @@ reads.sql` → `..._consultations.sql`, cf. l'alias dans `migrate.ts`), jamais u
 table du schéma actuel — sans le rejeu réel des 48 migrations en conditions
 Docker, cette erreur serait passée inaperçue et aurait fait échouer toute
 restauration légitime en production.
+
+**Lot 10, en cours : `TEST-01` et `TEST-05` clos.** Les 78 occurrences du
+warning jsdom `Not implemented: Window's scrollTo()` (déclenché par `Modal`
+lors de la restauration du scroll verrouillé à la fermeture) ont été
+éliminées par un mock inconditionnel dans `frontend/src/test/setup.ts` —
+jsdom fournit sa propre fonction non implémentée plutôt que de laisser la
+propriété absente, donc un simple test de présence ne suffisait pas. Un
+scénario de charge minimal (`scripts/load-test.js`, k6, débit constant sous
+le seuil de rate limiting nominal) documente désormais la volumétrie,
+manuel et volontairement hors CI. Le dossier jury précise maintenant que les
+seuils de couverture Jest portent sur le périmètre `collectCoverageFrom`
+configuré, jamais sur l'ensemble du code backend. `TEST-02` (checks textuels
+de `verifyReliability.js`), `TEST-03` (E2E cycle de vie incident, rôles
+OPERATOR/MAINTENANCE, Board, Pilotage, Admin) et `TEST-04` (intégration du
+worker outbox, du module support, et tests automatisés de `backup.sh`/
+`restore.sh`) restent à traiter.
 
 ### Porte D — certification
 
