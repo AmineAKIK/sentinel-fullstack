@@ -222,4 +222,13 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          shellcheck scripts/backup.sh scripts/restore.sh
+          shellcheck scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh
+
+  ops:
+    name: Ops / Backup and restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Exercise backup.sh and restore.sh against a real PostgreSQL
+        run: ./scripts/test-backup-restore.sh
