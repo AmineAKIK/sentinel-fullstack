@@ -158,7 +158,7 @@ commit audité au démarrage de cette branche.
 | `LIST-01` | P1 | 7 | Historique limité à 250 mais présenté comme complet. | Pagination stable et libellé exact. | VERIFIED |
 | `LIST-02` | P1 | 7 | Connaissance limitée à 300 mais présentée comme complète. | Pagination stable et libellé exact. | VERIFIED |
 | `LIST-03` | P1 | 7 | Journal limité à 80 sans navigation vers la suite. | Pagination conservant filtres et tri. | VERIFIED |
-| `LIST-04` | P1 | 7 | Dashboard recharge actifs et suivis résolus sans borne séparée. | Projection active complète + suivis terminaux paginés. | OPEN |
+| `LIST-04` | P1 | 7 | Dashboard recharge actifs et suivis résolus sans borne séparée. | Projection active complète + suivis terminaux paginés. | VERIFIED |
 
 ### Accessibilité
 
@@ -217,7 +217,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `4` | Unifier les contrats d'authentification et HTTP. | `HTTP-01` à `HTTP-10` | Lot 3 | VERIFIED |
 | `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | VERIFIED |
 | `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | VERIFIED |
-| `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | OPEN |
+| `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | VERIFIED |
 | `8` | Corriger la sémantique et prouver les parcours accessibles. | `A11Y-01` à `A11Y-06` | Lots 4 et 7 | OPEN |
 | `9` | Durcir et exercer sauvegarde/restauration. | `OPS-01` à `OPS-04` | Lot 3 | OPEN |
 | `10` | Remplacer les preuves textuelles fragiles par des tests comportementaux. | `TEST-01` à `TEST-05` | Lots 1 à 9 | OPEN |
@@ -244,7 +244,7 @@ Les lots 4 et 5 suivent le même découpage de preuve :
 | `7A` | Paginer le Journal par curseur (tri stabilisé par `id`, bouton de suite). | `LIST-03` | VERIFIED |
 | `7B` | Paginer l'Historique par curseur. | `LIST-01` | VERIFIED |
 | `7C` | Paginer la Connaissance par curseur. | `LIST-02` | VERIFIED |
-| `7D` | Séparer les suivis résolus du Dashboard en liste paginée indépendante. | `LIST-04` | OPEN |
+| `7D` | Séparer les suivis résolus du Dashboard en liste paginée indépendante. | `LIST-04` | VERIFIED |
 
 Preuves des lots clos :
 
@@ -324,6 +324,16 @@ fenêtre analytique refuse `start > end` et toute plage supérieure à 366 jours
 et le Journal accepte enfin un filtre période avec le même contrat de bornage.
 Le cadrage fonctionnel a été aligné sur le code (accès Pilotage aux trois rôles,
 retrait de la promesse non livrée de classement produits/synthèse textuelle).
+
+**Lot 7 clos localement, CI distante à confirmer.** Historique, Connaissance et
+Journal sont désormais paginés par curseur opaque `{sortValue, id}` (`DR-11`),
+avec un tri stabilisé par `id` en tie-breaker sur les quatre écrans — aucun
+tri existant n'avait de colonne réellement unique. Le Dashboard sépare la
+projection active (toujours complète, sans borne) des suivis résolus, chargés
+à la demande via `/workshop/incidents/followed-resolved` et paginés (`DR-12`).
+Un bug latent a été corrigé au passage : `boundedInt()` ignorait silencieusement
+un `limit` passé en `number` plutôt qu'en `string`, retombant sur la valeur par
+défaut — invisible tant qu'aucun test n'appelait le repository directement.
 
 ### Porte D — certification
 

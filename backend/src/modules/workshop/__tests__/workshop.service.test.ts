@@ -35,6 +35,7 @@ jest.mock('../workshop.repository', () => ({
   getBoardData: jest.fn(),
   listActiveWorkshopLines: jest.fn(),
   listIncidents: jest.fn(),
+  listFollowedResolvedIncidents: jest.fn(),
   listIncidentWorkspaceRows: jest.fn(),
   listHistoryEvents: jest.fn(),
   listIncidentEvents: jest.fn(),
@@ -997,6 +998,7 @@ import {
   getBoardDataService,
   listWorkshopLinesService,
   listIncidentsService,
+  listFollowedResolvedIncidentsService,
   listHistoryIncidentsService,
   listKnowledgeIncidentsService,
   getHistoryIncidentService,
@@ -1034,13 +1036,58 @@ describe('listWorkshopLinesService', () => {
 });
 
 describe('listIncidentsService', () => {
-  it('retourne tous les incidents actifs', async () => {
+  it('retourne tous les incidents actifs (DR-12 : projection active toujours complète)', async () => {
     const incidents = [mockIncident()];
     jest.mocked(repo.listIncidents).mockResolvedValue(incidents);
-    const result = await listIncidentsService(7, 'RESPONSABLE');
+    const result = await listIncidentsService(7);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual(incidents);
-    expect(repo.listIncidents).toHaveBeenCalledWith(7, 'RESPONSABLE');
+    expect(repo.listIncidents).toHaveBeenCalledWith(7);
+  });
+});
+
+describe('listFollowedResolvedIncidentsService', () => {
+  it('retourne FORBIDDEN pour un rôle non RESPONSABLE', async () => {
+    const result = await listFollowedResolvedIncidentsService(7, 'MAINTENANCE', {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('FORBIDDEN');
+    expect(repo.listFollowedResolvedIncidents).not.toHaveBeenCalled();
+  });
+
+  it('transmet la query décodée au repository pour un RESPONSABLE (lot 7D)', async () => {
+    const page = { items: [mockIncident({ status: 'CLOSED' })], nextCursor: null };
+    jest.mocked(repo.listFollowedResolvedIncidents).mockResolvedValue(page);
+
+    const result = await listFollowedResolvedIncidentsService(7, 'RESPONSABLE', { limit: '10' });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(page);
+    expect(repo.listFollowedResolvedIncidents).toHaveBeenCalledWith(7, {
+      limit: '10',
+      cursor: undefined,
+    });
+  });
+
+  it('décode un curseur valide avant de le transmettre au repository', async () => {
+    const page = { items: [], nextCursor: null };
+    jest.mocked(repo.listFollowedResolvedIncidents).mockResolvedValue(page);
+    const cursor = encodeCursor({ sortValue: '2026-03-15T10:00:00.000Z', id: 9 });
+
+    await listFollowedResolvedIncidentsService(7, 'RESPONSABLE', { cursor });
+
+    expect(repo.listFollowedResolvedIncidents).toHaveBeenCalledWith(7, {
+      cursor: { sortValue: '2026-03-15T10:00:00.000Z', id: 9 },
+    });
+  });
+
+  it('rejette un curseur illisible sans appeler le repository', async () => {
+    const result = await listFollowedResolvedIncidentsService(7, 'RESPONSABLE', {
+      cursor: 'not-a-valid-cursor',
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.listFollowedResolvedIncidents).not.toHaveBeenCalled();
   });
 });
 

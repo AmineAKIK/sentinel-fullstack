@@ -70,11 +70,24 @@ export async function listWorkshopLinesService(): Promise<ServiceResult<unknown>
   return ok(await workshopRepository.listActiveWorkshopLines());
 }
 
-export async function listIncidentsService(
+export async function listIncidentsService(userId: number): Promise<ServiceResult<unknown>> {
+  return ok(await workshopRepository.listIncidents(userId));
+}
+
+// Suivis résolus (CLOSED/CANCELED/INVALIDATED) : chargés séparément de la
+// projection active, réservés au responsable comme l'était l'ancien
+// paramètre includeFollowedResolved (DR-12, lot 7D).
+export async function listFollowedResolvedIncidentsService(
   userId: number,
-  role: string
+  role: string,
+  query: Record<string, unknown>
 ): Promise<ServiceResult<unknown>> {
-  return ok(await workshopRepository.listIncidents(userId, role));
+  if (role !== 'RESPONSABLE') {
+    return forbidden('Réservé au responsable atelier.');
+  }
+  const resolved = withDecodedCursor(query);
+  if (!resolved.ok) return resolved.error;
+  return ok(await workshopRepository.listFollowedResolvedIncidents(userId, resolved.query));
 }
 
 // Décode le jeton opaque `cursor` d'une query en objet {sortValue, id} avant

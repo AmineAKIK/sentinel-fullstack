@@ -9,6 +9,7 @@ import {
   getIncidentMetrics,
   getKnowledgeIncident,
   getWorkshopAnalytics,
+  listFollowedResolvedIncidents,
   listIncidentEvents,
   listHistoryEvents,
   listHistoryIncidents,
@@ -24,6 +25,7 @@ const router = Router();
 router.use(workshopAuthMiddleware);
 router.get('/lines', listWorkshopLines);
 router.get('/incidents', listIncidents);
+router.get('/incidents/followed-resolved', listFollowedResolvedIncidents);
 router.get('/history/incidents', listHistoryIncidents);
 router.get('/history/incidents/:id', getHistoryIncident);
 router.get('/history/events', listHistoryEvents);

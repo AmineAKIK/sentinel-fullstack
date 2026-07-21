@@ -15,6 +15,7 @@ import {
   getIncidentMetricsService,
   getKnowledgeIncidentService,
   getWorkshopAnalyticsService,
+  listFollowedResolvedIncidentsService,
   listHistoryEventsService,
   listHistoryIncidentsService,
   listIncidentEventsService,
@@ -56,11 +57,30 @@ export async function listWorkshopLines(_req: Request, res: Response): Promise<v
 
 export async function listIncidents(req: Request, res: Response): Promise<void> {
   try {
-    const result = await listIncidentsService(req.workshopUser!.userId, req.workshopUser!.role);
+    const result = await listIncidentsService(req.workshopUser!.userId);
     if (sendServiceError(res, result)) return;
     res.json(result.data);
   } catch (err) {
     handleControllerError(res, 'listIncidents', err);
+  }
+}
+
+export async function listFollowedResolvedIncidents(req: Request, res: Response): Promise<void> {
+  try {
+    const parsed = incidentWorkspaceQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
+      return;
+    }
+    const result = await listFollowedResolvedIncidentsService(
+      req.workshopUser!.userId,
+      req.workshopUser!.role,
+      parsed.data
+    );
+    if (sendServiceError(res, result)) return;
+    res.json(result.data);
+  } catch (err) {
+    handleControllerError(res, 'listFollowedResolvedIncidents', err);
   }
 }
 

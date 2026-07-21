@@ -39,8 +39,8 @@ export type IncidentWorkspaceParams = {
   // Filtre période — supporté uniquement par /workshop/history/events (Journal, ANA-03).
   start?: string;
   end?: string;
-  // Pagination par curseur — supporté uniquement par /workshop/history/events
-  // (Journal, LIST-03). Jeton opaque renvoyé par la page précédente.
+  // Pagination par curseur — jeton opaque renvoyé par la page précédente.
+  // Supporté par Historique, Connaissance, Journal et les suivis résolus.
   cursor?: string;
 };
 
@@ -55,6 +55,19 @@ export async function listWorkshopHistoryIncidents(
 ): Promise<CursorPage<WorkshopIncident>> {
   return api.get<CursorPage<WorkshopIncident>>(
     `/api/workshop/history/incidents${buildQuery(params)}`,
+    signal
+  );
+}
+
+// Suivis résolus (CLOSED/CANCELED/INVALIDATED) — chargés séparément de la
+// projection active du Dashboard, réservés au responsable, paginés par
+// curseur (DR-12, lot 7D).
+export async function listWorkshopFollowedResolvedIncidents(
+  params: IncidentWorkspaceParams = {},
+  signal?: AbortSignal
+): Promise<CursorPage<WorkshopIncident>> {
+  return api.get<CursorPage<WorkshopIncident>>(
+    `/api/workshop/incidents/followed-resolved${buildQuery(params)}`,
     signal
   );
 }
