@@ -310,20 +310,7 @@ export default function UserListPage() {
                   </thead>
                   <tbody>
                     {filteredUsers.map((user) => (
-                      <tr
-                        key={user.id}
-                        onClick={() => navigate(`/admin/users/${user.id}`)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            navigate(`/admin/users/${user.id}`);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Voir la fiche utilisateur ${user.first_name} ${user.last_name}`}
-                        title="Voir la fiche"
-                      >
+                      <tr key={user.id}>
                         <td>
                           <strong>{user.last_name}</strong> {user.first_name}
                         </td>
@@ -339,18 +326,21 @@ export default function UserListPage() {
                           </span>
                         </td>
                         <td>{formatDate(user.created_at)}</td>
-                        <td className="row-action" aria-hidden="true">
-                          <svg
-                            className="row-action-icon"
-                            viewBox="0 0 24 24"
-                            role="img"
-                            aria-label="Modifier"
+                        <td className="row-action">
+                          <button
+                            type="button"
+                            className="row-action-button"
+                            onClick={() => navigate(`/admin/users/${user.id}`)}
+                            aria-label={`Voir la fiche utilisateur ${user.first_name} ${user.last_name}`}
+                            title="Voir la fiche"
                           >
-                            <path
-                              d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41L18.37 3.29c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                              fill="currentColor"
-                            />
-                          </svg>
+                            <svg className="row-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41L18.37 3.29c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </button>
                         </td>
                       </tr>
                     ))}

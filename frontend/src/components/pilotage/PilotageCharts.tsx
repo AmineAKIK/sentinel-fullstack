@@ -62,6 +62,10 @@ export function TrendChart({ trend }: TrendChartProps) {
             const delta = item.created - item.closed;
             const createdPct = Math.max((item.created / maxVal) * 100, item.created > 0 ? 4 : 0);
             const closedPct = Math.max((item.closed / maxVal) * 100, item.closed > 0 ? 4 : 0);
+            const dayLabel = new Date(item.day).toLocaleDateString('fr-FR', {
+              day: '2-digit',
+              month: '2-digit',
+            });
             return (
               <div key={item.day} className="pilotage-trend-col">
                 <div className="pilotage-trend-col-bars">
@@ -70,14 +74,22 @@ export function TrendChart({ trend }: TrendChartProps) {
                       className="pilotage-trend-bar pilotage-trend-bar-created"
                       style={{ height: `${createdPct}%` }}
                       title={`Créés : ${item.created}`}
+                      aria-hidden="true"
                     />
+                    <span className="sr-only">
+                      {dayLabel} — Créés : {item.created}
+                    </span>
                   </div>
                   <div className="pilotage-trend-bar-wrap">
                     <div
                       className="pilotage-trend-bar pilotage-trend-bar-closed"
                       style={{ height: `${closedPct}%` }}
                       title={`Clôturés : ${item.closed}`}
+                      aria-hidden="true"
                     />
+                    <span className="sr-only">
+                      {dayLabel} — Clôturés : {item.closed}
+                    </span>
                   </div>
                 </div>
                 <span
@@ -85,11 +97,8 @@ export function TrendChart({ trend }: TrendChartProps) {
                 >
                   {delta > 0 ? `+${delta}` : delta < 0 ? String(delta) : '='}
                 </span>
-                <span className="pilotage-trend-label">
-                  {new Date(item.day).toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                  })}
+                <span className="pilotage-trend-label" aria-hidden="true">
+                  {dayLabel}
                 </span>
               </div>
             );

@@ -148,3 +148,22 @@ describe('WorkshopJournalPage — pagination par curseur (lot 7, LIST-03)', () =
     expect(button).toBeDisabled();
   });
 });
+
+describe('WorkshopJournalPage — filtre événement accessible (lot 8, A11Y-03)', () => {
+  it('a un nom accessible sur le filtre de type d’action', () => {
+    renderJournalPage();
+
+    expect(screen.getByLabelText("Filtrer par type d'action")).toBeInTheDocument();
+  });
+
+  it('permet de changer le filtre via son nom accessible', () => {
+    const setEventTypeFilter = vi.fn();
+    renderJournalPage({ setEventTypeFilter });
+
+    fireEvent.change(screen.getByLabelText("Filtrer par type d'action"), {
+      target: { value: 'INCIDENT_CLOSED' },
+    });
+
+    expect(setEventTypeFilter).toHaveBeenCalledWith('INCIDENT_CLOSED');
+  });
+});

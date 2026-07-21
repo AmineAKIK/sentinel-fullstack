@@ -185,6 +185,7 @@ export default function WorkshopJournalPage() {
             <div className="history-event-filter">
               <select
                 className="history-event-select"
+                aria-label="Filtrer par type d'action"
                 value={eventTypeFilter}
                 onChange={(e) => {
                   setEventTypeFilter(e.target.value);

@@ -190,11 +190,16 @@ describe('IncidentCard – interactions', () => {
     expect(onClick).toHaveBeenCalledWith(incident);
   });
 
-  it('appelle onClick avec Entrée quand la carte est focalisée', () => {
+  it('est un vrai bouton natif, activable au clavier sans gestionnaire keyDown manuel (A11Y-01)', () => {
     const onClick = vi.fn();
     const incident = mockIncident();
     render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
-    fireEvent.keyDown(screen.getByRole('button', { name: /ouvrir incident/i }), { key: 'Enter' });
+    const openButton = screen.getByRole('button', { name: /ouvrir incident/i });
+    // Un <button> HTML natif active onClick sur Entrée/Espace via le
+    // navigateur lui-même — testé ici en simulant directement l'activation
+    // native (jsdom ne traduit pas keyDown en click pour un vrai <button>).
+    expect(openButton.tagName).toBe('BUTTON');
+    fireEvent.click(openButton);
     expect(onClick).toHaveBeenCalledWith(incident);
   });
 
@@ -234,5 +239,21 @@ describe('IncidentCard – interactions', () => {
 
     expect(onToggleFollow).toHaveBeenCalledWith(incident);
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("n'imbrique jamais un bouton dans un autre bouton (A11Y-01)", () => {
+    const incident = mockIncident({
+      is_followed: true,
+      status: 'CLOSED',
+      edit_request: { state: 'ARRET' },
+      cancel_request: true,
+    });
+    render(<IncidentCard incident={incident} {...defaultProps} isResponsable />);
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBeGreaterThan(1);
+    for (const button of buttons) {
+      expect(button.querySelector('button')).toBeNull();
+    }
   });
 });

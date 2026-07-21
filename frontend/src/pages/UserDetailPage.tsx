@@ -74,7 +74,9 @@ export default function UserDetailPage() {
     return (
       <>
         <NavBar />
-        <FullPageLoader />
+        <main id="main-content">
+          <FullPageLoader />
+        </main>
       </>
     );
   }
@@ -83,12 +85,12 @@ export default function UserDetailPage() {
     return (
       <>
         <NavBar />
-        <div className="page-container">
+        <main id="main-content" className="page-container">
           <button className="back-link" onClick={() => navigate('/admin/users')}>
             Retour à la liste
           </button>
           <ErrorBanner>{error || 'Utilisateur introuvable.'}</ErrorBanner>
-        </div>
+        </main>
       </>
     );
   }

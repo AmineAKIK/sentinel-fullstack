@@ -51,7 +51,9 @@ test.beforeEach(async ({ page }) => {
 test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut', async ({ page }) => {
   const card = page.locator('.incident-card').filter({ hasText: 'E2E-ANNULATION' });
   await expect(card).toBeVisible();
-  await card.click();
+  // A11Y-01 : seul le titre (bouton natif) ouvre le dossier, plus toute la carte.
+  const openCard = card.locator('.incident-card-open');
+  await openCard.click();
 
   const dialog = page.getByRole('dialog', { name: 'Arbitrage annulation' });
   await expectCompactModal(page, dialog);
@@ -69,14 +71,14 @@ test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut',
   expect(page.url()).toContain('incident=');
 
   await dossier.getByRole('button', { name: 'Fermer le détail' }).click();
-  await card.click();
+  await openCard.click();
   await expect(page.getByRole('dialog', { name: 'Arbitrage annulation' })).toBeVisible();
 });
 
 test('la correction se décide directement depuis le modal mobile', async ({ page }) => {
   const card = page.locator('.incident-card').filter({ hasText: 'E2E-CORRECTION' });
   await expect(card).toBeVisible();
-  await card.click();
+  await card.locator('.incident-card-open').click();
 
   const dialog = page.getByRole('dialog', { name: 'Arbitrage correction' });
   await expectCompactModal(page, dialog);
