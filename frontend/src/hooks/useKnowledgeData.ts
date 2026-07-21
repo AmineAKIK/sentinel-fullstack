@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   getWorkshopKnowledgeIncident,
@@ -13,7 +13,9 @@ import {
 } from '../utils/workshopFilters';
 import { useDebouncedValue } from './useDebouncedValue';
 
-const KNOWLEDGE_INCIDENTS_LIMIT = 300;
+// Taille de page, pas plafond total : LIST-02 remplace la limite fixe par
+// une pagination par curseur (lot 7C).
+const KNOWLEDGE_INCIDENTS_PAGE_SIZE = 300;
 
 export function useKnowledgeData() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,6 +23,8 @@ export function useKnowledgeData() {
   const [incidents, setIncidents] = useState<WorkshopIncident[]>([]);
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const debouncedQuery = useDebouncedValue(query);
@@ -41,25 +45,29 @@ export function useKnowledgeData() {
     return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const params = buildIncidentWorkspaceParams({
+  const baseParams = useMemo(
+    () => ({
       query: debouncedQuery,
       stateFilter,
       lineFilter,
       machineFilter,
-      limit: KNOWLEDGE_INCIDENTS_LIMIT,
-    });
+      limit: KNOWLEDGE_INCIDENTS_PAGE_SIZE,
+    }),
+    [debouncedQuery, stateFilter, lineFilter, machineFilter]
+  );
 
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     setError('');
-    void listWorkshopKnowledgeIncidents(params, controller.signal)
-      .then((data) => {
+    void listWorkshopKnowledgeIncidents(buildIncidentWorkspaceParams(baseParams), controller.signal)
+      .then((page) => {
         if (controller.signal.aborted) return;
-        setIncidents(data);
+        setIncidents(page.items);
+        setNextCursor(page.nextCursor);
         setSelectedId((cur) => {
-          if (data.length === 0) return '';
-          return data.some((i) => String(i.id) === cur) ? cur : String(data[0].id);
+          if (page.items.length === 0) return '';
+          return page.items.some((i) => String(i.id) === cur) ? cur : String(page.items[0].id);
         });
       })
       .catch(() => {
@@ -70,7 +78,29 @@ export function useKnowledgeData() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [debouncedQuery, stateFilter, lineFilter, machineFilter]);
+  }, [baseParams]);
+
+  const loadMore = useCallback((): void => {
+    if (!nextCursor || loadingMore) return;
+    const controller = new AbortController();
+    setLoadingMore(true);
+    void listWorkshopKnowledgeIncidents(
+      buildIncidentWorkspaceParams({ ...baseParams, cursor: nextCursor }),
+      controller.signal
+    )
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setIncidents((current) => [...current, ...page.items]);
+        setNextCursor(page.nextCursor);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setError('Impossible de charger la suite de la base de connaissance.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingMore(false);
+      });
+  }, [baseParams, nextCursor, loadingMore]);
 
   useEffect(() => {
     const requestedId = searchParams.get('incident');
@@ -148,6 +178,9 @@ export function useKnowledgeData() {
     incidents,
     lines,
     loading,
+    loadingMore,
+    hasMore: nextCursor !== null,
+    loadMore,
     error,
     query,
     lineFilter,
