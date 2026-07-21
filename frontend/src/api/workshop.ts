@@ -79,8 +79,8 @@ export async function listWorkshopHistoryEvents(
 export async function listWorkshopKnowledgeIncidents(
   params: IncidentWorkspaceParams = {},
   signal?: AbortSignal
-): Promise<WorkshopIncident[]> {
-  return api.get<WorkshopIncident[]>(
+): Promise<CursorPage<WorkshopIncident>> {
+  return api.get<CursorPage<WorkshopIncident>>(
     `/api/workshop/knowledge/incidents${buildQuery(params)}`,
     signal
   );

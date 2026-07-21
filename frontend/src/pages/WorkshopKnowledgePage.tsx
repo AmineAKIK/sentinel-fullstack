@@ -218,6 +218,9 @@ export default function WorkshopKnowledgePage() {
     incidents,
     lines,
     loading,
+    loadingMore,
+    hasMore,
+    loadMore,
     error,
     query,
     lineFilter,
@@ -291,9 +294,11 @@ export default function WorkshopKnowledgePage() {
             <h1>Base de connaissance</h1>
             {!loading && incidents.length > 0 && (
               <p className="kb-memory-line">
-                {incidents.length} intervention{incidents.length !== 1 ? 's' : ''} documentée
+                {incidents.length} intervention{incidents.length !== 1 ? 's' : ''}
+                {hasMore ? ' chargée' : ' documentée'}
                 {incidents.length !== 1 ? 's' : ''} sur {machineCount} machine
-                {machineCount !== 1 ? 's' : ''} — la mémoire de l'atelier.
+                {machineCount !== 1 ? 's' : ''} — la mémoire de l'atelier
+                {hasMore ? ', d’autres restent à charger' : ''}.
               </p>
             )}
           </div>
@@ -382,6 +387,19 @@ export default function WorkshopKnowledgePage() {
                 ))
               )}
             </div>
+
+            {hasMore && (
+              <div className="journal-load-more">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Chargement…' : 'Charger la suite'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Colonne détail */}
