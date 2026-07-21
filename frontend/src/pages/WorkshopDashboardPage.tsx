@@ -24,6 +24,7 @@ import {
   DashboardFilters as DashboardFiltersState,
 } from '../hooks/useDashboardFilters';
 import { useIncidentsData } from '../hooks/useIncidentsData';
+import { useFollowedResolvedIncidents } from '../hooks/useFollowedResolvedIncidents';
 import { useModalState, ReviewType } from '../hooks/useModalState';
 import { useIncidentActions } from '../hooks/useIncidentActions';
 import { useIncidentDrawerPosition } from '../hooks/useIncidentDrawerPosition';
@@ -108,6 +109,14 @@ export default function WorkshopDashboardPage() {
     },
     [setSelectedIncident, upsertIncidentData]
   );
+  const {
+    followedResolvedIncidents,
+    followedResolvedLoading,
+    followedResolvedLoadingMore,
+    followedResolvedHasMore,
+    followedResolvedError,
+    loadMoreFollowedResolved,
+  } = useFollowedResolvedIncidents(filters.scope === 'followed');
   const modal = useModalState();
   const { closeReview, openReview } = modal;
   const { activeModal, reviewIncident } = modal.state;
@@ -166,7 +175,14 @@ export default function WorkshopDashboardPage() {
     setReportedArbitrationKey(null);
   }, [selectedIncident?.id]);
 
-  const filteredIncidents = incidents.filter((incident) => {
+  // DR-12 : la projection active reste toujours complète (incidents) ; les
+  // suivis résolus (followedResolvedIncidents) ne sont fusionnés dans la vue
+  // que le temps où le filtre « Suivis » est actif — jamais mélangés dans le
+  // rafraîchissement périodique du Dashboard.
+  const scopedIncidents =
+    filters.scope === 'followed' ? [...incidents, ...followedResolvedIncidents] : incidents;
+
+  const filteredIncidents = scopedIncidents.filter((incident) => {
     const isResolved = isIncidentResolved(incident);
     if (filters.scope === 'followed' && !incident.is_followed) return false;
     if (filters.scope === 'assigned_to_me' && incident.taken_by_user_id !== user?.id) return false;
@@ -535,6 +551,33 @@ export default function WorkshopDashboardPage() {
                     </div>
                   </section>
                 ))}
+              </div>
+            )}
+
+            {filters.scope === 'followed' && followedResolvedError && (
+              <ErrorBanner style={{ marginTop: 16 }}>{followedResolvedError}</ErrorBanner>
+            )}
+
+            {filters.scope === 'followed' && followedResolvedLoading && (
+              <div className="workshop-results-loading">
+                <span
+                  className="spinner"
+                  aria-hidden="true"
+                  style={{ width: 20, height: 20, borderWidth: 3 }}
+                />
+              </div>
+            )}
+
+            {filters.scope === 'followed' && followedResolvedHasMore && (
+              <div className="journal-load-more">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={loadMoreFollowedResolved}
+                  disabled={followedResolvedLoadingMore}
+                >
+                  {followedResolvedLoadingMore ? 'Chargement…' : 'Charger la suite'}
+                </button>
               </div>
             )}
           </section>

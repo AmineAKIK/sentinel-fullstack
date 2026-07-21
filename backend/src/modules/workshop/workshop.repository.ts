@@ -433,8 +433,11 @@ export async function listActiveWorkshopLines() {
   return rows;
 }
 
-export async function listIncidents(userId: number, role: string) {
-  const includeFollowedResolved = role === 'RESPONSABLE';
+// DR-12 : la projection active du Dashboard reste toujours complète, sans
+// limite ni curseur — seuls les suivis terminaux (CLOSED/CANCELED/INVALIDATED)
+// sont désormais chargés séparément et paginés (listFollowedResolvedIncidents,
+// lot 7D), pour qu'un incident actif ne soit jamais masqué par une page pleine.
+export async function listIncidents(userId: number) {
   const { rows } = await pool.query(
     `SELECT ${INCIDENT_BASE_COLS},
             ${INCIDENT_ACTOR_COLS},
@@ -448,17 +451,69 @@ export async function listIncidents(userId: number, role: string) {
       AND wif.user_id = $1
       AND wif.deleted_at IS NULL
      WHERE wi.status IN ('OPEN', 'PENDING')
-        OR ($2 = TRUE AND wif.id IS NOT NULL)
      ORDER BY
-       CASE WHEN wi.status IN ('OPEN', 'PENDING') THEN 0 ELSE 1 END ASC,
        wi.is_priority DESC,
        wi.display_order DESC,
        wi.is_taken ASC,
        wi.created_at DESC`,
-    [userId, includeFollowedResolved]
+    [userId]
   );
 
   return rows;
+}
+
+export async function listFollowedResolvedIncidents(
+  userId: number,
+  query: QueryParams
+): Promise<CursorPage<unknown>> {
+  const { limit, cursor } = query;
+  const safeLimit = boundedInt(limit, INCIDENT_LIST_DEFAULT_LIMIT, 1, INCIDENT_LIST_MAX_LIMIT);
+
+  const filters = [
+    `wif.user_id = $1`,
+    `wif.deleted_at IS NULL`,
+    statusInSql('wi.status', ['CLOSED', 'CANCELED', 'INVALIDATED']),
+  ];
+  const params: Array<string | number> = [userId];
+
+  if (cursor && typeof cursor === 'object') {
+    const decoded = cursor as { sortValue: string; id: number };
+    params.push(decoded.sortValue);
+    const sortParamIndex = params.length;
+    params.push(decoded.id);
+    const idParamIndex = params.length;
+    filters.push(
+      `(wi.created_at, wi.id) < ($${sortParamIndex}::timestamptz, $${idParamIndex}::int)`
+    );
+  }
+
+  const { rows } = await pool.query(
+    `SELECT ${INCIDENT_BASE_COLS},
+            ${INCIDENT_ACTOR_COLS},
+            ${INCIDENT_FOLLOWER_COLS},
+            ${INCIDENT_ARBITRATION_COLS}
+     FROM workshop_incident_followers wif
+     JOIN workshop_incidents wi ON wi.id = wif.incident_id
+     ${INCIDENT_USER_JOINS}
+     ${INCIDENT_ARBITRATION_JOINS}
+     WHERE ${filters.join(' AND ')}
+     ORDER BY wi.created_at DESC, wi.id DESC
+     LIMIT $${params.length + 1}`,
+    [...params, safeLimit + 1]
+  );
+
+  const hasMore = rows.length > safeLimit;
+  const items = hasMore ? rows.slice(0, safeLimit) : rows;
+  const last = items[items.length - 1] as Record<string, unknown> | undefined;
+  const nextCursor =
+    hasMore && last
+      ? encodeCursor({
+          sortValue: new Date(last.created_at as Date).toISOString(),
+          id: last.id as number,
+        })
+      : null;
+
+  return { items, nextCursor };
 }
 
 export async function listIncidentWorkspaceRows(
