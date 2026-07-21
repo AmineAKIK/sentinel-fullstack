@@ -1,6 +1,7 @@
 import {
   arbitrationConsultationSchema,
   createIncidentSchema,
+  incidentWorkspaceQuerySchema,
   journalEventQuerySchema,
   updateIncidentSchema,
   workshopAnalyticsQuerySchema,
@@ -308,6 +309,26 @@ describe('journalEventQuerySchema', () => {
       start: '2026-01-01T00:00:00.000Z',
       end: '2027-01-03T00:00:01.000Z',
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── incidentWorkspaceQuerySchema (lot 7B/7C — pagination par curseur) ────────
+
+describe('incidentWorkspaceQuerySchema', () => {
+  it('accepts a query without a cursor', () => {
+    expect(incidentWorkspaceQuerySchema.safeParse({ status: 'CLOSED' }).success).toBe(true);
+  });
+
+  it('accepts an opaque cursor token', () => {
+    const result = incidentWorkspaceQuerySchema.safeParse({
+      cursor: 'b64token-opaque-and-unvalidated-here',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a cursor longer than 200 characters', () => {
+    const result = incidentWorkspaceQuerySchema.safeParse({ cursor: 'x'.repeat(201) });
     expect(result.success).toBe(false);
   });
 });

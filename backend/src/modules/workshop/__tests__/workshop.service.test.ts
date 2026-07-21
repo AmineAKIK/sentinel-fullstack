@@ -1046,23 +1046,61 @@ describe('listIncidentsService', () => {
 
 describe('listHistoryIncidentsService', () => {
   it('transmet la query au repository en mode history', async () => {
-    const rows = [mockIncident({ status: 'CLOSED' })];
-    jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(rows);
+    const page = { items: [mockIncident({ status: 'CLOSED' })], nextCursor: null };
+    jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(page);
     const result = await listHistoryIncidentsService({ status: 'CLOSED' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data).toEqual(rows);
-    expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith({ status: 'CLOSED' }, 'history');
+    if (result.ok) expect(result.data).toEqual(page);
+    expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith(
+      { status: 'CLOSED', cursor: undefined },
+      'history'
+    );
+  });
+
+  it('décode un curseur valide avant de le transmettre au repository (lot 7B)', async () => {
+    const page = { items: [], nextCursor: null };
+    jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(page);
+    const cursor = encodeCursor({ sortValue: '2026-03-15T10:00:00.000Z', id: 7 });
+
+    await listHistoryIncidentsService({ status: 'CLOSED', cursor });
+
+    expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith(
+      { status: 'CLOSED', cursor: { sortValue: '2026-03-15T10:00:00.000Z', id: 7 } },
+      'history'
+    );
+  });
+
+  it('rejette un curseur illisible sans appeler le repository', async () => {
+    const result = await listHistoryIncidentsService({ cursor: 'not-a-valid-cursor' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.listIncidentWorkspaceRows).not.toHaveBeenCalled();
   });
 });
 
 describe('listKnowledgeIncidentsService', () => {
   it('transmet la query au repository en mode knowledge', async () => {
-    const rows = [mockIncident({ status: 'CLOSED', intervention_note: 'Ok' })];
-    jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(rows);
+    const page = {
+      items: [mockIncident({ status: 'CLOSED', intervention_note: 'Ok' })],
+      nextCursor: null,
+    };
+    jest.mocked(repo.listIncidentWorkspaceRows).mockResolvedValue(page);
     const result = await listKnowledgeIncidentsService({ q: 'robot' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data).toEqual(rows);
-    expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith({ q: 'robot' }, 'knowledge');
+    if (result.ok) expect(result.data).toEqual(page);
+    expect(repo.listIncidentWorkspaceRows).toHaveBeenCalledWith(
+      { q: 'robot', cursor: undefined },
+      'knowledge'
+    );
+  });
+
+  it('rejette un curseur illisible sans appeler le repository', async () => {
+    const result = await listKnowledgeIncidentsService({ cursor: 'not-a-valid-cursor' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
+    expect(repo.listIncidentWorkspaceRows).not.toHaveBeenCalled();
   });
 });
 

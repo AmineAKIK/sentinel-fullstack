@@ -52,8 +52,8 @@ export interface CursorPage<T> {
 export async function listWorkshopHistoryIncidents(
   params: IncidentWorkspaceParams = {},
   signal?: AbortSignal
-): Promise<WorkshopIncident[]> {
-  return api.get<WorkshopIncident[]>(
+): Promise<CursorPage<WorkshopIncident>> {
+  return api.get<CursorPage<WorkshopIncident>>(
     `/api/workshop/history/incidents${buildQuery(params)}`,
     signal
   );

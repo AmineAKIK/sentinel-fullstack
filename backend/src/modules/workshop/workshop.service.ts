@@ -1,7 +1,7 @@
 import { badRequest, forbidden, notFound, ok, ServiceResult } from '../../utils/serviceResult';
 import { ANALYTICS_DEFAULT_WINDOW_DAYS } from '../../domain/constants';
 import { withTransaction } from '../../db/transaction';
-import { Cursor, decodeCursor } from '../../utils/cursor';
+import { decodeCursor } from '../../utils/cursor';
 import * as workshopRepository from './workshop.repository';
 import * as arbitrationRepository from './workshop.arbitration.repository';
 import type { ArbitrationRequestType } from './workshop.arbitration.repository';
@@ -77,10 +77,27 @@ export async function listIncidentsService(
   return ok(await workshopRepository.listIncidents(userId, role));
 }
 
+// Décode le jeton opaque `cursor` d'une query en objet {sortValue, id} avant
+// de la transmettre au repository — partagé par Historique, Connaissance et
+// Journal (lot 7), même contrat de curseur pour les trois écrans.
+function withDecodedCursor(
+  query: Record<string, unknown>
+): { ok: true; query: Record<string, unknown> } | { ok: false; error: ServiceResult<never> } {
+  const { cursor: cursorToken, ...rest } = query;
+  if (typeof cursorToken !== 'string' || !cursorToken) {
+    return { ok: true, query: { ...rest, cursor: undefined } };
+  }
+  const decoded = decodeCursor(cursorToken);
+  if (!decoded) return { ok: false, error: badRequest('Curseur de pagination invalide.') };
+  return { ok: true, query: { ...rest, cursor: decoded } };
+}
+
 export async function listHistoryIncidentsService(
   query: Record<string, unknown>
 ): Promise<ServiceResult<unknown>> {
-  return ok(await workshopRepository.listIncidentWorkspaceRows(query, 'history'));
+  const resolved = withDecodedCursor(query);
+  if (!resolved.ok) return resolved.error;
+  return ok(await workshopRepository.listIncidentWorkspaceRows(resolved.query, 'history'));
 }
 
 export async function getHistoryIncidentService(id: number): Promise<ServiceResult<unknown>> {
@@ -92,7 +109,9 @@ export async function getHistoryIncidentService(id: number): Promise<ServiceResu
 export async function listKnowledgeIncidentsService(
   query: Record<string, unknown>
 ): Promise<ServiceResult<unknown>> {
-  return ok(await workshopRepository.listIncidentWorkspaceRows(query, 'knowledge'));
+  const resolved = withDecodedCursor(query);
+  if (!resolved.ok) return resolved.error;
+  return ok(await workshopRepository.listIncidentWorkspaceRows(resolved.query, 'knowledge'));
 }
 
 export async function getKnowledgeIncidentService(id: number): Promise<ServiceResult<unknown>> {
@@ -110,14 +129,9 @@ export async function listHistoryEventsService(
   if (role !== 'RESPONSABLE') {
     return forbidden('Réservé au responsable atelier.');
   }
-  const { cursor: cursorToken, ...rest } = query;
-  let cursor: Cursor | undefined;
-  if (typeof cursorToken === 'string' && cursorToken) {
-    const decoded = decodeCursor(cursorToken);
-    if (!decoded) return badRequest('Curseur de pagination invalide.');
-    cursor = decoded;
-  }
-  return ok(await workshopRepository.listHistoryEvents({ ...rest, cursor }));
+  const resolved = withDecodedCursor(query);
+  if (!resolved.ok) return resolved.error;
+  return ok(await workshopRepository.listHistoryEvents(resolved.query));
 }
 
 export async function listIncidentEventsService(id: number): Promise<ServiceResult<unknown>> {

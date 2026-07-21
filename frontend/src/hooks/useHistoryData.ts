@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   getWorkshopHistoryIncident,
@@ -13,6 +13,10 @@ import {
   withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
 import { useDebouncedValue } from './useDebouncedValue';
+
+// Taille de page, pas plafond total : LIST-01 remplace la limite fixe par
+// une pagination par curseur (lot 7B).
+const HISTORY_INCIDENTS_PAGE_SIZE = 250;
 
 export type HistoryStatusFilter =
   'all' | 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
@@ -35,6 +39,8 @@ export function useHistoryData() {
   const [selectedId, setSelectedId] = useState('');
   const [events, setEvents] = useState<WorkshopIncidentEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -76,27 +82,32 @@ export function useHistoryData() {
     return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const params = buildIncidentWorkspaceParams({
+  const baseParams = useMemo(
+    () => ({
       query: debouncedQuery,
       statusFilter,
       stateFilter,
       lineFilter,
       machineFilter,
-      limit: 250,
-    });
+      limit: HISTORY_INCIDENTS_PAGE_SIZE,
+    }),
+    [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     setError('');
-    void listWorkshopHistoryIncidents(params, controller.signal)
-      .then((incidentData) => {
+    void listWorkshopHistoryIncidents(buildIncidentWorkspaceParams(baseParams), controller.signal)
+      .then((page) => {
         if (controller.signal.aborted) return;
-        setIncidents(incidentData);
+        setIncidents(page.items);
+        setNextCursor(page.nextCursor);
         setSelectedId((currentId) => {
-          if (incidentData.length === 0) return '';
-          return incidentData.some((inc) => String(inc.id) === currentId)
+          if (page.items.length === 0) return '';
+          return page.items.some((inc) => String(inc.id) === currentId)
             ? currentId
-            : String(incidentData[0].id);
+            : String(page.items[0].id);
         });
       })
       .catch(() => {
@@ -107,7 +118,29 @@ export function useHistoryData() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [debouncedQuery, statusFilter, stateFilter, lineFilter, machineFilter]);
+  }, [baseParams]);
+
+  const loadMore = useCallback((): void => {
+    if (!nextCursor || loadingMore) return;
+    const controller = new AbortController();
+    setLoadingMore(true);
+    void listWorkshopHistoryIncidents(
+      buildIncidentWorkspaceParams({ ...baseParams, cursor: nextCursor }),
+      controller.signal
+    )
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setIncidents((current) => [...current, ...page.items]);
+        setNextCursor(page.nextCursor);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setError("Impossible de charger la suite de l'historique atelier.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingMore(false);
+      });
+  }, [baseParams, nextCursor, loadingMore]);
 
   useEffect(() => {
     const requestedId = searchParams.get('incident');
@@ -208,6 +241,9 @@ export function useHistoryData() {
     selectedIncident,
     events,
     loading,
+    loadingMore,
+    hasMore: nextCursor !== null,
+    loadMore,
     eventsLoading,
     highlightedEventId,
     error,

@@ -28,6 +28,9 @@ export default function WorkshopHistoryPage() {
     selectedIncident,
     events,
     loading,
+    loadingMore,
+    hasMore,
+    loadMore,
     eventsLoading,
     highlightedEventId,
     error,
@@ -196,6 +199,19 @@ export default function WorkshopHistoryPage() {
                   })
                 )}
               </div>
+
+              {hasMore && (
+                <div className="journal-load-more">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? 'Chargement…' : 'Charger la suite'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

@@ -54,6 +54,7 @@ export const incidentWorkspaceQuerySchema = z.object({
   machineId: z.string().trim().max(FIELD_LIMITS.SEARCH).optional(),
   eventType: z.string().trim().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(INCIDENT_LIST_MAX_LIMIT).optional(),
+  cursor: z.string().trim().max(200).optional(),
 });
 
 const isoDateTimeSchema = z
@@ -103,7 +104,6 @@ export const journalEventQuerySchema = withBoundedWindow(
   incidentWorkspaceQuerySchema.extend({
     start: isoDateTimeSchema.optional(),
     end: isoDateTimeSchema.optional(),
-    cursor: z.string().trim().max(200).optional(),
   })
 );
 
