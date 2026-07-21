@@ -231,6 +231,20 @@ Les logs Docker sont limités à cinq fichiers de 10 Mo par service. Le backend
 masque les cookies et en-têtes d'autorisation dans les requêtes journalisées.
 Ne pas augmenter le niveau de log en production sans surveiller le volume.
 
+### Test de charge
+
+`scripts/load-test.js` (k6) mesure la latence de `/api/health` sous un débit
+constant de 2 req/s pendant deux minutes — sous le seuil de rate limiting
+nominal (`GLOBAL_API_RATE_LIMIT_MAX=3000` sur 15 min, soit ~3,3 req/s/IP).
+Manuel, non intégré à la CI : à exécuter contre une instance dédiée, jamais
+contre la base de test partagée des autres suites.
+
+```bash
+k6 run --env BASE_URL=http://127.0.0.1:3000 scripts/load-test.js
+```
+
+Seuils attendus : moins de 1 % d'échecs, p95 sous 300 ms, p99 sous 800 ms.
+
 ## 8. Procédures d'incident
 
 ### Site inaccessible
