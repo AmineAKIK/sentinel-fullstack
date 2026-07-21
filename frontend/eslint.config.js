@@ -41,7 +41,7 @@ export default tseslint.config(
       'jsx-a11y/label-has-associated-control': 'off',
     },
   },
-  // Relax rules for test files — mocks are inherently any-typed, prop names may shadow ARIA attrs
+  // Relax rules for test files — mocks are inherently any-typed
   {
     files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}'],
     rules: {
@@ -49,6 +49,14 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+    },
+  },
+  // IncidentMetricsBar takes a business-domain `role` prop (OPERATOR/MAINTENANCE/RESPONSABLE),
+  // not an ARIA role — jsx-a11y/aria-role can't distinguish a custom component prop from a
+  // native element's ARIA attribute and flags it as an invalid ARIA role value.
+  {
+    files: ['src/components/__tests__/IncidentMetricsBar.test.tsx'],
+    rules: {
       'jsx-a11y/aria-role': 'off',
     },
   }

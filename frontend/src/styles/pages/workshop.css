@@ -537,7 +537,6 @@ button.workshop-metric:hover,
   box-shadow: var(--shadow);
   padding: 14px 16px;
   min-height: 0;
-  cursor: pointer;
   transform: translateY(0);
   transition:
     border-color var(--transition-base),
@@ -548,14 +547,21 @@ button.workshop-metric:hover,
   scroll-margin-block: 35dvh;
 }
 
-.incident-card:hover {
-  /* On colore les bords au survol mais on préserve le liseré gauche, qui
-     encode le niveau d'attention (P1/P4) — il ne doit pas virer au bleu. */
-  border-top-color: var(--color-primary);
-  border-right-color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+.incident-card-open {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.incident-card-open:hover h2,
+.incident-card-open:focus-visible h2 {
+  text-decoration: underline;
+  color: var(--color-primary);
 }
 
 /* Liseré gauche = niveau d'attention (doctrine §5.1, P1). L'urgent émerge par

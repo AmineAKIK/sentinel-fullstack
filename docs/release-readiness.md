@@ -164,12 +164,12 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `A11Y-01` | P1 | 8 | `IncidentCard` imbrique un pseudo-bouton et de vrais boutons. | Arbre interactif valide et tests clavier. | OPEN |
-| `A11Y-02` | P1 | 8 | Lignes utilisateurs/lignes en `tr role="button"`. | Action native dans une cellule, sémantique table conservée. | OPEN |
-| `A11Y-03` | P1 | 8 | Filtre d'événement du Journal sans nom accessible. | Label associé vérifié par Testing Library/axe. | OPEN |
-| `A11Y-04` | P1 | 8 | Certains états fiche utilisateur omettent `main-content`. | Skip link valide dans tous les états. | OPEN |
-| `A11Y-05` | P1 | 8 | Valeurs du graphique disponibles seulement via `title`. | Alternative textuelle ou tableau accessible. | OPEN |
-| `A11Y-06` | P1 | 8 | Règle label désactivée et aucune preuve axe/Lighthouse. | Règle active, axe critique vert et recette clavier consignée. | OPEN |
+| `A11Y-01` | P1 | 8 | `IncidentCard` imbrique un pseudo-bouton et de vrais boutons. | Arbre interactif valide et tests clavier. | VERIFIED |
+| `A11Y-02` | P1 | 8 | Lignes utilisateurs/lignes en `tr role="button"`. | Action native dans une cellule, sémantique table conservée. | VERIFIED |
+| `A11Y-03` | P1 | 8 | Filtre d'événement du Journal sans nom accessible. | Label associé vérifié par Testing Library/axe. | VERIFIED |
+| `A11Y-04` | P1 | 8 | Certains états fiche utilisateur omettent `main-content`. | Skip link valide dans tous les états. | VERIFIED |
+| `A11Y-05` | P1 | 8 | Valeurs du graphique disponibles seulement via `title`. | Alternative textuelle ou tableau accessible. | VERIFIED |
+| `A11Y-06` | P1 | 8 | Règle label désactivée et aucune preuve axe/Lighthouse. | Règle active, axe critique vert et recette clavier consignée. | VERIFIED |
 
 ### Exploitation et preuves
 
@@ -218,7 +218,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `5` | Rendre l'outbox observable et résistante aux reprises partielles. | `OUT-01` à `OUT-05` | Lots 3 et 4 | VERIFIED |
 | `6` | Définir et fiabiliser périodes, rôles et KPI du Pilotage. | `ANA-01` à `ANA-06` | Lot 3 | VERIFIED |
 | `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | VERIFIED |
-| `8` | Corriger la sémantique et prouver les parcours accessibles. | `A11Y-01` à `A11Y-06` | Lots 4 et 7 | OPEN |
+| `8` | Corriger la sémantique et prouver les parcours accessibles. | `A11Y-01` à `A11Y-06` | Lots 4 et 7 | VERIFIED |
 | `9` | Durcir et exercer sauvegarde/restauration. | `OPS-01` à `OPS-04` | Lot 3 | OPEN |
 | `10` | Remplacer les preuves textuelles fragiles par des tests comportementaux. | `TEST-01` à `TEST-05` | Lots 1 à 9 | OPEN |
 | `11` | Régénérer un dossier exact, reproductible et conforme. | `DOC-01` à `DOC-06`, `GOV-01` | Lots 1 à 10 | OPEN |
@@ -334,6 +334,28 @@ projection active (toujours complète, sans borne) des suivis résolus, chargés
 Un bug latent a été corrigé au passage : `boundedInt()` ignorait silencieusement
 un `limit` passé en `number` plutôt qu'en `string`, retombant sur la valeur par
 défaut — invisible tant qu'aucun test n'appelait le repository directement.
+
+**Lot 8 clos localement, CI distante à confirmer.** La carte incident n'imbrique
+plus un bouton dans un autre bouton (`IncidentCard` : conteneur `<article>`,
+seul le titre est un vrai `<button>`) et les lignes de tableau Utilisateurs/
+Lignes ont perdu leur `role="button"` de substitution au profit d'une vraie
+action nommée dans la cellule (`A11Y-01`, `A11Y-02`). Le filtre de type
+d'action du Journal porte désormais un nom accessible (`A11Y-03`), et la fiche
+utilisateur conserve la cible du lien d'évitement `#main-content` dans ses
+états de chargement et d'erreur, pas seulement à l'affichage réussi (`A11Y-04`).
+Les valeurs du graphique de tendance Pilotage (créés/clôturés par jour) sont
+désormais exposées en texte accessible en plus du `title` au survol, les
+barres décoratives portant `aria-hidden` (`A11Y-05`). La règle
+`jsx-a11y/aria-role` — désactivée à tort sur l'ensemble des fichiers de test —
+a été resserrée au seul fichier où elle produisait un faux positif réel (la
+prop métier `role` d'`IncidentMetricsBar`, confondue avec un rôle ARIA), avec
+la justification en commentaire ; les autres exceptions `jsx-a11y` restantes
+(`no-autofocus`, `label-has-associated-control`) étaient déjà justifiées et
+documentées. Une suite E2E `axe-core` (`@axe-core/playwright`) couvre
+désormais douze parcours authentifiés et publics (connexions Admin/Atelier,
+Board, dashboard, Journal, Historique, Connaissance, Pilotage, accueil Admin,
+listes Utilisateurs/Lignes, fiche utilisateur) sans violation `serious` ou
+`critical` WCAG 2 A/AA — la preuve automatisée qui manquait (`A11Y-06`).
 
 ### Porte D — certification
 

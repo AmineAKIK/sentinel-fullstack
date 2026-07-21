@@ -44,21 +44,10 @@ export default function IncidentCard({
   const attentionLevel = isResolvedFollowed ? 'calm' : incidentAttentionLevel(incident);
 
   return (
-    <div
-      role="button"
+    <article
       data-incident-card-id={incident.id}
       className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isSelected ? ' is-selected' : ''}`}
       aria-current={isSelected || undefined}
-      onClick={() => onClick(incident)}
-      tabIndex={0}
-      aria-label={`Ouvrir incident${isActiveUrgent ? ' urgent' : ''} ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onClick(incident);
-        }
-      }}
     >
       {isResolvedFollowed && (
         <div className="incident-followed-resolved-banner">
@@ -67,19 +56,23 @@ export default function IncidentCard({
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleFollow?.(incident);
-            }}
+            onClick={() => onToggleFollow?.(incident)}
           >
             Retirer du suivi
           </button>
         </div>
       )}
       <div className="incident-card-main">
-        <h2>
-          Ligne {incident.line_number} · {incident.machine_id}
-        </h2>
+        <button
+          type="button"
+          className="incident-card-open"
+          onClick={() => onClick(incident)}
+          aria-label={`Ouvrir incident${isActiveUrgent ? ' urgent' : ''} ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
+        >
+          <h2>
+            Ligne {incident.line_number} · {incident.machine_id}
+          </h2>
+        </button>
         <div className="incident-card-controls">
           <div className="incident-card-status" aria-label="Statuts de l'incident">
             <IncidentStateChip incident={incident} />
@@ -97,10 +90,7 @@ export default function IncidentCard({
               className={`incident-follow-toggle${incident.is_followed ? ' is-active' : ''}`}
               aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
               title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleFollow?.(incident);
-              }}
+              onClick={() => onToggleFollow?.(incident)}
             >
               <StarIcon filled={Boolean(incident.is_followed)} />
             </button>
@@ -113,10 +103,7 @@ export default function IncidentCard({
             <button
               type="button"
               className="incident-request-action incident-request-action--edit"
-              onClick={(event) => {
-                event.stopPropagation();
-                onReviewEdit(event, incident);
-              }}
+              onClick={(event) => onReviewEdit(event, incident)}
             >
               {editArbitrationWaiting ? 'Correction en attente' : 'Correction demandée'}
             </button>
@@ -125,10 +112,7 @@ export default function IncidentCard({
             <button
               type="button"
               className="incident-request-action incident-request-action--delete"
-              onClick={(event) => {
-                event.stopPropagation();
-                onReviewDelete(event, incident);
-              }}
+              onClick={(event) => onReviewDelete(event, incident)}
             >
               {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation demandée'}
             </button>
@@ -193,6 +177,6 @@ export default function IncidentCard({
           Suspension justifiée : {incident.diagnostic}
         </div>
       )}
-    </div>
+    </article>
   );
 }
