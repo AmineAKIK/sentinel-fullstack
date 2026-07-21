@@ -532,9 +532,16 @@ et `index.html` sans cache afin de préserver les déploiements SPA.
 `scripts/backup.sh` travaille via `docker compose exec -T postgres`, jamais via
 un nom de conteneur. Il vérifie le dump avant publication et crée son checksum.
 
-`scripts/restore.sh` importe dans une base temporaire, contrôle les tables
-structurantes, arrête brièvement le backend puis échange les noms de base. Un trap
-nettoie la base temporaire et tente le retour arrière si la bascule est incomplète.
+`scripts/restore.sh` et `scripts/backup.sh` partagent le même verrou de fichier
+(`$BACKUP_DIR/.sentinel-backup.lock`) : une sauvegarde et une restauration ne
+peuvent jamais s'exécuter en même temps. La restauration refuse par défaut tout
+dump sans checksum SHA-256 associé — `--allow-unverified` force le passage avec
+un avertissement audité en sortie d'erreur. Elle importe ensuite dans une base
+temporaire, valide la présence des quinze tables du schéma, la cohérence du
+ledger `schema_migrations` (aucun checksum ni horodatage manquant) et quelques
+colonnes témoins, avant d'arrêter brièvement le backend et d'échanger les noms
+de base. Un trap nettoie la base temporaire et tente le retour arrière si la
+bascule est incomplète.
 
 ## 17. Limites connues et extensions
 

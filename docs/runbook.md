@@ -118,10 +118,19 @@ Politique minimale recommandée :
 ./scripts/restore.sh backups/sentinel_backup_YYYY-MM-DD_HH-MM-SS.sql.gz
 ```
 
+Le script refuse de démarrer si une sauvegarde est en cours (verrou partagé avec
+`backup.sh`), et refuse tout dump sans fichier `.sha256` associé — sauf ajout
+explicite de `--allow-unverified`, qui journalise un avertissement audité :
+
+```bash
+./scripts/restore.sh --allow-unverified backups/sentinel_backup_sans_checksum.sql.gz
+```
+
 Pour confirmer, saisir exactement le nom de base affiché. Le script importe dans
-une base temporaire, contrôle le schéma, arrête le backend, bascule les bases puis
-redémarre le service. En cas d'échec avant la fin de la bascule, son trap tente de
-restaurer le nom de la base initiale.
+une base temporaire, contrôle le schéma (quinze tables), le ledger de migrations
+et des colonnes témoins, arrête le backend, bascule les bases puis redémarre le
+service. En cas d'échec avant la fin de la bascule, son trap tente de restaurer
+le nom de la base initiale.
 
 Après restauration :
 

@@ -175,9 +175,9 @@ commit audité au démarrage de cette branche.
 
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
-| `OPS-01` | P1 | 9 | Restore n'acquiert pas le verrou utilisé par backup. | Test d'exclusion mutuelle. | OPEN |
-| `OPS-02` | P1 | 9 | Restore accepte un dump sans checksum. | Refus par défaut, exception explicite auditée. | OPEN |
-| `OPS-03` | P1 | 9 | Validation restore limitée à trois tables. | Ledger, checksums et données témoins contrôlés. | OPEN |
+| `OPS-01` | P1 | 9 | Restore n'acquiert pas le verrou utilisé par backup. | Test d'exclusion mutuelle. | VERIFIED |
+| `OPS-02` | P1 | 9 | Restore accepte un dump sans checksum. | Refus par défaut, exception explicite auditée. | VERIFIED |
+| `OPS-03` | P1 | 9 | Validation restore limitée à trois tables. | Ledger, checksums et données témoins contrôlés. | VERIFIED |
 | `OPS-04` | EXT | 9 | Aucun exercice réel avec RTO et copie chiffrée prouvés. | Rapport daté sans données de production. | BLOCKED_EXTERNAL |
 | `REL-01` | P0 | 12 | Aucun tag de release immuable. | Tag signé/protégé et release GitHub sur le SHA final. | OPEN |
 | `REL-02` | P0 | 12 | VPS différent du candidat audité. | `/api/health.version` égale le SHA du tag. | OPEN |
@@ -366,6 +366,32 @@ comme le lockfile backend contenaient des entrées `@emnapi/*` sous-figées que
 seul `npm ci` (pas `npm install`) rejette sous npm 11.16.0, la version exacte
 utilisée par la CI ; et `js-yaml` était épinglé par un override à `4.2.0`,
 dans la plage vulnérable de `GHSA-52cp-r559-cp3m`, corrigé à `4.3.0`.
+
+**Lot 9 : `OPS-01` à `OPS-03` clos et vérifiés en conditions réelles (Docker
+Compose, PostgreSQL réel) ; `OPS-04` reste `BLOCKED_EXTERNAL`, donc le lot ne
+peut pas passer `VERIFIED`.** `restore.sh` acquiert désormais le même verrou de
+fichier que `backup.sh` (`$BACKUP_DIR/.sentinel-backup.lock`) : les deux sens de
+la contention ont été prouvés (un backup en cours bloque une restauration, et
+inversement). La restauration refuse par défaut tout dump sans `.sha256`
+associé, avec un message de refus explicite ; `--allow-unverified` permet de
+passer outre en journalisant un avertissement audité. La validation du schéma
+avant bascule est passée de trois tables à la structure complète (quinze
+tables), plus la cohérence du ledger `schema_migrations` (aucun `checksum` ni
+`applied_at` NULL) et de colonnes témoins sur les tables les plus critiques —
+un dump hors schéma Sentinel et un dump au ledger tronqué ont chacun été
+produits et rejetés avant toute tentative de bascule, sans jamais toucher la
+base réelle. Un bug a été corrigé pendant la vérification : la requête de
+validation plantait avec une erreur SQL brute (au lieu du message `[restore]`
+attendu) quand une table centrale manquait, parce que `count(*)` sur une table
+absente échoue avant que PostgreSQL n'évalue le reste du `AND` — la validation
+est désormais scindée en deux passes (existence des tables, puis ledger),
+chacune protégée contre l'échec de requête. Une deuxième correction a retiré
+`workshop_arbitration_reads` de la liste de tables attendues : ce nom est un
+résidu d'un fichier de migration renommé (`038_create_workshop_arbitration_
+reads.sql` → `..._consultations.sql`, cf. l'alias dans `migrate.ts`), jamais une
+table du schéma actuel — sans le rejeu réel des 48 migrations en conditions
+Docker, cette erreur serait passée inaperçue et aurait fait échouer toute
+restauration légitime en production.
 
 ### Porte D — certification
 
