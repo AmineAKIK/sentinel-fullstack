@@ -335,7 +335,8 @@ Un bug latent a été corrigé au passage : `boundedInt()` ignorait silencieusem
 un `limit` passé en `number` plutôt qu'en `string`, retombant sur la valeur par
 défaut — invisible tant qu'aucun test n'appelait le repository directement.
 
-**Lot 8 clos localement, CI distante à confirmer.** La carte incident n'imbrique
+**Lot 8 clos, CI distante verte sur les cinq jobs (commit `3918be3`).** La
+carte incident n'imbrique
 plus un bouton dans un autre bouton (`IncidentCard` : conteneur `<article>`,
 seul le titre est un vrai `<button>`) et les lignes de tableau Utilisateurs/
 Lignes ont perdu leur `role="button"` de substitution au profit d'une vraie
@@ -356,6 +357,15 @@ désormais douze parcours authentifiés et publics (connexions Admin/Atelier,
 Board, dashboard, Journal, Historique, Connaissance, Pilotage, accueil Admin,
 listes Utilisateurs/Lignes, fiche utilisateur) sans violation `serious` ou
 `critical` WCAG 2 A/AA — la preuve automatisée qui manquait (`A11Y-06`).
+
+La confirmation CI a mis au jour trois défauts préexistants, sans rapport avec
+l'accessibilité, corrigés dans la foulée pour rouvrir la porte : `verify:
+reliability` référençait encore `trendRows`, la variable renommée en
+`createdTrendRows`/`closedTrendRows` lors du lot 6 ; le lockfile frontend
+comme le lockfile backend contenaient des entrées `@emnapi/*` sous-figées que
+seul `npm ci` (pas `npm install`) rejette sous npm 11.16.0, la version exacte
+utilisée par la CI ; et `js-yaml` était épinglé par un override à `4.2.0`,
+dans la plage vulnérable de `GHSA-52cp-r559-cp3m`, corrigé à `4.3.0`.
 
 ### Porte D — certification
 
