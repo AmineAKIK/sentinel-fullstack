@@ -46,6 +46,10 @@ fail() {
 
 cleanup() {
   local code=$?
+  if [[ "$code" -ne 0 ]]; then
+    echo "[test-backup-restore] Échec (code $code) — logs PostgreSQL :" >&2
+    docker compose logs postgres >&2 || true
+  fi
   docker compose down postgres --volumes >/dev/null 2>&1 || true
   rm -rf "$WORKDIR"
   exit "$code"
@@ -54,13 +58,20 @@ trap cleanup EXIT INT TERM
 
 echo "[test-backup-restore] Démarrage de PostgreSQL jetable..."
 docker compose up -d postgres >/dev/null
-for _ in $(seq 1 30); do
+READY=false
+for _ in $(seq 1 60); do
   if docker compose exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+    READY=true
     break
   fi
-  sleep 1
+  sleep 2
 done
-docker compose exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null
+if [[ "$READY" != true ]]; then
+  echo "[test-backup-restore] PostgreSQL n'est pas devenu prêt à temps. Diagnostic :" >&2
+  docker compose ps postgres >&2 || true
+  docker compose logs postgres >&2 || true
+  exit 1
+fi
 
 echo "[test-backup-restore] Chargement du schéma réel (migrations SQL brutes)..."
 while IFS= read -r f; do
