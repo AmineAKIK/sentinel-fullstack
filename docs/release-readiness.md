@@ -406,7 +406,8 @@ manuel et volontairement hors CI. Le dossier jury précise maintenant que les
 seuils de couverture Jest portent sur le périmètre `collectCoverageFrom`
 configuré, jamais sur l'ensemble du code backend.
 
-`TEST-04` clos. `scripts/test-backup-restore.sh` (nouveau) exerce
+`TEST-04` clos, CI verte sur les six jobs (commit `bb90198`, nouveau job `Ops /
+Backup and restore drill` inclus). `scripts/test-backup-restore.sh` (nouveau) exerce
 `backup.sh`/`restore.sh` contre un PostgreSQL Docker Compose jetable avec les
 48 migrations réellement rejouées : sauvegarde nominale, restauration
 nominale avec bascule effective des données, exclusion mutuelle dans les deux
