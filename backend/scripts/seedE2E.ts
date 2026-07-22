@@ -31,6 +31,7 @@ export const E2E_LINE_NUMBER = '999';
 export const E2E_MACHINE_ID = 'E2E-MCH-1';
 export const E2E_RESPONSABLE_BADGE = '990001';
 export const E2E_OPERATOR_BADGE = '990002';
+export const E2E_MAINTENANCE_BADGE = '990003';
 export const E2E_WORKSHOP_PASSWORD = 'E2eWorkshop!23';
 
 async function upsertAdmin(): Promise<void> {
@@ -91,7 +92,7 @@ async function upsertWorkshopUser(input: {
   firstName: string;
   lastName: string;
   badgeNumber: string;
-  role: 'OPERATOR' | 'RESPONSABLE';
+  role: 'OPERATOR' | 'MAINTENANCE' | 'RESPONSABLE';
 }): Promise<number> {
   const passwordHash = await hashWorkshopPassword(E2E_WORKSHOP_PASSWORD);
   const { rows: existingRows } = await pool.query<{ id: number }>(
@@ -205,6 +206,12 @@ async function main(): Promise<void> {
     lastName: 'E2E',
     badgeNumber: E2E_RESPONSABLE_BADGE,
     role: 'RESPONSABLE',
+  });
+  await upsertWorkshopUser({
+    firstName: 'Maintenance',
+    lastName: 'E2E',
+    badgeNumber: E2E_MAINTENANCE_BADGE,
+    role: 'MAINTENANCE',
   });
   await createArbitrationIncidents(lineId, operatorId);
   console.log(
