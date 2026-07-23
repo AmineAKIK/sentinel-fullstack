@@ -1,4 +1,9 @@
 import { Request, Response } from 'express';
+// Side-effect import: declares req.workshopUser on Express.Request. This file
+// uses that augmentation extensively without otherwise depending on the
+// middleware — omitting the import works by accident whenever some other
+// entry point in the same compilation happens to load it first.
+import '../../middlewares/workshopAuth';
 import {
   formatZodError,
   handleControllerError,

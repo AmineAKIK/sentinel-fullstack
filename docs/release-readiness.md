@@ -191,7 +191,7 @@ commit audité au démarrage de cette branche.
 | --- | --- | ---: | --- | --- | --- |
 | `TEST-01` | P1 | 10 | Couverture partielle parfois présentée sans son périmètre. | Rapports et dossier parlent de couverture ciblée. | VERIFIED |
 | `TEST-02` | P1 | 10 | Contrôles de fiabilité surtout fondés sur des recherches de chaînes. | Contrats critiques couverts par comportement. | OPEN |
-| `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | OPEN |
+| `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | VERIFIED |
 | `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | VERIFIED |
 | `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | VERIFIED |
 | `DOC-01` | P0 | 11 | Dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | Faits générés depuis le candidat final. | OPEN |
@@ -425,9 +425,40 @@ PostgreSQL dédiée : c'est un proxy HTTP stateless sans donnée à vérifier
 après coup, sa seule dépendance DB réelle (revalidation d'auth) étant déjà
 couverte ailleurs (`DR-24`).
 
-`TEST-02` (checks textuels de `verifyReliability.js`) et `TEST-03` (E2E cycle
-de vie incident, rôles OPERATOR/MAINTENANCE, Board, Pilotage, Admin) restent
-à traiter.
+`TEST-03` clos. Quatre nouveaux fichiers E2E portent la couverture de 4 à 8
+fichiers, 22 à 29 scénarios : `incident-lifecycle.spec.ts` exerce le cycle
+complet création → prise en charge → suspension → reprise → clôture avec
+deux comptes distincts (OPERATOR puis MAINTENANCE, ce dernier ajouté au seed
+E2E qui n'avait jusqu'ici que RESPONSABLE et OPERATOR) ; `board.spec.ts`
+couvre le flux fonctionnel Board (code invalide refusé, code valide donnant
+accès, session persistée au rechargement — le seed configure désormais un
+`board_code_hash` réel sur l'admin E2E) ; `pilotage.spec.ts` couvre les
+préréglages de période, la validation de plage personnalisée invalide et le
+filtre Ligne→Machine en cascade ; `admin-users.spec.ts` couvre la création
+d'utilisateur de bout en bout (aperçu, code temporaire à usage unique,
+présence dans la liste) et le refus d'un badge déjà pris. `SelectField`
+étant un combobox ARIA custom et non un `<select>` natif, ces specs ouvrent
+puis cliquent l'option plutôt que d'utiliser `selectOption()`.
+
+Deux défauts de fond, sans rapport avec les tests eux-mêmes, ont été corrigés
+en cours de route : `workshop.controller.ts` utilisait `req.workshopUser`
+(augmentation de type globale déclarée dans `workshopAuth.ts`) sans jamais
+importer ce module — cela ne posait problème que lorsqu'aucun autre point
+d'entrée du même programme TypeScript ne chargeait `workshopAuth.ts` en
+premier, ce qui était vrai jusqu'ici pour tous les scripts mais plus pour
+`seedE2E.ts` une fois qu'il a dû importer `hashBoardCode` (qui dépend
+transitivement du contrôleur) ; corrigé par un import de dépendance
+explicite. Le générateur de code temporaire utilise un alphabet
+alphanumérique restreint (chiffres 2-9, lettres sans ambiguïté visuelle), pas
+des chiffres purs — un premier essai de regex trop étroit dans le test l'a
+révélé.
+
+Admin Audit et Paramètres, ainsi qu'une connexion OPERATOR autonome hors du
+cycle de vie incident, restent sans E2E dédié — non bloquant, laissé pour une
+passe ultérieure si le temps le permet.
+
+`TEST-02` (checks textuels de `verifyReliability.js`) reste seul ouvert dans
+ce lot.
 
 ### Porte D — certification
 

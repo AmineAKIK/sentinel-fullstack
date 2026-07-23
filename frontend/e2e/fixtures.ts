@@ -15,3 +15,4 @@ export const E2E_RESPONSABLE_BADGE = '990001';
 export const E2E_OPERATOR_BADGE = '990002';
 export const E2E_MAINTENANCE_BADGE = '990003';
 export const E2E_WORKSHOP_PASSWORD = 'E2eWorkshop!23';
+export const E2E_BOARD_CODE = 'e2e-board-code-42';
