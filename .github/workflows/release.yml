@@ -1,0 +1,118 @@
+name: Release
+
+# Déclenché par un tag de version (v1.0.0, v1.0.0-rc.1, ...). Construit les
+# images backend/frontend au SHA exact du tag, les pousse vers GHCR taguées par
+# version et par SHA, consigne leurs digests immuables, et publie une release
+# GitHub qui référence ces digests (REL-01, REL-03). Le VPS déploie ensuite ces
+# images par digest, jamais une reconstruction locale.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: ghcr.io/${{ github.repository }}
+
+jobs:
+  release:
+    name: Build, push and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve build metadata
+        id: meta
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # Namespace GHCR : minuscules obligatoires.
+          owner_repo="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "backend_image=ghcr.io/${owner_repo}/backend" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${owner_repo}/frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      - name: Build images at the tagged SHA
+        env:
+          BUILD_SHA: ${{ steps.meta.outputs.sha }}
+          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
+        run: |
+          docker build \
+            --build-arg BUILD_SHA="$BUILD_SHA" \
+            --tag "$BACKEND_IMAGE:${{ github.ref_name }}" \
+            --tag "$BACKEND_IMAGE:sha-${BUILD_SHA}" \
+            ./backend
+          docker build \
+            --build-arg VITE_API_URL= \
+            --build-arg BUILD_SHA="$BUILD_SHA" \
+            --tag "$FRONTEND_IMAGE:${{ github.ref_name }}" \
+            --tag "$FRONTEND_IMAGE:sha-${BUILD_SHA}" \
+            ./frontend
+
+      - name: Assert image provenance (non-root, revision label)
+        env:
+          BUILD_SHA: ${{ steps.meta.outputs.sha }}
+          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
+        run: |
+          test "$(docker image inspect --format '{{.Config.User}}' "$BACKEND_IMAGE:${{ github.ref_name }}")" = "node"
+          test "$(docker image inspect --format '{{.Config.User}}' "$FRONTEND_IMAGE:${{ github.ref_name }}")" = "nginx"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$BACKEND_IMAGE:${{ github.ref_name }}")" = "$BUILD_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$FRONTEND_IMAGE:${{ github.ref_name }}")" = "$BUILD_SHA"
+
+      - name: Push images
+        env:
+          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
+        run: |
+          docker push "$BACKEND_IMAGE:${{ github.ref_name }}"
+          docker push "$BACKEND_IMAGE:sha-${{ steps.meta.outputs.sha }}"
+          docker push "$FRONTEND_IMAGE:${{ github.ref_name }}"
+          docker push "$FRONTEND_IMAGE:sha-${{ steps.meta.outputs.sha }}"
+
+      - name: Capture immutable digests
+        id: digests
+        env:
+          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
+        run: |
+          backend_digest="$(docker inspect --format '{{ index .RepoDigests 0 }}' "$BACKEND_IMAGE:${{ github.ref_name }}")"
+          frontend_digest="$(docker inspect --format '{{ index .RepoDigests 0 }}' "$FRONTEND_IMAGE:${{ github.ref_name }}")"
+          echo "backend=$backend_digest" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend_digest" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## Images immuables"
+            echo
+            echo "Déployer ces images par digest (jamais un rebuild local) :"
+            echo
+            echo '```'
+            echo "backend  ${{ steps.digests.outputs.backend }}"
+            echo "frontend ${{ steps.digests.outputs.frontend }}"
+            echo '```'
+            echo
+            echo "Commit : \`${{ steps.meta.outputs.sha }}\`"
+            echo
+            echo "Vérifier après déploiement : \`GET /api/health\` renvoie \`version\` = ce commit."
+          } > release-notes.md
+          prerelease_flag=""
+          case "${{ github.ref_name }}" in
+            *-rc*|*-beta*|*-alpha*) prerelease_flag="--prerelease" ;;
+          esac
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file release-notes.md \
+            $prerelease_flag
