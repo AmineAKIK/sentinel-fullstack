@@ -14,6 +14,7 @@
 import 'dotenv/config';
 import pool from '../src/db/pool';
 import { hashAdminPassword, hashWorkshopPassword } from '../src/auth/bcrypt';
+import { hashBoardCode } from '../src/modules/board/board.auth';
 import { createLineData } from '../src/modules/lines/lines.repository';
 import {
   createIncidentService,
@@ -33,15 +34,20 @@ export const E2E_RESPONSABLE_BADGE = '990001';
 export const E2E_OPERATOR_BADGE = '990002';
 export const E2E_MAINTENANCE_BADGE = '990003';
 export const E2E_WORKSHOP_PASSWORD = 'E2eWorkshop!23';
+export const E2E_BOARD_CODE = 'e2e-board-code-42';
 
 async function upsertAdmin(): Promise<void> {
   const passwordHash = await hashAdminPassword(E2E_ADMIN_PASSWORD);
+  const boardCodeHash = await hashBoardCode(E2E_BOARD_CODE);
   await pool.query(
-    `INSERT INTO admin_accounts (username, password_hash)
-     VALUES ($1, $2)
+    `INSERT INTO admin_accounts (username, password_hash, board_enabled, board_code_hash)
+     VALUES ($1, $2, TRUE, $3)
      ON CONFLICT (username)
-     DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = NOW()`,
-    [E2E_ADMIN_USERNAME, passwordHash]
+     DO UPDATE SET password_hash = EXCLUDED.password_hash,
+                   board_enabled = TRUE,
+                   board_code_hash = EXCLUDED.board_code_hash,
+                   updated_at = NOW()`,
+    [E2E_ADMIN_USERNAME, passwordHash, boardCodeHash]
   );
 }
 
