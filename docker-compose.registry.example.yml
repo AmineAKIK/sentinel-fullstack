@@ -1,0 +1,25 @@
+# Variante de déploiement par images de registry (GHCR), à copier en
+# docker-compose.registry.yml sur le VPS. Le workflow Release pousse les images
+# backend/frontend taguées par version et par digest ; ici on les DÉPLOIE par
+# digest immuable plutôt que de les reconstruire localement.
+#
+# Usage sur le VPS (après avoir renseigné les deux digests de la release) :
+#
+#   export SENTINEL_BACKEND_IMAGE='ghcr.io/amineakik/sentinel-fullstack/backend@sha256:...'
+#   export SENTINEL_FRONTEND_IMAGE='ghcr.io/amineakik/sentinel-fullstack/frontend@sha256:...'
+#   docker login ghcr.io   # si les packages ne sont pas publics
+#   docker compose -f docker-compose.yml -f docker-compose.registry.yml pull backend frontend
+#   docker compose -f docker-compose.yml -f docker-compose.registry.yml up -d --no-build --remove-orphans
+#
+# BUILD_SHA reste requis (le backend le publie dans /api/health) : le renseigner
+# avec le commit exact de la release. Vérifier ensuite que /api/health.version
+# égale ce commit et le digest de l'image backend déployée.
+
+services:
+  backend:
+    image: ${SENTINEL_BACKEND_IMAGE:?SENTINEL_BACKEND_IMAGE must pin the backend image by digest}
+    pull_policy: always
+
+  frontend:
+    image: ${SENTINEL_FRONTEND_IMAGE:?SENTINEL_FRONTEND_IMAGE must pin the frontend image by digest}
+    pull_policy: always

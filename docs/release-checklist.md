@@ -146,14 +146,19 @@ npm run test:e2e
 
 ## 10. Publication
 
-- [ ] CI GitHub verte sur le SHA exact à publier
+- [ ] CI GitHub verte sur le SHA exact à publier, sur `main`
 - [ ] commit et message de publication relus
-- [ ] déploiement effectué avec `git pull --ff-only`
+- [ ] tag de version créé sur ce SHA (`v1.0.0-rc.N` puis `v1.0.0`)
+- [ ] le workflow `Release` a construit et poussé les images GHCR sans échec
+- [ ] la release GitHub référence les deux digests d'images immuables
+- [ ] déploiement effectué par image de registry épinglée par digest
+      (`docker-compose.registry.yml`), pas par reconstruction locale
 - [ ] `/api/health` répond HTTP 200 après déploiement
-- [ ] la propriété `version` de `/api/health` égale le SHA déployé
+- [ ] la propriété `version` de `/api/health` égale le SHA du tag déployé
+- [ ] les digests des images déployées égalent ceux de la release
 - [ ] logs post-déploiement sans erreur inattendue
 - [ ] recette courte Admin/Atelier/Board réussie
-- [ ] SHA déployé et résultat de recette consignés
+- [ ] SHA, tag, digests d'images et résultat de recette consignés
 
 **Décision :** `GO` seulement si aucun point bloquant n'est ouvert. Toute
 dérogation doit être écrite, limitée dans le temps et assortie d'un responsable.

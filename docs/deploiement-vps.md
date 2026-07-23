@@ -242,6 +242,38 @@ Contrôler ensuite les trois accès depuis un navigateur : portail, Board et
 connexion Atelier. Les données Board ne doivent pas être accessibles sans sa
 session dédiée.
 
+## 6bis. Déploiement d'une release par image de registry (recommandé)
+
+Pour un tag de version, préférer le déploiement des images publiées par le
+workflow `Release` (GHCR) plutôt qu'une reconstruction locale : le VPS exécute
+alors exactement l'image construite et vérifiée en CI, épinglée par digest
+immuable. Les deux digests figurent dans les notes de la release GitHub.
+
+```bash
+cd /opt/sentinel
+git fetch --tags origin
+git checkout v1.0.0            # aligne le code (BUILD_SHA, migrations) sur le tag
+cp docker-compose.registry.example.yml docker-compose.registry.yml
+export BUILD_SHA="$(git rev-parse HEAD)"
+export SENTINEL_BACKEND_IMAGE='ghcr.io/amineakik/sentinel-fullstack/backend@sha256:...'
+export SENTINEL_FRONTEND_IMAGE='ghcr.io/amineakik/sentinel-fullstack/frontend@sha256:...'
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <utilisateur> --password-stdin   # si packages privés
+docker compose -f docker-compose.yml -f docker-compose.registry.yml pull backend frontend
+docker compose -f docker-compose.yml -f docker-compose.registry.yml up -d --no-build --remove-orphans
+docker compose ps
+```
+
+Vérifier que la version déployée correspond exactement au tag :
+
+```bash
+curl --fail --show-error https://sentinel.example.com/api/health
+docker inspect --format '{{ index .RepoDigests 0 }}' "$(docker compose -f docker-compose.yml -f docker-compose.registry.yml images -q backend)"
+```
+
+`version` dans `/api/health` doit égaler `git rev-parse v1.0.0^{commit}`, et le
+digest de l'image backend doit correspondre à `SENTINEL_BACKEND_IMAGE`. Consigner
+les deux digests déployés dans le procès-verbal de recette (REL-03).
+
 ## 7. Mise à jour
 
 ```bash
