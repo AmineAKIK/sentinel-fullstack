@@ -483,6 +483,32 @@ encore leur cohérence croisée automatiquement.
 Lots `11` et `12`. Elle exige un dossier recalculé, une CI verte, un tag, des
 images identifiées, un VPS au même SHA et une recette externe consignée.
 
+**Candidat figé et release candidate publiée.** La branche
+`release/v1.0.0-readiness` a été rebasée sur `main` (PR #24), CI verte sur les
+six jobs au commit `c57b1f8`. Un workflow `Release` (`.github/workflows/
+release.yml`) construit sur tag `v*` les images backend/frontend, vérifie leur
+provenance (utilisateurs non-root, label `org.opencontainers.image.revision`
+égal au SHA), les pousse vers GHCR taguées par version et par digest, et publie
+une release GitHub référençant les digests immuables. Le tag `v1.0.0-rc.1` a
+produit :
+
+- backend `ghcr.io/amineakik/sentinel-fullstack/backend@sha256:c779719970…`
+- frontend `ghcr.io/amineakik/sentinel-fullstack/frontend@sha256:e1f5d4941d…`
+
+au commit `c57b1f860f083a5318c8314ccf43f760a5624dce`, images publiques et
+vérifiées (le label revision de l'image poussée égale le SHA du tag). Le VPS
+déploie ces images par digest via `docker-compose.registry.example.yml`, jamais
+une reconstruction locale. `REL-02` (health.version == SHA) et `REL-03` (recette
+HTTPS) se ferment au déploiement effectif ; `REL-01` (tag final `v1.0.0`) reste
+`OPEN` : par décision, le tag final n'est créé qu'après validation complète du
+dossier jury, en promouvant le même commit et les mêmes images, ou via un
+`rc.2` si une correction versionnée s'avère nécessaire.
+
+Outillage du dossier (lot 11) : `scripts/collectDossierFacts.py` dérive
+automatiquement chaque fait chiffré depuis le dépôt (SHA, 48 migrations, 15
+tables, 6 jobs, 471+ fichiers, 1022 tests) et échoue si un fait n'est pas
+établissable — plus aucun nombre codé en dur (`DOC-01`, `DOC-02`).
+
 ## 6. Contrôles de chaque lot
 
 Chaque lot exécute d'abord les tests ciblés, puis au minimum :
