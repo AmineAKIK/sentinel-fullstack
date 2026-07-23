@@ -19,6 +19,16 @@ import { hashWorkshopPassword } from '../../auth/bcrypt';
 import authRoutes from '../../modules/auth/auth.routes';
 import { workshopAuthMiddleware } from '../../middlewares/workshopAuth';
 
+// Le job CI d'intégration ne définit ni JWT_SECRET ni COOKIE_SECRET (contrairement
+// au job e2e) : sans eux, signAuthToken renvoie null et le login n'émet aucun
+// cookie. On les fixe ici pour que le test soit autonome, indépendant de la
+// config d'environnement de la machine ou du runner. getJwtSecret relit
+// process.env à chaque appel, donc une définition avant buildApp() suffit.
+process.env.JWT_SECRET =
+  process.env.JWT_SECRET || 'workshop_auth_integration_jwt_secret_at_least_32_chars';
+process.env.COOKIE_SECRET =
+  process.env.COOKIE_SECRET || 'workshop_auth_integration_cookie_secret_at_least_32_chars';
+
 const DB_URL = process.env.DATABASE_URL!;
 const fixtureSuffix = `${process.pid}${Date.now()}`;
 const badgeNumber = `96${fixtureSuffix}`.slice(0, 9);
