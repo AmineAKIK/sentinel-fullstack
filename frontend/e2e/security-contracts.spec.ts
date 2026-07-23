@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import {
   E2E_ADMIN_PASSWORD,
   E2E_ADMIN_USERNAME,
+  E2E_BOARD_CODE,
   E2E_RESPONSABLE_BADGE,
   E2E_WORKSHOP_PASSWORD,
 } from './fixtures';
@@ -144,4 +145,54 @@ test("l'écran Admin refuse le namespace numérique sans ouvrir de session Ateli
 
   await expect(page.getByRole('alert')).toHaveText('Identifiant ou mot de passe incorrect.');
   expect((await context.cookies()).some((cookie) => cookie.name === WORKSHOP_COOKIE)).toBe(false);
+});
+
+test('les endpoints Board et Atelier détaillés exigent une session valide', async ({ page }) => {
+  await page.goto('/board');
+
+  const protectedPaths = [
+    '/api/board/data',
+    '/api/workshop/incidents',
+    '/api/workshop/history/incidents',
+    '/api/workshop/history/events',
+    '/api/workshop/knowledge/incidents',
+    '/api/workshop/metrics',
+    '/api/workshop/analytics',
+  ];
+  for (const path of protectedPaths) {
+    const response = await fetchContract(page, path);
+    expect(response.status, `${path} sans session`).toBe(401);
+  }
+
+  // Une session Board seule ouvre /api/board/data, jamais les endpoints
+  // détaillés workshopAuthMiddleware — ce sont deux gardes distincts.
+  await page.evaluate(
+    async ({ url, code }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!response.ok) throw new Error(`Board session failed with ${response.status}.`);
+    },
+    { url: `${API_ORIGIN}/api/board/session`, code: E2E_BOARD_CODE }
+  );
+
+  const boardDataResponse = await fetchContract(page, '/api/board/data');
+  expect(boardDataResponse.status).toBe(200);
+  const incidentsAsBoard = await fetchContract(page, '/api/workshop/incidents');
+  expect(incidentsAsBoard.status).toBe(401);
+
+  await page.evaluate(async (url) => {
+    await fetch(url, { method: 'POST', credentials: 'include' });
+  }, `${API_ORIGIN}/api/board/logout`);
+
+  // Une session Atelier ouvre les deux : elle satisfait aussi le garde Board
+  // (hasValidWorkshopSession est vérifié en second recours dans boardReadAuthMiddleware).
+  await loginAsResponsable(page);
+  for (const path of ['/api/board/data', '/api/workshop/incidents']) {
+    const response = await fetchContract(page, path);
+    expect(response.status, `${path} avec session Atelier`).toBe(200);
+  }
 });

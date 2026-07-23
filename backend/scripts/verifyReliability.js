@@ -23,86 +23,27 @@ function includesInOrder(source, first, second) {
   return firstIndex !== -1 && secondIndex !== -1 && firstIndex < secondIndex;
 }
 
-check(
-  'Board API requires board or workshop session and detailed workshop APIs are protected',
-  () => {
-    const routes = read('backend/src/modules/workshop/workshop.routes.ts');
-    const board = read('backend/src/modules/board/board.auth.ts');
-    const server = read('backend/src/server.ts');
-    const production = read('backend/src/config/production.ts');
-    return (
-      !routes.includes("router.get('/board'") &&
-      board.includes('BOARD_AUTH_COOKIE') &&
-      board.includes("res.setHeader('Cache-Control', 'no-store')") &&
-      board.includes("boardRouter.post('/session'") &&
-      board.includes("boardRouter.get('/data', boardReadAuthMiddleware, getBoardData)") &&
-      server.includes("app.use('/api/board/session', loginRateLimit)") &&
-      server.includes("app.use('/api/board', boardRouter)") &&
-      production.includes("'BOARD_ACCESS_CODE_HASH'") &&
-      production.includes('BCRYPT_HASH_PATTERN') &&
-      includesInOrder(
-        routes,
-        'router.use(workshopAuthMiddleware)',
-        "router.get('/incidents', listIncidents)"
-      ) &&
-      includesInOrder(
-        routes,
-        'router.use(workshopAuthMiddleware)',
-        "router.get('/history/incidents', listHistoryIncidents)"
-      ) &&
-      includesInOrder(
-        routes,
-        'router.use(workshopAuthMiddleware)',
-        "router.get('/history/events', listHistoryEvents)"
-      ) &&
-      includesInOrder(
-        routes,
-        'router.use(workshopAuthMiddleware)',
-        "router.get('/knowledge/incidents', listKnowledgeIncidents)"
-      ) &&
-      includesInOrder(
-        routes,
-        'router.use(workshopAuthMiddleware)',
-        "router.get('/metrics', getIncidentMetrics)"
-      ) &&
-      includesInOrder(
-        routes,
-        'router.use(workshopAuthMiddleware)',
-        "router.get('/analytics', getWorkshopAnalytics)"
-      )
-    );
-  }
-);
+// Le contrat "Board API requires board or workshop session and detailed
+// workshop APIs are protected" était vérifié ici par grep de littéraux
+// (TEST-02). Il est désormais prouvé par de vraies requêtes HTTP contre un
+// serveur réel : frontend/e2e/security-contracts.spec.ts, test "les endpoints
+// Board et Atelier détaillés exigent une session valide" — 401 sans session
+// sur les sept endpoints listés, accès Board-only limité à /api/board/data,
+// accès complet avec une session Atelier.
 
-check('Workshop middleware revalidates active user and current role from database', () => {
-  const middleware = read('backend/src/middlewares/workshopAuth.ts');
-  return (
-    middleware.includes('FROM sentinel_users') &&
-    middleware.includes('is_active = TRUE') &&
-    middleware.includes('is_deleted = FALSE') &&
-    middleware.includes('role: user.role') &&
-    middleware.includes('password_hash IS NOT NULL')
-  );
-});
+// Le contrat "Workshop middleware revalidates active user and current role
+// from database" est désormais prouvé par de vraies requêtes HTTP contre le
+// vrai middleware : backend/src/integration/__tests__/
+// workshopAuthMiddleware.integration.test.ts — refus immédiat sur compte
+// désactivé sans nouvelle connexion, refus du token périmé après changement
+// de rôle, acceptation du rôle courant après reconnexion.
 
-check('Admin cannot remove active operational references', () => {
-  const accounts = read('backend/src/modules/accounts/accounts.service.ts');
-  const accountsRepo = read('backend/src/modules/accounts/accounts.repository.ts');
-  const lines = read('backend/src/modules/lines/lines.service.ts');
-  const linesRepo = read('backend/src/modules/lines/lines.repository.ts');
-  const constants = read('backend/src/domain/constants.ts');
-  return (
-    accounts.includes('getActiveTakenIncidentCountForUser') &&
-    accounts.includes('RESOURCE_IN_USE') &&
-    accountsRepo.includes('getActiveTakenIncidentCountForUser') &&
-    accountsRepo.includes('ACTIVE_INCIDENT_STATUSES') &&
-    lines.includes('getActiveIncidentCountForLine') &&
-    lines.includes('RESOURCE_IN_USE') &&
-    linesRepo.includes('getActiveIncidentCountForLine') &&
-    linesRepo.includes('ACTIVE_INCIDENT_STATUSES') &&
-    constants.includes("'OPEN', 'PENDING'")
-  );
-});
+// Le contrat "Admin cannot remove active operational references" est déjà
+// prouvé en comportement réel, pas seulement en grep : accounts.service.test.ts
+// (RESOURCE_IN_USE sur changement de rôle, désactivation, suppression) et
+// lines.service.test.ts (RESOURCE_IN_USE sur désactivation/reconfiguration),
+// plus workshop.integration.test.ts et assigneeConcurrency.integration.test.ts
+// en conditions PostgreSQL réelles.
 
 check('Workshop permissions are mirrored backend/frontend', () => {
   const policy = read('backend/src/modules/workshop/workshop.policy.ts');
