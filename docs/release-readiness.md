@@ -190,7 +190,7 @@ commit audité au démarrage de cette branche.
 | ID | Niveau | Lot | Constat | Preuve de fermeture | État |
 | --- | --- | ---: | --- | --- | --- |
 | `TEST-01` | P1 | 10 | Couverture partielle parfois présentée sans son périmètre. | Rapports et dossier parlent de couverture ciblée. | VERIFIED |
-| `TEST-02` | P1 | 10 | Contrôles de fiabilité surtout fondés sur des recherches de chaînes. | Contrats critiques couverts par comportement. | OPEN |
+| `TEST-02` | P1 | 10 | Contrôles de fiabilité surtout fondés sur des recherches de chaînes. | Contrats critiques couverts par comportement. | VERIFIED |
 | `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | VERIFIED |
 | `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | VERIFIED |
 | `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | VERIFIED |
@@ -221,7 +221,7 @@ distante reste attachée au run GitHub Actions du commit et, lorsqu'elle existe,
 | `7` | Paginer les listes sans perdre la projection opérationnelle active. | `LIST-01` à `LIST-04` | Lot 6 | VERIFIED |
 | `8` | Corriger la sémantique et prouver les parcours accessibles. | `A11Y-01` à `A11Y-06` | Lots 4 et 7 | VERIFIED |
 | `9` | Durcir et exercer sauvegarde/restauration. | `OPS-01` à `OPS-04` | Lot 3 | OPEN |
-| `10` | Remplacer les preuves textuelles fragiles par des tests comportementaux. | `TEST-01` à `TEST-05` | Lots 1 à 9 | OPEN |
+| `10` | Remplacer les preuves textuelles fragiles par des tests comportementaux. | `TEST-01` à `TEST-05` | Lots 1 à 9 | VERIFIED |
 | `11` | Régénérer un dossier exact, reproductible et conforme. | `DOC-01` à `DOC-06`, `GOV-01` | Lots 1 à 10 | OPEN |
 | `12` | Construire, déployer et recetter le candidat immuable. | `REL-01` à `REL-04` | Lots 1 à 11 | OPEN |
 
@@ -457,8 +457,26 @@ Admin Audit et Paramètres, ainsi qu'une connexion OPERATOR autonome hors du
 cycle de vie incident, restent sans E2E dédié — non bloquant, laissé pour une
 passe ultérieure si le temps le permet.
 
-`TEST-02` (checks textuels de `verifyReliability.js`) reste seul ouvert dans
-ce lot.
+**`TEST-02` clos — lot 10 entièrement `VERIFIED`.** Les trois checks textuels
+les plus critiques de `verifyReliability.js` (contrats de sécurité et règles
+métier) sont remplacés par du comportement réel : le contrat Board/Atelier
+par le nouveau test `security-contracts.spec.ts` (section précédente) ; la
+revalidation d'utilisateur du middleware par
+`workshopAuthMiddleware.integration.test.ts` (nouveau, premier usage de
+`supertest` dans ce projet — monte une app Express minimale avec la vraie
+route de login et le vrai middleware, prouve le refus immédiat sur compte
+désactivé ou rôle changé, sans attendre une nouvelle connexion) ; le contrat
+« admin ne peut pas retirer une référence opérationnelle active » était déjà
+prouvé sans grep par `accounts.service.test.ts`, `lines.service.test.ts` et
+deux suites d'intégration — le check textuel était pur doublon, supprimé sans
+nouveau test. Le script est passé de 20 à 17 checks ; les 17 restants
+(routing, Board/Pilotage/Modal structurels, contrats UI) restent des
+vérifications statiques volontairement légères, hors du périmètre critique de
+sécurité ou de règle métier. Le miroir de permissions backend/frontend
+(`workshop.policy.ts` / `workshopPermissions.ts`) reste vérifié par grep
+faute d'un test de contrat croisé construit dans ce lot — chaque côté a sa
+propre suite unitaire exhaustive (35 cas côté backend), mais rien ne garantit
+encore leur cohérence croisée automatiquement.
 
 ### Porte D — certification
 
