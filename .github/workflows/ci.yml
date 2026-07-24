@@ -187,8 +187,6 @@ jobs:
         run: ./scripts/verify-compose-topology.sh
       - name: Verify safe .env parsing (spaces, $, #, quotes, bcrypt)
         run: ./scripts/test-env-parsing.sh
-      - name: Non-destructive deployment preflight passes on a valid config
-        run: ./scripts/preflight.sh
       - name: Build production images
         run: |
           docker build \
@@ -214,6 +212,8 @@ jobs:
         run: docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m sentinel-frontend:ci nginx -t
       - name: Assert the favicon is shipped in the frontend image
         run: docker run --rm --entrypoint test sentinel-frontend:ci -f /usr/share/nginx/html/favicon.svg
+      - name: Exercise the deployment preflight (valid config + rejection matrix)
+        run: ./scripts/test-preflight.sh
       - name: Validate host Nginx example
         run: |
           mkdir -p .ci-certs/live/sentinel.akiksystems.fr
@@ -239,7 +239,7 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          shellcheck -x scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh
+          shellcheck -x scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh scripts/test-preflight.sh
 
   ops:
     name: Ops / Backup and restore drill
