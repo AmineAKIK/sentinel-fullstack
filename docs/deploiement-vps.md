@@ -172,14 +172,14 @@ BOARD_ACCESS_CODE='code-temporaire-du-board' npm run hash:board
 cd ..
 ```
 
-Reporter la sortie complète `$2b$...` **en doublant chaque `$` en `$$`** :
-Docker Compose interpole les `$` non échappés du `.env`, ce qui tronquerait le
-hash. Compose reconvertit `$$` en `$` à l'exécution, le conteneur reçoit donc le
-hash exact.
+Reporter la sortie complète `$2b$...` **entre quotes simples** : Docker Compose
+interpolerait les `$` non quotés du `.env` et tronquerait le hash, alors qu'une
+valeur entre quotes simples est prise littéralement — le conteneur reçoit le
+bcrypt exact (60 caractères, commençant par `$2b$`, sans quote résiduelle).
 
 ```dotenv
-# hash généré : $2b$10$abcdef...  ->  valeur ci-dessous avec les $ doublés :
-BOARD_ACCESS_CODE_HASH=$$2b$$10$$abcdef...
+# hash généré : $2b$10$abcdef...
+BOARD_ACCESS_CODE_HASH='$2b$10$abcdef...'
 ```
 
 Le libellé et la durée de session Board sont stockés en base et administrables
@@ -225,9 +225,10 @@ cd "$SENTINEL_DIR"   # répertoire de déploiement, p. ex. /var/www/sentinel
 
 Il refuse : une variable obligatoire manquante, un secret resté placeholder, un
 secret trop court, un `BUILD_SHA` non conforme, un `BOARD_ACCESS_CODE_HASH` qui
-n'est pas un bcrypt valide une fois déséchappé (un `$` non doublé le tronque, un
-ancien hash SHA-256 est rejeté), une image sans digest, une publication hors
-loopback ou un PostgreSQL exposé. Ne jamais déployer tant qu'un contrôle échoue.
+n'est pas un bcrypt valide tel que le conteneur le recevra (un hash nu, sans
+quotes simples, est tronqué par l'interpolation ; un ancien hash SHA-256 est
+rejeté), une image sans digest, une publication hors loopback ou un PostgreSQL
+exposé. Ne jamais déployer tant qu'un contrôle échoue.
 
 **Ordre de déploiement à respecter :**
 

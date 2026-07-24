@@ -198,11 +198,11 @@ BOARD_ACCESS_CODE='nouveau-code-temporaire' npm run hash:board
 cd ..
 ```
 
-Mettre le hash bcrypt obtenu dans `.env` **en doublant chaque `$` en `$$`**
-(Compose interpole sinon les `$` et tronque le hash), recréer le backend, puis
-vérifier une nouvelle connexion Board. Les sessions Board antérieures peuvent
-rester valides jusqu'à leur expiration ; une rotation du `JWT_SECRET` les
-invalide toutes.
+Mettre le hash bcrypt obtenu dans `.env` **entre quotes simples**
+(`BOARD_ACCESS_CODE_HASH='$2b$...'`) : sans quotes, Compose interpole les `$` et
+tronque le hash. Recréer le backend, puis vérifier une nouvelle connexion Board.
+Les sessions Board antérieures peuvent rester valides jusqu'à leur expiration ;
+une rotation du `JWT_SECRET` les invalide toutes.
 
 ### Mot de passe admin
 

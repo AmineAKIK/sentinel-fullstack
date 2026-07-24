@@ -10,8 +10,9 @@
 # Usage :
 #   ./scripts/preflight.sh [-f docker-compose.yml -f docker-compose.override.yml ...]
 # Sans -f, utilise la composition par défaut (docker-compose.yml). Les valeurs
-# résolues sont lues via `docker compose config`, donc telles que les conteneurs
-# les recevront (les $$ du .env sont déjà déséchappés).
+# sont lues via `docker compose config` ; cette sortie ré-échappe les $ en $$,
+# donc le préflight normalise ($$ -> $) pour valider la valeur telle que le
+# conteneur la recevra réellement.
 
 set -euo pipefail
 
@@ -85,15 +86,18 @@ else
 fi
 
 # 5. BOARD_ACCESS_CODE_HASH est un bcrypt valide TEL QUE le conteneur le recevra.
-#    `docker compose config` affiche la forme échappée ($$) ; le conteneur reçoit
-#    la forme déséchappée. On déséchappe $$ -> $ avant de valider le format.
-#    La production exige bcrypt, pas un ancien SHA-256.
-board_hash_escaped="$(env_of backend BOARD_ACCESS_CODE_HASH)"
-board_hash="${board_hash_escaped//\$\$/\$}"
+#    `docker compose config` ré-échappe systématiquement les $ en $$ dans sa
+#    sortie (pour rester ré-injectable) ; ce n'est PAS ce que le conteneur reçoit.
+#    On normalise donc $$ -> $ pour retrouver la valeur runtime et valider le
+#    format. Le format canonique dans le .env est le hash entre quotes simples ;
+#    un hash nu y serait tronqué par l'interpolation. La production exige bcrypt,
+#    pas un ancien SHA-256.
+board_hash_config="$(env_of backend BOARD_ACCESS_CODE_HASH)"
+board_hash="${board_hash_config//\$\$/\$}"
 if [[ "$board_hash" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]; then
-  ok "BOARD_ACCESS_CODE_HASH est un bcrypt valide (déséchappé)"
+  ok "BOARD_ACCESS_CODE_HASH est un bcrypt valide"
 else
-  bad "BOARD_ACCESS_CODE_HASH n'est pas un bcrypt valide — un \$ non doublé dans le .env le tronque, ou c'est un ancien hash SHA-256"
+  bad "BOARD_ACCESS_CODE_HASH n'est pas un bcrypt valide — un hash nu (sans quotes simples) est tronqué par l'interpolation, ou c'est un ancien hash SHA-256"
 fi
 
 # 6. Si des images sont référencées (variante registry), elles sont épinglées

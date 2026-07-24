@@ -239,7 +239,7 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          shellcheck scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh
+          shellcheck -x scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh
 
   ops:
     name: Ops / Backup and restore drill

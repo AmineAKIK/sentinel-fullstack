@@ -30,9 +30,9 @@ WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT INT TERM
 ENV_FILE="$WORKDIR/.env"
 
-# Hash bcrypt factice mais de forme réaliste ($2b$, avec des $ internes).
+# Hash bcrypt factice de forme réaliste et de longueur bcrypt exacte (60).
 # shellcheck disable=SC2016 # $ littéraux voulus : le hash ne doit jamais s'expandre
-FAKE_BCRYPT='$2b$10$abcdefghijklmnopqrstuvXYZ0123456789.ABCDEFGHIJKLMNOPqr'
+FAKE_BCRYPT='$2b$10$abcdefghijklmnopqrstuvXYZ0123456789.ABCDEFGHIJKLMNOPq'
 
 cat > "$ENV_FILE" <<EOF
 POSTGRES_DB=sentinel
@@ -56,11 +56,14 @@ assert_eq "variable exportée" "exported_value" "$(read_env_var "$ENV_FILE" EXPO
 assert_eq "variable absente -> vide" "" "$(read_env_var "$ENV_FILE" ABSENTE)"
 
 # Docker Compose interpole les $ non échappés d'un .env : un bcrypt écrit
-# `$2b$10$...` se fait tronquer, alors qu'écrit avec les $ doublés `$$2b$$10$$...`
-# il arrive intact dans le conteneur (Compose reconvertit $$ -> $ à l'exécution).
-# On vérifie ce contrat : le .env échappé produit, après `config`, une valeur
-# dont chaque $ du hash d'origine est représenté par $$ — donc le conteneur
-# recevra exactement le bcrypt attendu, sans troncature.
+# `$2b$10$...` sans quotes se fait tronquer. La représentation CANONIQUE, celle
+# qui tourne en production, est de l'entourer de QUOTES SIMPLES : Docker Compose
+# traite alors la valeur littéralement et le conteneur reçoit le hash intact.
+#
+# On vérifie le VRAI comportement runtime (pas la sortie de `docker compose
+# config`, qui ré-échappe les $ en $$ pour rester ré-injectable et ne reflète
+# donc PAS ce que le conteneur reçoit). `docker compose run` exécute réellement
+# le service et expose la valeur telle que le processus la voit.
 COMPOSE_TEST_DIR="$WORKDIR/compose"
 mkdir -p "$COMPOSE_TEST_DIR"
 cat > "$COMPOSE_TEST_DIR/docker-compose.yml" <<'YAML'
@@ -70,16 +73,17 @@ services:
     environment:
       HASH: ${BOARD_ACCESS_CODE_HASH:?set}
 YAML
-# .env avec les $ correctement doublés.
-ESCAPED_BCRYPT="${FAKE_BCRYPT//\$/\$\$}"
-printf 'BOARD_ACCESS_CODE_HASH=%s\n' "$ESCAPED_BCRYPT" > "$COMPOSE_TEST_DIR/.env"
-RENDERED="$(cd "$COMPOSE_TEST_DIR" && docker compose config --format json 2>/dev/null \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['services']['probe']['environment']['HASH'])")"
-# Le rendu de `config` montre les $ doublés ; à l'exécution le conteneur reçoit
-# le hash dé-échappé. On vérifie qu'aucune troncature n'a eu lieu (longueur et
-# dé-échappement cohérents avec le hash d'origine).
-assert_eq "bcrypt échappé non tronqué par docker compose config" "$ESCAPED_BCRYPT" "$RENDERED"
-assert_eq "bcrypt dé-échappé == hash d'origine" "$FAKE_BCRYPT" "${RENDERED//\$\$/\$}"
+# .env avec le bcrypt entre quotes simples (représentation canonique).
+printf "BOARD_ACCESS_CODE_HASH='%s'\n" "$FAKE_BCRYPT" > "$COMPOSE_TEST_DIR/.env"
+RUNTIME_HASH="$(cd "$COMPOSE_TEST_DIR" \
+  && docker compose run --rm --no-deps --entrypoint sh probe -c 'printf %s "$HASH"' 2>/dev/null)"
+# Le conteneur doit recevoir EXACTEMENT le bcrypt : préfixe $2b$, longueur 60,
+# tous les $ conservés, aucune quote résiduelle, aucun $$.
+assert_eq "bcrypt runtime identique au hash d'origine" "$FAKE_BCRYPT" "$RUNTIME_HASH"
+assert_eq "bcrypt runtime commence par \$2b\$" "\$2b\$" "${RUNTIME_HASH:0:4}"
+assert_eq "bcrypt runtime a la longueur bcrypt (60)" "60" "${#RUNTIME_HASH}"
+assert_eq "bcrypt runtime sans quote résiduelle" "" "$(printf %s "$RUNTIME_HASH" | tr -cd "\"'")"
+assert_eq "bcrypt runtime sans \$\$" "0" "$(printf %s "$RUNTIME_HASH" | grep -c '\$\$' || true)"
 
 echo ""
 echo "[test-env] $PASS test(s) réussi(s), $FAIL échec(s)."
