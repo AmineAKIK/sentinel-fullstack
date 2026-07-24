@@ -33,7 +33,19 @@ bad() {
 }
 
 WORKDIR="$(mktemp -d)"
+# Registre local jetable : le préflight, comme le déploiement réel, exige des
+# images épinglées par digest @sha256:. Un digest de manifeste n'existe QUE pour
+# une image poussée vers un registre. On ne peut PAS se reposer sur
+# `.RepoDigests` d'une image seulement buildée : il n'est peuplé que par le
+# magasin d'images containerd (Docker Desktop local), pas par le magasin
+# classique des runners GitHub — d'où l'échec CI. On pousse donc l'image vers un
+# registre local éphémère (loopback) pour obtenir un digest RÉEL, reproductible
+# sur tout magasin d'images.
+REGISTRY_NAME="preflight-registry-$$"
+REGISTRY_PORT=5099
+REGISTRY_HOST="127.0.0.1:${REGISTRY_PORT}"
 cleanup() {
+  docker rm -f "$REGISTRY_NAME" >/dev/null 2>&1 || true
   rm -f "$PROJECT_ROOT/.env.test-preflight" "$PROJECT_ROOT/.env"
   rm -rf "$WORKDIR"
 }
@@ -41,12 +53,33 @@ trap cleanup EXIT INT TERM
 
 echo "[test-preflight] Construction de l'image backend (checker inclus)..."
 docker build --build-arg BUILD_SHA="$BUILD_SHA_OK" --tag sentinel-backend:preflight-test ./backend >/dev/null 2>&1
-# Digest local de l'image (référence complète repo@sha256:...).
-DIGEST="$(docker inspect --format '{{index .RepoDigests 0}}' sentinel-backend:preflight-test)"
-if [[ -z "$DIGEST" ]]; then
-  echo "[test-preflight] L'image locale n'a pas de RepoDigest — impossible de tester le déploiement par digest." >&2
+
+echo "[test-preflight] Démarrage d'un registre local jetable pour obtenir un digest réel..."
+docker rm -f "$REGISTRY_NAME" >/dev/null 2>&1 || true
+docker run -d --name "$REGISTRY_NAME" -p "${REGISTRY_HOST}:5000" registry:2 >/dev/null 2>&1
+# Attendre que le registre réponde (au plus ~15 s).
+REGISTRY_READY=0
+for _ in $(seq 1 15); do
+  if curl -sf "http://${REGISTRY_HOST}/v2/" >/dev/null 2>&1; then REGISTRY_READY=1; break; fi
+  sleep 1
+done
+if [[ "$REGISTRY_READY" -ne 1 ]]; then
+  echo "[test-preflight] Le registre local n'a pas démarré — impossible de tester le déploiement par digest." >&2
   exit 1
 fi
+
+# Pousse l'image de test vers le registre local ; le digest imprimé par le push
+# est le digest de manifeste RÉEL, valable pour un run/pull sur tout magasin.
+LOCAL_REF="${REGISTRY_HOST}/sentinel-backend:preflight-test"
+docker tag sentinel-backend:preflight-test "$LOCAL_REF" >/dev/null 2>&1
+PUSH_OUT="$(docker push "$LOCAL_REF" 2>&1)"
+MANIFEST_DIGEST="$(printf '%s\n' "$PUSH_OUT" | grep -oE 'sha256:[0-9a-f]{64}' | head -1)"
+if [[ -z "$MANIFEST_DIGEST" ]]; then
+  echo "[test-preflight] Échec du push vers le registre local (digest introuvable) :" >&2
+  printf '%s\n' "$PUSH_OUT" | tail -3 >&2
+  exit 1
+fi
+DIGEST="${REGISTRY_HOST}/sentinel-backend@${MANIFEST_DIGEST}"
 
 # Override qui déploie backend et frontend par digest (l'image de test sert aux
 # deux : on ne teste ici que la validation de config, pas le contenu frontend).
