@@ -212,6 +212,8 @@ jobs:
           docker run --rm --entrypoint test sentinel-backend:ci -f /app/dist/server.js
       - name: Validate unprivileged Nginx configuration
         run: docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m sentinel-frontend:ci nginx -t
+      - name: Assert the favicon is shipped in the frontend image
+        run: docker run --rm --entrypoint test sentinel-frontend:ci -f /usr/share/nginx/html/favicon.svg
       - name: Validate host Nginx example
         run: |
           mkdir -p .ci-certs/live/sentinel.akiksystems.fr
