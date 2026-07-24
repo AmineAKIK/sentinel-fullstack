@@ -75,8 +75,13 @@ services:
 YAML
 # .env avec le bcrypt entre quotes simples (représentation canonique).
 printf "BOARD_ACCESS_CODE_HASH='%s'\n" "$FAKE_BCRYPT" > "$COMPOSE_TEST_DIR/.env"
+# Une variable d'environnement du shell primerait sur le .env (c'est le cas dans
+# le job CI containers). On la retire pour tester la valeur du .env seul, telle
+# qu'elle serait lue sur un hôte de déploiement. $HASH doit s'expanser DANS le
+# conteneur, pas dans le shell hôte — d'où les quotes simples.
+# shellcheck disable=SC2016
 RUNTIME_HASH="$(cd "$COMPOSE_TEST_DIR" \
-  && docker compose run --rm --no-deps --entrypoint sh probe -c 'printf %s "$HASH"' 2>/dev/null)"
+  && env -u BOARD_ACCESS_CODE_HASH docker compose run --rm --no-deps --entrypoint sh probe -c 'printf %s "$HASH"' 2>/dev/null)"
 # Le conteneur doit recevoir EXACTEMENT le bcrypt : préfixe $2b$, longueur 60,
 # tous les $ conservés, aucune quote résiduelle, aucun $$.
 assert_eq "bcrypt runtime identique au hash d'origine" "$FAKE_BCRYPT" "$RUNTIME_HASH"
