@@ -104,6 +104,12 @@ Politique minimale recommandée :
 - 3 sauvegardes mensuelles ;
 - un test de restauration trimestriel sur une base isolée.
 
+`scripts/test-backup-restore.sh` réalise cet exercice de bout en bout dans un
+projet Compose jetable et unique, mesure le temps de restauration (RTO) et
+prouve son isolation. Il est sûr à lancer depuis le répertoire de déploiement
+(`/var/www/sentinel`) : le projet de production n'est jamais ciblé et le
+nettoyage se limite strictement au projet jetable du test.
+
 ## 4. Restauration
 
 ### Préconditions
