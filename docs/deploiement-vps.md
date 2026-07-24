@@ -211,16 +211,37 @@ NOTIFICATION_MAX_ATTEMPTS=5
 NOTIFICATION_POLL_INTERVAL_MS=5000
 ```
 
-## 5. Validation avant démarrage
+## 5. Préflight avant démarrage
+
+Le préflight est **non destructif** : il vérifie les prérequis d'une release
+avant tout arrêt ou remplacement de conteneur, sans jamais rien démarrer ni
+arrêter. Il n'affiche aucune valeur de secret.
 
 ```bash
-cd /opt/sentinel
-docker compose config --quiet
-docker compose build backend frontend
+cd "$SENTINEL_DIR"   # répertoire de déploiement, p. ex. /var/www/sentinel
+# Passer la ou les mêmes compositions que le déploiement réel :
+./scripts/preflight.sh -f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml
 ```
 
-`docker compose config --quiet` doit échouer si une variable obligatoire manque.
-Ne jamais contourner ce contrôle avec une valeur factice en production.
+Il refuse : une variable obligatoire manquante, un secret resté placeholder, un
+secret trop court, un `BUILD_SHA` non conforme, un `BOARD_ACCESS_CODE_HASH` qui
+n'est pas un bcrypt valide une fois déséchappé (un `$` non doublé le tronque, un
+ancien hash SHA-256 est rejeté), une image sans digest, une publication hors
+loopback ou un PostgreSQL exposé. Ne jamais déployer tant qu'un contrôle échoue.
+
+**Ordre de déploiement à respecter :**
+
+1. **sauvegarde** (`./scripts/backup.sh`) ;
+2. **préflight** (`./scripts/preflight.sh …`) — corriger avant d'aller plus loin ;
+3. **pull** des images par digest ;
+4. **déploiement** (`up -d --no-build`) ;
+5. **health** (`/api/health.version` == SHA du tag) ;
+6. **recette** courte Admin/Atelier/Board.
+
+Les valeurs de release (`BUILD_SHA`, digests d'images) doivent être **persistées
+de façon maîtrisée** — dans le `.env` du déploiement et le procès-verbal de
+recette — jamais laissées à de simples `export` de session comme procédure
+officielle.
 
 ## 6. Premier démarrage
 

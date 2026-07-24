@@ -187,6 +187,8 @@ jobs:
         run: ./scripts/verify-compose-topology.sh
       - name: Verify safe .env parsing (spaces, $, #, quotes, bcrypt)
         run: ./scripts/test-env-parsing.sh
+      - name: Non-destructive deployment preflight passes on a valid config
+        run: ./scripts/preflight.sh
       - name: Build production images
         run: |
           docker build \
@@ -235,7 +237,7 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          shellcheck scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh
+          shellcheck scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh
 
   ops:
     name: Ops / Backup and restore drill
