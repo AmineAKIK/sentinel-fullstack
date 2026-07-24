@@ -1,9 +1,25 @@
 # Déploiement VPS de Sentinel
 
-Ce document décrit les deux topologies de déploiement maintenues. Le Compose
-racine fournit une distribution autonome où Caddy est l'unique point d'entrée.
-L'instance publique `sentinel.akiksystems.fr` conserve le Nginx déjà présent sur
-le VPS et utilise l'override assaini `docker-compose.host-proxy.example.yml`.
+Ce document décrit **deux topologies de déploiement**, sans les mélanger :
+
+- **Topologie A — distribution autonome (Caddy intégré).** Le Compose racine
+  fournit Caddy comme unique point d'entrée TLS. Les seuls ports publiés sont
+  `80`/`443`. Aucun proxy hôte n'est requis.
+- **Topologie B — frontal Nginx hôte (l'instance publique
+  `sentinel.akiksystems.fr`).** Le VPS possède déjà son Nginx ; Caddy ne démarre
+  pas. Les services applicatifs sont publiés **uniquement sur `127.0.0.1`** via
+  `docker-compose.host-proxy.example.yml`, et le Nginx hôte termine le TLS.
+
+Ce guide documente **la topologie B pour l'instance publique**, déployée par
+image de registry épinglée par digest. La topologie A est décrite en annexe
+(section 11) pour une distribution autonome.
+
+Toutes les commandes s'exécutent depuis le répertoire de déploiement. Pour
+l'instance publique il est fixe ; on le référence par `SENTINEL_DIR` :
+
+```bash
+export SENTINEL_DIR=/var/www/sentinel
+```
 
 ## 1. Architecture de production
 
@@ -61,39 +77,40 @@ Pour la distribution autonome, arrêter ou reconfigurer tout Apache, Nginx ou
 Caddy de l'hôte qui utiliserait déjà 80/443. Pour un VPS mutualisant son Nginx,
 suivre la variante décrite à la section 2.1.
 
-### 2.1 Variante avec Nginx hôte
+### 2.1 Frontal Nginx hôte (topologie B)
 
-Copier l'override d'exemple vers un fichier local ignoré, choisir deux ports
-loopback libres et adapter le virtual host Nginx à partir de
-`deploy/nginx/sentinel.conf.example` :
+Copier l'override d'exemple, choisir deux ports loopback libres et adapter le
+virtual host Nginx à partir de `deploy/nginx/sentinel.conf.example` :
 
 ```bash
+cd "$SENTINEL_DIR"
 cp docker-compose.host-proxy.example.yml docker-compose.override.yml
-export SENTINEL_BACKEND_BIND_PORT=13000
-export SENTINEL_FRONTEND_BIND_PORT=18080
-export BUILD_SHA="$(git rev-parse HEAD)"
-docker compose config --quiet
-docker compose up -d --build --remove-orphans
 ```
 
-Dans cette variante, le profil `bundled-edge` n'est pas activé : Caddy ne
-démarre pas. Les ports applicatifs sont liés à `127.0.0.1` et ne doivent jamais
-être ouverts dans le pare-feu public. Le Nginx hôte termine TLS, redirige HTTP et
-transmet `Host`, `X-Real-IP`, `X-Forwarded-For` et `X-Forwarded-Proto`.
+Les deux ports de publication loopback (`SENTINEL_BACKEND_BIND_PORT`,
+`SENTINEL_FRONTEND_BIND_PORT`) sont **persistés dans le `.env`** (voir §4), jamais
+laissés à de simples `export` de session. Le profil `bundled-edge` n'est pas
+activé : Caddy ne démarre pas. Les ports applicatifs sont publiés **sur
+`127.0.0.1` uniquement** — jamais ouverts dans le pare-feu public. Le Nginx hôte
+termine le TLS, redirige HTTP et transmet `Host`, `X-Real-IP`, `X-Forwarded-For`
+et `X-Forwarded-Proto`. Le déploiement lui-même (build/pull, démarrage) est
+décrit à la section 6, procédure unique par image de registry.
 
 ## 3. Installation
 
 ```bash
-sudo install -d -o "$USER" -g "$USER" /opt/sentinel
-git clone <URL_DU_DEPOT> /opt/sentinel
-cd /opt/sentinel
+export SENTINEL_DIR=/var/www/sentinel
+sudo install -d -o "$USER" -g "$USER" "$SENTINEL_DIR"
+git clone <URL_DU_DEPOT> "$SENTINEL_DIR"
+cd "$SENTINEL_DIR"
 cp .env.release.example .env
 chmod 600 .env
-export BUILD_SHA="$(git rev-parse HEAD)"
 ```
 
 Ne jamais versionner `.env`. Toutes les valeurs `replace_with_...` doivent être
-remplacées avant le premier démarrage.
+remplacées avant le premier démarrage. `BUILD_SHA` est **persisté dans le `.env`**
+(voir §4), pas exporté en session : après une reconnexion SSH, un `export`
+perdu ferait échouer le préflight et le démarrage.
 
 ## 4. Configuration
 
@@ -244,88 +261,91 @@ de façon maîtrisée** — dans le `.env` du déploiement et le procès-verbal 
 recette — jamais laissées à de simples `export` de session comme procédure
 officielle.
 
-## 6. Premier démarrage
+## 6. Déploiement d'une release (topologie B, procédure unique)
 
-```bash
-docker compose up -d
-docker compose ps
-docker compose logs --tail=100 backend
+L'instance publique déploie **une image de registry épinglée par digest**,
+jamais une reconstruction locale : le VPS exécute exactement l'image construite
+et vérifiée en CI. Les deux digests figurent dans les notes de la release
+GitHub. La même procédure vaut pour le premier démarrage et pour chaque mise à
+jour de version.
+
+### 6.1 Renseigner les valeurs de release dans le `.env`
+
+Les valeurs de release sont **persistées dans le `.env`** (mode `600`), jamais
+laissées à des `export` de session. Ajouter/mettre à jour, en plus des secrets
+de la section 4 :
+
+```dotenv
+# SHA git complet du commit de la release (git rev-parse <tag>^{commit})
+BUILD_SHA=c57b1f860f083a5318c8314ccf43f760a5624dce
+# Images épinglées par digest (depuis les notes de la release)
+SENTINEL_BACKEND_IMAGE=ghcr.io/amineakik/sentinel-fullstack/backend@sha256:...
+SENTINEL_FRONTEND_IMAGE=ghcr.io/amineakik/sentinel-fullstack/frontend@sha256:...
+# Ports de publication loopback (topologie B)
+SENTINEL_BACKEND_BIND_PORT=13000
+SENTINEL_FRONTEND_BIND_PORT=18080
 ```
 
-Le backend applique les migrations sous verrou PostgreSQL avant d'écouter. Le
-runner refuse une migration déjà appliquée dont le checksum a changé et refuse
-un historique qui référence un fichier absent.
-
-Contrôles externes :
+Aligner le code sur le tag (migrations, exemples) sans dépendre de son `.env`
+suivi :
 
 ```bash
-curl --fail --show-error https://sentinel.example.com/api/health
-curl --fail --show-error --head https://sentinel.example.com/login
+cd "$SENTINEL_DIR"
+git fetch --tags origin
+git checkout v1.0.0
+cp docker-compose.registry.example.yml docker-compose.registry.yml
 ```
 
-Réponse santé attendue :
+Les trois fichiers Compose de la topologie B sont : **base + override host-proxy
++ registry**. On les réutilise à chaque commande via une variable :
+
+```bash
+COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
+```
+
+### 6.2 Sauvegarde → préflight → pull → déploiement → health → recette
+
+```bash
+# 1. sauvegarde
+./scripts/backup.sh
+
+# 2. préflight NON destructif (échoue avant tout arrêt si un prérequis manque)
+./scripts/preflight.sh "${COMPOSE[@]}"
+
+# 3. pull des images par digest (docker login ghcr.io d'abord si packages privés)
+docker compose "${COMPOSE[@]}" pull backend frontend
+
+# 4. déploiement sans reconstruction locale
+docker compose "${COMPOSE[@]}" up -d --no-build --remove-orphans
+docker compose "${COMPOSE[@]}" ps
+
+# 5. health
+curl --fail --show-error https://sentinel.akiksystems.fr/api/health
+```
+
+Le backend applique les migrations sous verrou PostgreSQL avant d'écouter ; il
+refuse une migration déjà appliquée au checksum modifié ou un historique
+référençant un fichier absent. Réponse santé attendue :
 
 ```json
 {"status":"ok","db":"ok","version":"<sha_git_40_caracteres>"}
 ```
 
-Contrôler ensuite les trois accès depuis un navigateur : portail, Board et
-connexion Atelier. Les données Board ne doivent pas être accessibles sans sa
-session dédiée.
+`version` doit égaler `git rev-parse v1.0.0^{commit}`, et le digest de l'image
+backend déployée doit correspondre à `SENTINEL_BACKEND_IMAGE`. Consigner les deux
+digests dans le procès-verbal de recette (REL-03).
 
-## 6bis. Déploiement d'une release par image de registry (recommandé)
+### 6.3 Recette
 
-Pour un tag de version, préférer le déploiement des images publiées par le
-workflow `Release` (GHCR) plutôt qu'une reconstruction locale : le VPS exécute
-alors exactement l'image construite et vérifiée en CI, épinglée par digest
-immuable. Les deux digests figurent dans les notes de la release GitHub.
+Contrôler les trois accès depuis un navigateur : portail, Board et connexion
+Atelier. Les données Board ne doivent pas être accessibles sans leur session
+dédiée. Détail des cas dans la [checklist de recette](#10-checklist-de-recette).
 
-```bash
-cd /opt/sentinel
-git fetch --tags origin
-git checkout v1.0.0            # aligne le code (BUILD_SHA, migrations) sur le tag
-cp docker-compose.registry.example.yml docker-compose.registry.yml
-export BUILD_SHA="$(git rev-parse HEAD)"
-export SENTINEL_BACKEND_IMAGE='ghcr.io/amineakik/sentinel-fullstack/backend@sha256:...'
-export SENTINEL_FRONTEND_IMAGE='ghcr.io/amineakik/sentinel-fullstack/frontend@sha256:...'
-echo "$GHCR_TOKEN" | docker login ghcr.io -u <utilisateur> --password-stdin   # si packages privés
-docker compose -f docker-compose.yml -f docker-compose.registry.yml pull backend frontend
-docker compose -f docker-compose.yml -f docker-compose.registry.yml up -d --no-build --remove-orphans
-docker compose ps
-```
-
-Vérifier que la version déployée correspond exactement au tag :
-
-```bash
-curl --fail --show-error https://sentinel.example.com/api/health
-docker inspect --format '{{ index .RepoDigests 0 }}' "$(docker compose -f docker-compose.yml -f docker-compose.registry.yml images -q backend)"
-```
-
-`version` dans `/api/health` doit égaler `git rev-parse v1.0.0^{commit}`, et le
-digest de l'image backend doit correspondre à `SENTINEL_BACKEND_IMAGE`. Consigner
-les deux digests déployés dans le procès-verbal de recette (REL-03).
-
-## 7. Mise à jour
-
-```bash
-cd /opt/sentinel
-./scripts/backup.sh
-git fetch origin
-git pull --ff-only origin main
-docker compose config --quiet
-docker compose build backend frontend
-docker compose up -d --remove-orphans
-docker compose ps
-curl --fail --show-error https://sentinel.example.com/api/health
-docker compose logs --since=10m backend frontend caddy
-```
-
-La propriété `version` retournée par la santé doit être strictement égale à
-`git rev-parse HEAD` sur le serveur.
-
-Ne supprimer ni le volume `sentinel_data`, ni les volumes Caddy lors d'une mise
-à jour normale. Consulter les migrations ajoutées avant de déployer et conserver
-le backup hors du VPS.
+**Ne jamais `docker compose down` pour une mise à jour normale** : `up -d` suffit
+à recréer uniquement les conteneurs dont l'image ou la configuration a changé.
+Ne supprimer ni le volume `sentinel_data` ni les volumes Caddy. Conserver le
+backup hors du VPS. En cas de problème, voir le retour arrière du
+[runbook](runbook.md) (redéploiement du digest précédent).
 
 ## 8. Sauvegarde et restauration
 
@@ -364,15 +384,59 @@ arrière.
 
 ## 10. Checklist de recette
 
+### Commune aux deux topologies
+
 - [ ] DNS correct et certificat TLS valide
-- [ ] `docker compose config --quiet` réussi
-- [ ] tous les placeholders supprimés de `.env`
+- [ ] préflight (`./scripts/preflight.sh …`) passé sans échec
+- [ ] tous les placeholders supprimés de `.env` (mode `600`)
 - [ ] secrets Cookie/JWT distincts et aléatoires
-- [ ] code Board représenté par un hash bcrypt `$2...`
+- [ ] code Board représenté par un hash bcrypt `$2...`, entre quotes simples
+- [ ] `BUILD_SHA` et digests d'images persistés dans `.env`
 - [ ] admin initial connecté, mot de passe changé, variables bootstrap retirées
-- [ ] `/api/health` renvoie HTTP 200
-- [ ] services `postgres`, `backend`, `frontend` et `caddy` actifs
-- [ ] aucun port 3000, 5432 ou 8080 publié
+- [ ] `/api/health` renvoie HTTP 200 ; `version` == SHA du tag déployé
+- [ ] digests des images déployées == ceux de la release (REL-03)
+- [ ] `postgres` jamais publié sur l'hôte (aucun port 5432 exposé)
 - [ ] parcours Admin, Atelier et Board validés
 - [ ] backup créé, copié hors site et checksum vérifié
 - [ ] procédure de restauration testée hors production
+
+### Topologie A — distribution autonome (Caddy intégré)
+
+- [ ] service `caddy` actif ; seuls les ports `80`/`443` publiés
+- [ ] aucun port applicatif (`3000`, `8080`) publié sur l'hôte
+
+### Topologie B — frontal Nginx hôte (instance publique)
+
+- [ ] service `caddy` **absent** (profil `bundled-edge` non activé)
+- [ ] `backend` et `frontend` publiés **uniquement** sur `127.0.0.1`
+      (`SENTINEL_BACKEND_BIND_PORT`, `SENTINEL_FRONTEND_BIND_PORT`)
+- [ ] aucun de ces ports loopback n'est ouvert dans le pare-feu public
+- [ ] Nginx hôte termine le TLS et transmet les en-têtes `X-Forwarded-*`
+
+## 11. Annexe — Topologie A (distribution autonome, Caddy intégré)
+
+Pour un VPS dédié sans proxy hôte, la distribution autonome utilise **le seul
+fichier `docker-compose.yml`** : Caddy termine le TLS et publie `80`/`443`. Le
+`.env` porte les mêmes secrets (section 4) et `BUILD_SHA` ; on peut y déployer
+soit une image de registry (comme en topologie B, sans l'override host-proxy),
+soit une construction locale.
+
+Déploiement par image de registry (recommandé) :
+
+```bash
+cd "$SENTINEL_DIR"
+cp docker-compose.registry.example.yml docker-compose.registry.yml
+COMPOSE=(-f docker-compose.yml -f docker-compose.registry.yml)
+./scripts/backup.sh
+./scripts/preflight.sh "${COMPOSE[@]}"
+docker compose "${COMPOSE[@]}" pull backend frontend
+docker compose "${COMPOSE[@]}" up -d --no-build --remove-orphans
+curl --fail --show-error https://sentinel.example.com/api/health
+```
+
+Construction locale (si l'on ne consomme pas le registry) : remplacer les étapes
+`pull`/`up --no-build` par `docker compose -f docker-compose.yml build backend
+frontend` puis `docker compose -f docker-compose.yml up -d --remove-orphans`. Le
+préflight ne peut alors pas vérifier de digest (build local accepté). Comme en
+topologie B, ne jamais utiliser `docker compose down` pour une mise à jour
+normale.
