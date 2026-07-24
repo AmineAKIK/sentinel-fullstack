@@ -228,7 +228,10 @@ df -h
 ```
 
 Les logs Docker sont limités à cinq fichiers de 10 Mo par service. Le backend
-masque les cookies et en-têtes d'autorisation dans les requêtes journalisées.
+masque, dans les journaux HTTP, les cookies et en-têtes d'autorisation entrants
+ainsi que l'en-tête `Set-Cookie` sortant (qui transporte le jeton de session
+signé) — la liste des chemins masqués est centralisée dans
+`backend/src/httpLogging.ts` et couverte par un test de journalisation réelle.
 Ne pas augmenter le niveau de log en production sans surveiller le volume.
 
 ### Test de charge

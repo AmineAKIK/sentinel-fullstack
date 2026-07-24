@@ -6,6 +6,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import logger from './logger';
+import { httpLoggingOptions } from './httpLogging';
 import { assertProductionConfig, parsePort, parseTrustProxy } from './config/production';
 import pool from './db/pool';
 import runMigrations from './db/migrate';
@@ -48,19 +49,7 @@ app.use(
   })
 );
 
-app.use(
-  pinoHttp({
-    logger,
-    // Log 5xx at error, 4xx at warn, everything else at info
-    customLogLevel: (_req, res, err) => {
-      if (err || res.statusCode >= 500) return 'error';
-      if (res.statusCode >= 400) return 'warn';
-      return 'info';
-    },
-    // Redact sensitive fields from request logs
-    redact: ['req.headers.cookie', 'req.headers.authorization'],
-  })
-);
+app.use(pinoHttp(httpLoggingOptions(logger)));
 
 app.use(securityHeaders);
 app.use(express.json({ limit: '50kb' }));
