@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Vérifie que la lecture du .env (scripts/lib/env.sh) ne casse pas et ne corrompt
-# aucune valeur difficile — espaces, $, #, guillemets — et qu'un bcrypt ressort
-# strictement identique, y compris après `docker compose config` (P1 rc.2).
+# aucune valeur difficile — espaces, $, #, guillemets — et qu'un bcrypt entre
+# quotes simples ressort strictement identique dans le conteneur (P1 rc.2). Le
+# probe Compose tourne dans un projet jetable, nettoyé sur succès comme sur échec.
 #
 # Aucun vrai secret : uniquement des valeurs factices.
 
@@ -27,7 +28,15 @@ assert_eq() {
 }
 
 WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$WORKDIR"' EXIT INT TERM
+# Projet Compose jetable et unique pour le probe : sans lui, `docker compose run`
+# créerait des ressources (réseau, conteneur) dans un projet déduit du
+# répertoire. On les nettoie strictement sur ce projet, sur succès et sur échec.
+PROBE_PROJECT="sentinel_envprobe_$$"
+cleanup() {
+  docker compose -p "$PROBE_PROJECT" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  rm -rf "$WORKDIR"
+}
+trap cleanup EXIT INT TERM
 ENV_FILE="$WORKDIR/.env"
 
 # Hash bcrypt factice de forme réaliste et de longueur bcrypt exacte (60).
@@ -81,7 +90,7 @@ printf "BOARD_ACCESS_CODE_HASH='%s'\n" "$FAKE_BCRYPT" > "$COMPOSE_TEST_DIR/.env"
 # conteneur, pas dans le shell hôte — d'où les quotes simples.
 # shellcheck disable=SC2016
 RUNTIME_HASH="$(cd "$COMPOSE_TEST_DIR" \
-  && env -u BOARD_ACCESS_CODE_HASH docker compose run --rm --no-deps --entrypoint sh probe -c 'printf %s "$HASH"' 2>/dev/null)"
+  && env -u BOARD_ACCESS_CODE_HASH docker compose -p "$PROBE_PROJECT" run --rm --no-deps --entrypoint sh probe -c 'printf %s "$HASH"' 2>/dev/null)"
 # Le conteneur doit recevoir EXACTEMENT le bcrypt : préfixe $2b$, longueur 60,
 # tous les $ conservés, aucune quote résiduelle, aucun $$.
 assert_eq "bcrypt runtime identique au hash d'origine" "$FAKE_BCRYPT" "$RUNTIME_HASH"
@@ -89,6 +98,11 @@ assert_eq "bcrypt runtime commence par \$2b\$" "\$2b\$" "${RUNTIME_HASH:0:4}"
 assert_eq "bcrypt runtime a la longueur bcrypt (60)" "60" "${#RUNTIME_HASH}"
 assert_eq "bcrypt runtime sans quote résiduelle" "" "$(printf %s "$RUNTIME_HASH" | tr -cd "\"'")"
 assert_eq "bcrypt runtime sans \$\$" "0" "$(printf %s "$RUNTIME_HASH" | grep -c '\$\$' || true)"
+
+# Nettoyage explicite du projet jetable + preuve qu'aucune ressource ne subsiste.
+docker compose -p "$PROBE_PROJECT" down --volumes --remove-orphans >/dev/null 2>&1 || true
+LEFTOVER="$(docker ps -a --filter "label=com.docker.compose.project=$PROBE_PROJECT" -q | wc -l)"
+assert_eq "aucune ressource du probe ne subsiste" "0" "$(echo "$LEFTOVER" | tr -d '[:space:]')"
 
 echo ""
 echo "[test-env] $PASS test(s) réussi(s), $FAIL échec(s)."
