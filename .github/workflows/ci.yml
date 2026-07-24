@@ -185,6 +185,8 @@ jobs:
           config --quiet
       - name: Verify deployed Compose topology (networks, loopback ports, digests)
         run: ./scripts/verify-compose-topology.sh
+      - name: Verify safe .env parsing (spaces, $, #, quotes, bcrypt)
+        run: ./scripts/test-env-parsing.sh
       - name: Build production images
         run: |
           docker build \
@@ -233,7 +235,7 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          shellcheck scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh
+          shellcheck scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh
 
   ops:
     name: Ops / Backup and restore drill

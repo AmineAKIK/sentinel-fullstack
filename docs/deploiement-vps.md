@@ -172,10 +172,14 @@ BOARD_ACCESS_CODE='code-temporaire-du-board' npm run hash:board
 cd ..
 ```
 
-Reporter la sortie complète `$2b$...` :
+Reporter la sortie complète `$2b$...` **en doublant chaque `$` en `$$`** :
+Docker Compose interpole les `$` non échappés du `.env`, ce qui tronquerait le
+hash. Compose reconvertit `$$` en `$` à l'exécution, le conteneur reçoit donc le
+hash exact.
 
 ```dotenv
-BOARD_ACCESS_CODE_HASH=<hash_bcrypt>
+# hash généré : $2b$10$abcdef...  ->  valeur ci-dessous avec les $ doublés :
+BOARD_ACCESS_CODE_HASH=$$2b$$10$$abcdef...
 ```
 
 Le libellé et la durée de session Board sont stockés en base et administrables
