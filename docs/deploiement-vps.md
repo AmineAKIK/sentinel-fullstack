@@ -29,7 +29,12 @@ Internet -> Nginx hôte :443 -> 127.0.0.1:18080 -> frontend/Nginx :8080
 ```
 
 - `caddy` appartient aux réseaux `edge` et `internal` ;
-- `frontend` et `postgres` appartiennent uniquement au réseau isolé `internal` ;
+- `postgres` appartient uniquement au réseau isolé `internal` et n'est jamais
+  publié sur l'hôte ;
+- `frontend` appartient à `internal` ; dans la variante frontal-hôte
+  (`docker-compose.host-proxy.example.yml`), il rejoint aussi `edge` pour que sa
+  publication sur le loopback fonctionne (sans quoi le port n'est pas
+  réellement exposé) ;
 - `backend` appartient aussi à `edge` pour joindre les fournisseurs SMTP et IA ;
 - seuls les ports `80` et `443` sont publiés sur l'hôte ;
 - les conteneurs applicatifs ont un système de fichiers en lecture seule, un
