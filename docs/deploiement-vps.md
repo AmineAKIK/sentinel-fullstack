@@ -22,6 +22,9 @@ dans `COMPOSE` et réutilisés à l'identique par chaque commande :
 ```bash
 export SENTINEL_DIR=/var/www/sentinel
 cd "$SENTINEL_DIR"
+# Tag de la release réellement déployée (ex. v1.0.0-rc.1, v1.0.0…). Toutes les
+# commandes en dérivent : jamais de tag ni de SHA codé en dur.
+export RELEASE_TAG=<tag_de_la_release>
 # base + override host-proxy (Nginx hôte) + registry (images par digest)
 COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
 ```
@@ -322,7 +325,7 @@ suivi :
 ```bash
 cd "$SENTINEL_DIR"
 git fetch --tags origin
-git checkout v1.0.0
+git checkout "$RELEASE_TAG"
 cp docker-compose.registry.example.yml docker-compose.registry.yml
 ```
 
@@ -367,8 +370,8 @@ référençant un fichier absent. Réponse santé attendue :
 {"status":"ok","db":"ok","version":"<sha_git_40_caracteres>"}
 ```
 
-`version` doit égaler `git rev-parse v1.0.0^{commit}`, et le digest de l'image
-backend déployée doit correspondre à `SENTINEL_BACKEND_IMAGE`. Consigner les deux
+`version` doit égaler `git rev-parse "$RELEASE_TAG^{commit}"`, et le digest de
+l'image backend déployée doit correspondre à `SENTINEL_BACKEND_IMAGE`. Consigner les deux
 digests dans le procès-verbal de recette (REL-03).
 
 ### 6.3 Recette
@@ -457,22 +460,26 @@ fichier `docker-compose.yml`** : Caddy termine le TLS et publie `80`/`443`. Le
 soit une image de registry (comme en topologie B, sans l'override host-proxy),
 soit une construction locale.
 
-Déploiement par image de registry (recommandé) :
+Déploiement par image de registry (recommandé) — même ordre qu'en topologie B,
+`sauvegarde → pull → préflight → up → health`, le préflight exigeant les images
+déjà présentes localement :
 
 ```bash
 cd "$SENTINEL_DIR"
 cp docker-compose.registry.example.yml docker-compose.registry.yml
 COMPOSE=(-f docker-compose.yml -f docker-compose.registry.yml)
 ./scripts/backup.sh
-./scripts/preflight.sh "${COMPOSE[@]}"
 docker compose "${COMPOSE[@]}" pull backend frontend
+./scripts/preflight.sh --env-file "$SENTINEL_DIR/.env" "${COMPOSE[@]}"
 docker compose "${COMPOSE[@]}" up -d --no-build --remove-orphans
 curl --fail --show-error https://sentinel.example.com/api/health
 ```
 
-Construction locale (si l'on ne consomme pas le registry) : remplacer les étapes
-`pull`/`up --no-build` par `docker compose -f docker-compose.yml build backend
-frontend` puis `docker compose -f docker-compose.yml up -d --remove-orphans`. Le
-préflight ne peut alors pas vérifier de digest (build local accepté). Comme en
-topologie B, ne jamais utiliser `docker compose down` pour une mise à jour
-normale.
+Construction locale (si l'on ne consomme pas le registry) : `docker compose -f
+docker-compose.yml build backend frontend` puis `docker compose -f
+docker-compose.yml up -d --remove-orphans`. **Le préflight de release ne
+s'applique pas à ce mode** : il certifie une release de registry et exige un
+digest complet pour backend et frontend ; une composition sans digest est
+refusée. La construction locale vise le développement/la démo, pas une release
+certifiée. Comme en topologie B, ne jamais utiliser `docker compose down` pour
+une mise à jour normale.
