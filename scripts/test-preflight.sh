@@ -64,9 +64,25 @@ REGISTRY_NAME="preflight-registry-${RUN_ID}"
 REGISTRY_VOLUME=""            # volume anonyme du registre, renseigné après run
 LOCAL_TAG_OK="sentinel-backend:preflight-${RUN_ID}-ok"
 LOCAL_TAG_WRONG="sentinel-backend:preflight-${RUN_ID}-wrong"
-# Références poussées vers le registre local (tags + digests), remplies au fur
-# et à mesure ; le cleanup ne supprime QUE ces références.
+# Références poussées vers le registre local (tags registry + références par
+# digest), remplies DANS LE PROCESSUS PARENT (jamais dans un sous-shell $(...),
+# sinon les ajouts seraient perdus). Le cleanup ne supprime QUE ces références.
 CREATED_REFS=()
+# IDs exacts des images créées par ce test (docker build + tags/pull), pour
+# prouver leur disparition par ID et pas seulement par nom.
+CREATED_IMAGE_IDS=()
+
+# Enregistre l'ID d'image d'une référence si elle existe (dédupliqué).
+record_image_id() {
+  local ref="$1" id
+  id="$(docker image inspect --format '{{.Id}}' "$ref" 2>/dev/null || true)"
+  [[ -z "$id" ]] && return 0
+  local existing
+  for existing in "${CREATED_IMAGE_IDS[@]}"; do
+    [[ "$existing" == "$id" ]] && return 0
+  done
+  CREATED_IMAGE_IDS+=("$id")
+}
 
 # --- Invariant .env : état initial constaté (jamais déposé) --------------------
 SENTINEL_ENV="$PROJECT_ROOT/.env"
@@ -106,29 +122,47 @@ check_env_invariant() {
 }
 
 # --- Nettoyage idempotent, garanti par trap sur toute sortie ------------------
-cleanup() {
-  # Registre + son volume anonyme (rm -fv). Le volume est aussi retiré nommément
-  # au cas où (idempotent).
+# Supprime UNIQUEMENT les ressources créées par cette exécution (conteneur de
+# registre, volume anonyme, tags locaux, tags/digests registry, images par ID),
+# jamais de prune global.
+do_cleanup() {
   docker rm -fv "$REGISTRY_NAME" >/dev/null 2>&1 || true
   if [[ -n "$REGISTRY_VOLUME" ]]; then
     docker volume rm -f "$REGISTRY_VOLUME" >/dev/null 2>&1 || true
   fi
-  # Références registry créées (tags + digests) et tags locaux.
   local ref
-  for ref in "${CREATED_REFS[@]}" "$LOCAL_TAG_OK" "$LOCAL_TAG_WRONG"; do
+  for ref in ${CREATED_REFS[@]+"${CREATED_REFS[@]}"} "$LOCAL_TAG_OK" "$LOCAL_TAG_WRONG"; do
     if [[ -n "$ref" ]]; then
       docker rmi -f "$ref" >/dev/null 2>&1 || true
     fi
   done
+  local id
+  for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
+    if [[ -n "$id" ]]; then
+      docker rmi -f "$id" >/dev/null 2>&1 || true
+    fi
+  done
   rm -rf "$WORKDIR"
-  # L'invariant .env doit tenir même sur sortie anticipée : on le contrôle ici,
-  # et on l'échoue bruyamment (le test global échoue de toute façon si on sort
-  # avant le compte final).
-  if ! check_env_invariant; then
-    echo "[test-preflight] FAIL (cleanup): $ENV_INVARIANT_MSG" >&2
-  fi
 }
-trap cleanup EXIT INT TERM
+
+# Trap EXIT : nettoie puis, si l'invariant .env est violé, force un code non nul.
+on_exit() {
+  local rc=$?
+  do_cleanup
+  if ! check_env_invariant; then
+    echo "[test-preflight] FAIL (exit): $ENV_INVARIANT_MSG" >&2
+    [[ "$rc" -eq 0 ]] && rc=1
+  fi
+  exit "$rc"
+}
+# Traps SIGINT/SIGTERM TERMINAUX : on nettoie et on SORT (code non nul), le script
+# ne continue pas avec $WORKDIR supprimé. L'EXIT enchaîné fait le contrôle .env.
+on_signal() {
+  echo "[test-preflight] interruption reçue — nettoyage puis sortie." >&2
+  exit 130
+}
+trap on_exit EXIT
+trap on_signal INT TERM
 
 echo "[test-preflight] Construction de l'image backend (checker inclus)..."
 docker build --build-arg BUILD_SHA="$BUILD_SHA_OK" \
@@ -163,14 +197,18 @@ if [[ "$REGISTRY_READY" -ne 1 ]]; then
   exit 1
 fi
 
-# Pousse une image vers le registre local et renvoie sa référence par digest de
-# manifeste RÉEL (repo@sha256:...), utilisable en pull/run sur tout magasin. Les
-# références créées (tag registry + digest) sont enregistrées pour le nettoyage.
+# Pousse une image vers le registre local et renvoie, VIA LA VARIABLE nommée en
+# 3e argument (printf -v, donc dans le PROCESSUS PARENT — jamais un sous-shell
+# $(...) qui perdrait les ajouts de tableau), sa référence par digest de manifeste
+# RÉEL (repo@sha256:...). Le tag registry et la référence digest sont enregistrés
+# dans CREATED_REFS AVANT/juste après leur création, pour un nettoyage exact.
 push_and_digest() {
-  local src_tag="$1" dest_tag="$2" ref push_out digest digest_ref
+  local src_tag="$1" dest_tag="$2" out_var="$3" ref push_out digest digest_ref
   ref="${REGISTRY_HOST}/sentinel-backend:${dest_tag}"
-  docker tag "$src_tag" "$ref" >/dev/null 2>&1
+  # Enregistre le tag registry AVANT de le créer : même un échec ultérieur laisse
+  # une trace nettoyable.
   CREATED_REFS+=("$ref")
+  docker tag "$src_tag" "$ref" >/dev/null 2>&1
   push_out="$(docker push "$ref" 2>&1)"
   digest="$(printf '%s\n' "$push_out" | grep -oE 'sha256:[0-9a-f]{64}' | head -1)"
   if [[ -z "$digest" ]]; then
@@ -180,16 +218,24 @@ push_and_digest() {
   fi
   digest_ref="${REGISTRY_HOST}/sentinel-backend@${digest}"
   CREATED_REFS+=("$digest_ref")
-  printf '%s' "$digest_ref"
+  printf -v "$out_var" '%s' "$digest_ref"
 }
 
-DIGEST_OK="$(push_and_digest "$LOCAL_TAG_OK" "run-${RUN_ID}-ok")"
-DIGEST_WRONG="$(push_and_digest "$LOCAL_TAG_WRONG" "run-${RUN_ID}-wrong")"
+# Appels DIRECTS (pas de substitution) : les ajouts à CREATED_REFS persistent.
+push_and_digest "$LOCAL_TAG_OK" "run-${RUN_ID}-ok" DIGEST_OK
+push_and_digest "$LOCAL_TAG_WRONG" "run-${RUN_ID}-wrong" DIGEST_WRONG
 
 # S'assure que les images par digest sont présentes localement (procédure :
 # pull non destructif AVANT préflight ; ici elles le sont déjà après le push).
 docker image inspect "$DIGEST_OK" >/dev/null 2>&1 || docker pull "$DIGEST_OK" >/dev/null 2>&1
 docker image inspect "$DIGEST_WRONG" >/dev/null 2>&1 || docker pull "$DIGEST_WRONG" >/dev/null 2>&1
+
+# Capture les IDs exacts des images créées (tags locaux + références par digest),
+# pour prouver leur disparition par ID après nettoyage.
+record_image_id "$LOCAL_TAG_OK"
+record_image_id "$LOCAL_TAG_WRONG"
+record_image_id "$DIGEST_OK"
+record_image_id "$DIGEST_WRONG"
 
 # Override qui déploie backend et frontend par le digest VALIDE (image correcte).
 OVERRIDE="$WORKDIR/registry.yml"
@@ -370,37 +416,68 @@ else
   bad "invariant .env violé : $ENV_INVARIANT_MSG"
 fi
 
-# --- Preuve P0 : nettoyage Docker complet, disparition contrôlée ---------------
-# On nettoie explicitement (comme le fera aussi le trap), puis on prouve qu'aucun
-# des objets créés par CETTE exécution ne subsiste : conteneur de registre,
-# volume anonyme, tags locaux, tags/digests registry, images.
+# --- Preuve P0 : les ressources attendues ont bien été créées (non vides) ------
+# Garde-fou : si les collections sont vides, le "nettoyage complet" plus bas
+# serait trivialement vrai et donc mensonger. On exige des collections peuplées.
+ALL_TAGS=(${CREATED_REFS[@]+"${CREATED_REFS[@]}"} "$LOCAL_TAG_OK" "$LOCAL_TAG_WRONG")
+if [[ "${#CREATED_REFS[@]}" -ge 4 && "${#CREATED_IMAGE_IDS[@]}" -ge 1 ]]; then
+  ok "ressources de test enregistrées (${#CREATED_REFS[@]} réf. registry, ${#CREATED_IMAGE_IDS[@]} image(s) par ID) avant nettoyage"
+else
+  bad "collections de ressources incomplètes (réfs=${#CREATED_REFS[@]}, ids=${#CREATED_IMAGE_IDS[@]}) — le nettoyage ne prouverait rien"
+fi
+
+# Preuve AVANT nettoyage : le conteneur, le volume, chaque tag/digest et chaque
+# ID d'image créés existent réellement à cet instant.
+PRESENT=0
+[[ -n "$(docker ps -a --filter "name=^/${REGISTRY_NAME}$" -q)" ]] && PRESENT=$((PRESENT + 1))
+if [[ -n "$REGISTRY_VOLUME" ]] && docker volume inspect "$REGISTRY_VOLUME" >/dev/null 2>&1; then
+  PRESENT=$((PRESENT + 1))
+fi
+for ref in "${ALL_TAGS[@]}"; do
+  docker image inspect "$ref" >/dev/null 2>&1 && PRESENT=$((PRESENT + 1))
+done
+for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
+  docker image inspect "$id" >/dev/null 2>&1 && PRESENT=$((PRESENT + 1))
+done
+if [[ "$PRESENT" -ge 5 ]]; then
+  ok "avant nettoyage : conteneur, volume, tags/digests et IDs d'images présents ($PRESENT objets)"
+else
+  bad "avant nettoyage : ressources attendues absentes ($PRESENT objets seulement)"
+fi
+
+# --- Nettoyage explicite (le trap le referait), puis preuve d'ABSENCE ----------
 docker rm -fv "$REGISTRY_NAME" >/dev/null 2>&1 || true
 if [[ -n "$REGISTRY_VOLUME" ]]; then
   docker volume rm -f "$REGISTRY_VOLUME" >/dev/null 2>&1 || true
 fi
-for ref in "${CREATED_REFS[@]}" "$LOCAL_TAG_OK" "$LOCAL_TAG_WRONG"; do
+for ref in "${ALL_TAGS[@]}"; do
   docker rmi -f "$ref" >/dev/null 2>&1 || true
+done
+for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
+  docker rmi -f "$id" >/dev/null 2>&1 || true
 done
 
 LEFT=0
-# Conteneur de registre.
 if [[ -n "$(docker ps -a --filter "name=^/${REGISTRY_NAME}$" -q)" ]]; then
   LEFT=$((LEFT + 1)); echo "[test-preflight]   subsiste: conteneur $REGISTRY_NAME" >&2
 fi
-# Volume anonyme du registre.
 if [[ -n "$REGISTRY_VOLUME" ]] && docker volume inspect "$REGISTRY_VOLUME" >/dev/null 2>&1; then
   LEFT=$((LEFT + 1)); echo "[test-preflight]   subsiste: volume $REGISTRY_VOLUME" >&2
 fi
-# Tags/digests/images créés.
-for ref in "${CREATED_REFS[@]}" "$LOCAL_TAG_OK" "$LOCAL_TAG_WRONG"; do
+for ref in "${ALL_TAGS[@]}"; do
   if docker image inspect "$ref" >/dev/null 2>&1; then
-    LEFT=$((LEFT + 1)); echo "[test-preflight]   subsiste: image/ref $ref" >&2
+    LEFT=$((LEFT + 1)); echo "[test-preflight]   subsiste: tag/digest $ref" >&2
+  fi
+done
+for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
+  if docker image inspect "$id" >/dev/null 2>&1; then
+    LEFT=$((LEFT + 1)); echo "[test-preflight]   subsiste: image $id" >&2
   fi
 done
 if [[ "$LEFT" -eq 0 ]]; then
-  ok "nettoyage Docker complet : conteneur, volume, tags locaux et registry, digests, images — aucun ne subsiste"
+  ok "après nettoyage : aucun objet ne subsiste (conteneur, volume, tags, digests, IDs d'images)"
 else
-  bad "$LEFT ressource(s) Docker de test subsiste(nt)"
+  bad "$LEFT ressource(s) Docker de test subsiste(nt) après nettoyage"
 fi
 
 echo ""
