@@ -99,8 +99,13 @@ if dc run --rm --no-deps \
     --entrypoint node backend dist/scripts/checkProductionConfig.js >/dev/null 2>"$WORKDIR/checker.err"; then
   ok "configuration acceptée par la garde de production (assertProductionConfig)"
 else
-  # Le message d'erreur de la garde ne contient que des noms de variables.
-  reason="$(tail -n 1 "$WORKDIR/checker.err" 2>/dev/null || true)"
+  # Le checker émet « production config INVALID: <message> » sur stderr, mais
+  # `docker compose run` y intercale ses propres lignes de progression (Creating…)
+  # et parfois une ligne vide finale. On extrait donc précisément la ligne du
+  # verdict de la garde (qui ne contient que des noms de variables, aucun secret),
+  # sans se fier à la dernière ligne.
+  reason="$(grep -m1 'production config INVALID:' "$WORKDIR/checker.err" 2>/dev/null \
+    | sed 's/.*production config INVALID: //' || true)"
   bad "configuration refusée par la garde de production : ${reason:-voir le démarrage backend}"
 fi
 
@@ -142,35 +147,38 @@ else
   bad "BUILD_SHA absent, divergent ou non conforme (40 hex) dans les build-args"
 fi
 
-# 5. Images (variante registry) : épinglées par un digest @sha256: + 64 hex.
+# 5. Images épinglées par un digest @sha256: + 64 hex, EXIGÉ pour backend ET
+#    frontend. Ce préflight certifie une release de REGISTRY : une composition
+#    sans digest (build local) est refusée. Le développement local peut utiliser
+#    Compose sans passer par ce préflight, mais ne prétend alors pas satisfaire
+#    le contrat de release.
 if json_check <<'PY'
 import json, os, re, sys
 d = json.load(open(os.environ["CONFIG_FILE"], encoding="utf-8"))
 rx = re.compile(r"@sha256:[0-9a-f]{64}$")
-problems = []
+missing = []
 for svc in ("backend", "frontend"):
     image = str(d["services"].get(svc, {}).get("image", "") or "")
-    # image absente = build local, accepté ; image présente = digest complet exigé.
-    if image and not rx.search(image):
-        problems.append(svc)
-sys.exit(1 if problems else 0)
+    if not rx.search(image):
+        missing.append(svc)
+sys.exit(1 if missing else 0)
 PY
 then
-  ok "images backend/frontend épinglées par digest complet (ou build local)"
+  ok "images backend et frontend épinglées par digest complet (@sha256: + 64 hex)"
 else
-  bad "une image backend/frontend n'est pas épinglée par un digest @sha256: + 64 hex"
+  bad "une image backend/frontend n'est pas épinglée par un digest @sha256: + 64 hex (release registry exigée)"
 fi
 
-# 7. CORRESPONDANCE digest ↔ BUILD_SHA attendu. Les contrôles #4 et #5 vérifient
-#    séparément que le build-arg BUILD_SHA est bien formé et que les images sont
-#    épinglées par digest — mais rien ne garantit que ces digests désignent des
-#    images RÉELLEMENT construites pour ce SHA. Une release antérieure a un digest
-#    valide et un SHA valide : sans ce contrôle, on déploierait de mauvaises
-#    images sans le voir avant le health post-remplacement. On exige donc, pour
-#    chaque image déployée par digest, que son label OCI
-#    org.opencontainers.image.revision soit égal au BUILD_SHA attendu, et pour le
-#    backend que le BUILD_SHA embarqué au runtime le soit aussi. Le SHA et les
-#    références d'images ne sont pas des secrets : ils peuvent apparaître.
+# 6. CORRESPONDANCE digest ↔ BUILD_SHA attendu. Le contrôle #4 vérifie que le
+#    build-arg BUILD_SHA est bien formé et #5 que les images sont épinglées par
+#    digest — mais rien ne garantit que ces digests désignent des images
+#    RÉELLEMENT construites pour ce SHA. Une release antérieure a un digest valide
+#    et un SHA valide : sans ce contrôle, on déploierait de mauvaises images sans
+#    le voir avant le health post-remplacement. On exige donc, pour backend et
+#    frontend, que le label OCI org.opencontainers.image.revision de l'image
+#    déployée soit égal au BUILD_SHA attendu, et pour le backend que le BUILD_SHA
+#    embarqué au runtime le soit aussi. Le SHA et les références d'images ne sont
+#    pas des secrets : ils peuvent apparaître.
 #
 # Extrait (sans secret) le SHA attendu et les images par digest depuis la config.
 EXPECTED_SHA="$(json_check <<'PY'
@@ -196,9 +204,8 @@ if ! sha_ok "$EXPECTED_SHA"; then
   # Sans SHA attendu bien formé (déjà signalé par #4), on ne peut pas comparer.
   bad "impossible de vérifier la correspondance digest ↔ BUILD_SHA (SHA attendu absent ou mal formé)"
 elif [[ -z "$DIGEST_IMAGES" ]]; then
-  # Aucun service par digest = build local : la correspondance est garantie par
-  # construction (le build utilise le build-arg BUILD_SHA vérifié en #4).
-  ok "images construites localement à partir du BUILD_SHA vérifié (pas de digest à confronter)"
+  # Sans image par digest (déjà refusé par #5), rien à confronter : échec.
+  bad "aucune image par digest à confronter au BUILD_SHA (release registry exigée)"
 else
   MISMATCH=0
   while IFS=$'\t' read -r svc ref; do
@@ -228,7 +235,7 @@ else
   fi
 fi
 
-# 6. Topologie : publications sur le loopback uniquement, PostgreSQL jamais publié.
+# 7. Topologie : publications sur le loopback uniquement, PostgreSQL jamais publié.
 if json_check <<'PY'
 import json, os, sys
 d = json.load(open(os.environ["CONFIG_FILE"], encoding="utf-8"))
