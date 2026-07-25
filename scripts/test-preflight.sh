@@ -33,6 +33,16 @@ cd "$PROJECT_ROOT"
 # écraser — une ressource préexistante d'un développeur.
 RUN_ID="$$-${RANDOM}${RANDOM}"
 
+# Label de test propre à l'exécution, ajouté aux DEUX images buildées. Comme un
+# label est baké dans l'image, il en change l'ID de contenu : les deux images
+# sont donc UNIQUES par construction (elles ne peuvent pas partager leur ID avec
+# une image préexistante). Avant toute suppression par ID, on vérifie que l'image
+# porte bien CE label — donc qu'elle n'appartient qu'à cette exécution. Ce label
+# NE remplace PAS org.opencontainers.image.revision (posé par le Dockerfile).
+TEST_LABEL_KEY="com.akiksystems.sentinel.test-run"
+TEST_LABEL_OK="${RUN_ID}-ok"
+TEST_LABEL_WRONG="${RUN_ID}-wrong"
+
 # Secrets factices reconnaissables, pour prouver qu'ils ne fuient jamais.
 STRONG_DB='FAKE_db_password_of_at_least_32_characters'
 COOKIE='FAKE_cookie_secret_with_at_least_32_chars'
@@ -62,6 +72,7 @@ TEST_ENV_FILE="$WORKDIR/test.env"
 # --- Ressources Docker créées par cette exécution (pour un nettoyage exact) ----
 REGISTRY_NAME="preflight-registry-${RUN_ID}"
 REGISTRY_VOLUME=""            # volume anonyme du registre, renseigné après run
+WITNESS_TAG="sentinel-witness-${RUN_ID}:preexisting"  # alias tiers, nettoyé aussi
 LOCAL_TAG_OK="sentinel-backend:preflight-${RUN_ID}-ok"
 LOCAL_TAG_WRONG="sentinel-backend:preflight-${RUN_ID}-wrong"
 # Références poussées vers le registre local (tags registry + références par
@@ -121,10 +132,22 @@ check_env_invariant() {
   fi
 }
 
+# Vrai (0) si l'image d'ID donné porte le label de test de CETTE exécution — donc
+# n'appartient qu'à elle. Une image de contenu identique préexistante sous un
+# autre tag ne porterait pas ce label (il est baké dans nos builds uniquement),
+# et ne serait donc jamais supprimée par ID.
+id_belongs_to_run() {
+  local id="$1" val
+  [[ -n "$id" ]] || return 1
+  val="$(docker image inspect --format "{{ index .Config.Labels \"$TEST_LABEL_KEY\" }}" "$id" 2>/dev/null || true)"
+  [[ "$val" == "$TEST_LABEL_OK" || "$val" == "$TEST_LABEL_WRONG" ]]
+}
+
 # --- Nettoyage idempotent, garanti par trap sur toute sortie ------------------
 # Supprime UNIQUEMENT les ressources créées par cette exécution (conteneur de
 # registre, volume anonyme, tags locaux, tags/digests registry, images par ID),
-# jamais de prune global.
+# jamais de prune global. La suppression par ID n'a lieu que si l'image porte le
+# label de test de cette exécution.
 do_cleanup() {
   docker rm -fv "$REGISTRY_NAME" >/dev/null 2>&1 || true
   if [[ -n "$REGISTRY_VOLUME" ]]; then
@@ -136,9 +159,12 @@ do_cleanup() {
       docker rmi -f "$ref" >/dev/null 2>&1 || true
     fi
   done
+  # Alias témoin (référence par NOM uniquement : retire l'alias, jamais son ID
+  # partagé avec registry:2).
+  docker rmi -f "$WITNESS_TAG" >/dev/null 2>&1 || true
   local id
   for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
-    if [[ -n "$id" ]]; then
+    if [[ -n "$id" ]] && id_belongs_to_run "$id"; then
       docker rmi -f "$id" >/dev/null 2>&1 || true
     fi
   done
@@ -166,9 +192,12 @@ trap on_signal INT TERM
 
 echo "[test-preflight] Construction de l'image backend (checker inclus)..."
 docker build --build-arg BUILD_SHA="$BUILD_SHA_OK" \
+  --label "${TEST_LABEL_KEY}=${TEST_LABEL_OK}" \
   --tag "$LOCAL_TAG_OK" ./backend >/dev/null 2>&1
-# Image "bonne forme, mauvaise release" : même Dockerfile, autre BUILD_SHA.
+# Image "bonne forme, mauvaise release" : même Dockerfile, autre BUILD_SHA et
+# autre label de test → ID de contenu distinct des autres images de la machine.
 docker build --build-arg BUILD_SHA="$BUILD_SHA_WRONG" \
+  --label "${TEST_LABEL_KEY}=${TEST_LABEL_WRONG}" \
   --tag "$LOCAL_TAG_WRONG" ./backend >/dev/null 2>&1
 
 echo "[test-preflight] Démarrage d'un registre local jetable (port loopback dynamique)..."
@@ -416,36 +445,84 @@ else
   bad "invariant .env violé : $ENV_INVARIANT_MSG"
 fi
 
-# --- Preuve P0 : les ressources attendues ont bien été créées (non vides) ------
-# Garde-fou : si les collections sont vides, le "nettoyage complet" plus bas
-# serait trivialement vrai et donc mensonger. On exige des collections peuplées.
+# --- Preuve P0 : les collections attendues sont EXACTES -----------------------
+# Comptes exacts (pas ">=") : 4 références registry (2 tags + 2 digests),
+# 2 IDs d'images, 6 références totales (4 registry + 2 tags locaux). Sans cela,
+# le "nettoyage complet" plus bas serait trivialement vrai et donc mensonger.
 ALL_TAGS=(${CREATED_REFS[@]+"${CREATED_REFS[@]}"} "$LOCAL_TAG_OK" "$LOCAL_TAG_WRONG")
-if [[ "${#CREATED_REFS[@]}" -ge 4 && "${#CREATED_IMAGE_IDS[@]}" -ge 1 ]]; then
-  ok "ressources de test enregistrées (${#CREATED_REFS[@]} réf. registry, ${#CREATED_IMAGE_IDS[@]} image(s) par ID) avant nettoyage"
+COUNTS_OK=1
+[[ "${#CREATED_REFS[@]}" -eq 4 ]] || { COUNTS_OK=0; echo "[test-preflight]   CREATED_REFS=${#CREATED_REFS[@]} (attendu 4)" >&2; }
+[[ "${#CREATED_IMAGE_IDS[@]}" -eq 2 ]] || { COUNTS_OK=0; echo "[test-preflight]   CREATED_IMAGE_IDS=${#CREATED_IMAGE_IDS[@]} (attendu 2)" >&2; }
+[[ "${#ALL_TAGS[@]}" -eq 6 ]] || { COUNTS_OK=0; echo "[test-preflight]   ALL_TAGS=${#ALL_TAGS[@]} (attendu 6)" >&2; }
+# Les deux IDs doivent être DISTINCTS (label de test différent → contenu distinct).
+if [[ "${#CREATED_IMAGE_IDS[@]}" -eq 2 && "${CREATED_IMAGE_IDS[0]}" == "${CREATED_IMAGE_IDS[1]}" ]]; then
+  COUNTS_OK=0; echo "[test-preflight]   les deux IDs d'images sont identiques" >&2
+fi
+# Chaque ID doit porter le label de test de CETTE exécution (appartenance exclusive).
+IDS_OWNED=1
+for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
+  if ! id_belongs_to_run "$id"; then
+    IDS_OWNED=0; echo "[test-preflight]   ID $id ne porte pas le label de test du run" >&2
+  fi
+done
+if [[ "$COUNTS_OK" -eq 1 && "$IDS_OWNED" -eq 1 ]]; then
+  ok "ressources enregistrées exactes (4 réfs registry, 2 tags locaux, 2 IDs distincts labellisés du run)"
 else
-  bad "collections de ressources incomplètes (réfs=${#CREATED_REFS[@]}, ids=${#CREATED_IMAGE_IDS[@]}) — le nettoyage ne prouverait rien"
+  bad "collections de ressources non conformes — le nettoyage ne prouverait rien de sûr"
 fi
 
-# Preuve AVANT nettoyage : le conteneur, le volume, chaque tag/digest et chaque
-# ID d'image créés existent réellement à cet instant.
+# Preuve AVANT nettoyage : EXACTEMENT 10 objets attendus (conteneur + volume +
+# 6 références + 2 IDs). Tout objet absent est signalé nommément.
 PRESENT=0
-[[ -n "$(docker ps -a --filter "name=^/${REGISTRY_NAME}$" -q)" ]] && PRESENT=$((PRESENT + 1))
+if [[ -n "$(docker ps -a --filter "name=^/${REGISTRY_NAME}$" -q)" ]]; then
+  PRESENT=$((PRESENT + 1))
+else
+  echo "[test-preflight]   absent avant nettoyage: conteneur $REGISTRY_NAME" >&2
+fi
 if [[ -n "$REGISTRY_VOLUME" ]] && docker volume inspect "$REGISTRY_VOLUME" >/dev/null 2>&1; then
   PRESENT=$((PRESENT + 1))
+else
+  echo "[test-preflight]   absent avant nettoyage: volume ${REGISTRY_VOLUME:-<non capturé>}" >&2
 fi
 for ref in "${ALL_TAGS[@]}"; do
-  docker image inspect "$ref" >/dev/null 2>&1 && PRESENT=$((PRESENT + 1))
+  if docker image inspect "$ref" >/dev/null 2>&1; then
+    PRESENT=$((PRESENT + 1))
+  else
+    echo "[test-preflight]   absent avant nettoyage: réf $ref" >&2
+  fi
 done
 for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
-  docker image inspect "$id" >/dev/null 2>&1 && PRESENT=$((PRESENT + 1))
+  if docker image inspect "$id" >/dev/null 2>&1; then
+    PRESENT=$((PRESENT + 1))
+  else
+    echo "[test-preflight]   absent avant nettoyage: image $id" >&2
+  fi
 done
-if [[ "$PRESENT" -ge 5 ]]; then
-  ok "avant nettoyage : conteneur, volume, tags/digests et IDs d'images présents ($PRESENT objets)"
+if [[ "$PRESENT" -eq 10 ]]; then
+  ok "avant nettoyage : exactement 10 objets présents (conteneur + volume + 6 réfs + 2 IDs)"
 else
-  bad "avant nettoyage : ressources attendues absentes ($PRESENT objets seulement)"
+  bad "avant nettoyage : $PRESENT objets présents au lieu de 10 exactement"
 fi
 
+# --- Preuve : une image témoin tierce (ID DISTINCT, non marquée du run) survit -
+# Le danger que ce test écarte : `docker rmi -f <ID>` supprime TOUTES les
+# références d'un ID. Nos images étant uniques par construction (label baké → ID
+# propre au run), aucune image tierce ne partage leur ID ; la suppression par ID
+# est en plus gardée par id_belongs_to_run. On matérialise un témoin d'ID
+# DIFFÉRENT (l'image registry:2, déjà présente, re-taggée) : il ne porte pas le
+# label du run et ne figure dans aucune de nos collections. Il DOIT survivre.
+docker tag registry:2 "$WITNESS_TAG" >/dev/null 2>&1 || true
+WITNESS_ID="$(docker image inspect --format '{{.Id}}' "$WITNESS_TAG" 2>/dev/null || true)"
+# Sûreté du test lui-même : le témoin ne doit partager l'ID d'aucune de nos
+# images (sinon la preuve serait faussée). Nos IDs sont labellisés du run.
+WITNESS_DISTINCT=1
+for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
+  [[ "$WITNESS_ID" == "$id" ]] && WITNESS_DISTINCT=0
+done
+
 # --- Nettoyage explicite (le trap le referait), puis preuve d'ABSENCE ----------
+# La suppression par ID est gardée par id_belongs_to_run (label du run) : jamais
+# de rmi -f sur un ID qui ne serait pas exclusivement à nous.
 docker rm -fv "$REGISTRY_NAME" >/dev/null 2>&1 || true
 if [[ -n "$REGISTRY_VOLUME" ]]; then
   docker volume rm -f "$REGISTRY_VOLUME" >/dev/null 2>&1 || true
@@ -454,8 +531,18 @@ for ref in "${ALL_TAGS[@]}"; do
   docker rmi -f "$ref" >/dev/null 2>&1 || true
 done
 for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
-  docker rmi -f "$id" >/dev/null 2>&1 || true
+  if id_belongs_to_run "$id"; then
+    docker rmi -f "$id" >/dev/null 2>&1 || true
+  fi
 done
+
+# Le témoin (référence tierce, ID distinct, non listé) doit SURVIVRE.
+if [[ "$WITNESS_DISTINCT" -eq 1 ]] && docker image inspect "$WITNESS_TAG" >/dev/null 2>&1; then
+  ok "l'image témoin tierce (ID distinct, non marquée du run) a survécu au nettoyage"
+else
+  bad "l'image témoin tierce a été supprimée ou n'était pas distincte — le nettoyage n'est pas prouvé sûr"
+fi
+docker rmi -f "$WITNESS_TAG" >/dev/null 2>&1 || true
 
 LEFT=0
 if [[ -n "$(docker ps -a --filter "name=^/${REGISTRY_NAME}$" -q)" ]]; then
