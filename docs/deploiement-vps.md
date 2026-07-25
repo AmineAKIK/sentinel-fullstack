@@ -23,8 +23,10 @@ dans `COMPOSE` et réutilisés à l'identique par chaque commande :
 export SENTINEL_DIR=/var/www/sentinel
 cd "$SENTINEL_DIR"
 # Tag de la release réellement déployée (ex. v1.0.0-rc.1, v1.0.0…). Toutes les
-# commandes en dérivent : jamais de tag ni de SHA codé en dur.
-export RELEASE_TAG=<tag_de_la_release>
+# commandes en dérivent : jamais de tag ni de SHA codé en dur. Renseigner
+# explicitement AVANT de continuer ; le laisser vide interrompt les commandes.
+export RELEASE_TAG=""   # p. ex. : export RELEASE_TAG=v1.0.0
+: "${RELEASE_TAG:?définir RELEASE_TAG (le tag de la release à déployer)}"
 # base + override host-proxy (Nginx hôte) + registry (images par digest)
 COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
 ```
