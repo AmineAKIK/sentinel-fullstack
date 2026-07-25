@@ -111,10 +111,15 @@ production réelle.
 
 - TLS valide et renouvelable ;
 - headers vérifiés avec un outil externe ;
-- aucun port 3000, 5432 ou 8080 exposé ;
+- aucun port applicatif accessible publiquement : selon la topologie, les ports
+  frontend/backend sont soit non publiés (topologie A, seul Caddy expose 80/443),
+  soit publiés **uniquement sur le loopback `127.0.0.1`** (topologie B, derrière
+  le Nginx hôte). PostgreSQL (`5432`) n'est **jamais** publié, dans aucune
+  topologie ;
 - conteneurs frontend/backend non-root et read-only ;
 - `.env` non lisible par les autres comptes ;
-- logs sans cookie, bearer, mot de passe ou clé API.
+- logs sans cookie ni bearer entrant, sans `Set-Cookie` sortant, sans mot de
+  passe ni clé API.
 
 Un scan DAST peut compléter ces tests, mais ses alertes doivent être vérifiées
 manuellement avant conclusion.

@@ -7,11 +7,21 @@ umask 077
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck source=scripts/lib/env.sh
+source "$SCRIPT_DIR/lib/env.sh"
+
+# Lecture SÛRE du .env : on n'exécute jamais son contenu et on ne lit que les
+# variables réellement nécessaires. Un label avec espace ou un bcrypt en $2b$
+# ne peuvent plus casser le script ni être corrompus. Les valeurs déjà
+# présentes dans l'environnement (ex. CI) restent prioritaires.
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$PROJECT_ROOT/.env"
-  set +a
+  for _var in POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD COMPOSE_FILE; do
+    if [[ -z "${!_var:-}" ]]; then
+      _value="$(read_env_var "$PROJECT_ROOT/.env" "$_var")"
+      [[ -n "$_value" ]] && printf -v "$_var" '%s' "$_value"
+    fi
+  done
+  unset _var _value
 fi
 
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/backups}"

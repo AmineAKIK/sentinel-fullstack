@@ -6,11 +6,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck source=scripts/lib/env.sh
+source "$SCRIPT_DIR/lib/env.sh"
+
+# Lecture SÛRE du .env (voir scripts/lib/env.sh) : aucun `source` du contenu,
+# uniquement les variables nécessaires. Les valeurs déjà dans l'environnement
+# restent prioritaires.
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$PROJECT_ROOT/.env"
-  set +a
+  for _var in POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD COMPOSE_FILE; do
+    if [[ -z "${!_var:-}" ]]; then
+      _value="$(read_env_var "$PROJECT_ROOT/.env" "$_var")"
+      [[ -n "$_value" ]] && printf -v "$_var" '%s' "$_value"
+    fi
+  done
+  unset _var _value
 fi
 
 DB_NAME="${POSTGRES_DB:-sentinel}"

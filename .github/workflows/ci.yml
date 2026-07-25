@@ -38,7 +38,14 @@ jobs:
       - run: npm run build
       - run: npm run test:coverage
       - run: npm run verify:reliability
-      - run: npm audit --audit-level=high
+      # Audit des dépendances de PRODUCTION (celles réellement expédiées).
+      # Portée : --omit=dev ne couvre PAS l'intégralité de la chaîne d'outillage
+      # de dev ; il valide ce qui part en production. Les paquets de dev (Jest,
+      # ESLint) tirent des versions de brace-expansion (1.1.16, 2.1.2) déjà
+      # corrigées mais que l'avis GHSA-mh99-v99m-4gvg — aplati par npm en une
+      # plage unique `<=5.0.7` — signale à tort ; aucune ne part en production.
+      # La version 5.x réellement vulnérable est épinglée en 5.0.8 via overrides.
+      - run: npm audit --omit=dev --audit-level=high
 
   frontend:
     name: Frontend / Quality
@@ -59,7 +66,10 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
-      - run: npm audit --audit-level=high
+      # Voir le job backend : audit des dépendances de production (pas de toute
+      # la chaîne de dev) ; les faux positifs brace-expansion viennent de
+      # l'outillage de dev, jamais expédié.
+      - run: npm audit --omit=dev --audit-level=high
 
   integration:
     name: Backend / PostgreSQL integration
@@ -183,6 +193,10 @@ jobs:
           -f docker-compose.yml
           -f docker-compose.registry.example.yml
           config --quiet
+      - name: Verify deployed Compose topology (networks, loopback ports, digests)
+        run: ./scripts/verify-compose-topology.sh
+      - name: Verify safe .env parsing (spaces, $, #, quotes, bcrypt)
+        run: ./scripts/test-env-parsing.sh
       - name: Build production images
         run: |
           docker build \
@@ -206,6 +220,10 @@ jobs:
           docker run --rm --entrypoint test sentinel-backend:ci -f /app/dist/server.js
       - name: Validate unprivileged Nginx configuration
         run: docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m sentinel-frontend:ci nginx -t
+      - name: Assert the favicon is shipped in the frontend image
+        run: docker run --rm --entrypoint test sentinel-frontend:ci -f /usr/share/nginx/html/favicon.svg
+      - name: Exercise the deployment preflight (valid config + rejection matrix)
+        run: ./scripts/test-preflight.sh
       - name: Validate host Nginx example
         run: |
           mkdir -p .ci-certs/live/sentinel.akiksystems.fr
@@ -231,7 +249,7 @@ jobs:
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
           koalaman/shellcheck-alpine:v0.10.0
-          shellcheck scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh
+          shellcheck -x scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh scripts/test-preflight.sh
 
   ops:
     name: Ops / Backup and restore drill

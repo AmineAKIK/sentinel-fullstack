@@ -1,48 +1,74 @@
 # Runbook d'exploitation Sentinel
 
-Ce runbook couvre les opérations courantes de la stack Docker Compose fournie
-par le dépôt. Toutes les commandes sont lancées depuis la racine du déploiement,
-par exemple `/opt/sentinel`.
+Ce runbook fait autorité pour **l'instance publique** `sentinel.akiksystems.fr`,
+déployée en **topologie B** : images de registry épinglées par digest, derrière
+le **Nginx hôte** du VPS (Caddy ne démarre pas). La topologie A (distribution
+autonome avec Caddy intégré) est décrite en [annexe](#annexe--topologie-a-caddy-autonome).
 
-Au début de chaque session d'exploitation, exporter le SHA du checkout. Cette
-valeur alimente le label et l'environnement de l'image backend :
+Deux principes non négociables pour l'instance publique :
+
+- **Images immuables par digest, jamais de reconstruction locale.** Le VPS
+  exécute exactement l'image construite et vérifiée en CI. On ne fait jamais
+  `git pull` + `docker compose build` sur le VPS.
+- **Valeurs de release persistées dans `.env`** (mode `600`), jamais des `export`
+  de session : `BUILD_SHA` et les digests survivent à une reconnexion SSH.
+
+Toutes les commandes s'exécutent depuis le répertoire de déploiement, et la
+topologie B se compose **toujours** des trois mêmes fichiers Compose :
 
 ```bash
-export BUILD_SHA="$(git rev-parse HEAD)"
+SENTINEL_DIR=/var/www/sentinel
+cd "$SENTINEL_DIR"
+# base + override host-proxy (Nginx hôte) + registry (images par digest)
+COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
 ```
+
+Toutes les commandes opérationnelles ci-dessous utilisent `"${COMPOSE[@]}"`.
 
 ## 1. Contrôles rapides
 
 ```bash
-docker compose config --quiet
-docker compose ps
-curl --fail --show-error https://sentinel.example.com/api/health
-docker compose logs --since=15m backend frontend caddy postgres
+docker compose "${COMPOSE[@]}" config --quiet
+docker compose "${COMPOSE[@]}" ps
+curl --fail --show-error https://sentinel.akiksystems.fr/api/health
+docker compose "${COMPOSE[@]}" logs --since=15m backend frontend postgres
 ```
 
 État nominal :
 
 - `postgres`, `backend` et `frontend` sont `healthy` ;
-- `caddy` est `running`, sauf sur la variante Nginx hôte où il est désactivé ;
-- `/api/health` répond HTTP 200 et sa propriété `version` égale `git rev-parse HEAD` ;
-- aucune boucle de redémarrage n'apparaît dans `docker compose ps`.
+- `caddy` n'est **pas** lancé (le TLS est terminé par le Nginx hôte) ;
+- `/api/health` répond HTTP 200 et sa propriété `version` égale le SHA du tag
+  déployé (`git rev-parse <tag>^{commit}`) ;
+- aucune boucle de redémarrage n'apparaît dans `docker compose … ps`.
+
+Le frontal TLS étant le Nginx hôte, ses diagnostics ne passent pas par Compose :
+
+```bash
+sudo nginx -t
+sudo systemctl status nginx
+sudo tail -n 100 /var/log/nginx/error.log
+```
 
 ## 2. Variables critiques
 
 | Variable | Obligatoire | Rôle |
 | --- | --- | --- |
-| `CADDY_DOMAIN` | oui | domaine public servi par Caddy |
-| `BUILD_SHA` | oui au build | commit Git exact embarqué dans l'image backend |
+| `BUILD_SHA` | oui | SHA git 40 hex du tag ; embarqué dans l'image et publié par `/api/health` |
+| `SENTINEL_BACKEND_IMAGE` | oui (topo B) | image backend épinglée par digest `@sha256:` |
+| `SENTINEL_FRONTEND_IMAGE` | oui (topo B) | image frontend épinglée par digest `@sha256:` |
+| `SENTINEL_BACKEND_BIND_PORT` | oui (topo B) | port loopback de publication du backend |
+| `SENTINEL_FRONTEND_BIND_PORT` | oui (topo B) | port loopback de publication du frontend |
 | `CLIENT_ORIGIN` | oui | origine HTTPS exacte autorisée par CORS |
 | `TRUST_PROXY` | oui | prise en compte sûre de l'IP via le proxy inverse |
 | `POSTGRES_PASSWORD` | oui | mot de passe du service PostgreSQL |
 | `DATABASE_URL` | oui | connexion interne du backend à PostgreSQL |
 | `COOKIE_SECRET` | oui | signature des cookies Express |
 | `JWT_SECRET` | oui | signature des sessions JWT |
-| `BOARD_ACCESS_CODE_HASH` | oui | hash bcrypt du code Board initial |
+| `BOARD_ACCESS_CODE_HASH` | oui | hash bcrypt du code Board initial (entre quotes simples) |
 | `ADMIN_USERNAME` | base vide | bootstrap Admin, non vide, max. 80 caractères, non numérique |
 | `ADMIN_PASSWORD` | base vide | mot de passe temporaire du premier admin |
-| `VITE_API_URL` | vide en same-origin | surcharge de l'origine API au build |
+| `CADDY_DOMAIN` | topo A | domaine servi par Caddy (annexe uniquement) |
 
 Les variables SMTP, DeepSeek et d'outbox sont documentées dans
 `.env.release.example`. Ne jamais mettre un secret dans une commande versionnée,
@@ -85,10 +111,10 @@ cd ..
 Exemple de cron quotidien à 03:00 :
 
 ```cron
-0 3 * * * cd /opt/sentinel && ./scripts/backup.sh >> /var/log/sentinel-backup.log 2>&1
+0 3 * * * cd /var/www/sentinel && ./scripts/backup.sh >> /var/log/sentinel-backup.log 2>&1
 ```
 
-Le compte cron doit pouvoir exécuter Docker et lire `/opt/sentinel/.env`.
+Le compte cron doit pouvoir exécuter Docker et lire `/var/www/sentinel/.env`.
 Protéger le fichier de log et surveiller explicitement les codes de sortie.
 
 ### Hors site
@@ -103,6 +129,12 @@ Politique minimale recommandée :
 - 4 sauvegardes hebdomadaires ;
 - 3 sauvegardes mensuelles ;
 - un test de restauration trimestriel sur une base isolée.
+
+`scripts/test-backup-restore.sh` réalise cet exercice de bout en bout dans un
+projet Compose jetable et unique, mesure le temps de restauration (RTO) et
+prouve son isolation. Il est sûr à lancer depuis le répertoire de déploiement
+(`/var/www/sentinel`) : le projet de production n'est jamais ciblé et le
+nettoyage se limite strictement au projet jetable du test.
 
 ## 4. Restauration
 
@@ -135,34 +167,54 @@ le nom de la base initiale.
 Après restauration :
 
 ```bash
-docker compose ps
-curl --fail --show-error https://sentinel.example.com/api/health
-docker compose logs --since=10m backend postgres
+docker compose "${COMPOSE[@]}" ps
+curl --fail --show-error https://sentinel.akiksystems.fr/api/health
+docker compose "${COMPOSE[@]}" logs --since=10m backend postgres
 ```
 
 Faire ensuite une recette fonctionnelle : connexion, ouverture d'un incident,
 historique, Board et dernier événement d'audit attendu.
 
-## 5. Mise à jour applicative
+## 5. Mise à jour applicative (release par digest)
+
+Une mise à jour = déployer une **nouvelle release immuable**. On ne reconstruit
+rien sur le VPS ; on renseigne les valeurs de la release dans `.env`, on tire les
+images par digest, on vérifie, on bascule.
 
 ```bash
+cd "$SENTINEL_DIR"
+
+# 1. renseigner dans .env les valeurs de la NOUVELLE release (depuis les notes
+#    de la release GitHub) : BUILD_SHA (git rev-parse <tag>^{commit}),
+#    SENTINEL_BACKEND_IMAGE / SENTINEL_FRONTEND_IMAGE (digests @sha256:).
+#    Optionnel : aligner l'arbre sur le tag pour migrations/exemples, sans
+#    dépendre du .env :  git fetch --tags origin && git checkout <tag>
+
+# 2. sauvegarde
 ./scripts/backup.sh
-git fetch origin
-git status --short
-git pull --ff-only origin main
-export BUILD_SHA="$(git rev-parse HEAD)"
-docker compose config --quiet
-docker compose build backend frontend
-docker compose up -d --remove-orphans
-docker compose ps
-curl --fail --show-error https://sentinel.example.com/api/health
-docker compose logs --since=10m backend frontend caddy
+
+# 3. pull non destructif des images par digest (aucun conteneur remplacé)
+docker compose "${COMPOSE[@]}" pull backend frontend
+
+# 4. préflight : confronte les digests au BUILD_SHA attendu (label OCI + SHA
+#    runtime), sans stopper/reconfigurer aucun service en cours
+./scripts/preflight.sh --env-file "$SENTINEL_DIR/.env" "${COMPOSE[@]}"
+
+# 5. bascule sans reconstruction locale (recrée seulement ce qui a changé)
+docker compose "${COMPOSE[@]}" up -d --no-build --remove-orphans
+docker compose "${COMPOSE[@]}" ps
+
+# 6. health : la version doit égaler le SHA du tag déployé
+curl --fail --show-error https://sentinel.akiksystems.fr/api/health
+docker compose "${COMPOSE[@]}" logs --since=10m backend frontend
 ```
 
-Ne pas déployer depuis un arbre Git sale. Vérifier la CI du commit cible avant la
-mise à jour. Les migrations sont appliquées automatiquement au démarrage du
-backend, sous verrou exclusif et avec vérification de checksum. Après démarrage,
-comparer la propriété `version` de `/api/health` à `$BUILD_SHA` avant la recette.
+Vérifier la CI du commit cible avant la mise à jour. Les migrations sont
+appliquées automatiquement au démarrage du backend, sous verrou exclusif et avec
+vérification de checksum. Après démarrage, comparer la propriété `version` de
+`/api/health` au SHA du tag avant la recette. **Ne jamais `docker compose down`
+pour une mise à jour normale** : `up -d` recrée uniquement les conteneurs dont
+l'image ou la configuration a changé.
 
 ## 6. Rotation des secrets
 
@@ -173,10 +225,11 @@ openssl rand -hex 32
 openssl rand -hex 32
 ```
 
-Remplacer les deux valeurs dans `.env`, puis :
+Remplacer les deux valeurs dans `.env`, puis recréer le backend **sans
+reconstruction locale** :
 
 ```bash
-docker compose up -d --force-recreate backend
+docker compose "${COMPOSE[@]}" up -d --no-build --force-recreate backend
 ```
 
 La rotation de `JWT_SECRET` invalide toutes les sessions. Planifier l'opération
@@ -192,16 +245,19 @@ BOARD_ACCESS_CODE='nouveau-code-temporaire' npm run hash:board
 cd ..
 ```
 
-Mettre le hash bcrypt obtenu dans `.env`, recréer le backend, puis vérifier une
-nouvelle connexion Board. Les sessions Board antérieures peuvent rester valides
-jusqu'à leur expiration ; une rotation du `JWT_SECRET` les invalide toutes.
+Mettre le hash bcrypt obtenu dans `.env` **entre quotes simples**
+(`BOARD_ACCESS_CODE_HASH='$2b$...'`) : sans quotes, Compose interpole les `$` et
+tronque le hash. Recréer le backend (`up -d --no-build --force-recreate backend`),
+puis vérifier une nouvelle connexion Board. Les sessions Board antérieures
+peuvent rester valides jusqu'à leur expiration ; une rotation du `JWT_SECRET` les
+invalide toutes.
 
 ### Mot de passe admin
 
 La voie normale est Administration > Sécurité. Si l'accès est perdu :
 
 ```bash
-docker compose exec -T backend node dist/scripts/reset-admin-password.js
+docker compose "${COMPOSE[@]}" exec -T backend node dist/scripts/reset-admin-password.js
 ```
 
 La commande choisit l'admin unique, remplace son mot de passe dans une transaction
@@ -219,16 +275,26 @@ environnement de préproduction avant la production.
 ## 7. Logs et diagnostic
 
 ```bash
-docker compose logs --follow --tail=200
-docker compose logs --follow --tail=200 backend
-docker compose logs --since=1h backend | grep -Ei 'error|fatal|migration|shutdown'
-docker compose stats --no-stream
+docker compose "${COMPOSE[@]}" logs --follow --tail=200
+docker compose "${COMPOSE[@]}" logs --follow --tail=200 backend
+docker compose "${COMPOSE[@]}" logs --since=1h backend | grep -Ei 'error|fatal|migration|shutdown'
+docker compose "${COMPOSE[@]}" stats --no-stream
 docker system df
 df -h
 ```
 
+Le frontal TLS de l'instance publique est le **Nginx hôte**, hors Compose :
+
+```bash
+sudo nginx -t
+sudo tail -n 200 /var/log/nginx/{access,error}.log
+```
+
 Les logs Docker sont limités à cinq fichiers de 10 Mo par service. Le backend
-masque les cookies et en-têtes d'autorisation dans les requêtes journalisées.
+masque, dans les journaux HTTP, les cookies et en-têtes d'autorisation entrants
+ainsi que l'en-tête `Set-Cookie` sortant (qui transporte le jeton de session
+signé) — la liste des chemins masqués est centralisée dans
+`backend/src/httpLogging.ts` et couverte par un test de journalisation réelle.
 Ne pas augmenter le niveau de log en production sans surveiller le volume.
 
 ### Test de charge
@@ -240,7 +306,7 @@ Manuel, non intégré à la CI : à exécuter contre une instance dédiée, jama
 contre la base de test partagée des autres suites.
 
 ```bash
-k6 run --env BASE_URL=http://127.0.0.1:3000 scripts/load-test.js
+k6 run --env BASE_URL=http://127.0.0.1:<port_backend_loopback> scripts/load-test.js
 ```
 
 Seuils attendus : moins de 1 % d'échecs, p95 sous 300 ms, p99 sous 800 ms.
@@ -250,22 +316,26 @@ Seuils attendus : moins de 1 % d'échecs, p95 sous 300 ms, p99 sous 800 ms.
 ### Site inaccessible
 
 ```bash
-docker compose ps
-docker compose logs --since=15m caddy frontend backend
-curl --verbose https://sentinel.example.com/api/health
+docker compose "${COMPOSE[@]}" ps
+docker compose "${COMPOSE[@]}" logs --since=15m frontend backend
+curl --verbose https://sentinel.akiksystems.fr/api/health
+# frontal TLS = Nginx hôte
+sudo nginx -t && sudo systemctl status nginx
+sudo tail -n 100 /var/log/nginx/error.log
 ```
 
-- échec TLS : contrôler DNS, ports 80/443, horloge et logs Caddy ;
-- frontend sain mais API 502/503 : contrôler backend et PostgreSQL ;
+- échec TLS : contrôler DNS, ports 80/443, horloge et logs du **Nginx hôte** ;
+- frontend sain mais API 502/503 : contrôler backend et PostgreSQL, et que le
+  `proxy_pass` du vhost pointe le bon port loopback ;
 - service arrêté : lire ses logs avant de le relancer ;
 - boucle de redémarrage : ne pas masquer l'erreur avec des redémarrages répétés.
 
 ### PostgreSQL indisponible
 
 ```bash
-docker compose ps postgres
-docker compose logs --tail=200 postgres
-docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-sentinel}" -d "${POSTGRES_DB:-sentinel}"
+docker compose "${COMPOSE[@]}" ps postgres
+docker compose "${COMPOSE[@]}" logs --tail=200 postgres
+docker compose "${COMPOSE[@]}" exec -T postgres pg_isready -U "${POSTGRES_USER:-sentinel}" -d "${POSTGRES_DB:-sentinel}"
 ```
 
 Vérifier l'espace disque et les permissions du volume. Ne restaurer qu'après
@@ -276,7 +346,7 @@ avoir distingué une indisponibilité transitoire d'une corruption réelle.
 Le backend s'arrête si le ledger contient une migration absente ou si le checksum
 d'une migration appliquée ne correspond plus au fichier. Ne jamais modifier une
 migration publiée. Restaurer le fichier d'origine ou ajouter une nouvelle
-migration corrective.
+migration corrective, puis publier une nouvelle release.
 
 ### Notifications en échec
 
@@ -294,34 +364,69 @@ du -sh backups/* 2>/dev/null | sort -h
 ```
 
 Exporter les backups avant suppression. Ne jamais exécuter
-`docker compose down -v` : l'option `-v` supprimerait les données PostgreSQL et
-les données de certificat Caddy.
+`docker compose … down -v` : l'option `-v` supprimerait les données PostgreSQL.
 
-## 9. Retour arrière
+## 9. Retour arrière (rollback par digest précédent)
 
-Un rollback du code n'implique pas automatiquement un rollback du schéma. Avant
-la mise en production, vérifier si les nouvelles migrations restent compatibles
-avec le commit précédent.
+Le rollback de l'instance publique **ne reconstruit rien** et ne fait pas de
+`git checkout` de production : on redéploie les **digests de la release
+précédente**. Un rollback du code n'implique pas automatiquement un rollback du
+schéma : vérifier d'abord si les migrations de la release fautive restent
+compatibles avec le commit précédent.
 
 ```bash
-docker compose stop backend frontend
-git checkout <commit_precedent_valide>
-export BUILD_SHA="$(git rev-parse HEAD)"
-docker compose build backend frontend
-docker compose up -d
-curl --fail --show-error https://sentinel.example.com/api/health
+cd "$SENTINEL_DIR"
+
+# 1. remettre dans .env les valeurs de la release PRÉCÉDENTE (BUILD_SHA + digests
+#    @sha256:), relevées lors de son propre déploiement (trace d'intervention §10)
+
+# 2. pull des digests précédents (déjà en cache local le plus souvent)
+docker compose "${COMPOSE[@]}" pull backend frontend
+
+# 3. préflight sur ces digests
+./scripts/preflight.sh --env-file "$SENTINEL_DIR/.env" "${COMPOSE[@]}"
+
+# 4. bascule sans reconstruction
+docker compose "${COMPOSE[@]}" up -d --no-build --remove-orphans
+curl --fail --show-error https://sentinel.akiksystems.fr/api/health
 ```
 
 Si le schéma n'est pas rétrocompatible, restaurer le backup pris juste avant le
-déploiement avec `scripts/restore.sh`, puis relancer le commit précédent.
+déploiement avec `scripts/restore.sh`, puis redéployer les digests précédents.
 
 ## 10. Trace d'intervention
 
 Pour chaque opération sensible, consigner hors du dépôt :
 
 - date, intervenant et motif ;
-- commit déployé avant/après ;
+- `BUILD_SHA` et digests déployés avant/après (indispensables au rollback) ;
 - backup utilisé et checksum ;
 - commandes structurantes exécutées ;
 - résultat des contrôles de santé et de recette ;
 - décision de clôture ou d'escalade.
+
+## Annexe — Topologie A (Caddy autonome)
+
+La distribution autonome n'utilise **pas** le Nginx hôte : Caddy est l'unique
+point d'entrée TLS et publie `80`/`443`. Elle vise un déploiement autonome
+(démo, préproduction), pas l'instance publique. La composition n'utilise alors
+que **deux** fichiers (base + registry), sans l'override host-proxy :
+
+```bash
+COMPOSE_A=(-f docker-compose.yml -f docker-compose.registry.yml)
+```
+
+Différences par rapport à la topologie B :
+
+- `CADDY_DOMAIN` doit être renseigné ; le profil `bundled-edge` est actif et
+  `caddy` doit être `running` ;
+- les diagnostics TLS passent par les logs Caddy
+  (`docker compose "${COMPOSE_A[@]}" logs --since=15m caddy`), pas par le Nginx
+  hôte ;
+- aucune variable `SENTINEL_*_BIND_PORT` n'est requise : seuls `80`/`443` sont
+  publiés ;
+- ne jamais supprimer le volume de certificats Caddy lors d'un nettoyage disque.
+
+Tout le reste (sauvegarde, restauration, rotation des secrets, mise à jour et
+rollback par digest) est identique, en substituant `"${COMPOSE_A[@]}"` à
+`"${COMPOSE[@]}"`.

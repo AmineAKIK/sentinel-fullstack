@@ -37,7 +37,7 @@ verte.
 | Fiabilité structurelle          | **20 contrôles sur 20**                   |
 | Intégration PostgreSQL          | **4 suites, 37 tests**                    |
 | E2E Chromium                    | **4 parcours sur 4**                      |
-| Audit npm                       | **0 vulnérabilité** sur les deux projets  |
+| Audit npm                       | **0 vulnérabilité ≥ high** au 17 juillet 2026 via `npm audit --audit-level=high` (arbre complet) sur les deux projets |
 | Caddy et scripts d'exploitation | OK, Caddy `2.11.4` et ShellCheck `0.10.0` |
 | Contrat conteneurs              | **OK dans la CI distante**                |
 

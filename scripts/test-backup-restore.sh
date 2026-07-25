@@ -1,17 +1,43 @@
 #!/usr/bin/env bash
 # Exercice automatisé de scripts/backup.sh et scripts/restore.sh contre un
-# PostgreSQL Docker Compose jetable. Ne touche jamais une base réelle : tout
-# tourne sous POSTGRES_DB=sentinel_ci_test, détruit à la fin.
+# PostgreSQL Docker Compose jetable. Ne touche JAMAIS une base ou un projet
+# réel : tout tourne dans un projet Compose jetable et unique
+# (COMPOSE_PROJECT_NAME=sentinel_bkrestore_test_$$), détruit à la fin. Le
+# nettoyage est strictement limité à ce projet ; une ressource sentinelle
+# extérieure est vérifiée intacte en fin de test pour prouver l'isolation.
 #
 # Usage : ./scripts/test-backup-restore.sh
-# Prérequis : Docker Compose v2, aucun autre projet Compose nommé "sentinel"
-# en conflit sur le réseau/volume utilisés (le script les nettoie lui-même).
+# Prérequis : Docker Compose v2. Sûr à exécuter depuis /var/www/sentinel : le
+# projet de production « sentinel » n'est jamais ciblé.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
+
+# Nom de projet Compose JETABLE et unique. Sans lui, Docker Compose déduit le
+# nom du projet du répertoire courant : dans /var/www/sentinel il réutiliserait
+# le projet de production « sentinel » et le nettoyage `down --volumes`
+# détruirait le volume de production. On l'impose donc explicitement et on
+# l'exporte pour que backup.sh/restore.sh (qui utilisent --project-directory)
+# héritent du même projet jetable, jamais celui de production.
+COMPOSE_PROJECT_NAME="sentinel_bkrestore_test_$$"
+export COMPOSE_PROJECT_NAME
+
+# Garde : aucun nom de projet réservé à un environnement réel n'est toléré.
+case "$COMPOSE_PROJECT_NAME" in
+  sentinel | production | sentinel_prod | staging)
+    echo "[test-backup-restore] Nom de projet interdit : $COMPOSE_PROJECT_NAME" >&2
+    exit 2
+    ;;
+esac
+
+# Toutes les commandes Compose du test passent par ce wrapper, qui ré-impose le
+# projet jetable via -p (double sécurité avec COMPOSE_PROJECT_NAME).
+dc() {
+  docker compose -p "$COMPOSE_PROJECT_NAME" "$@"
+}
 
 export POSTGRES_DB="sentinel_ci_test"
 export POSTGRES_USER="sentinel"
@@ -44,23 +70,35 @@ fail() {
   echo "[test-backup-restore] FAIL: $1" >&2
 }
 
+# Ressource « sentinelle » extérieure au projet de test : un volume Docker
+# nommé, hors du projet jetable. Il simule une ressource de production. Si le
+# nettoyage `down --volumes` du test le supprimait, c'est que le projet ciblé
+# n'est pas correctement isolé. On vérifie en fin de test qu'il est intact.
+SENTINEL_VOLUME="sentinel_bkrestore_sentinel_$$"
+
 cleanup() {
   local code=$?
   if [[ "$code" -ne 0 ]]; then
     echo "[test-backup-restore] Échec (code $code) — logs PostgreSQL :" >&2
-    docker compose logs postgres >&2 || true
+    dc logs postgres >&2 || true
   fi
-  docker compose down postgres --volumes >/dev/null 2>&1 || true
+  # Nettoyage STRICTEMENT limité au projet jetable de ce test.
+  dc down postgres --volumes >/dev/null 2>&1 || true
+  # La sentinelle est nettoyée à part, explicitement par son nom.
+  docker volume rm "$SENTINEL_VOLUME" >/dev/null 2>&1 || true
   rm -rf "$WORKDIR"
   exit "$code"
 }
 trap cleanup EXIT INT TERM
 
+echo "[test-backup-restore] Installation de la ressource sentinelle externe..."
+docker volume create "$SENTINEL_VOLUME" >/dev/null
+
 echo "[test-backup-restore] Démarrage de PostgreSQL jetable..."
-docker compose up -d postgres >/dev/null
+dc up -d postgres >/dev/null
 READY=false
 for _ in $(seq 1 60); do
-  if docker compose exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+  if dc exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
     READY=true
     break
   fi
@@ -68,22 +106,22 @@ for _ in $(seq 1 60); do
 done
 if [[ "$READY" != true ]]; then
   echo "[test-backup-restore] PostgreSQL n'est pas devenu prêt à temps. Diagnostic :" >&2
-  docker compose ps postgres >&2 || true
-  docker compose logs postgres >&2 || true
+  dc ps postgres >&2 || true
+  dc logs postgres >&2 || true
   exit 1
 fi
 
 echo "[test-backup-restore] Chargement du schéma réel (migrations SQL brutes)..."
 while IFS= read -r f; do
-  docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
+  dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
     < "$f" >/dev/null
 done < <(find backend/migrations -maxdepth 1 -name '*.sql' | sort)
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
+dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
   -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename VARCHAR PRIMARY KEY, checksum VARCHAR(64), applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW());" >/dev/null
 for f in backend/migrations/*.sql; do
   base="$(basename "$f")"
   sum="$(sha256sum "$f" | cut -d' ' -f1)"
-  docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
+  dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
     -c "INSERT INTO schema_migrations (filename, checksum) VALUES ('$base', '$sum');" >/dev/null
 done
 
@@ -104,16 +142,18 @@ fi
 
 # --- Scénario 2 : restauration nominale, bascule réelle des données --------
 echo "[test-backup-restore] Scénario 2 : restauration nominale."
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
+dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
   -c "DELETE FROM schema_migrations WHERE filename = '001_deleted_after_backup.sql';" >/dev/null 2>&1 || true
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
+dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q \
   -c "INSERT INTO schema_migrations (filename, checksum) VALUES ('999_marker_before_restore.sql', repeat('a', 64));" >/dev/null
+RESTORE_START="$(date +%s)"
 if echo "$POSTGRES_DB" | bash scripts/restore.sh "$BACKUP_FILE" >/dev/null 2>&1; then
-  ok "restore.sh réussit contre une base réelle"
+  RESTORE_ELAPSED="$(( $(date +%s) - RESTORE_START ))"
+  ok "restore.sh réussit contre une base réelle (RTO mesuré : ${RESTORE_ELAPSED}s)"
 else
   fail "restore.sh a échoué en conditions nominales"
 fi
-MARKER_GONE="$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atq \
+MARKER_GONE="$(dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atq \
   -c "SELECT count(*) FROM schema_migrations WHERE filename = '999_marker_before_restore.sql';")"
 if [[ "$(echo "$MARKER_GONE" | tr -d '[:space:]')" == "0" ]]; then
   ok "la restauration a bien remplacé l'état post-backup"
@@ -168,15 +208,15 @@ fi
 
 # --- Scénario 5 : rejet d'un dump hors schéma Sentinel ----------------------
 echo "[test-backup-restore] Scénario 5 : validation de schéma (OPS-03)."
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -q \
+dc exec -T postgres psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -q \
   -c "CREATE DATABASE sentinel_ci_bogus;" >/dev/null
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d sentinel_ci_bogus -v ON_ERROR_STOP=1 -q \
+dc exec -T postgres psql -U "$POSTGRES_USER" -d sentinel_ci_bogus -v ON_ERROR_STOP=1 -q \
   -c "CREATE TABLE not_a_sentinel_table (id serial primary key);" >/dev/null
 BOGUS_FILE="$BACKUP_DIR/sentinel_backup_bogus.sql.gz"
-docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d sentinel_ci_bogus --no-owner --no-privileges \
+dc exec -T postgres pg_dump -U "$POSTGRES_USER" -d sentinel_ci_bogus --no-owner --no-privileges \
   | gzip -9 > "$BOGUS_FILE"
 (cd "$BACKUP_DIR" && sha256sum "$(basename "$BOGUS_FILE")" > "$(basename "$BOGUS_FILE").sha256")
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -q \
+dc exec -T postgres psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -q \
   -c "DROP DATABASE sentinel_ci_bogus;" >/dev/null
 
 if echo "$POSTGRES_DB" | bash scripts/restore.sh "$BOGUS_FILE" >/dev/null 2>&1; then
@@ -184,12 +224,20 @@ if echo "$POSTGRES_DB" | bash scripts/restore.sh "$BOGUS_FILE" >/dev/null 2>&1; 
 else
   ok "restore.sh rejette un dump hors schéma Sentinel (OPS-03)"
 fi
-STILL_INTACT="$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atq \
+STILL_INTACT="$(dc exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atq \
   -c "SELECT count(*) FROM schema_migrations;")"
 if [[ "$(echo "$STILL_INTACT" | tr -d '[:space:]')" -gt "0" ]]; then
   ok "la base réelle reste intacte après un rejet de validation"
 else
   fail "la base réelle semble avoir été affectée par une restauration rejetée"
+fi
+
+# --- Scénario 6 : isolation prouvée — la ressource externe survit -----------
+echo "[test-backup-restore] Scénario 6 : isolation du projet jetable."
+if docker volume inspect "$SENTINEL_VOLUME" >/dev/null 2>&1; then
+  ok "une ressource Docker hors du projet de test reste intacte (isolation prouvée)"
+else
+  fail "la ressource sentinelle externe a disparu : le test n'est pas isolé"
 fi
 
 echo ""

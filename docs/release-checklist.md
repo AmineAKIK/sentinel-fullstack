@@ -28,7 +28,7 @@ npm run typecheck:scripts
 npm run build
 npm run test:coverage
 npm run verify:reliability
-npm audit --audit-level=high
+npm audit --omit=dev --audit-level=high
 ```
 
 - [ ] toutes les commandes réussissent
@@ -64,7 +64,7 @@ npm run format:check
 npm run lint
 npm run build
 npm run test:coverage
-npm audit --audit-level=high
+npm audit --omit=dev --audit-level=high
 ```
 
 - [ ] toutes les commandes réussissent
