@@ -12,13 +12,18 @@ Ce document décrit **deux topologies de déploiement**, sans les mélanger :
 
 Ce guide documente **la topologie B pour l'instance publique**, déployée par
 image de registry épinglée par digest. La topologie A est décrite en annexe
-(section 11) pour une distribution autonome.
+(section 10) pour une distribution autonome.
 
 Toutes les commandes s'exécutent depuis le répertoire de déploiement. Pour
-l'instance publique il est fixe ; on le référence par `SENTINEL_DIR` :
+l'instance publique il est fixe ; on le référence par `SENTINEL_DIR`, et la
+topologie B se compose **toujours** des trois mêmes fichiers Compose, regroupés
+dans `COMPOSE` et réutilisés à l'identique par chaque commande :
 
 ```bash
 export SENTINEL_DIR=/var/www/sentinel
+cd "$SENTINEL_DIR"
+# base + override host-proxy (Nginx hôte) + registry (images par digest)
+COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
 ```
 
 ## 1. Architecture de production
@@ -40,9 +45,13 @@ Nginx non-root :8080   API Node non-root :3000
 Variante de l'instance publique :
 
 ```text
-Internet -> Nginx hôte :443 -> 127.0.0.1:18080 -> frontend/Nginx :8080
-                         \-> 127.0.0.1:13000 -> API Node :3000 -> PostgreSQL
+Internet -> Nginx hôte :443 -> 127.0.0.1:<port_frontend> -> frontend/Nginx :8080
+                         \-> 127.0.0.1:<port_backend> -> API Node :3000 -> PostgreSQL
 ```
+
+Les deux ports loopback (`SENTINEL_FRONTEND_BIND_PORT`,
+`SENTINEL_BACKEND_BIND_PORT`) sont choisis par l'exploitant et reportés à
+l'identique dans le vhost Nginx ; ils ne sont publiés que sur `127.0.0.1`.
 
 - `caddy` appartient aux réseaux `edge` et `internal` ;
 - `postgres` appartient uniquement au réseau isolé `internal` et n'est jamais
@@ -173,7 +182,12 @@ démarrage :
 1. se connecter ;
 2. changer le mot de passe dans Administration > Sécurité ;
 3. retirer `ADMIN_USERNAME` et `ADMIN_PASSWORD` de `.env` ;
-4. recréer le backend avec `docker compose up -d --force-recreate backend`.
+4. recréer le backend **sans reconstruction locale**, avec la composition
+   complète de la topologie B (voir §6.1 pour `COMPOSE`) :
+
+   ```bash
+   docker compose "${COMPOSE[@]}" up -d --no-build --force-recreate backend
+   ```
 
 Les redémarrages suivants utilisent l'admin stocké en base. Sentinel impose un
 seul compte administrateur au niveau SQL.
@@ -228,30 +242,42 @@ NOTIFICATION_MAX_ATTEMPTS=5
 NOTIFICATION_POLL_INTERVAL_MS=5000
 ```
 
-## 5. Préflight avant démarrage
+## 5. Préflight avant bascule
 
-Le préflight est **non destructif** : il vérifie les prérequis d'une release
-avant tout arrêt ou remplacement de conteneur, sans jamais rien démarrer ni
-arrêter. Il n'affiche aucune valeur de secret.
+Le préflight **ne stoppe, ne remplace et ne reconfigure aucun service en
+cours**, et ne modifie aucun fichier du dépôt (jamais le `.env`). Il **peut
+récupérer les images candidates** et **lance un conteneur backend éphémère**,
+sans dépendances, afin d'exécuter la garde de configuration de production. Il
+n'affiche aucune valeur de secret ; le SHA et les références d'images ne sont
+pas des secrets et peuvent apparaître.
+
+Parce que le préflight confronte le **digest déployé au `BUILD_SHA` attendu**
+(voir plus bas), **les images doivent déjà être présentes localement** : on
+exécute donc le `pull` **avant** le préflight. Le pull ne remplace aucun
+conteneur en cours.
 
 ```bash
 cd "$SENTINEL_DIR"   # répertoire de déploiement, p. ex. /var/www/sentinel
-# Passer la ou les mêmes compositions que le déploiement réel :
-./scripts/preflight.sh -f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml
+# 1) pull non destructif des images par digest (aucun conteneur remplacé)
+docker compose "${COMPOSE[@]}" pull
+# 2) préflight sur la MÊME composition, avec le .env du déploiement
+./scripts/preflight.sh --env-file "$SENTINEL_DIR/.env" "${COMPOSE[@]}"
 ```
 
 Il refuse : une variable obligatoire manquante, un secret resté placeholder, un
 secret trop court, un `BUILD_SHA` non conforme, un `BOARD_ACCESS_CODE_HASH` qui
 n'est pas un bcrypt valide tel que le conteneur le recevra (un hash nu, sans
 quotes simples, est tronqué par l'interpolation ; un ancien hash SHA-256 est
-rejeté), une image sans digest, une publication hors loopback ou un PostgreSQL
+rejeté), une image sans digest, **un digest dont l'image ne correspond pas au
+`BUILD_SHA` attendu** (label OCI `org.opencontainers.image.revision` et
+`BUILD_SHA` runtime du backend), une publication hors loopback ou un PostgreSQL
 exposé. Ne jamais déployer tant qu'un contrôle échoue.
 
 **Ordre de déploiement à respecter :**
 
 1. **sauvegarde** (`./scripts/backup.sh`) ;
-2. **préflight** (`./scripts/preflight.sh …`) — corriger avant d'aller plus loin ;
-3. **pull** des images par digest ;
+2. **pull** non destructif des images par digest ;
+3. **préflight** (`./scripts/preflight.sh --env-file "$SENTINEL_DIR/.env" "${COMPOSE[@]}"`) — corriger avant d'aller plus loin ;
 4. **déploiement** (`up -d --no-build`) ;
 5. **health** (`/api/health.version` == SHA du tag) ;
 6. **recette** courte Admin/Atelier/Board.
@@ -276,14 +302,18 @@ laissées à des `export` de session. Ajouter/mettre à jour, en plus des secret
 de la section 4 :
 
 ```dotenv
-# SHA git complet du commit de la release (git rev-parse <tag>^{commit})
-BUILD_SHA=c57b1f860f083a5318c8314ccf43f760a5624dce
+# SHA git complet du commit de la release. À DÉRIVER du tag réellement déployé,
+# jamais codé en dur : BUILD_SHA=$(git rev-parse <tag>^{commit})
+BUILD_SHA=<sha_git_40_hex_du_tag>
 # Images épinglées par digest (depuis les notes de la release)
 SENTINEL_BACKEND_IMAGE=ghcr.io/amineakik/sentinel-fullstack/backend@sha256:...
 SENTINEL_FRONTEND_IMAGE=ghcr.io/amineakik/sentinel-fullstack/frontend@sha256:...
-# Ports de publication loopback (topologie B)
-SENTINEL_BACKEND_BIND_PORT=13000
-SENTINEL_FRONTEND_BIND_PORT=18080
+# Ports de publication loopback (topologie B). Ces valeurs sont des PLACEHOLDERS :
+# choisir les ports loopback réels de l'hôte et les reporter à l'identique dans
+# le vhost Nginx (proxy_pass 127.0.0.1:<port>). Ils ne sont jamais publiés
+# publiquement, seulement sur le loopback.
+SENTINEL_BACKEND_BIND_PORT=<port_backend_loopback>
+SENTINEL_FRONTEND_BIND_PORT=<port_frontend_loopback>
 ```
 
 Aligner le code sur le tag (migrations, exemples) sans dépendre de son `.env`
@@ -296,24 +326,30 @@ git checkout v1.0.0
 cp docker-compose.registry.example.yml docker-compose.registry.yml
 ```
 
-Les trois fichiers Compose de la topologie B sont : **base + override host-proxy
-+ registry**. On les réutilise à chaque commande via une variable :
+Les trois fichiers Compose de la topologie B (**base + override host-proxy +
+registry**) sont regroupés dans `COMPOSE`, défini en tête de ce guide. Le
+rappel :
 
 ```bash
 COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
 ```
 
-### 6.2 Sauvegarde → préflight → pull → déploiement → health → recette
+### 6.2 Sauvegarde → pull → préflight → déploiement → health → recette
+
+Le pull précède le préflight : ce dernier confronte le digest déployé au
+`BUILD_SHA` attendu (label OCI + SHA runtime), ce qui exige les images présentes
+localement. Le pull ne remplace aucun conteneur en cours.
 
 ```bash
 # 1. sauvegarde
 ./scripts/backup.sh
 
-# 2. préflight NON destructif (échoue avant tout arrêt si un prérequis manque)
-./scripts/preflight.sh "${COMPOSE[@]}"
-
-# 3. pull des images par digest (docker login ghcr.io d'abord si packages privés)
+# 2. pull des images par digest (docker login ghcr.io d'abord si packages privés)
+#    non destructif : aucun conteneur en cours n'est remplacé
 docker compose "${COMPOSE[@]}" pull backend frontend
+
+# 3. préflight (ne stoppe/remplace aucun service ; lit le .env du déploiement)
+./scripts/preflight.sh --env-file "$SENTINEL_DIR/.env" "${COMPOSE[@]}"
 
 # 4. déploiement sans reconstruction locale
 docker compose "${COMPOSE[@]}" up -d --no-build --remove-orphans
@@ -339,7 +375,7 @@ digests dans le procès-verbal de recette (REL-03).
 
 Contrôler les trois accès depuis un navigateur : portail, Board et connexion
 Atelier. Les données Board ne doivent pas être accessibles sans leur session
-dédiée. Détail des cas dans la [checklist de recette](#10-checklist-de-recette).
+dédiée. Détail des cas dans la [checklist de recette](#9-checklist-de-recette).
 
 **Ne jamais `docker compose down` pour une mise à jour normale** : `up -d` suffit
 à recréer uniquement les conteneurs dont l'image ou la configuration a changé.
@@ -347,7 +383,7 @@ Ne supprimer ni le volume `sentinel_data` ni les volumes Caddy. Conserver le
 backup hors du VPS. En cas de problème, voir le retour arrière du
 [runbook](runbook.md) (redéploiement du digest précédent).
 
-## 8. Sauvegarde et restauration
+## 7. Sauvegarde et restauration
 
 Le script de backup utilise le service Compose `postgres`, produit un fichier
 temporaire puis le renomme après vérification gzip. Un checksum SHA-256 protège
@@ -370,7 +406,7 @@ La restauration :
 Voir [runbook.md](runbook.md) pour le cron, la copie hors site et le retour
 arrière.
 
-## 9. Sécurité d'exploitation
+## 8. Sécurité d'exploitation
 
 - limiter SSH par pare-feu et clé ;
 - garder Docker, le noyau et les paquets du VPS à jour ;
@@ -382,7 +418,7 @@ arrière.
 - tester périodiquement une restauration sur un environnement isolé ;
 - conserver au moins une sauvegarde chiffrée hors site.
 
-## 10. Checklist de recette
+## 9. Checklist de recette
 
 ### Commune aux deux topologies
 
@@ -413,7 +449,7 @@ arrière.
 - [ ] aucun de ces ports loopback n'est ouvert dans le pare-feu public
 - [ ] Nginx hôte termine le TLS et transmet les en-têtes `X-Forwarded-*`
 
-## 11. Annexe — Topologie A (distribution autonome, Caddy intégré)
+## 10. Annexe — Topologie A (distribution autonome, Caddy intégré)
 
 Pour un VPS dédié sans proxy hôte, la distribution autonome utilise **le seul
 fichier `docker-compose.yml`** : Caddy termine le TLS et publie `80`/`443`. Le
