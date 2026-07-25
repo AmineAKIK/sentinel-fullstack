@@ -1,20 +1,29 @@
 #!/usr/bin/env bash
-# Préflight de déploiement NON DESTRUCTIF : vérifie les prérequis d'une release
-# AVANT tout arrêt ou remplacement de conteneur. Ne démarre aucun service, ne
-# supprime rien. Il fait valider l'environnement par la MÊME garde que le
-# démarrage réel (assertProductionConfig, via dist/scripts/checkProductionConfig
-# exécuté dans l'image backend) — aucun contrôle dupliqué en bash, aucune
-# divergence possible — puis ajoute les invariants d'infrastructure que cette
-# garde ne peut pas voir (POSTGRES_PASSWORD == mot de passe de DATABASE_URL,
-# BUILD_SHA des build-args, digests d'images, topologie réseau/ports).
+# Préflight de déploiement. Il ne stoppe, ne remplace et ne reconfigure aucun
+# service en cours, et ne modifie aucun fichier du dépôt (notamment jamais le
+# .env). Il PEUT récupérer les images candidates et lance un conteneur backend
+# éphémère, sans dépendances, afin d'exécuter la garde de configuration de
+# production (assertProductionConfig, via dist/scripts/checkProductionConfig
+# dans l'image backend) — aucun contrôle dupliqué en bash, aucune divergence
+# possible — puis ajoute les invariants d'infrastructure que cette garde ne peut
+# pas voir : POSTGRES_PASSWORD == mot de passe de DATABASE_URL, BUILD_SHA des
+# build-args, images épinglées par digest, et surtout la CORRESPONDANCE entre le
+# digest déployé et le BUILD_SHA attendu (label OCI + SHA runtime), enfin la
+# topologie réseau/ports.
 #
 # Aucune valeur de secret n'est jamais placée dans argv, un message ou un log :
-# la configuration résolue (qui contient des secrets) ne circule que par stdin
-# ou un fichier --env-file temporaire à permissions restreintes, détruit en fin
-# d'exécution. Seuls des verdicts OK/FAIL sortent.
+# la configuration résolue (qui contient des secrets) ne circule que par un
+# fichier à permissions restreintes lu via une variable d'environnement, détruit
+# en fin d'exécution. Seuls des verdicts OK/FAIL, le SHA et des références
+# d'images (non secrets) sortent.
 #
 # Usage :
-#   ./scripts/preflight.sh [-f docker-compose.yml -f docker-compose.override.yml ...]
+#   ./scripts/preflight.sh [--env-file <fichier>] \
+#       [-f docker-compose.yml -f docker-compose.override.yml ...]
+#
+# --env-file est un flag GLOBAL de docker compose : quand il est fourni, Compose
+# lit CE fichier au lieu du .env du répertoire, pour `config` comme pour `run`.
+# Le .env du dépôt n'est alors ni lu, ni écrit, ni supprimé.
 
 set -euo pipefail
 
@@ -22,12 +31,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
+# --env-file optionnel (propagé en flag GLOBAL à toutes les commandes compose) ;
+# le reste des arguments est une liste de -f pour la composition.
+ENV_FILE_ARGS=()
 COMPOSE_ARGS=()
-if [[ $# -gt 0 ]]; then
-  COMPOSE_ARGS=("$@")
-else
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      [[ $# -ge 2 ]] || { echo "[preflight] --env-file exige un chemin" >&2; exit 2; }
+      ENV_FILE_ARGS=(--env-file "$2")
+      shift 2
+      ;;
+    *)
+      COMPOSE_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+if [[ ${#COMPOSE_ARGS[@]} -eq 0 ]]; then
   COMPOSE_ARGS=(-f docker-compose.yml)
 fi
+
+# Wrapper : docker compose avec le --env-file global éventuel EN PREMIER.
+dc() { docker compose "${ENV_FILE_ARGS[@]}" "${COMPOSE_ARGS[@]}" "$@"; }
 
 umask 077
 WORKDIR="$(mktemp -d)"
@@ -43,7 +69,7 @@ bad() {
 }
 
 # 1. Composition valide (schéma + interpolation).
-if ! docker compose "${COMPOSE_ARGS[@]}" config --quiet 2>/dev/null; then
+if ! dc config --quiet 2>/dev/null; then
   bad "la composition Compose est invalide (docker compose config a échoué)"
   echo "[preflight] Impossible de continuer sans configuration valide." >&2
   exit 1
@@ -53,7 +79,7 @@ ok "composition Compose valide"
 # La configuration résolue est écrite dans un fichier à accès restreint, JAMAIS
 # passée en argument de processus.
 CONFIG_FILE="$WORKDIR/config.json"
-docker compose "${COMPOSE_ARGS[@]}" config --format json > "$CONFIG_FILE"
+dc config --format json > "$CONFIG_FILE"
 export CONFIG_FILE
 
 # Exécute un contrôle python (code lu sur stdin) : le JSON est chargé depuis le
@@ -68,7 +94,7 @@ json_check() {
 #    service (déjà dé-échappé, tel que le conteneur le reçoit) ; on force
 #    NODE_ENV=production et on exécute le checker compilé, sans démarrer le
 #    serveur ni ouvrir de connexion. Aucun secret ne transite par argv.
-if docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps \
+if dc run --rm --no-deps \
     -e NODE_ENV=production \
     --entrypoint node backend dist/scripts/checkProductionConfig.js >/dev/null 2>"$WORKDIR/checker.err"; then
   ok "configuration acceptée par la garde de production (assertProductionConfig)"
@@ -133,6 +159,73 @@ then
   ok "images backend/frontend épinglées par digest complet (ou build local)"
 else
   bad "une image backend/frontend n'est pas épinglée par un digest @sha256: + 64 hex"
+fi
+
+# 7. CORRESPONDANCE digest ↔ BUILD_SHA attendu. Les contrôles #4 et #5 vérifient
+#    séparément que le build-arg BUILD_SHA est bien formé et que les images sont
+#    épinglées par digest — mais rien ne garantit que ces digests désignent des
+#    images RÉELLEMENT construites pour ce SHA. Une release antérieure a un digest
+#    valide et un SHA valide : sans ce contrôle, on déploierait de mauvaises
+#    images sans le voir avant le health post-remplacement. On exige donc, pour
+#    chaque image déployée par digest, que son label OCI
+#    org.opencontainers.image.revision soit égal au BUILD_SHA attendu, et pour le
+#    backend que le BUILD_SHA embarqué au runtime le soit aussi. Le SHA et les
+#    références d'images ne sont pas des secrets : ils peuvent apparaître.
+#
+# Extrait (sans secret) le SHA attendu et les images par digest depuis la config.
+EXPECTED_SHA="$(json_check <<'PY'
+import json, os
+d = json.load(open(os.environ["CONFIG_FILE"], encoding="utf-8"))
+print(str(d["services"].get("backend", {}).get("build", {}).get("args", {}).get("BUILD_SHA", "") or ""))
+PY
+)"
+# Images déployées par digest, une par ligne : "service<TAB>reference".
+DIGEST_IMAGES="$(json_check <<'PY'
+import json, os
+d = json.load(open(os.environ["CONFIG_FILE"], encoding="utf-8"))
+for svc in ("backend", "frontend"):
+    image = str(d["services"].get(svc, {}).get("image", "") or "")
+    if "@sha256:" in image:
+        print(f"{svc}\t{image}")
+PY
+)"
+
+sha_ok() { [[ "$1" =~ ^[a-f0-9]{40}$ ]]; }
+
+if ! sha_ok "$EXPECTED_SHA"; then
+  # Sans SHA attendu bien formé (déjà signalé par #4), on ne peut pas comparer.
+  bad "impossible de vérifier la correspondance digest ↔ BUILD_SHA (SHA attendu absent ou mal formé)"
+elif [[ -z "$DIGEST_IMAGES" ]]; then
+  # Aucun service par digest = build local : la correspondance est garantie par
+  # construction (le build utilise le build-arg BUILD_SHA vérifié en #4).
+  ok "images construites localement à partir du BUILD_SHA vérifié (pas de digest à confronter)"
+else
+  MISMATCH=0
+  while IFS=$'\t' read -r svc ref; do
+    [[ -n "$svc" ]] || continue
+    # L'image doit être présente localement (procédure : pull non destructif
+    # AVANT préflight). Absente = on ne peut pas confronter, c'est un échec.
+    if ! docker image inspect "$ref" >/dev/null 2>&1; then
+      bad "image $svc absente en local ($ref) — exécuter le pull non destructif avant le préflight"
+      MISMATCH=1
+      continue
+    fi
+    label="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$ref" 2>/dev/null || true)"
+    if [[ "$label" != "$EXPECTED_SHA" ]]; then
+      bad "label OCI de $svc (${label:-absent}) != BUILD_SHA attendu ($EXPECTED_SHA)"
+      MISMATCH=1
+    fi
+    if [[ "$svc" == "backend" ]]; then
+      runtime_sha="$(docker run --rm --entrypoint printenv "$ref" BUILD_SHA 2>/dev/null || true)"
+      if [[ "$runtime_sha" != "$EXPECTED_SHA" ]]; then
+        bad "BUILD_SHA runtime du backend (${runtime_sha:-absent}) != BUILD_SHA attendu ($EXPECTED_SHA)"
+        MISMATCH=1
+      fi
+    fi
+  done <<< "$DIGEST_IMAGES"
+  if [[ "$MISMATCH" -eq 0 ]]; then
+    ok "digests déployés cohérents avec le BUILD_SHA attendu (label OCI + SHA runtime)"
+  fi
 fi
 
 # 6. Topologie : publications sur le loopback uniquement, PostgreSQL jamais publié.
