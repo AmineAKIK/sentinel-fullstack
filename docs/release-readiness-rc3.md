@@ -1,0 +1,309 @@
+# Préparation de la release Sentinel v1.0.0-rc.3
+
+**Statut : NO-GO** (RC3 en cours de réalisation)
+
+**Branche de stabilisation :** `release/v1.0.0-rc3`
+
+**Baseline :** `a85c55c03608da2e52838b3a06ec1610a7683813` (`main`, `v1.0.0-rc.2`, 26 juillet 2026)
+
+Ce document est la source canonique et publique de pilotage de la RC3. Il relie
+chaque constat à une décision, un lot, une preuve de correction et un état. La
+RC3 n'ajoute aucun domaine fonctionnel : elle rend prévisibles, explicites et
+démontrables les fonctions déjà présentes (retour d'action, erreurs publiques,
+traçabilité fidèle, arbitrages visibles, suivi explicite, mise en attente comme
+concept métier, session Board sans expiration, cartes et panneau accessibles).
+
+## 1. Règles de pilotage
+
+- gel fonctionnel : aucun nouveau besoin produit n'entre dans cette branche ;
+- un lot ne mélange pas correction métier, refonte esthétique et maintenance sans
+  rapport direct ;
+- chaque correction est livrée avec ses tests comportementaux et sa documentation
+  dans le même lot ;
+- les migrations `001` à `048` sont **immuables** ; toute évolution SQL commence à
+  `049` ;
+- un constat passe à `VERIFIED` seulement après revue du diff, tests requis et CI
+  verte sur le commit qui le corrige ;
+- un résultat local ne remplace pas une preuve PostgreSQL, navigateur ou VPS quand
+  le contrat dépend de cet environnement ;
+- l'historique Git existant n'est pas réécrit ; aucun amend, rebase, squash,
+  force-push ou trailer `Co-authored-by` ;
+- aucun push, PR, merge, tag ni déploiement sans autorisation explicite ;
+- hors périmètre RC3, reportés : exports CSV (**v1.1**), impression/PDF (**v1.2**),
+  partage courriel tracé (**v1.3**).
+
+## 2. Contrats figés (avant toute modification de code)
+
+### 2.1 Contrat UX commun — cinq états de mutation
+
+1. **Prêt** : libellé d'action explicite.
+2. **En cours** : bouton désactivé, libellé progressif, double clic bloqué.
+3. **Succès** : message précis dans une zone `aria-live="polite"`, ~6 s, fermable.
+4. **Échec** : message compréhensible et persistant dans `role="alert"`, sans
+   perte des valeurs saisies ; une modale en échec reste ouverte.
+5. **Récupération** : réessai/retour possible, focus replacé correctement.
+
+Règles : confirmation exigée pour annulation définitive, invalidation, clôture et
+révocations de session ; la modale d'arbitrage d'annulation **est** la
+confirmation (bouton final « Confirmer l'annulation », pas de seconde modale) ;
+erreurs de champ près du champ, erreurs réseau/globales via le système global ;
+aucun bouton n'envoie deux mutations simultanées ; fermer une modale après succès
+restaure le focus sur l'élément déclencheur ; messages formulés en résultat
+métier, jamais en réponse HTTP.
+
+Catalogue des messages de succès : voir plan §4 (figé, non répété ici pour éviter
+la divergence — le catalogue est repris tel quel dans les tests du lot 1/10).
+
+### 2.2 Contrat de traçabilité
+
+Charge JSONB versionnée et autoportante des événements de correction :
+
+```json
+{
+  "schemaVersion": 2,
+  "requestEventId": 123,
+  "changes": {
+    "state": { "before": "DEGRADEE", "after": "INDISPONIBLE" },
+    "currentProduct": { "before": "TBM", "after": "E365" }
+  },
+  "decisionReason": "Motif éventuel de la décision"
+}
+```
+
+- Le snapshot **avant** est pris à la demande, **dans la transaction**, jamais
+  recalculé plus tard depuis l'incident devenu mutable.
+- Application et refus conservent le même diff. Un refus exige un motif court.
+- Les événements historiques incomplets ne sont **jamais** complétés par une
+  valeur inventée : l'interface affiche « Détail non enregistré pour cet
+  événement antérieur. »
+- Statut courant (bandeau du dossier : « Statut actuel : … ») ≠ statut
+  événementiel. Une ligne d'événement n'affiche une transition que si le payload
+  contient `from/to` ou `before/after`. Le Journal ne montre plus le statut
+  courant sous chaque événement. L'API peut renommer les champs joints en
+  `current_status` / `current_state`.
+
+### 2.3 Contrat d'erreur public
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Une valeur est invalide.",
+    "details": { "field": "boardSessionDuration", "reason": "OUT_OF_RANGE", "min": 1, "max": 168 }
+  }
+}
+```
+
+Le frontend traduit `code + details` vers un libellé métier et n'affiche plus
+automatiquement le `message` brut ; un fallback générique couvre les erreurs
+inconnues. Aucun identifiant `snake_case` ni nom de colonne SQL n'apparaît à
+l'écran. `NETWORK_ERROR`, `REQUEST_TIMEOUT`, `NO_CHANGES`,
+`ARBITRATION_ALREADY_PENDING`, `SESSION_REVOKED` et les validations ont chacun un
+message et une issue adaptés. Le texte ne pilote jamais la logique applicative.
+
+### 2.4 Terminologie figée
+
+- Mise en attente : action « Mettre en attente » · statut « En attente » · champ
+  « Motif de mise en attente » · événement « Mise en attente » · sortie
+  « Reprendre le traitement ».
+- Arbitrage : « Modification à arbitrer » / « Annulation à arbitrer » (carte,
+  panneau, Board) ; bouton destructif final « Confirmer l'annulation ».
+- Rôles en français : `OPERATOR`→Opérateur, `MAINTENANCE`→Technicien,
+  `RESPONSABLE`→Responsable, `ADMIN`→Administrateur, `SYSTEM`→Système.
+- « Narratif atelier » → « Suivi de l'incident ».
+- Session Board sans expiration : « Session Board sans expiration automatique —
+  Reste active tant que le navigateur conserve sa session. Elle peut être révoquée
+  immédiatement depuis cette page. »
+
+### 2.5 Stratégie de migrations
+
+- `001..048` immuables.
+- `049_allow_board_session_without_automatic_expiry.sql` (lot 3) : autorise le
+  marqueur interne `0` (sans expiration), append-only.
+- `050_add_incident_waiting_reason.sql` (lot 7) : ajoute `waiting_reason`,
+  backfill des seuls incidents actuellement `PENDING` depuis `diagnostic`,
+  append-only.
+- Toutes deux testées sur base vierge et sur copie de la base RC2 (upgrade
+  048→050).
+
+## 3. Matrice des constats
+
+Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (secondaire).
+État : `OPEN` → `IN_PROGRESS` → `VERIFIED` (diff relu + tests requis verts).
+
+### C-01 — Traçabilité ambiguë : le Journal affiche le statut courant sous chaque événement
+
+- **Sévérité :** P0
+- **Preuve initiale :** `backend/src/modules/workshop/workshop.repository.ts:28,967`
+  joint `wi.status` ; le Journal restitue ce statut courant sous des événements
+  anciens (ex. « Incident signalé » affiché « Annulé »). Aucun `before/after`
+  n'est exigé pour afficher une transition.
+- **Fichiers concernés :** `workshop.repository.ts`, projection Journal/Historique
+  frontend, traducteurs d'événements.
+- **Correction (lots 4 et 9) :** payload versionné `schemaVersion:2` avec
+  `before/after` ; renommage des champs joints en `current_status`/`current_state` ;
+  la ligne d'événement n'affiche une transition que sur `from/to`/`before/after` ;
+  statut courant réservé au bandeau du dossier.
+- **Tests :** unité restitution avant/après ; « aucune transition affichée sans
+  payload » ; E2E historique fidèle.
+- **Preuve finale :** _(à compléter — lot 4/9)_
+- **État :** OPEN
+
+### C-02 — Retour d'action incomplet (mutations silencieuses, contrats hétérogènes)
+
+- **Sévérité :** P1
+- **Preuve initiale :** plusieurs mutations ferment une modale/rafraîchissent une
+  carte sans annoncer le résultat ; erreurs de formulaire, réseau et métier ne
+  suivent pas un contrat unique.
+- **Fichiers concernés :** composants de mutation Atelier/Administration,
+  infrastructure de feedback frontend.
+- **Correction (lot 1) :** mécanisme global unique succès/erreur (cinq états),
+  anti-double soumission, conservation des saisies, restauration du focus, branché
+  sur toutes les mutations.
+- **Tests :** composant de retour global ; double envoi ; focus après fermeture ;
+  conservation des formulaires en échec.
+- **Preuve finale :** _(à compléter — lot 1)_
+- **État :** OPEN
+
+### C-03 — Erreurs techniques exposées (`error.message` brut)
+
+- **Sévérité :** P1
+- **Preuve initiale :** `frontend/src/api/client.ts:67`
+  (`message = data.error.message`) et usages directs `err.message`
+  (`EditMachineModal.tsx:84,113`, etc.) ; l'API renvoie des textes comme
+  `board_session_ttl_hours doit être un entier entre 1 et 168`
+  (`backend/src/modules/adminSettings/adminSettings.controller.ts:230`).
+- **Fichiers concernés :** `client.ts`, `ApiResponseError`, contrôleurs de
+  validation, composants affichant `err.message`.
+- **Correction (lot 2) :** `details` structurés côté API ; traducteur de
+  présentation `code+details` → libellé métier ; suppression des affichages
+  directs ; fallback générique.
+- **Tests :** aucun `snake_case`/nom de colonne visible ; erreurs nommées
+  traduites.
+- **Preuve finale :** _(à compléter — lot 2)_
+- **État :** OPEN
+
+### C-04 — Option Board contradictoire (« illimitée » = `0`, contrainte `1..168`)
+
+- **Sévérité :** P0
+- **Preuve initiale :** contrainte `board_session_ttl_hours { min: 1, max: 168 }`
+  (`adminSettings.controller.ts:230`) alors que l'UI propose « illimitée » ;
+  `jwt.ts:14,24` et `board.auth.ts:55,58` savent déjà gérer `'unlimited'`.
+- **Fichiers concernés :** migration `049`, `adminSettings.controller.ts`,
+  `jwt.ts`, `board.auth.ts`, écran Administration.
+- **Correction (lot 3) :** autoriser le marqueur interne `0`, le traduire en
+  `unlimited` pour JWT et cookie, conserver la révocation par
+  `board_session_version`, libellé exact figé §2.4.
+- **Tests :** durée normale, mode sans durée, révocation, retour au mode normal ;
+  aucun identifiant interne dans une erreur.
+- **Preuve finale :** _(à compléter — lot 3)_
+- **État :** OPEN
+
+### C-05 — Mise en attente stockée comme « diagnostic »
+
+- **Sévérité :** P0
+- **Preuve initiale :**
+  `backend/src/modules/workshop/workshop.service.mutations.ts:109,128`
+  (`updates: { status: 'PENDING', diagnostic }`) ;
+  `notificationOutbox.worker.ts:182` lit `diagnostic` pour `INCIDENT_SET_PENDING`.
+- **Fichiers concernés :** migration `050`, `workshop.service.mutations.ts`,
+  `workshop.validation.ts`, worker de notification, carte/panneau/Board/Journal.
+- **Correction (lot 7) :** `waiting_reason` réel ; API/UI `waitingReason` / « Motif
+  de mise en attente » ; backfill des seuls incidents `PENDING` ; compatibilité de
+  lecture des anciennes traces ; à la reprise, motif courant masqué mais conservé
+  dans l'événement.
+- **Tests :** migration base vierge + upgrade ; nouvelle mise en attente écrit
+  `waiting_reason` ; reprise ; alignement des surfaces.
+- **Preuve finale :** _(à compléter — lot 7)_
+- **État :** OPEN
+
+### C-06 — Arbitrages visibles de façon inégale ; retrait d'annulation absent
+
+- **Sévérité :** P0
+- **Preuve initiale :** l'arbitrage existe côté service
+  (`workshop.service.edit.ts:257,376`, `arbitration_required`) mais la visibilité
+  carte/Board et le retrait de demande d'annulation ne sont pas symétriques ;
+  aucune fonction `withdrawCancelRequest` recensée.
+- **Fichiers concernés :** service/repository d'arbitrage, projection Board,
+  cartes, panneau.
+- **Correction (lot 5) :** `withdrawCancelRequest` (demandeur du cas `WAITING`
+  uniquement), événement `CANCEL_REQUEST_WITHDRAWN`, indicateurs visibles à tous
+  les rôles et sur le Board (commandes filtrées par rôle), motif de refus
+  obligatoire et persistant.
+- **Tests :** PostgreSQL concurrents (un seul gagnant, retrait interdit à un autre
+  opérateur) ; visibilité multi-rôle ; Board minimal sans données privées.
+- **Preuve finale :** _(à compléter — lot 5)_
+- **État :** OPEN
+
+### C-07 — Suivi implicite (`autoFollowForResponsable`)
+
+- **Sévérité :** P0
+- **Preuve initiale :** `workshop.service.mutations.ts:30` (définition) et appels
+  multiples (`workshop.service.edit.ts:217,345,547,599` ;
+  `workshop.service.mutations.ts:355,408,518,584`). Une étoile peut s'activer sans
+  action explicite.
+- **Fichiers concernés :** `workshop.service.mutations.ts`,
+  `workshop.service.edit.ts`.
+- **Correction (lot 6) :** supprimer `autoFollowForResponsable` et ses appels ;
+  étoile = unique opt-in ; ne pas toucher les suivis existants ; vérifier les
+  destinataires de notification.
+- **Tests :** action responsable n'active pas l'étoile ; clic explicite
+  active/retire ; destinataires conformes.
+- **Preuve finale :** _(à compléter — lot 6)_
+- **État :** OPEN
+
+### C-08 — En-têtes de sécurité publics en double
+
+- **Sévérité :** P2
+- **Preuve initiale :** posés à deux niveaux —
+  `backend/src/middlewares/securityHeaders.ts:12,13,17,21` **et**
+  `frontend/nginx.conf:8,9,12,13` (X-Content-Type-Options, X-Frame-Options, CSP,
+  HSTS).
+- **Fichiers concernés :** `securityHeaders.ts`, `frontend/nginx.conf`.
+- **Correction (lot 9/annexe) :** identifier l'autorité de chaque en-tête,
+  conserver une seule valeur effective, vérifier le résultat public. Ne retarde
+  aucun P0/P1.
+- **Tests :** vérification qu'un seul exemplaire effectif est servi.
+- **Preuve finale :** _(à compléter — P2)_
+- **État :** OPEN
+
+### C-09 — Notification e-mail dépendante des images distantes
+
+- **Sévérité :** P2
+- **Preuve initiale :** certains clients bloquent les images distantes ; le sujet,
+  les données essentielles et le lien doivent rester compréhensibles sans image.
+- **Fichiers concernés :** gabarits de notification.
+- **Correction (P2) :** garantir la lisibilité sans chargement d'image.
+- **Tests :** contenu essentiel présent hors image.
+- **Preuve finale :** _(à compléter — P2)_
+- **État :** OPEN
+
+## 4. Portes de validation
+
+- **Porte A — Contrats :** matrice complète, terminologie figée, payload
+  événementiel figé, stratégie migrations approuvée. → **fermée par ce document
+  (lot 0).**
+- **Porte B — Intégrité métier :** correction et annulation complètes, aucun suivi
+  implicite, événements fidèles, tests PostgreSQL concurrents verts.
+- **Porte C — UX :** cinq états sur toutes les mutations, aucun message technique
+  visible, cartes et panneau conformes, zéro violation axe critique.
+- **Porte D — Release :** migrations testées (base vierge + 048→050), six jobs CI
+  verts sur le SHA candidat, aucun avertissement significatif, recette multi-rôle,
+  captures depuis la RC3 déployée, dossier synchronisé sur le commit final.
+
+## 5. Journal des lots
+
+| Lot | Objet | Commit | État |
+| --- | --- | --- | --- |
+| 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` | EN COURS |
+| 1 | Retour d'action standardisé | `feat(ux): standardize mutation feedback and recovery` | À FAIRE |
+| 2 | Erreurs publiques stables | `fix(api): expose stable user-facing validation errors` | À FAIRE |
+| 3 | Session Board sans expiration | `fix(board): make no-expiry sessions a valid revocable contract` | À FAIRE |
+| 4 | Trace des corrections | `fix(audit): preserve exact incident correction decisions` | À FAIRE |
+| 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | À FAIRE |
+| 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |
+| 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | À FAIRE |
+| 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |
+| 9 | Terminologie et restitution | `fix(copy): align workshop labels with the incident lifecycle` | À FAIRE |
+| 10 | Recette comportementale et axe | `test: cover rc3 multi-role ux and audit contracts` | À FAIRE |
+| 11 | Documentation et candidate | `docs: synchronize the jury evidence with rc3` | À FAIRE |
