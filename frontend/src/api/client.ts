@@ -12,15 +12,29 @@ function requestTimeoutMs(): number {
     : DEFAULT_TIMEOUT_MS;
 }
 
+/**
+ * Détails d'erreur structurés et publics (lot 2 RC3). `field`/`reason` sont des
+ * identifiants sémantiques stables ; ils servent à traduire et à cibler un champ,
+ * jamais à être affichés tels quels.
+ */
+export interface ApiErrorDetails {
+  field?: string;
+  reason?: string;
+  min?: number;
+  max?: number;
+}
+
 export class ApiResponseError extends Error {
   code: string;
   status: number;
+  details?: ApiErrorDetails;
 
-  constructor(code: string, message: string, status: number) {
+  constructor(code: string, message: string, status: number, details?: ApiErrorDetails) {
     super(message);
     this.name = 'ApiResponseError';
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -61,15 +75,19 @@ async function request<T>(
     if (!res.ok) {
       let code = 'SERVER_ERROR';
       let message = 'Une erreur est survenue.';
+      let details: ApiErrorDetails | undefined;
       try {
-        const data = (await res.json()) as { error?: { code?: string; message?: string } };
+        const data = (await res.json()) as {
+          error?: { code?: string; message?: string; details?: ApiErrorDetails };
+        };
         if (data?.error?.code) code = data.error.code;
         if (data?.error?.message) message = data.error.message;
+        if (data?.error?.details) details = data.error.details;
       } catch (error) {
         if (timedOut || signal?.aborted) throw error;
         // Le contrat d'erreur de secours reste volontairement générique.
       }
-      const error = new ApiResponseError(code, message, res.status);
+      const error = new ApiResponseError(code, message, res.status, details);
       if (res.status === 401 && code !== 'REAUTHENTICATION_FAILED') onUnauthorized?.(error);
       throw error;
     }

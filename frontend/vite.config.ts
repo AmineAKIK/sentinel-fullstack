@@ -20,6 +20,8 @@ export default defineConfig({
       provider: 'v8',
       include: [
         'src/api/client.ts',
+        'src/api/errorMessages.ts',
+        'src/components/ui/MutationFeedback.tsx',
         'src/hooks/useIncidentsData.ts',
         'src/components/ConfirmModal.tsx',
         'src/components/IncidentBadges.tsx',

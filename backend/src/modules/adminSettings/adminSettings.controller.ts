@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { sendUnauthenticated } from '../../auth/authResponses';
-import { sendError } from '../../utils/errors';
+import { sendError, PUBLIC_ERROR_MESSAGE, type PublicField } from '../../utils/errors';
 import { handleControllerError } from '../../utils/controller';
 import { createAdminSystemAuditEvent } from '../adminAudit/adminAudit.events';
 import {
@@ -69,7 +69,10 @@ export async function patchNotifPrefs(req: Request, res: Response): Promise<void
   for (const key of PREF_KEYS) {
     if (key in body) {
       if (typeof body[key] !== 'boolean') {
-        sendError(res, 400, 'VALIDATION_ERROR', `${key} doit être un booléen.`);
+        // Pas de nom de préférence interne dans le message : garde-fou générique.
+        sendError(res, 400, 'VALIDATION_ERROR', 'Préférence de notification invalide.', {
+          reason: 'INVALID_FORMAT',
+        });
         return;
       }
       patch[key] = body[key];
@@ -221,15 +224,19 @@ export async function getAppSettingsHandler(req: Request, res: Response): Promis
   }
 }
 
+// Bornes + champ SÉMANTIQUE public de chaque réglage. La clé (à gauche) est le
+// nom interne/colonne ; `publicField` est l'identifiant d'UI stable renvoyé dans
+// details.field. Le nom interne ne quitte JAMAIS le backend : ni dans le message,
+// ni dans details.
 const APP_SETTINGS_BOUNDS: Record<
   keyof Omit<AppSettings, 'board_label'>,
-  { min: number; max: number }
+  { min: number; max: number; publicField: PublicField }
 > = {
-  session_duration_hours: { min: 1, max: 168 },
-  workshop_session_hours: { min: 1, max: 168 },
-  board_session_ttl_hours: { min: 1, max: 168 },
-  login_max_attempts: { min: 3, max: 50 },
-  setup_code_ttl_hours: { min: 1, max: 72 },
+  session_duration_hours: { min: 1, max: 168, publicField: 'adminSessionDuration' },
+  workshop_session_hours: { min: 1, max: 168, publicField: 'workshopSessionDuration' },
+  board_session_ttl_hours: { min: 1, max: 168, publicField: 'boardSessionDuration' },
+  login_max_attempts: { min: 3, max: 50, publicField: 'loginMaxAttempts' },
+  setup_code_ttl_hours: { min: 1, max: 72, publicField: 'setupCodeDuration' },
 };
 
 export async function patchAppSettingsHandler(req: Request, res: Response): Promise<void> {
@@ -246,12 +253,14 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
     if (!(k in body)) continue;
     const val = body[k];
     if (typeof val !== 'number' || !Number.isInteger(val) || val < bounds.min || val > bounds.max) {
-      sendError(
-        res,
-        400,
-        'VALIDATION_ERROR',
-        `${k} doit être un entier entre ${bounds.min} et ${bounds.max}.`
-      );
+      // Message générique sûr + details publics : le client reconstruit le
+      // libellé précis à partir de (code, field public, reason, min, max).
+      sendError(res, 400, 'VALIDATION_ERROR', PUBLIC_ERROR_MESSAGE, {
+        field: bounds.publicField,
+        reason: 'OUT_OF_RANGE',
+        min: bounds.min,
+        max: bounds.max,
+      });
       return;
     }
     patch[k] = val;
@@ -260,12 +269,11 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
   if ('board_label' in body) {
     const label = body.board_label;
     if (typeof label !== 'string' || label.trim().length === 0 || label.trim().length > 64) {
-      sendError(
-        res,
-        400,
-        'VALIDATION_ERROR',
-        'board_label doit être une chaîne de 1 à 64 caractères.'
-      );
+      sendError(res, 400, 'VALIDATION_ERROR', PUBLIC_ERROR_MESSAGE, {
+        field: 'boardLabel',
+        reason: label && String(label).trim().length > 64 ? 'TOO_LONG' : 'REQUIRED',
+        max: 64,
+      });
       return;
     }
     patch.board_label = label.trim();

@@ -15,6 +15,7 @@ import {
   AppSettingsPatch,
 } from '../api/adminSettings';
 import { ApiResponseError } from '../api/client';
+import { translateApiError, fieldInError } from '../api/errorMessages';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
 import SuccessBanner from '../components/ui/SuccessBanner';
@@ -75,6 +76,17 @@ const DEFAULT_PREFS: AdminNotifPrefs = {
   notif_responsables: true,
   notif_techniciens: true,
   notif_operateurs: true,
+};
+
+// Champ public (details.field renvoyé par l'API) → id DOM de l'input concerné,
+// pour ramener le focus sur une erreur de validation identifiable.
+const APP_SETTING_FIELD_DOM_ID: Record<string, string> = {
+  adminSessionDuration: 'sessionDuration',
+  workshopSessionDuration: 'workshopSessionHours',
+  boardSessionDuration: 'boardSessionTtl',
+  loginMaxAttempts: 'loginMaxAttempts',
+  setupCodeDuration: 'setupCodeTtl',
+  boardLabel: 'boardLabel',
 };
 
 const NOTIF_ITEMS: { key: keyof AdminNotifPrefs; label: string; description: string }[] = [
@@ -512,9 +524,18 @@ export default function AdminSettingsPage() {
       setAppSettingsSuccess(parts.join(' '));
       scheduleSuccessClear('app', () => setAppSettingsSuccess(''), 5000);
     } catch (err) {
-      setAppSettingsError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.'
-      );
+      // Message métier traduit (jamais le message brut du backend). Les saisies
+      // sont conservées : appSettingsDraft n'est pas réinitialisé sur erreur.
+      setAppSettingsError(translateApiError(err));
+      // Focus ramené vers le champ concerné lorsqu'il est identifiable. On mappe
+      // le champ public (details.field) vers l'id DOM de l'input existant.
+      const field = fieldInError(err);
+      const domId = field ? APP_SETTING_FIELD_DOM_ID[field] : undefined;
+      if (domId) {
+        requestAnimationFrame(() => {
+          document.getElementById(domId)?.focus();
+        });
+      }
     } finally {
       setAppSettingsSaving(false);
     }
