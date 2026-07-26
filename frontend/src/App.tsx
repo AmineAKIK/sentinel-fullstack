@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import FullPageLoader from './components/ui/FullPageLoader';
+import { MutationFeedbackProvider } from './components/ui/MutationFeedback';
 import { AppAuthProvider } from './routes/AppAuthContext';
 import AdminRoute from './routes/AdminRoute';
 import { FieldLimitsProvider } from './routes/FieldLimitsContext';
@@ -34,149 +35,151 @@ export default function App() {
     <ErrorBoundary>
       <FieldLimitsProvider>
         <AppAuthProvider>
-          <a className="skip-link" href="#main-content">
-            Passer au contenu principal
-          </a>
-          <Suspense fallback={<FullPageLoader />}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route
-                path="/login"
-                element={
-                  <GuestRoute>
-                    <LoginPage />
-                  </GuestRoute>
-                }
-              />
-              <Route path="/board" element={<BoardAccessPage />} />
-              <Route path="/confidentialite" element={<PrivacyPage />} />
-              <Route
-                path="/admin/login"
-                element={
-                  <GuestRoute>
-                    <AdminLoginPage />
-                  </GuestRoute>
-                }
-              />
-              <Route
-                path="/workshop/login"
-                element={
-                  <GuestRoute>
-                    <WorkshopLoginPage />
-                  </GuestRoute>
-                }
-              />
+          <MutationFeedbackProvider>
+            <a className="skip-link" href="#main-content">
+              Passer au contenu principal
+            </a>
+            <Suspense fallback={<FullPageLoader />}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route
+                  path="/login"
+                  element={
+                    <GuestRoute>
+                      <LoginPage />
+                    </GuestRoute>
+                  }
+                />
+                <Route path="/board" element={<BoardAccessPage />} />
+                <Route path="/confidentialite" element={<PrivacyPage />} />
+                <Route
+                  path="/admin/login"
+                  element={
+                    <GuestRoute>
+                      <AdminLoginPage />
+                    </GuestRoute>
+                  }
+                />
+                <Route
+                  path="/workshop/login"
+                  element={
+                    <GuestRoute>
+                      <WorkshopLoginPage />
+                    </GuestRoute>
+                  }
+                />
 
-              <Route
-                path="/workshop/dashboard"
-                element={
-                  <WorkshopRoute>
-                    <WorkshopDashboardPage />
-                  </WorkshopRoute>
-                }
-              />
-              <Route
-                path="/workshop/pilotage"
-                element={
-                  <WorkshopRoute>
-                    <WorkshopPilotagePage />
-                  </WorkshopRoute>
-                }
-              />
-              <Route
-                path="/workshop/history"
-                element={
-                  <WorkshopRoute>
-                    <WorkshopHistoryPage />
-                  </WorkshopRoute>
-                }
-              />
-              <Route
-                path="/workshop/journal"
-                element={
-                  <WorkshopResponsableRoute>
-                    <WorkshopJournalPage />
-                  </WorkshopResponsableRoute>
-                }
-              />
-              <Route
-                path="/workshop/knowledge"
-                element={
-                  <WorkshopRoute>
-                    <WorkshopKnowledgePage />
-                  </WorkshopRoute>
-                }
-              />
-              <Route
-                path="/workshop/support"
-                element={
-                  <WorkshopRoute>
-                    <WorkshopSupportPage />
-                  </WorkshopRoute>
-                }
-              />
+                <Route
+                  path="/workshop/dashboard"
+                  element={
+                    <WorkshopRoute>
+                      <WorkshopDashboardPage />
+                    </WorkshopRoute>
+                  }
+                />
+                <Route
+                  path="/workshop/pilotage"
+                  element={
+                    <WorkshopRoute>
+                      <WorkshopPilotagePage />
+                    </WorkshopRoute>
+                  }
+                />
+                <Route
+                  path="/workshop/history"
+                  element={
+                    <WorkshopRoute>
+                      <WorkshopHistoryPage />
+                    </WorkshopRoute>
+                  }
+                />
+                <Route
+                  path="/workshop/journal"
+                  element={
+                    <WorkshopResponsableRoute>
+                      <WorkshopJournalPage />
+                    </WorkshopResponsableRoute>
+                  }
+                />
+                <Route
+                  path="/workshop/knowledge"
+                  element={
+                    <WorkshopRoute>
+                      <WorkshopKnowledgePage />
+                    </WorkshopRoute>
+                  }
+                />
+                <Route
+                  path="/workshop/support"
+                  element={
+                    <WorkshopRoute>
+                      <WorkshopSupportPage />
+                    </WorkshopRoute>
+                  }
+                />
 
-              <Route path="/admin" element={<Navigate to="/admin/accueil" replace />} />
-              <Route
-                path="/admin/accueil"
-                element={
-                  <AdminRoute>
-                    <AdminHomePage />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/users"
-                element={
-                  <AdminRoute>
-                    <UserListPage />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/users/:id"
-                element={
-                  <AdminRoute>
-                    <UserDetailPage />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/lines"
-                element={
-                  <AdminRoute>
-                    <LinesPage />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/audit"
-                element={
-                  <AdminRoute>
-                    <AdminAuditPage />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/support"
-                element={
-                  <AdminRoute>
-                    <AdminSupportPage />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/parametres"
-                element={
-                  <AdminRoute>
-                    <AdminSettingsPage />
-                  </AdminRoute>
-                }
-              />
+                <Route path="/admin" element={<Navigate to="/admin/accueil" replace />} />
+                <Route
+                  path="/admin/accueil"
+                  element={
+                    <AdminRoute>
+                      <AdminHomePage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users"
+                  element={
+                    <AdminRoute>
+                      <UserListPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/:id"
+                  element={
+                    <AdminRoute>
+                      <UserDetailPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/lines"
+                  element={
+                    <AdminRoute>
+                      <LinesPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/audit"
+                  element={
+                    <AdminRoute>
+                      <AdminAuditPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/support"
+                  element={
+                    <AdminRoute>
+                      <AdminSupportPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/parametres"
+                  element={
+                    <AdminRoute>
+                      <AdminSettingsPage />
+                    </AdminRoute>
+                  }
+                />
 
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </MutationFeedbackProvider>
         </AppAuthProvider>
       </FieldLimitsProvider>
     </ErrorBoundary>
