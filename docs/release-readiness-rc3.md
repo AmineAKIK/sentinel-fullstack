@@ -210,13 +210,22 @@ les révocations sont finalisés au lot 3.
   (`backend/src/modules/adminSettings/adminSettings.controller.ts:230`).
 - **Fichiers concernés :** `client.ts`, `ApiResponseError`, contrôleurs de
   validation, composants affichant `err.message`.
-- **Correction (lot 2) :** `details` structurés côté API ; traducteur de
-  présentation `code+details` → libellé métier ; suppression des affichages
-  directs ; fallback générique.
-- **Tests :** aucun `snake_case`/nom de colonne visible ; erreurs nommées
-  traduites.
-- **Preuve finale :** _(à compléter — lot 2)_
-- **État :** OPEN
+- **Correction (lot 2) :** `errors.ts` gagne `PublicField`/`ErrorReason`/
+  `ErrorDetails` + `PUBLIC_ERROR_MESSAGE` ; `sendError(details?)` rétrocompatible.
+  Le controller mappe chaque réglage interne vers son champ **public**
+  (`board_session_ttl_hours` → `boardSessionDuration`) et émet le message
+  générique + `details`, plus aucun nom interne. Frontend : `ApiResponseError.details`
+  et un traducteur `errorMessages.ts` (`translateApiError`) qui n'affiche jamais
+  `message`/`field`/`reason`/snake_case et retombe sur un générique sûr ;
+  `AdminSettingsPage` affiche le message traduit, conserve les saisies et ramène
+  le focus au champ concerné.
+- **Tests :** `errors.test.ts` (payload rétrocompatible + details) ;
+  `adminSettings.controller.errors.test.ts` (mapping + **négatif** : aucun
+  identifiant interne dans la réponse) ; `errorMessages.test.ts` (traduction de
+  chaque reason/code, inconnu→générique, **négatif** : le message brut ne
+  surface jamais). Backend unit 481, frontend 425, coverage branches ≥ 80 %.
+- **Preuve finale :** commit `8932ae9`.
+- **État :** VERIFIED
 
 ### C-04 — Option Board contradictoire (« illimitée » = `0`, contrainte `1..168`)
 
@@ -331,8 +340,8 @@ les révocations sont finalisés au lot 3.
 | Lot | Objet | Commit | État |
 | --- | --- | --- | --- |
 | 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` (5de13f8) | FAIT |
-| 1 | Retour d'action standardisé | `fd1ff70` (fondation) + `3b4e736` (Atelier) | FAIT (Admin/Board aux lots 2/3) |
-| 2 | Erreurs publiques stables | `fix(api): expose stable user-facing validation errors` | À FAIRE |
+| 1 | Retour d'action standardisé | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice) | FAIT |
+| 2 | Erreurs publiques stables | `8932ae9` | FAIT |
 | 3 | Session Board sans expiration | `fix(board): make no-expiry sessions a valid revocable contract` | À FAIRE |
 | 4 | Trace des corrections | `fix(audit): preserve exact incident correction decisions` | À FAIRE |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | À FAIRE |
