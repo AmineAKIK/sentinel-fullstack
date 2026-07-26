@@ -27,9 +27,10 @@ function makeReq(body: Record<string, unknown>): Request {
 describe('patchAppSettingsHandler — erreurs publiques structurées (lot 2 RC3)', () => {
   it('renvoie details publics pour une durée Board hors bornes, sans nom interne', async () => {
     const { res, captured } = makeRes();
-    // board_session_ttl_hours interne, hors bornes (0). La validation précède
-    // toute dépendance DB, donc aucun mock n'est nécessaire.
-    await patchAppSettingsHandler(makeReq({ board_session_ttl_hours: 0 }), res);
+    // board_session_ttl_hours hors bornes (200). La validation précède toute
+    // dépendance DB, donc aucun mock n'est nécessaire. (0 est un marqueur interne
+    // valide depuis le lot 3 ; on utilise donc une vraie valeur hors plage.)
+    await patchAppSettingsHandler(makeReq({ board_session_ttl_hours: 200 }), res);
 
     expect(captured.status).toBe(400);
     expect(captured.body?.error?.code).toBe('VALIDATION_ERROR');
@@ -45,7 +46,7 @@ describe('patchAppSettingsHandler — erreurs publiques structurées (lot 2 RC3)
     const cases: Array<{ internal: string; value: number; field: string }> = [
       { internal: 'session_duration_hours', value: 0, field: 'adminSessionDuration' },
       { internal: 'workshop_session_hours', value: 999, field: 'workshopSessionDuration' },
-      { internal: 'board_session_ttl_hours', value: 0, field: 'boardSessionDuration' },
+      { internal: 'board_session_ttl_hours', value: 200, field: 'boardSessionDuration' },
       { internal: 'login_max_attempts', value: 1, field: 'loginMaxAttempts' },
       { internal: 'setup_code_ttl_hours', value: 0, field: 'setupCodeDuration' },
     ];
@@ -70,7 +71,7 @@ describe('patchAppSettingsHandler — erreurs publiques structurées (lot 2 RC3)
     ];
     // On teste plusieurs entrées invalides et on inspecte TOUT le corps sérialisé.
     for (const body of [
-      { board_session_ttl_hours: 0 },
+      { board_session_ttl_hours: 200 },
       { session_duration_hours: 9999 },
       { board_label: '' },
       { notif_should_not_exist: true },

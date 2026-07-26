@@ -1089,7 +1089,7 @@ export default function AdminSettingsPage() {
                           className="form-input"
                           type="text"
                           value=""
-                          placeholder='Désactivez "Session illimitée" pour choisir une durée'
+                          placeholder="Désactivez « sans expiration automatique » pour choisir une durée"
                           disabled
                           readOnly
                         />
@@ -1188,10 +1188,16 @@ export default function AdminSettingsPage() {
 
                   <div className="notif-toggle-item" style={{ margin: '8px 0 4px' }}>
                     <div className="notif-toggle-label">
-                      <strong>Session board illimitée</strong>
-                      <span>Pour écrans kiosque allumés en permanence</span>
+                      <strong>Session Board sans expiration automatique</strong>
+                      <span>
+                        Reste active tant que le navigateur conserve sa session. Elle peut être
+                        révoquée immédiatement depuis cette page.
+                      </span>
                     </div>
-                    <label className="toggle-switch" aria-label="Session board illimitée">
+                    <label
+                      className="toggle-switch"
+                      aria-label="Session Board sans expiration automatique"
+                    >
                       <input
                         type="checkbox"
                         checked={appSettingsDraftValue('board_session_ttl_hours') === 0}

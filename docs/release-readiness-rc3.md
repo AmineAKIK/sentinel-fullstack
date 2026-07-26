@@ -235,13 +235,22 @@ les révocations sont finalisés au lot 3.
   `jwt.ts:14,24` et `board.auth.ts:55,58` savent déjà gérer `'unlimited'`.
 - **Fichiers concernés :** migration `049`, `adminSettings.controller.ts`,
   `jwt.ts`, `board.auth.ts`, écran Administration.
-- **Correction (lot 3) :** autoriser le marqueur interne `0`, le traduire en
-  `unlimited` pour JWT et cookie, conserver la révocation par
-  `board_session_version`, libellé exact figé §2.4.
-- **Tests :** durée normale, mode sans durée, révocation, retour au mode normal ;
-  aucun identifiant interne dans une erreur.
-- **Preuve finale :** _(à compléter — lot 3)_
-- **État :** OPEN
+- **Correction (lot 3) :** migration append-only `049` assouplit la contrainte
+  `chk_board_session_duration` en `= 0 OR BETWEEN 1 AND 168` (041 inchangée) ;
+  `board.auth.ts` traduit `0 → 'unlimited'` pour le JWT (aucun `exp`) et le cookie
+  (cookie de session, aucun `maxAge`) ; la validation controller accepte `0` via
+  `allowZero` ; révocation conservée par `board_session_version` ; libellé exact
+  figé (§2.4) posé dans `AdminSettingsPage`.
+- **Tests :** `jwt.boardSession.test.ts` (`'unlimited'` → JWT sans `exp`, durée →
+  `exp` = h×3600) ; `adminSettings.boardSession.test.ts` (0 accepté et transmis à
+  la persistance, hors-plage rejeté) ; **intégration** `boardSessionMigration…`
+  (migration 001→049 sur base réelle : 0 accepté, 1/168 acceptés, −1/169/200
+  rejetés par la contrainte). Cas du lot 2 réalignés (0 n'est plus « hors
+  bornes »). Backend unit 485, frontend 425.
+- **Preuve finale :** commit _(lot 3, ci-dessous)_. Le test d'intégration
+  n'a pas pu être exécuté localement (PostgreSQL en peer-auth sans rôle
+  utilisable) ; il est vérifié par le job CI « Backend / PostgreSQL integration ».
+- **État :** VERIFIED (sous réserve du job CI intégration au push autorisé)
 
 ### C-05 — Mise en attente stockée comme « diagnostic »
 
@@ -342,7 +351,7 @@ les révocations sont finalisés au lot 3.
 | 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` (5de13f8) | FAIT |
 | 1 | Retour d'action standardisé | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice) | FAIT |
 | 2 | Erreurs publiques stables | `8932ae9` | FAIT |
-| 3 | Session Board sans expiration | `fix(board): make no-expiry sessions a valid revocable contract` | À FAIRE |
+| 3 | Session Board sans expiration | migration `049` + `fix(board)` | FAIT (intégration à confirmer en CI) |
 | 4 | Trace des corrections | `fix(audit): preserve exact incident correction decisions` | À FAIRE |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | À FAIRE |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |

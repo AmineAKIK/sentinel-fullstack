@@ -230,11 +230,18 @@ export async function getAppSettingsHandler(req: Request, res: Response): Promis
 // ni dans details.
 const APP_SETTINGS_BOUNDS: Record<
   keyof Omit<AppSettings, 'board_label'>,
-  { min: number; max: number; publicField: PublicField }
+  { min: number; max: number; publicField: PublicField; allowZero?: boolean }
 > = {
   session_duration_hours: { min: 1, max: 168, publicField: 'adminSessionDuration' },
   workshop_session_hours: { min: 1, max: 168, publicField: 'workshopSessionDuration' },
-  board_session_ttl_hours: { min: 1, max: 168, publicField: 'boardSessionDuration' },
+  // 0 = marqueur interne « sans expiration automatique » (RC3, lot 3), accepté en
+  // plus de la plage 1..168. Aligné sur la contrainte SQL de la migration 049.
+  board_session_ttl_hours: {
+    min: 1,
+    max: 168,
+    publicField: 'boardSessionDuration',
+    allowZero: true,
+  },
   login_max_attempts: { min: 3, max: 50, publicField: 'loginMaxAttempts' },
   setup_code_ttl_hours: { min: 1, max: 72, publicField: 'setupCodeDuration' },
 };
@@ -252,7 +259,10 @@ export async function patchAppSettingsHandler(req: Request, res: Response): Prom
     const k = key as keyof typeof APP_SETTINGS_BOUNDS;
     if (!(k in body)) continue;
     const val = body[k];
-    if (typeof val !== 'number' || !Number.isInteger(val) || val < bounds.min || val > bounds.max) {
+    const inRange =
+      typeof val === 'number' && Number.isInteger(val) && val >= bounds.min && val <= bounds.max;
+    const isAllowedZero = bounds.allowZero === true && val === 0;
+    if (!inRange && !isAllowedZero) {
       // Message générique sûr + details publics : le client reconstruit le
       // libellé précis à partir de (code, field public, reason, min, max).
       sendError(res, 400, 'VALIDATION_ERROR', PUBLIC_ERROR_MESSAGE, {
