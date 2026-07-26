@@ -309,8 +309,8 @@ export async function updateIncidentService(
   if (updates.applyEditRequest !== undefined) return unexpectedFieldsError();
 
   if (updates.rejectEditRequest === true) {
-    if (!hasOnlyKeys(keys, ['rejectEditRequest'])) return unexpectedFieldsError();
-    return rejectEditIncidentService(id, actorUserId, actorRole);
+    if (!hasOnlyKeys(keys, ['rejectEditRequest', 'decisionReason'])) return unexpectedFieldsError();
+    return rejectEditIncidentService(id, actorUserId, actorRole, updates.decisionReason ?? '');
   }
   if (updates.rejectEditRequest !== undefined) return unexpectedFieldsError();
 

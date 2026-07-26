@@ -129,6 +129,7 @@ export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   rejectEditRequest?: boolean;
   rejectDeleteRequest?: boolean;
   withdrawEditRequest?: boolean;
+  decisionReason?: string;
 };
 
 export async function updateWorkshopIncident(

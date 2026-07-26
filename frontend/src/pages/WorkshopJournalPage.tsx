@@ -304,9 +304,10 @@ export default function WorkshopJournalPage() {
                             >
                               Ligne {event.line_number} · {event.machine_id}
                             </button>
-                            <div className="muted">
-                              {STATUS_LABELS[event.status] ?? event.status}
-                            </div>
+                            {/* Le statut COURANT de l'incident n'est plus affiché
+                                sous chaque événement : il caractériserait à tort
+                                l'événement (RC3 §5.3). Le statut actuel se lit
+                                dans le bandeau du dossier. */}
                           </td>
                           <td>{formatEventActor(event)}</td>
                         </tr>

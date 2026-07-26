@@ -74,8 +74,12 @@ export interface WorkshopHistoryEvent extends WorkshopIncidentEvent {
   machine_id: string;
   robot_label: string;
   head_number: number;
-  state: IncidentState;
-  status: IncidentStatus;
+  // Statut/état COURANTS de l'incident (pas un snapshot au moment de l'événement).
+  // Renommés explicitement pour empêcher toute confusion avec le statut
+  // événementiel : une ligne d'événement n'affiche une transition que si son
+  // payload porte un before/after ou from/to (RC3 §5.3).
+  current_state: IncidentState;
+  current_status: IncidentStatus;
 }
 
 export interface WorkshopIncidentMetrics {

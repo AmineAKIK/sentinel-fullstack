@@ -233,4 +233,106 @@ describe('ReviewIncidentRequestModal', () => {
     expect(actionGroups[1].textContent).toContain('Refuser la demande');
     expect(actionGroups[1].textContent).toContain('Appliquer la correction');
   });
+
+  // ─── Motif du refus (lot 4 RC3) ────────────────────────────────────────────
+
+  it('n’affiche le champ « Motif du refus » qu’après le choix de refuser', () => {
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={vi.fn()}
+        onApplyEdit={vi.fn()}
+      />
+    );
+    // Avant : pas de champ motif.
+    expect(screen.queryByLabelText('Motif du refus')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    // Après : le champ apparaît, la confirmation destructive aussi.
+    expect(screen.getByLabelText('Motif du refus')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Confirmer le refus' })).toBeDefined();
+  });
+
+  it('bloque la confirmation tant que le motif est vide ou composé d’espaces', () => {
+    const onRejectEdit = vi.fn();
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={onRejectEdit}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    const confirm = screen.getByRole('button', { name: 'Confirmer le refus' });
+    expect(confirm).toBeDisabled();
+
+    // Espaces uniquement : toujours bloqué, aucun appel.
+    fireEvent.change(screen.getByLabelText('Motif du refus'), { target: { value: '   ' } });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(onRejectEdit).not.toHaveBeenCalled();
+  });
+
+  it('confirme le refus avec le motif normalisé (trim)', () => {
+    const onRejectEdit = vi.fn();
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={onRejectEdit}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    fireEvent.change(screen.getByLabelText('Motif du refus'), {
+      target: { value: '  Valeurs incohérentes avec le relevé.  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer le refus' }));
+    expect(onRejectEdit).toHaveBeenCalledWith('Valeurs incohérentes avec le relevé.');
+  });
+
+  it('conserve la saisie du motif quand une erreur est affichée (échec)', () => {
+    const { rerender } = render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    fireEvent.change(screen.getByLabelText('Motif du refus'), { target: { value: 'Motif saisi' } });
+
+    // Le parent réaffiche la modale avec une erreur (échec réseau/métier).
+    rerender(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error="Le motif du refus est obligatoire."
+        onClose={vi.fn()}
+        onRejectEdit={vi.fn()}
+      />
+    );
+    // La saisie n'est pas perdue et l'erreur est visible.
+    expect((screen.getByLabelText('Motif du refus') as HTMLTextAreaElement).value).toBe(
+      'Motif saisi'
+    );
+    expect(screen.getByText('Le motif du refus est obligatoire.')).toBeDefined();
+  });
 });

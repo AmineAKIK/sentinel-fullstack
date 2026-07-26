@@ -32,7 +32,8 @@ export type PublicField =
   | 'workshopSessionDuration'
   | 'loginMaxAttempts'
   | 'setupCodeDuration'
-  | 'boardLabel';
+  | 'boardLabel'
+  | 'decisionReason';
 
 /**
  * Raisons STABLES et publiques. Elles décrivent la nature de l'erreur sans

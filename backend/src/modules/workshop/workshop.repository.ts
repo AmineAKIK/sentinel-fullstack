@@ -964,7 +964,7 @@ export async function listHistoryEvents(query: QueryParams): Promise<CursorPage<
   const { rows } = await pool.query(
     `SELECT we.id, we.incident_id, we.event_type, we.payload, we.created_at,
             wi.line_id, wi.line_number, wi.machine_id, wi.robot_label, wi.head_number,
-            wi.state, wi.status,
+            wi.state AS current_state, wi.status AS current_status,
             COALESCE(we.actor_first_name,    su.first_name)    AS first_name,
             COALESCE(we.actor_last_name,     su.last_name)     AS last_name,
             COALESCE(we.actor_role,          su.role)          AS role,

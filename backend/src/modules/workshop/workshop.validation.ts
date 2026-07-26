@@ -44,6 +44,8 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   rejectEditRequest: z.boolean().optional(),
   rejectDeleteRequest: z.boolean().optional(),
   withdrawEditRequest: z.boolean().optional(),
+  // Motif de décision obligatoire lors d'un refus de correction (RC3, lot 4).
+  decisionReason: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
 });
 
 export const incidentWorkspaceQuerySchema = z.object({

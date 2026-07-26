@@ -14,7 +14,7 @@ export function sendServiceError<T>(
   result: ServiceResult<T>
 ): result is Extract<ServiceResult<T>, { ok: false }> {
   if (result.ok) return false;
-  sendError(res, result.status, result.code, result.message);
+  sendError(res, result.status, result.code, result.message, result.details);
   return true;
 }
 

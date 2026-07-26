@@ -111,4 +111,55 @@ describe('formatEventDetail', () => {
   it('retourne "" pour type sans traitement', () => {
     expect(formatEventDetail(event({ event_type: 'INCIDENT_CREATED', payload: {} }))).toBe('');
   });
+
+  // ─── Restitution des corrections versionnées (lot 4 RC3) ────────────────────
+
+  it('restitue une demande de correction en avant → après avec libellés métier', () => {
+    const detail = formatEventDetail(
+      event({
+        event_type: 'EDIT_REQUESTED',
+        payload: {
+          schemaVersion: 2,
+          changes: {
+            state: { before: 'DEGRADEE', after: 'INDISPONIBLE' },
+            currentProduct: { before: 'TBM', after: 'E365' },
+          },
+        },
+      })
+    );
+    expect(detail).toContain('État : Dégradée → Indisponible');
+    expect(detail).toContain('Produit en cours : TBM → E365');
+  });
+
+  it('affiche le motif de décision d’un refus de correction versionné', () => {
+    const detail = formatEventDetail(
+      event({
+        event_type: 'EDIT_REJECTED',
+        payload: {
+          schemaVersion: 2,
+          changes: { state: { before: 'DEGRADEE', after: 'INDISPONIBLE' } },
+          decisionReason: 'Valeurs incohérentes.',
+        },
+      })
+    );
+    expect(detail).toContain('État : Dégradée → Indisponible');
+    expect(detail).toContain('Motif : Valeurs incohérentes.');
+  });
+
+  it('n’invente rien pour un événement de correction historique sans payload versionné', () => {
+    const detail = formatEventDetail(
+      event({
+        event_type: 'EDIT_REQUESTED',
+        payload: { changes: { state: 'INDISPONIBLE' }, fields: ['state'] },
+      })
+    );
+    expect(detail).toBe('Détail non enregistré pour cet événement antérieur.');
+  });
+
+  it('n’affiche jamais une transition sans before/after dans le payload', () => {
+    // Un événement sans payload de transition ne fabrique pas de flèche.
+    expect(formatEventDetail(event({ event_type: 'INCIDENT_TAKEN', payload: {} }))).not.toContain(
+      '→'
+    );
+  });
 });

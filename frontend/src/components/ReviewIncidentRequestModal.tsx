@@ -1,7 +1,9 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import Modal from './Modal';
+import CharCounter from './ui/CharCounter';
 import { ProductionLine, WorkshopIncident } from '../types';
 import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
+import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { computeIncidentDiff } from '../utils/incidentDiff';
 import { formatDateTime, formatElapsed } from '../utils/date';
 
@@ -23,9 +25,66 @@ interface ReviewIncidentRequestModalProps {
   onConsult?: () => void;
   onReport?: () => void;
   onApplyEdit?: () => void;
-  onRejectEdit?: () => void;
+  onRejectEdit?: (decisionReason: string) => void;
   onApproveDelete?: () => void;
   onRejectDelete?: () => void;
+}
+
+// Formulaire de motif de refus (RC3, lot 4). Affiché uniquement lorsque le refus
+// est choisi. Le motif est normalisé (trim), non vide et borné exactement comme
+// le backend (FIELD_LIMITS.COMMENT). La soumission est bloquée si le motif est
+// invalide, le focus est placé sur le champ, et la saisie est conservée après
+// une erreur (l'état vit dans le composant parent, la modale reste ouverte).
+function RejectReasonForm({
+  value,
+  onChange,
+  onConfirm,
+  onCancel,
+  loading,
+  inputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
+}) {
+  const trimmed = value.trim();
+  const invalid = trimmed.length === 0 || trimmed.length > FIELD_LIMITS.COMMENT;
+  return (
+    <div className="arbitration-reject-form">
+      <label className="form-label" htmlFor="decisionReason">
+        Motif du refus
+      </label>
+      <textarea
+        id="decisionReason"
+        ref={inputRef}
+        className="form-input"
+        rows={3}
+        maxLength={FIELD_LIMITS.COMMENT}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={loading}
+        aria-required="true"
+        aria-invalid={invalid || undefined}
+      />
+      <CharCounter current={value.length} max={FIELD_LIMITS.COMMENT} />
+      <div className="arbitration-footer-group arbitration-footer-group--decision">
+        <button className="btn btn-secondary" onClick={onCancel} disabled={loading} type="button">
+          Annuler
+        </button>
+        <button
+          className="btn btn-danger"
+          onClick={onConfirm}
+          disabled={loading || invalid}
+          type="button"
+        >
+          {loading ? 'Refus…' : 'Confirmer le refus'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 type ArbitrationRequestState = 'ACTIVE' | 'WAITING' | undefined;
@@ -81,6 +140,26 @@ export default function ReviewIncidentRequestModal({
   onApproveDelete,
   onRejectDelete,
 }: ReviewIncidentRequestModalProps) {
+  // Mode « refus » : quand actif, le champ Motif du refus remplace les boutons de
+  // décision. La saisie est conservée tant que la modale reste ouverte (échec).
+  const [rejectMode, setRejectMode] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const rejectInputRef = useRef<HTMLTextAreaElement>(null);
+
+  function enterRejectMode() {
+    setRejectMode(true);
+    // Focus au champ dès son apparition.
+    requestAnimationFrame(() => rejectInputRef.current?.focus());
+  }
+  function confirmReject() {
+    const reason = rejectReason.trim();
+    if (reason.length === 0 || reason.length > FIELD_LIMITS.COMMENT) {
+      rejectInputRef.current?.focus();
+      return;
+    }
+    onRejectEdit?.(reason);
+  }
+
   const requested = useMemo(() => {
     if (!incident.edit_request || typeof incident.edit_request !== 'object') return null;
     return incident.edit_request;
@@ -147,26 +226,39 @@ export default function ReviewIncidentRequestModal({
             </button>
           )}
         </div>
-        <div className="arbitration-footer-group arbitration-footer-group--decision">
-          {allowEditReject && (
-            <button
-              className="btn btn-secondary"
-              onClick={onRejectEdit}
-              disabled={loading || editDisabled}
-            >
-              Refuser la demande
-            </button>
-          )}
-          {allowEditApply && (
-            <button
-              className="btn btn-primary"
-              onClick={onApplyEdit}
-              disabled={loading || editDisabled}
-            >
-              {loading ? 'Application…' : 'Appliquer la correction'}
-            </button>
-          )}
-        </div>
+        {rejectMode ? (
+          <RejectReasonForm
+            value={rejectReason}
+            onChange={setRejectReason}
+            onConfirm={confirmReject}
+            onCancel={() => setRejectMode(false)}
+            loading={loading}
+            inputRef={rejectInputRef}
+          />
+        ) : (
+          <div className="arbitration-footer-group arbitration-footer-group--decision">
+            {allowEditReject && (
+              <button
+                className="btn btn-secondary"
+                onClick={enterRejectMode}
+                disabled={loading || editDisabled}
+                type="button"
+              >
+                Refuser la demande
+              </button>
+            )}
+            {allowEditApply && (
+              <button
+                className="btn btn-primary"
+                onClick={onApplyEdit}
+                disabled={loading || editDisabled}
+                type="button"
+              >
+                {loading ? 'Application…' : 'Appliquer la correction'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     ) : (
       <div className="arbitration-footer">

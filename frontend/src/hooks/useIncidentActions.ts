@@ -6,6 +6,7 @@ import {
   updateWorkshopIncident,
 } from '../api/workshop';
 import { apiErrorMessage } from '../api/client';
+import { translateApiError } from '../api/errorMessages';
 import { useMutationFeedback } from '../components/ui/MutationFeedback';
 import { WorkshopIncident } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
@@ -164,7 +165,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     }
   }
 
-  async function handleRejectEditRequest() {
+  async function handleRejectEditRequest(decisionReason: string) {
     if (!modal.state.reviewIncident || reviewActionRef.current) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
       modal.setReviewError('Modification interdite apres prise en charge.');
@@ -176,13 +177,17 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     try {
       const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
         rejectEditRequest: true,
+        decisionReason,
       });
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
       feedback.notifySuccess(SUCCESS.REJECT_EDIT);
     } catch (requestError) {
-      modal.setReviewError(apiErrorMessage(requestError, 'Impossible de refuser la modification.'));
+      // Erreur TRADUITE (jamais le message brut ; le motif invalide renvoie un
+      // details.field=decisionReason). La modale reste ouverte : la saisie du
+      // motif est conservée.
+      modal.setReviewError(translateApiError(requestError));
     } finally {
       reviewActionRef.current = false;
       modal.setReviewLoading(false);

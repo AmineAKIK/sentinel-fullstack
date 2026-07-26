@@ -238,7 +238,12 @@ export async function deliverNotificationOutboxItem(
       break;
     case 'EDIT_REJECTED':
       await runner.run('declarant_edit_rejected', (alreadyDelivered) =>
-        notifyDeclarantEditRejected(incidentId, actorUserId, alreadyDelivered)
+        notifyDeclarantEditRejected(
+          incidentId,
+          actorUserId,
+          payloadString(item.payload, 'decisionReason'),
+          alreadyDelivered
+        )
       );
       break;
     case 'CANCEL_REQUEST_REJECTED':

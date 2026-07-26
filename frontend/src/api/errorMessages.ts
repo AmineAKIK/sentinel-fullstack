@@ -24,6 +24,7 @@ const FIELD_LABELS: Record<string, string> = {
   loginMaxAttempts: 'Le nombre maximal de tentatives de connexion',
   setupCodeDuration: 'La durée de validité du code de configuration',
   boardLabel: 'Le libellé du Board',
+  decisionReason: 'Le motif du refus',
 };
 
 // Codes métier globaux (indépendants d'un champ) → message français.

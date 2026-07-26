@@ -146,14 +146,28 @@ Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (seco
   n'est exigé pour afficher une transition.
 - **Fichiers concernés :** `workshop.repository.ts`, projection Journal/Historique
   frontend, traducteurs d'événements.
-- **Correction (lots 4 et 9) :** payload versionné `schemaVersion:2` avec
-  `before/after` ; renommage des champs joints en `current_status`/`current_state` ;
-  la ligne d'événement n'affiche une transition que sur `from/to`/`before/after` ;
-  statut courant réservé au bandeau du dossier.
-- **Tests :** unité restitution avant/après ; « aucune transition affichée sans
-  payload » ; E2E historique fidèle.
-- **Preuve finale :** _(à compléter — lot 4/9)_
-- **État :** OPEN
+- **Correction (lot 4) :** payload d'événement versionné `schemaVersion:2` avec
+  `before/after` snapshoté **dans la transaction** à la demande
+  (`workshop.correctionEvents.ts`) ; application et refus rattachés à la même
+  demande (`requestEventId`) et au même diff (via l'arbitrage) ; refus = motif
+  obligatoire persisté dans l'événement, l'arbitrage (`decision_reason`) et la
+  notification. Champs joints du Journal renommés `wi.status`→`current_status`,
+  `wi.state`→`current_state` ; le statut courant n'est **plus** affiché sous
+  chaque ligne d'événement ; la restitution n'affiche une transition que sur
+  `before/after` et affiche « Détail non enregistré pour cet événement antérieur »
+  pour un événement de correction sans payload versionné (rien inventé).
+- **Tests :** unité `correctionEvents` (payload versionné) et `workshopHistory`
+  (restitution avant→après, motif, fallback historique, « pas de transition sans
+  before/after ») ; frontend `ReviewIncidentRequestModal` (motif conditionnel,
+  blocage vide/espaces, trim, conservation après échec) ; **intégration
+  PostgreSQL réelle** `correctionArbitration` : événement `schemaVersion:2` avec
+  before snapshoté, refus sans/avec-espaces refusé, refus valide conserve le diff
+  + motif + arbitrage + **outbox**, application conserve le même avant→après.
+  Backend unit 490, intégration 121/121 (PG jetable), frontend 433.
+- **Preuve finale :** commit _(lot 4, ci-dessous)_. Cycle rouge→vert exécuté sur
+  PostgreSQL via `with-disposable-postgres.sh`.
+- **État :** VERIFIED (statut courant/événementiel séparé ; restitution finalisée
+  au lot 9 pour la terminologie « Suivi de l'incident » et l'élargissement UI)
 
 ### C-02 — Retour d'action incomplet (mutations silencieuses, contrats hétérogènes)
 
@@ -367,7 +381,7 @@ les révocations sont finalisés au lot 3.
 | 1 | Retour d'action standardisé | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice) | FAIT |
 | 2 | Erreurs publiques stables | `8932ae9` | FAIT |
 | 3 | Session Board sans expiration | migration `049` + `fix(board)` (1249c3a) + validation PG | FAIT (VERIFIED sur PostgreSQL jetable) |
-| 4 | Trace des corrections | `fix(audit): preserve exact incident correction decisions` | À FAIRE |
+| 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | À FAIRE |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |
 | 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | À FAIRE |
