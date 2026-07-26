@@ -51,6 +51,23 @@ async function setBoardTtl(value: number): Promise<void> {
 }
 
 describe('migration 049 — board_session_ttl_hours constraint (lot 3)', () => {
+  it('ROUGE : le contrat RC2 (contrainte 1..168) refuse la valeur 0', async () => {
+    // Reproduit la contrainte d'origine (migration 041) pour prouver, dans le
+    // même environnement, que 0 était bien refusé AVANT 049. Tout se fait sur UN
+    // client réservé (les tables temporaires sont liées à une connexion).
+    const client = await pool.connect();
+    try {
+      await client.query(
+        'CREATE TEMPORARY TABLE rc2_board_probe (v integer NOT NULL DEFAULT 12 CHECK (v BETWEEN 1 AND 168))'
+      );
+      await expect(client.query('INSERT INTO rc2_board_probe (v) VALUES (0)')).rejects.toThrow(
+        /rc2_board_probe|check constraint/i
+      );
+    } finally {
+      client.release();
+    }
+  });
+
   it('accepte 0 (sans expiration automatique)', async () => {
     await expect(setBoardTtl(0)).resolves.not.toThrow();
     const { rows } = await pool.query(

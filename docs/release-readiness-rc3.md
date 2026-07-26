@@ -31,6 +31,12 @@ concept métier, session Board sans expiration, cartes et panneau accessibles).
 - aucun push, PR, merge, tag ni déploiement sans autorisation explicite ;
 - hors périmètre RC3, reportés : exports CSV (**v1.1**), impression/PDF (**v1.2**),
   partage courriel tracé (**v1.3**).
+- **validation PostgreSQL locale** : `backend/scripts/with-disposable-postgres.sh`
+  provisionne un PostgreSQL jetable identique à la CI (`postgres:15.18-alpine3.23`,
+  port loopback dynamique, volume anonyme, nettoyage par trap, zéro résidu prouvé),
+  sans `sudo`, sans toucher au PostgreSQL système ni au `.env` du dépôt. Tout
+  constat PostgreSQL n'est marqué `VERIFIED` qu'après un cycle rouge → vert
+  réellement exécuté avec ce runner (ou en CI après push autorisé).
 
 ## 2. Contrats figés (avant toute modification de code)
 
@@ -247,10 +253,19 @@ les révocations sont finalisés au lot 3.
   (migration 001→049 sur base réelle : 0 accepté, 1/168 acceptés, −1/169/200
   rejetés par la contrainte). Cas du lot 2 réalignés (0 n'est plus « hors
   bornes »). Backend unit 485, frontend 425.
-- **Preuve finale :** commit _(lot 3, ci-dessous)_. Le test d'intégration
-  n'a pas pu être exécuté localement (PostgreSQL en peer-auth sans rôle
-  utilisable) ; il est vérifié par le job CI « Backend / PostgreSQL integration ».
-- **État :** VERIFIED (sous réserve du job CI intégration au push autorisé)
+- **Preuve finale :** commits `1249c3a` (implémentation) + validation PG. Cycle
+  « rouge → vert » **réellement exécuté** sur un PostgreSQL jetable isolé
+  (`postgres:15.18-alpine3.23`, identique CI, via
+  `backend/scripts/with-disposable-postgres.sh` : port loopback dynamique, volume
+  anonyme, trap, zéro résidu prouvé ; le `.env` du dépôt n'est pas touché) :
+  - **ROUGE** : sous la contrainte RC2 (1..168), `0` est refusé ;
+  - **migration `049`** appliquée puis `runMigrations` 001→049 sur base vierge ;
+  - **VERT** : `0` accepté, `1`/`168` acceptés, `-1`/`169`/`200` refusés ;
+  - **modes** : durée normale (12) persistée, sans-expiration (0) persistée,
+    **révocation** = `board_session_version` incrémenté, retour à une durée (24) ;
+  - unitaires : `jwt.boardSession` (`'unlimited'` → JWT sans `exp` ; durée → `exp`).
+  Suites d'intégration `boardSessionMigration` + `boardSessionSettings` : **8/8**.
+- **État :** VERIFIED
 
 ### C-05 — Mise en attente stockée comme « diagnostic »
 
@@ -351,7 +366,7 @@ les révocations sont finalisés au lot 3.
 | 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` (5de13f8) | FAIT |
 | 1 | Retour d'action standardisé | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice) | FAIT |
 | 2 | Erreurs publiques stables | `8932ae9` | FAIT |
-| 3 | Session Board sans expiration | migration `049` + `fix(board)` | FAIT (intégration à confirmer en CI) |
+| 3 | Session Board sans expiration | migration `049` + `fix(board)` (1249c3a) + validation PG | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 4 | Trace des corrections | `fix(audit): preserve exact incident correction decisions` | À FAIRE |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | À FAIRE |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |
