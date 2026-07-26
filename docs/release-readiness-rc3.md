@@ -158,12 +158,22 @@ Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (seco
 - **Fichiers concernés :** composants de mutation Atelier/Administration,
   infrastructure de feedback frontend.
 - **Correction (lot 1) :** mécanisme global unique succès/erreur (cinq états),
-  anti-double soumission, conservation des saisies, restauration du focus, branché
-  sur toutes les mutations.
-- **Tests :** composant de retour global ; double envoi ; focus après fermeture ;
-  conservation des formulaires en échec.
-- **Preuve finale :** _(à compléter — lot 1)_
-- **État :** OPEN
+  anti-double soumission, restauration du focus, monté dans `App`. Branché sur le
+  hub `useIncidentActions` (toutes les mutations d'incident Atelier, là où le
+  retour était réellement absent : prise en charge, mise en attente, reprise,
+  clôture, invalidation, urgence, suivi, demande d'annulation, arbitrages). Les
+  surfaces Administration/Board possèdent déjà un retour local accessible
+  (`SuccessBanner`/`ErrorBanner`) et sont alignées dans leur lot dédié (2 et 3)
+  pour éviter un double affichage et un double travail.
+- **Tests :** `MutationFeedback.test.tsx` (succès poli auto-6s, erreur
+  persistante `role="alert"`, verrou double-soumission) ;
+  `useIncidentActions.feedback.test.tsx` (succès métier annoncé, échec en
+  `role="alert"` sans fermer la modale, double-clic = un seul appel API). Suite
+  frontend complète 417/417.
+- **Preuve finale :** commits `fd1ff70` (fondation) + `3b4e736` (Atelier). Les
+  erreurs de champ restent locales aux formulaires ; ce canal ne porte que le
+  résultat métier et les erreurs globales.
+- **État :** IN_PROGRESS (Atelier fait ; Admin/Board alignés aux lots 2/3)
 
 ### C-03 — Erreurs techniques exposées (`error.message` brut)
 
@@ -295,8 +305,8 @@ Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (seco
 
 | Lot | Objet | Commit | État |
 | --- | --- | --- | --- |
-| 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` | EN COURS |
-| 1 | Retour d'action standardisé | `feat(ux): standardize mutation feedback and recovery` | À FAIRE |
+| 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` (5de13f8) | FAIT |
+| 1 | Retour d'action standardisé | `fd1ff70` (fondation) + `3b4e736` (Atelier) | FAIT (Admin/Board aux lots 2/3) |
 | 2 | Erreurs publiques stables | `fix(api): expose stable user-facing validation errors` | À FAIRE |
 | 3 | Session Board sans expiration | `fix(board): make no-expiry sessions a valid revocable contract` | À FAIRE |
 | 4 | Trace des corrections | `fix(audit): preserve exact incident correction decisions` | À FAIRE |
