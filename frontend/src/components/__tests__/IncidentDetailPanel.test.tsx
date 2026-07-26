@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 import IncidentDetailPanel from '../IncidentDetailPanel';
 import { ModalStateApi } from '../../hooks/useModalState';
 import { WorkshopIncident } from '../../types';
@@ -84,27 +85,29 @@ function renderPanel({
 
   render(
     <MemoryRouter>
-      <IncidentDetailPanel
-        incident={incident}
-        lines={[]}
-        modal={modal}
-        userRole={userRole}
-        userId={userId}
-        isResponsable={isResponsable}
-        onBack={vi.fn()}
-        onToggleFollow={vi.fn(resolvedVoid)}
-        onToggleUrgent={vi.fn(resolvedVoid)}
-        onConfirmTakeCharge={vi.fn(resolvedVoid)}
-        onRequestDelete={vi.fn(resolvedVoid)}
-        onSetPending={vi.fn(resolvedVoid)}
-        onResumeIncident={vi.fn(resolvedVoid)}
-        onCloseIncident={vi.fn(resolvedVoid)}
-        onInvalidateIncident={vi.fn(resolvedVoid)}
-        onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
-        onEditSuccess={vi.fn()}
-        onDeleteCommentConfirm={vi.fn(resolvedVoid)}
-        patchIncident={vi.fn(() => Promise.resolve(incident))}
-      />
+      <MutationFeedbackProvider>
+        <IncidentDetailPanel
+          incident={incident}
+          lines={[]}
+          modal={modal}
+          userRole={userRole}
+          userId={userId}
+          isResponsable={isResponsable}
+          onBack={vi.fn()}
+          onToggleFollow={vi.fn(resolvedVoid)}
+          onToggleUrgent={vi.fn(resolvedVoid)}
+          onConfirmTakeCharge={vi.fn(resolvedVoid)}
+          onRequestDelete={vi.fn(resolvedVoid)}
+          onSetPending={vi.fn(resolvedVoid)}
+          onResumeIncident={vi.fn(resolvedVoid)}
+          onCloseIncident={vi.fn(resolvedVoid)}
+          onInvalidateIncident={vi.fn(resolvedVoid)}
+          onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+          onEditSuccess={vi.fn()}
+          onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+          patchIncident={vi.fn(() => Promise.resolve(incident))}
+        />
+      </MutationFeedbackProvider>
     </MemoryRouter>
   );
 

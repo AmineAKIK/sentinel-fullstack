@@ -3,7 +3,8 @@ import Modal from './Modal';
 import SelectField from './ui/SelectField';
 import CharCounter from './ui/CharCounter';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
-import { ApiResponseError } from '../api/client';
+import { translateApiError } from '../api/errorMessages';
+import { useMutationFeedback } from './ui/MutationFeedback';
 import { IncidentState, ProductionLine, WorkshopIncident } from '../types';
 import { getRobotOptions } from '../utils/lineMachines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
@@ -31,6 +32,7 @@ export default function CreateIncidentModal({
   onClose,
   onSuccess,
 }: CreateIncidentModalProps) {
+  const { notifySuccess } = useMutationFeedback();
   const hasLineReferences = lines.length > 0;
   const [lineId, setLineId] = useState(incident ? String(incident.line_id) : '');
   const [machineId, setMachineId] = useState(incident?.machine_id || '');
@@ -71,10 +73,14 @@ export default function CreateIncidentModal({
 
   async function handleSubmit() {
     if (!validate()) return;
+    // Verrou anti-double-soumission : le bouton est déjà désactivé via `loading`,
+    // mais on garde aussi cette garde pour couvrir la touche Entrée.
+    if (loading) return;
 
     const selectedState = state as IncidentState;
 
     setLoading(true);
+    setError('');
     try {
       const payload = {
         lineId: Number(lineId),
@@ -89,11 +95,14 @@ export default function CreateIncidentModal({
       const saved = incident
         ? await updateWorkshopIncident(incident.id, payload)
         : await createWorkshopIncident(payload);
+      // Succès métier annoncé globalement (contrat RC3). La modale se ferme via
+      // onSuccess (restauration du focus gérée par l'appelant).
+      notifySuccess(incident ? 'Modification appliquée.' : 'Incident signalé.');
       onSuccess(saved);
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      // Erreur traduite (jamais le message brut) et conservée près du formulaire ;
+      // les saisies restent en place (aucun reset de champ ici).
+      setError(translateApiError(err));
     } finally {
       setLoading(false);
     }

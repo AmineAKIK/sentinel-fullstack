@@ -23,6 +23,7 @@ vi.mock('../../api/client', () => ({
 
 import * as workshopApi from '../../api/workshop';
 import CreateIncidentModal from '../CreateIncidentModal';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 import { ProductionLine } from '../../types';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -52,7 +53,9 @@ function renderModal(
   onClose = vi.fn(),
   onSuccess = vi.fn()
 ) {
-  return render(<CreateIncidentModal lines={lines} onClose={onClose} onSuccess={onSuccess} />);
+  return render(<CreateIncidentModal lines={lines} onClose={onClose} onSuccess={onSuccess} />, {
+    wrapper: MutationFeedbackProvider,
+  });
 }
 
 function chooseOption(label: string, option: string) {
@@ -206,7 +209,8 @@ describe('CreateIncidentModal – mode requestOnly', () => {
         onSuccess={vi.fn()}
         incident={incident as never}
         requestOnly
-      />
+      />,
+      { wrapper: MutationFeedbackProvider }
     );
     expect(screen.getByText("Modifier l'incident")).toBeDefined();
   });

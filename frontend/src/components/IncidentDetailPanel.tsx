@@ -30,7 +30,8 @@ import ChevronDownIcon from './icons/ChevronDownIcon';
 import CloseIcon from './icons/CloseIcon';
 import StarIcon from './icons/StarIcon';
 import ErrorBanner from './ui/ErrorBanner';
-import { apiErrorMessage } from '../api/client';
+import { translateApiError } from '../api/errorMessages';
+import { useMutationFeedback } from './ui/MutationFeedback';
 
 interface IncidentDetailPanelProps {
   incident: WorkshopIncident;
@@ -249,16 +250,21 @@ export default function IncidentDetailPanel({
   const [actionError, setActionError] = useState('');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const pendingActionRef = useRef(false);
+  const { notifySuccess } = useMutationFeedback();
 
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
     setActionError('');
   }, [incident.id, incident.responsible_comment]);
 
+  // Runner des actions du panneau : verrou anti-double (pendingActionRef), état
+  // « en cours » (pendingAction), erreur locale TRADUITE près de l'action, et
+  // succès métier annoncé globalement lorsqu'un message est fourni.
   async function runPanelAction(
     actionName: string,
     action: () => Promise<unknown>,
-    fallback: string
+    fallback: string,
+    successMessage?: string
   ): Promise<void> {
     if (pendingActionRef.current) return;
     pendingActionRef.current = true;
@@ -266,8 +272,10 @@ export default function IncidentDetailPanel({
     setActionError('');
     try {
       await action();
+      if (successMessage) notifySuccess(successMessage);
     } catch (requestError) {
-      setActionError(apiErrorMessage(requestError, fallback));
+      // `fallback` reste le repli métier si l'erreur n'est pas une ApiResponseError.
+      setActionError(requestError ? translateApiError(requestError) : fallback);
     } finally {
       pendingActionRef.current = false;
       setPendingAction(null);
@@ -562,7 +570,8 @@ export default function IncidentDetailPanel({
                           patchIncident(incident.id, {
                             responsibleComment: responsibleDraft.trim(),
                           }),
-                        "Impossible d'enregistrer la consigne."
+                        "Impossible d'enregistrer la consigne.",
+                        'Consigne enregistrée.'
                       )
                     }
                     disabled={!responsibleDraft.trim() || pendingAction !== null}

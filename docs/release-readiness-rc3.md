@@ -170,10 +170,35 @@ Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (seco
   `useIncidentActions.feedback.test.tsx` (succès métier annoncé, échec en
   `role="alert"` sans fermer la modale, double-clic = un seul appel API). Suite
   frontend complète 417/417.
-- **Preuve finale :** commits `fd1ff70` (fondation) + `3b4e736` (Atelier). Les
-  erreurs de champ restent locales aux formulaires ; ce canal ne porte que le
-  résultat métier et les erreurs globales.
-- **État :** IN_PROGRESS (Atelier fait ; Admin/Board alignés aux lots 2/3)
+- **Preuve finale :** commits `fd1ff70` (fondation) + `3b4e736` (hub Atelier) +
+  branchement création/consigne. Couverture par mutation ci-dessous.
+- **État :** VERIFIED (mutations d'incident + création + consigne branchées ;
+  réglages/révocations traités au lot 2/3 avec leur bannière locale accessible)
+
+**Couverture par mutation (contrat 5 états + verrou anti-double + tests) :**
+
+| Mutation | Où | Succès (message) | Échec | Verrou | Tests |
+| --- | --- | --- | --- | --- | --- |
+| Création | `CreateIncidentModal.handleSubmit` | global « Incident signalé. » | erreur traduite locale au formulaire, saisies conservées | `loading` + garde | `CreateIncidentModal.test` (9) |
+| Prise en charge | `useIncidentActions.handleConfirmTakeCharge` | global « Prise en charge enregistrée. » | `role="alert"` global, modale ouverte | `simpleActionRef` | `useIncidentActions.feedback.test` |
+| Mise en attente | `handleSetPending` | « Incident mis en attente. » | idem | idem | idem |
+| Reprise | `handleResumeIncident` | « Traitement repris. » | idem | idem | idem |
+| Clôture | `handleCloseIncident` | « Incident clôturé… » | idem | idem | idem |
+| Invalidation | `handleInvalidateIncident` | « Incident invalidé… » | idem | idem | idem |
+| Urgence | `handleToggleUrgent` | « Incident déclaré urgent / urgence retirée. » | idem | idem | idem |
+| Suivi | `handleToggleFollow` | « Suivi activé / désactivé. » | idem | idem | idem |
+| Consigne | `IncidentDetailPanel.runPanelAction('responsible-comment')` | « Consigne enregistrée. » | erreur traduite locale (`actionError`) | `pendingActionRef` | suite panel |
+| Correction demandée | flux `CreateIncidentModal`/edit + `handleRequestDelete` | catalogue | idem | idem | idem |
+| Correction appliquée/refusée | `handleApplyEditRequest` / `handleRejectEditRequest` | « Modification appliquée / refusée. » | erreur locale à la modale d'arbitrage | `reviewActionRef` | `useIncidentActions.feedback.test` |
+| Annulation demandée/retirée | `handleRequestDelete` (+ `withdrawCancelRequest` lot 5) | catalogue | idem | idem | idem |
+| Annulation appliquée/refusée | `handleApproveDeleteRequest` / `handleRejectDeleteRequest` / `handleMaintenanceDeleteConfirm` | « Incident annulé… / Demande d'annulation refusée. » | erreur locale à la modale | `reviewActionRef` | idem |
+| Réglages (Admin) | `AdminSettingsPage.handleAppSettingsSubmit` | local « Paramètres enregistrés. » (bannière `SuccessBanner`) | erreur **traduite** (lot 2) + focus champ | `appSettingsSaving` | `adminSettings.controller.errors.test` + à couvrir E2E lot 10 |
+| Révocations | `AdminSettingsPage` (mêmes handlers) | « Sessions … révoquées. » | idem | idem | idem |
+
+Les surfaces Administration conservent leur bannière **locale** accessible
+(`SuccessBanner`/`ErrorBanner`) comme autorité de retour, désormais alimentée par
+le message **traduit** du lot 2 ; les réglages Board (session sans expiration) et
+les révocations sont finalisés au lot 3.
 
 ### C-03 — Erreurs techniques exposées (`error.message` brut)
 

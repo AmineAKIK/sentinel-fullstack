@@ -2,6 +2,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { MutationFeedbackProvider } from '../../components/ui/MutationFeedback';
 import WorkshopDashboardPage from '../WorkshopDashboardPage';
 import { useIncidentsData } from '../../hooks/useIncidentsData';
 import { WorkshopIncident, WorkshopIncidentMetrics } from '../../types';
@@ -122,7 +123,9 @@ function mockDashboardData(incidents: WorkshopIncident[]) {
 function renderDashboard(initialPath = '/workshop/dashboard') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
-      <WorkshopDashboardPage />
+      <MutationFeedbackProvider>
+        <WorkshopDashboardPage />
+      </MutationFeedbackProvider>
     </MemoryRouter>
   );
 }
@@ -142,7 +145,9 @@ function DashboardWithBackControl() {
 function renderDashboardHistory(initialEntries: string[], initialIndex: number) {
   return render(
     <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
-      <DashboardWithBackControl />
+      <MutationFeedbackProvider>
+        <DashboardWithBackControl />
+      </MutationFeedbackProvider>
     </MemoryRouter>
   );
 }
