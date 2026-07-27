@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ApiResponseError } from '../client';
-import { translateApiError, fieldInError, GENERIC_ERROR_MESSAGE } from '../errorMessages';
+import {
+  apiErrorMessage,
+  translateApiError,
+  fieldInError,
+  GENERIC_ERROR_MESSAGE,
+} from '../errorMessages';
 
 describe('translateApiError — traduction métier (lot 2 RC3)', () => {
   it('traduit une durée Board hors bornes en français avec les bornes', () => {
@@ -121,5 +126,48 @@ describe('translateApiError — traduction métier (lot 2 RC3)', () => {
       fieldInError(new ApiResponseError('VALIDATION_ERROR', 'x', 400, { field: 'inconnu' }))
     ).toBeNull();
     expect(fieldInError(new Error('boom'))).toBeNull();
+  });
+});
+
+describe('apiErrorMessage — abstraction sûre (C-03)', () => {
+  it('NÉGATIF : ne laisse jamais fuiter le message brut ni le snake_case d’une erreur API', () => {
+    const err = new ApiResponseError(
+      'VALIDATION_ERROR',
+      'board_session_ttl_hours internal_failure',
+      400,
+      { field: 'boardSessionDuration', reason: 'OUT_OF_RANGE', min: 1, max: 168 }
+    );
+    const text = apiErrorMessage(err, 'Repli métier.');
+    // Ni le message brut, ni le nom SQL, ni aucun identifiant snake_case.
+    expect(text).not.toContain('board_session_ttl_hours');
+    expect(text).not.toContain('internal_failure');
+    expect(text).not.toMatch(/[a-z]+_[a-z]+/);
+    // …et un libellé français utile apparaît bien (traduction du field public).
+    expect(text).toMatch(/durée de session Board/i);
+    expect(text).toMatch(/1 et 168/);
+  });
+
+  it('n’expose jamais details.field / details.reason bruts', () => {
+    const err = new ApiResponseError('VALIDATION_ERROR', 'x', 400, {
+      field: 'boardSessionDuration',
+      reason: 'OUT_OF_RANGE',
+      min: 1,
+      max: 168,
+    });
+    const text = apiErrorMessage(err, 'Repli.');
+    expect(text).not.toContain('boardSessionDuration');
+    expect(text).not.toContain('OUT_OF_RANGE');
+  });
+
+  it('code API inconnu → générique sûr, jamais le message brut', () => {
+    const err = new ApiResponseError('SOME_UNKNOWN_CODE', 'raw backend detail xyz', 400);
+    expect(apiErrorMessage(err, 'Repli.')).toBe(GENERIC_ERROR_MESSAGE);
+  });
+
+  it('erreur NON API → repli français fourni (jamais error.message)', () => {
+    expect(apiErrorMessage(new Error('stack trace interne'), 'Impossible de charger.')).toBe(
+      'Impossible de charger.'
+    );
+    expect(apiErrorMessage('boom', 'Impossible de charger.')).toBe('Impossible de charger.');
   });
 });

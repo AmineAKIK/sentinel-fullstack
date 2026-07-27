@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { unifiedLogin, requestPasswordReset } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { ApiResponseError } from '../api/client';
+import { apiErrorMessage, translateApiError } from '../api/errorMessages';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import ConfirmModal from '../components/ConfirmModal';
@@ -83,7 +84,7 @@ export default function WorkshopLoginPage() {
         }
       } catch (err) {
         if (err instanceof ApiResponseError && err.status === 403) {
-          setWarning(err.message);
+          setWarning(translateApiError(err));
         } else {
           setError('Identifiant ou mot de passe incorrect.');
         }
@@ -127,11 +128,9 @@ export default function WorkshopLoginPage() {
         navigate('/workshop/dashboard', { replace: true });
       } catch (err) {
         if (err instanceof ApiResponseError && err.status === 403) {
-          setWarning(err.message);
+          setWarning(translateApiError(err));
         } else {
-          setError(
-            err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.'
-          );
+          setError(apiErrorMessage(err, 'Identifiant ou mot de passe incorrect.'));
         }
       } finally {
         setLoading(false);
@@ -177,7 +176,7 @@ export default function WorkshopLoginPage() {
         });
         navigate('/workshop/dashboard', { replace: true });
       } catch (err) {
-        setError(err instanceof ApiResponseError ? err.message : 'Code temporaire incorrect.');
+        setError(apiErrorMessage(err, 'Code temporaire incorrect.'));
       } finally {
         setLoading(false);
       }

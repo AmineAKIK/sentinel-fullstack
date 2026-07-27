@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import Modal from './Modal';
 import { ProductionLine } from '../types';
 import { updateLine } from '../api/lines';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
 
 interface LinePlanModalProps {
@@ -41,9 +41,7 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
       const updated = await updateLine(line.id, { machines });
       onSuccess(updated);
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
       setLoading(false);
     }
   }

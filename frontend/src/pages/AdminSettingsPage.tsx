@@ -14,8 +14,7 @@ import {
   AppSettings,
   AppSettingsPatch,
 } from '../api/adminSettings';
-import { ApiResponseError } from '../api/client';
-import { translateApiError, fieldInError } from '../api/errorMessages';
+import { apiErrorMessage, translateApiError, fieldInError } from '../api/errorMessages';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
 import SuccessBanner from '../components/ui/SuccessBanner';
@@ -182,7 +181,7 @@ export default function AdminSettingsPage() {
         state: { reason: 'Mot de passe modifié. Reconnectez-vous.' },
       });
     } catch (err) {
-      setPwdError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setPwdError(apiErrorMessage(err, 'Une erreur est survenue.'));
     } finally {
       setPwdLoading(false);
     }
@@ -263,7 +262,7 @@ export default function AdminSettingsPage() {
       setEmailSuccess('Email mis à jour.');
       scheduleSuccessClear('email', () => setEmailSuccess(''), 4000);
     } catch (err) {
-      setEmailError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setEmailError(apiErrorMessage(err, 'Une erreur est survenue.'));
     } finally {
       setEmailLoading(false);
     }
@@ -400,7 +399,7 @@ export default function AdminSettingsPage() {
       setBoardSuccess('Code mis à jour. Sessions révoquées.');
       scheduleSuccessClear('board', () => setBoardSuccess(''), 5000);
     } catch (err) {
-      setBoardError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setBoardError(apiErrorMessage(err, 'Une erreur est survenue.'));
     } finally {
       setBoardSubmitting(false);
     }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
 import Spinner from './ui/Spinner';
-import { apiErrorMessage } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 
 type ConfirmModalProps = {
   title: string;

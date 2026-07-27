@@ -167,9 +167,11 @@ describe('ConfirmModal – error', () => {
     expect(screen.queryByText('Erreur serveur.')).toBeNull();
   });
 
-  it('displays the API business message when submission fails', async () => {
+  it('traduit l’erreur API (code) sans jamais exposer le message brut (C-03)', async () => {
+    // Le backend envoie un CODE + un message serveur ; le frontend affiche la
+    // TRADUCTION du code, jamais le message brut.
     const onConfirm = vi.fn(() =>
-      Promise.reject(new ApiResponseError('INCIDENT_CONFLICT', 'Incident déjà traité.', 409))
+      Promise.reject(new ApiResponseError('CONFLICT', 'raw server detail — do not show', 409))
     );
     render(
       <ConfirmModal title="T" onClose={vi.fn()} onConfirm={onConfirm}>
@@ -180,8 +182,11 @@ describe('ConfirmModal – error', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent('Incident déjà traité.')
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Cette action entre en conflit avec l’état actuel. Rechargez puis réessayez.'
+      )
     );
+    expect(document.body.textContent).not.toContain('raw server detail');
   });
 });
 

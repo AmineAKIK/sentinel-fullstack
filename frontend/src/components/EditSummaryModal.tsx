@@ -4,6 +4,7 @@ import { UserFormData } from './UserForm';
 import { SentinelUser } from '../types';
 import { activateAccount, deactivateAccount, updateAccount } from '../api/accounts';
 import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { ROLE_LABELS } from '../utils/labels';
 
 interface EditSummaryModalProps {
@@ -115,7 +116,7 @@ export default function EditSummaryModal({
       onSuccess(updated);
     } catch (err) {
       if (err instanceof ApiResponseError) {
-        setError(err.message);
+        setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
       } else {
         setError('Une erreur inattendue est survenue.');
       }

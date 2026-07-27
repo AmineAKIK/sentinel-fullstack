@@ -36,6 +36,7 @@ const CODE_MESSAGES: Record<string, string> = {
   ARBITRATION_REQUIRED: 'Une demande d’arbitrage doit être décidée avant cette action.',
   SESSION_REVOKED: 'Votre session a été révoquée. Veuillez vous reconnecter.',
   UNAUTHORIZED: 'Votre session a expiré. Veuillez vous reconnecter.',
+  WORKSHOP_ACCOUNT_DISABLED: 'Votre accès atelier a été suspendu. Contactez votre responsable.',
   REAUTHENTICATION_FAILED: 'Mot de passe incorrect.',
   FORBIDDEN: 'Vous n’avez pas les droits pour effectuer cette action.',
   NOT_FOUND: 'L’élément demandé est introuvable.',
@@ -84,6 +85,21 @@ export function fieldInError(error: unknown): string | null {
     return error.details.field in FIELD_LABELS ? error.details.field : null;
   }
   return null;
+}
+
+/**
+ * Message d'erreur SÛR pour l'affichage utilisateur (C-03). Remplace l'ancien
+ * `apiErrorMessage` de `./client` qui renvoyait le `error.message` brut.
+ *
+ * - Erreur API (`ApiResponseError`) → `translateApiError` : jamais le message
+ *   brut, jamais `details.field`/`reason`, jamais de snake_case ; libellé
+ *   français ou générique sûr.
+ * - Erreur NON API (exception JS, échec réseau bas niveau) → `fallback` fourni
+ *   par l'appelant (déjà un libellé français métier), jamais `error.message`.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiResponseError) return translateApiError(error);
+  return fallback;
 }
 
 export function translateApiError(error: unknown): string {

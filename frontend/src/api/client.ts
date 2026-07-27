@@ -38,9 +38,11 @@ export class ApiResponseError extends Error {
   }
 }
 
-export function apiErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiResponseError ? error.message : fallback;
-}
+// `apiErrorMessage` a été retiré de ce module : renvoyer `error.message` brut
+// viole le contrat d'erreur public (C-03). L'unique voie de restitution est
+// `translateApiError` / `apiErrorMessage` depuis `./errorMessages`, qui ne
+// laissent jamais fuiter le message brut, `details.field`/`reason` ni le
+// snake_case.
 
 let onUnauthorized: ((error: ApiResponseError) => void) | null = null;
 export function setOn401Handler(handler: ((error: ApiResponseError) => void) | null): void {

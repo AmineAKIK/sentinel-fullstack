@@ -54,10 +54,12 @@ export async function login(req: Request, res: Response): Promise<void> {
         return;
 
       case 'workshop_account_disabled':
+        // Code métier dédié : le frontend traduit le CODE (C-03), il n'affiche
+        // jamais ce `message` brut. Le message reste un repli côté serveur.
         sendError(
           res,
           403,
-          'FORBIDDEN',
+          'WORKSHOP_ACCOUNT_DISABLED',
           'Votre accès atelier a été suspendu. Contactez votre responsable.'
         );
         return;

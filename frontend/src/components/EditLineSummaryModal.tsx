@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import { updateLine } from '../api/lines';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { ProductionLine } from '../types';
 import { LineFormData } from './LineForm';
 import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
@@ -73,9 +73,7 @@ export default function EditLineSummaryModal({
       });
       onSuccess(updated);
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
       setLoading(false);
     }

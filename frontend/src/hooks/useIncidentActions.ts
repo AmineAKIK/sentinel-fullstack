@@ -5,8 +5,7 @@ import {
   unfollowWorkshopIncident,
   updateWorkshopIncident,
 } from '../api/workshop';
-import { apiErrorMessage } from '../api/client';
-import { translateApiError } from '../api/errorMessages';
+import { apiErrorMessage, translateApiError } from '../api/errorMessages';
 import { useMutationFeedback } from '../components/ui/MutationFeedback';
 import { WorkshopIncident } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
@@ -76,6 +75,9 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       if (opts2.closeOnSuccess !== false) modal.closeModal();
       feedback.notifySuccess(opts2.successMessage);
     } catch (error) {
+      // C-03 : jamais de message brut. apiErrorMessage traduit une erreur API
+      // (code+details) et n'utilise le repli français métier que pour une erreur
+      // NON API (exception JS / réseau bas niveau sans code).
       feedback.notifyError(apiErrorMessage(error, opts2.errorFallback));
     } finally {
       simpleActionRef.current = false;
@@ -160,6 +162,8 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       modal.closeReview();
       feedback.notifySuccess(SUCCESS.APPLY_EDIT);
     } catch (requestError) {
+      // C-03 : erreur API traduite (jamais de message brut) ; repli français
+      // métier réservé aux erreurs non API.
       modal.setReviewError(
         apiErrorMessage(requestError, "Impossible d'appliquer la modification.")
       );
