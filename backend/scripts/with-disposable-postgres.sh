@@ -8,8 +8,10 @@
 # Isolation :
 #  - conteneur au nom unique (PID + aléatoire), volume ANONYME jetable ;
 #  - port loopback DYNAMIQUE choisi côté hôte (jamais un port fixe) ;
-#  - identifiants exclusivement de test ; base « sentinel_test » (accepte le
-#    garde d'intégration qui exige un suffixe _test/_integration) ;
+#  - identifiants exclusivement de test ; base « sentinel_test » par défaut
+#    (accepte le garde d'intégration qui exige un suffixe _test/_integration).
+#    Surchargeable via DISPOSABLE_PG_DB pour la recette E2E, qui exige un nom se
+#    terminant par _e2e (ex. DISPOSABLE_PG_DB=sentinel_e2e) ;
 #  - nettoyage garanti par trap (conteneur + volume) sur toute sortie, puis
 #    contrôle d'absence de résidu.
 #
@@ -32,6 +34,8 @@ PG_IMAGE="postgres:15.18-alpine3.23"
 RUN_ID="$$-${RANDOM}${RANDOM}"
 PG_NAME="sentinel-testpg-${RUN_ID}"
 PG_VOL=""
+# Base par défaut « sentinel_test » ; surchargeable pour la recette E2E.
+PG_DB="${DISPOSABLE_PG_DB:-sentinel_test}"
 
 cleanup() {
   docker rm -fv "$PG_NAME" >/dev/null 2>&1 || true
@@ -50,7 +54,7 @@ fi
 
 echo "[disposable-pg] démarrage ${PG_IMAGE} sur 127.0.0.1:${PG_PORT} (conteneur ${PG_NAME})"
 docker run -d --name "$PG_NAME" \
-  -e POSTGRES_DB=sentinel_test \
+  -e POSTGRES_DB="$PG_DB" \
   -e POSTGRES_USER=sentinel \
   -e POSTGRES_PASSWORD=sentinel_test_password \
   -p "127.0.0.1:${PG_PORT}:5432" \
@@ -61,7 +65,7 @@ PG_VOL="$(docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' "$PG_NAME"
 # Attente de disponibilité (au plus ~30 s).
 READY=0
 for _ in $(seq 1 30); do
-  if docker exec "$PG_NAME" pg_isready -U sentinel -d sentinel_test >/dev/null 2>&1; then
+  if docker exec "$PG_NAME" pg_isready -U sentinel -d "$PG_DB" >/dev/null 2>&1; then
     READY=1
     break
   fi
@@ -76,7 +80,7 @@ echo "[disposable-pg] prêt."
 # DATABASE_URL exporté pour la commande uniquement (sous-shell), NODE_ENV=test.
 STATUS=0
 (
-  export DATABASE_URL="postgres://sentinel:sentinel_test_password@127.0.0.1:${PG_PORT}/sentinel_test"
+  export DATABASE_URL="postgres://sentinel:sentinel_test_password@127.0.0.1:${PG_PORT}/${PG_DB}"
   export NODE_ENV=test
   export LOG_LEVEL="${LOG_LEVEL:-warn}"
   "$@"
