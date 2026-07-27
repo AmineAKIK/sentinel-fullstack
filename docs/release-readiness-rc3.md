@@ -518,6 +518,6 @@ les révocations sont finalisés au lot 3.
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` (1bd197f) | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel) |
 | 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff) | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel) |
 | 8 | Cartes et panneau (clavier, focus, scroll) | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd) | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts) |
-| 9 | Terminologie et restitution | `fix(copy): align workshop labels with the incident lifecycle` | PRÊT — « Suivi de l'incident », plus aucun code d'événement brut restitué ; tests verts ; en attente de commit |
+| 9 | Terminologie et restitution | `fix(copy): align workshop terminology and hide technical codes` (5038582) | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué) |
 | 10 | Recette comportementale et axe | `test: cover rc3 multi-role ux and audit contracts` | À FAIRE |
 | 11 | Documentation et candidate | `docs: synchronize the jury evidence with rc3` | À FAIRE |
