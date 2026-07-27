@@ -1,6 +1,9 @@
 # Préparation de la release Sentinel v1.0.0-rc.3
 
-**Statut : NO-GO** (RC3 en cours de réalisation)
+**Statut : NO-GO** — le produit versionné est prêt (Portes A/B VERIFIED,
+Porte C VERIFIED sous réserve de la confirmation navigateur/HTTPS déployée) ;
+la Porte D reste `BLOCKED_EXTERNAL` (CI distante, VPS, HTTPS/HSTS, SMTP, captures
+RC3 déployée). Aucun défaut ouvert non tracé sur le périmètre RC3.
 
 **Branche de stabilisation :** `release/v1.0.0-rc3`
 
@@ -25,11 +28,11 @@ au SHA candidat final avant la Porte D.
 | Tables totales                        | 15     | 14 + `schema_migrations` (créée par `migrate.ts`)                               |
 | Jobs CI                               | 5      | clés sous `jobs:` de `ci.yml` : backend, frontend, integration, containers, ops |
 | Fichiers suivis                       | 508    | `git ls-files \| wc -l`                                                         |
-| Backend unit                          | 493    | `jest --selectProjects unit`                                                    |
-| Backend intégration (PostgreSQL réel) | 136    | `jest --selectProjects integration` (20 suites)                                 |
+| Backend unit                          | 507    | `jest --selectProjects unit`                                                    |
+| Backend intégration (PostgreSQL réel) | 137    | `jest --selectProjects integration` (20 suites)                                 |
 | Frontend                              | 454    | `vitest run`                                                                    |
 | E2E Playwright                        | 34     | `playwright test --list`                                                        |
-| Total tests                           | 1117   | somme (ensembles disjoints)                                                     |
+| Total tests                           | 1132   | somme (ensembles disjoints)                                                     |
 
 ## 1. Règles de pilotage
 
@@ -613,34 +616,73 @@ autre opérateur`) ;
 - **Porte A — Contrats :** matrice complète, terminologie figée, payload
   événementiel figé, stratégie migrations approuvée. → **fermée par ce document
   (lot 0).**
-- **Porte B — Intégrité métier :** VALIDÉE. Correction et annulation complètes,
+- **Porte B — Intégrité métier : VERIFIED.** Correction et annulation complètes,
   aucun suivi implicite, mise en attente comme concept métier, événements
-  fidèles, tests PostgreSQL concurrents verts. **Aucun défaut ouvert sur le
-  périmètre de la Porte B** (C-01, C-05, C-06, C-07 = VERIFIED). Les constats
-  C-08/C-09 (P2) et les constats des lots 8-11 (dont C-08/C-09 pour la partie UX
-  et sécurité) restent `OPEN`/`PENDING` et hors périmètre de cette porte.
-- **Porte C — UX :** cinq états sur toutes les mutations, aucun message technique
-  visible, cartes et panneau conformes, zéro violation axe critique.
-- **Porte D — Release :** migrations testées (base vierge `001→050` **faite** ;
-  montée `048→050` sur base figée à `048` **faite** — cf. C-05),
-  **cinq** jobs CI (backend, frontend, integration, containers, ops) verts sur
-  le SHA candidat, aucun avertissement significatif,
-  recette multi-rôle, captures depuis la RC3 déployée, dossier synchronisé sur
-  le commit final.
+  fidèles, tests PostgreSQL concurrents verts (C-01, C-05, C-06, C-07 =
+  VERIFIED). Aucun défaut métier ouvert sur ce périmètre.
+- **Porte C — UX : VERIFIED sous réserve externe.** Cinq états de mutation
+  prouvés (lot 1 + E2E lot 10) ; aucun message technique visible (lot 2 erreurs
+  publiques, lot 9 `formatEventLabel`) ; cartes et panneau conformes (lots 5, 8) ;
+  **zéro violation axe sérieuse** après correction C-10, confirmée sur plusieurs
+  démarrages froids. La seule réserve est la confirmation navigateur/HTTPS sur la
+  RC3 réellement déployée (captures + recette externe), non réalisable localement.
+- **Porte D — Release : `BLOCKED_EXTERNAL`.** Tant que ne sont pas vérifiés : CI
+  distante verte sur le SHA candidat, VPS déployé, HTTPS/HSTS d'extrémité (cf.
+  C-08 `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION`), SMTP réel (cf. C-09), et
+  captures depuis la RC3 déployée. **Localement déjà prouvé** (équivalents CI,
+  cf. §4.1) : builds backend+frontend, audits prod, ShellCheck, contrat des
+  conteneurs de production (images non-root, labels révision, artefact runtime
+  minimal, Nginx non privilégié, favicon), préflight + matrice de rejet, parsing
+  `.env` sûr, exercice backup/restore jetable, migrations base vierge et montée
+  `048 → 049 → 050` depuis la fixture RC2 figée. Migrations : base vierge
+  `001→050` **faite** ; montée `048→050` **faite** (cf. C-05).
+
+### 4.1 Contrôles locaux exécutés (équivalents des jobs CI, HEAD courant)
+
+Reproduits localement avec les commandes exactes du dépôt/CI. Ce qui dépend du
+VPS distant reste `BLOCKED_EXTERNAL` et n'est pas prétendu exécuté.
+
+| Contrôle (job CI)                                                                               | Commande exacte                                                   | Résultat                                                                                                                    | Sortie |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Build backend (backend)                                                                         | `npm run build` (backend)                                         | OK                                                                                                                          | 0      |
+| Build frontend (frontend)                                                                       | `npm run build` (frontend)                                        | OK                                                                                                                          | 0      |
+| Typecheck scripts (backend)                                                                     | `npm run typecheck:scripts`                                       | OK                                                                                                                          | 0      |
+| Fiabilité (backend)                                                                             | `npm run verify:reliability`                                      | 17 checks OK                                                                                                                | 0      |
+| Audit prod backend                                                                              | `npm audit --omit=dev --audit-level=high`                         | 0 vuln                                                                                                                      | 0      |
+| Audit prod frontend                                                                             | `npm audit --omit=dev --audit-level=high`                         | 2 modérées (react-router) sous le seuil `high`                                                                              | 0      |
+| ShellCheck (ops)                                                                                | `koalaman/shellcheck-alpine:v0.10.0 shellcheck -x <8 scripts>`    | propre                                                                                                                      | 0      |
+| Compose base (containers)                                                                       | `docker compose config --quiet`                                   | OK                                                                                                                          | 0      |
+| Compose host-proxy (containers)                                                                 | `docker compose -f … -f host-proxy config --quiet`                | OK                                                                                                                          | 0      |
+| Compose registry (containers)                                                                   | `docker compose -f … -f registry config --quiet`                  | OK                                                                                                                          | 0      |
+| Topologie compose (containers)                                                                  | `./scripts/verify-compose-topology.sh`                            | invariants OK                                                                                                               | 0      |
+| Parsing `.env` sûr (containers)                                                                 | `./scripts/test-env-parsing.sh`                                   | 14/14, 0 résidu                                                                                                             | 0      |
+| Préflight + matrice de rejet (containers)                                                       | `./scripts/test-preflight.sh`                                     | 19/19, 0 résidu                                                                                                             | 0      |
+| Images prod + non-root + labels + runtime minimal + Nginx non privilégié + favicon (containers) | `docker build … ; docker image inspect … ; docker run … nginx -t` | backend=`node`, frontend=`nginx`, révision=SHA, aucun artefact de test, `server.js` présent, `nginx -t` OK, favicon présent | 0      |
+| Backup/restore jetable (ops)                                                                    | `./scripts/test-backup-restore.sh`                                | 11/11, isolation prouvée                                                                                                    | 0      |
+| Intégration + migrations (integration)                                                          | `npm run test:integration`                                        | 136/136 (20 suites)                                                                                                         | 0      |
+| Montée 048→049→050 (fixture RC2 figée)                                                          | `jest … waitingReasonUpgrade048to050` sur PG jetable              | 2/2 (001..048 byte-identiques à `release/v1.0.0-rc2` + backfill vérifié)                                                    | 0      |
+| Résidu Docker                                                                                   | inspection après tous les contrôles                               | 0 conteneur/volume/image `:ci`/dangling résiduel                                                                            | —      |
+
+Non exécuté localement (dépend du VPS/CI distante) : jobs CI distants sur le SHA
+candidat, déploiement, HTTPS/HSTS, SMTP, captures RC3 déployée.
 
 ## 5. Journal des lots
 
-| Lot | Objet                                      | Commit                                                                       | État                                                                                                                                                       |
-| --- | ------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0   | Matrice et contrats RC3                    | `docs: establish rc3 ux and traceability contracts` (5de13f8)                | FAIT                                                                                                                                                       |
-| 1   | Retour d'action standardisé                | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice)              | FAIT                                                                                                                                                       |
-| 2   | Erreurs publiques stables                  | `8932ae9`                                                                    | FAIT                                                                                                                                                       |
-| 3   | Session Board sans expiration              | migration `049` + `fix(board)` (1249c3a) + validation PG                     | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
-| 4   | Trace des corrections                      | `fix(audit)` + validation PG réelle                                          | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
-| 5   | Cycle d'annulation complet                 | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136)       | FAIT (C-06 VERIFIED sur PostgreSQL jetable)                                                                                                                |
-| 6   | Suivi explicite                            | `fix(workshop): require explicit incident follow consent` (1bd197f)          | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel)                                                                                               |
-| 7   | Mise en attente métier                     | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff) | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel)                                                                                                     |
-| 8   | Cartes et panneau (clavier, focus, scroll) | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd)     | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts)                                                                       |
-| 9   | Terminologie et restitution                | `fix(copy): align workshop terminology and hide technical codes` (5038582)   | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué)                                                              |
-| 10  | Recette comportementale et axe             | `test: cover rc3 multi-role UX end-to-end and at 200% zoom` (93e99d2)        | FAIT (E2E 34/34 sur PostgreSQL jetable `_e2e` : axe multi-rôles, retrait annulation multi-rôles, zoom 200 %, mobile ; drift terminologique lot 9 rattrapé) |
-| 11  | Documentation et candidate                 | `docs: synchronize the readiness matrix with measured facts` (046f021)       | FAIT (montée 048→050 sur base figée validée sur PG réel ; faits mesurés synchronisés : 50 migrations, 5 jobs CI, 1117 tests)                               |
+| Lot  | Objet                                                | Commit                                                                            | État                                                                                                                                                       |
+| ---- | ---------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Matrice et contrats RC3                              | `docs: establish rc3 ux and traceability contracts` (5de13f8)                     | FAIT                                                                                                                                                       |
+| 1    | Retour d'action standardisé                          | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice)                   | FAIT                                                                                                                                                       |
+| 2    | Erreurs publiques stables                            | `8932ae9`                                                                         | FAIT                                                                                                                                                       |
+| 3    | Session Board sans expiration                        | migration `049` + `fix(board)` (1249c3a) + validation PG                          | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
+| 4    | Trace des corrections                                | `fix(audit)` + validation PG réelle                                               | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
+| 5    | Cycle d'annulation complet                           | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136)            | FAIT (C-06 VERIFIED sur PostgreSQL jetable)                                                                                                                |
+| 6    | Suivi explicite                                      | `fix(workshop): require explicit incident follow consent` (1bd197f)               | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel)                                                                                               |
+| 7    | Mise en attente métier                               | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff)      | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel)                                                                                                     |
+| 8    | Cartes et panneau (clavier, focus, scroll)           | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd)          | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts)                                                                       |
+| 9    | Terminologie et restitution                          | `fix(copy): align workshop terminology and hide technical codes` (5038582)        | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué)                                                              |
+| 10   | Recette comportementale et axe                       | `test: cover rc3 multi-role UX end-to-end and at 200% zoom` (93e99d2)             | FAIT (E2E 34/34 sur PostgreSQL jetable `_e2e` : axe multi-rôles, retrait annulation multi-rôles, zoom 200 %, mobile ; drift terminologique lot 9 rattrapé) |
+| 11   | Documentation et candidate                           | `docs: synchronize the readiness matrix with measured facts` (046f021)            | FAIT (montée 048→050 sur base figée validée sur PG réel ; faits mesurés synchronisés : 50 migrations, 5 jobs CI, 1117 tests)                               |
+| C-08 | En-têtes de sécurité (autorité unique + anti-dérive) | `fix(security): make security headers single-authority and drift-proof` (8d54595) | FAIT (IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION : dérive CSP corrigée, source canonique unique, test anti-dérive)                                         |
+| C-09 | E-mail lisible sans images (alternative texte brut)  | `fix(notifications): keep emails readable without remote images` (ef5dfc4)        | FAIT (IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION : aucune image, partie texte brut ajoutée + tests)                                                        |
+| C-10 | Violation axe sur l'état de chargement               | `fix(a11y): give loading regions a role so aria-label is valid` (a7fd77a)         | FAIT (VERIFIED : `role="status"`, cause corrigée, signal déterministe, 3 démarrages froids verts)                                                          |
+| 11+  | Contrôles locaux (équivalents CI) + montée RC2 figée | (ce commit)                                                                       | FAIT (cf. §4.1 : builds, audits, ShellCheck, conteneurs, préflight, `.env`, backup/restore, migrations, 048→049→050 RC2 ; 0 résidu Docker)                 |

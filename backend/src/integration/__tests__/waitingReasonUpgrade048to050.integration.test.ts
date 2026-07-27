@@ -11,6 +11,8 @@
  * suites d'intégration.
  */
 
+import { execFileSync } from 'child_process';
+import { createHash } from 'crypto';
 import { readFileSync, readdirSync } from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
@@ -18,6 +20,26 @@ import { Pool } from 'pg';
 const DB_URL = process.env.DATABASE_URL!;
 const SCHEMA = `rc3_upgrade_${process.pid}`;
 const MIGRATIONS_DIR = path.join(__dirname, '../../../migrations');
+const REPO_ROOT = path.join(__dirname, '../../../..');
+// Réf. RC2 figée : la branche de stabilisation rc.2. La montée testée part donc
+// littéralement des migrations RC2 (001..048), pas d'une copie approximative.
+const RC2_REF = 'release/v1.0.0-rc2';
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+// Contenu d'un fichier de migration tel qu'il existe dans la réf. RC2 figée.
+function rc2MigrationSql(file: string): string | null {
+  try {
+    return execFileSync('git', ['show', `${RC2_REF}:backend/migrations/${file}`], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+  } catch {
+    return null;
+  }
+}
 
 let pool: Pool;
 
@@ -61,8 +83,23 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe('montée 048 → 050 sur base figée à 048 (lot 11, C-05)', () => {
-  it('applique 001..048, seed ancienne forme, puis 049+050 et backfill le motif', async () => {
+describe('montée 048 → 049 → 050 depuis la fixture RC2 figée (lot 11, C-05)', () => {
+  it('les migrations 001..048 appliquées SONT celles de la RC2 figée (byte-identiques)', () => {
+    const upTo048 = migrationFiles().filter((f) => Number(f.slice(0, 3)) <= 48);
+    expect(upTo048.length).toBe(48);
+    // Chaque fichier 001..048 utilisé pour bâtir la base est identique, au bit
+    // près, à son homologue de la réf. RC2 — la « base figée à 048 » est donc
+    // exactement l'état RC2, pas une reconstruction approximative.
+    for (const file of upTo048) {
+      const rc2 = rc2MigrationSql(file);
+      // Chaque migration 001..048 doit exister dans la réf. RC2…
+      expect(rc2).not.toBeNull();
+      // …et être identique au bit près à celle appliquée par le test.
+      expect(sha256(migrationSql(file))).toBe(sha256(rc2 as string));
+    }
+  });
+
+  it('applique 001..048, seed ancienne forme, puis 049 puis 050 et backfill le motif', async () => {
     const files = migrationFiles();
     const upTo048 = files.filter((f) => Number(f.slice(0, 3)) <= 48);
     const has049 = files.includes('049_allow_board_session_without_automatic_expiry.sql');
@@ -70,7 +107,7 @@ describe('montée 048 → 050 sur base figée à 048 (lot 11, C-05)', () => {
     expect(has049 && has050).toBe(true);
     expect(upTo048.length).toBe(48);
 
-    // 1. État figé à 048.
+    // 1. État figé à 048 (fixture RC2).
     for (const file of upTo048) {
       await applyMigration(file);
     }
