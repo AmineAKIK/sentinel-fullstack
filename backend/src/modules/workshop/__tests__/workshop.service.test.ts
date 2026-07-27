@@ -165,6 +165,7 @@ function mockIncident(overrides: Record<string, unknown> = {}) {
     comment: null,
     current_product: null,
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: null,
     is_priority: false,
     display_order: 0,
@@ -615,7 +616,10 @@ describe('updateIncidentService – OPERATOR', () => {
         incidentId: 1,
         requestEventId: 1,
         requestType: 'EDIT',
-        payload: { state: 'INDISPONIBLE' },
+        payload: {
+          schemaVersion: 2,
+          changes: { state: { before: 'DEGRADEE', after: 'INDISPONIBLE' } },
+        },
         requestedByUserId: 1,
       },
       null
@@ -678,11 +682,17 @@ describe('updateIncidentService – OPERATOR', () => {
 
     expect(result.ok).toBe(true);
     expect(repo.requestEditIncident).toHaveBeenCalledWith(1, { state: 'INDISPONIBLE' }, null);
+    // Événement versionné (RC3 §5.1) : before snapshoté depuis la ligne courante
+    // (state DEGRADEE), after = valeur demandée.
     expect(events.logIncidentEvent).toHaveBeenCalledWith(
       1,
       1,
       'EDIT_REQUESTED',
-      { changes: { state: 'INDISPONIBLE' }, fields: ['state'] },
+      {
+        schemaVersion: 2,
+        changes: { state: { before: 'DEGRADEE', after: 'INDISPONIBLE' } },
+        fields: ['state'],
+      },
       null
     );
     expect(arbitrationRepo.createArbitrationCase).toHaveBeenCalledWith(
@@ -690,7 +700,10 @@ describe('updateIncidentService – OPERATOR', () => {
         incidentId: 1,
         requestEventId: 17,
         requestType: 'EDIT',
-        payload: { state: 'INDISPONIBLE' },
+        payload: {
+          schemaVersion: 2,
+          changes: { state: { before: 'DEGRADEE', after: 'INDISPONIBLE' } },
+        },
         requestedByUserId: 1,
       },
       null
@@ -847,6 +860,36 @@ describe('updateIncidentService – RESPONSABLE', () => {
     );
   });
 
+  it("n'ajoute JAMAIS de suivi implicite au responsable lorsqu'il agit (C-07)", async () => {
+    // Le suivi (l'étoile) est le SEUL opt-in explicite : arbitrer, prioriser,
+    // consigner, corriger, annuler ne doit jamais suivre l'incident au nom du
+    // responsable. Preuve sur une action représentative de chaque fichier de
+    // service (approbation de correction ici, priorité ci-dessous).
+    const incident = mockIncident({ edit_request: { state: 'INDISPONIBLE' } });
+    const updated = mockIncident({ state: 'INDISPONIBLE' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(mockArbitrationCase());
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([mockLine()]);
+    jest.mocked(repo.applyEditRequestIncident).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
+
+    const approve = await updateIncidentService(1, { applyEditRequest: true }, 1, 'RESPONSABLE');
+    expect(approve.ok).toBe(true);
+    expect(repo.followIncidentData).not.toHaveBeenCalled();
+
+    jest.mocked(repo.followIncidentData).mockClear();
+
+    const priorityIncident = mockIncident({ is_priority: false });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(priorityIncident);
+    jest.mocked(repo.updateIncidentData).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(mockIncident({ is_priority: true }));
+
+    const priority = await updateIncidentService(1, { isPriority: true }, 1, 'RESPONSABLE');
+    expect(priority.ok).toBe(true);
+    expect(repo.followIncidentData).not.toHaveBeenCalled();
+  });
+
   it("RESPONSABLE peut refuser une correction et l'événement EDIT_REJECTED est loggué", async () => {
     const incident = mockIncident({ edit_request: { state: 'INDISPONIBLE' } });
     const updated = mockIncident({ edit_request: null });
@@ -856,23 +899,40 @@ describe('updateIncidentService – RESPONSABLE', () => {
     jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
     jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
 
-    const result = await updateIncidentService(1, { rejectEditRequest: true }, 1, 'RESPONSABLE');
+    const result = await updateIncidentService(
+      1,
+      { rejectEditRequest: true, decisionReason: 'Valeurs incohérentes avec le relevé.' },
+      1,
+      'RESPONSABLE'
+    );
     expect(result.ok).toBe(true);
     expect(events.logIncidentEvent).toHaveBeenCalledWith(
       1,
       1,
       'EDIT_REJECTED',
-      expect.any(Object),
+      expect.objectContaining({ decisionReason: 'Valeurs incohérentes avec le relevé.' }),
       null
     );
+    // Le motif de refus est persisté dans l'arbitrage (5e argument).
     expect(arbitrationRepo.resolveArbitrationCase).toHaveBeenCalledWith(
       1,
       'EDIT',
       'REJECTED',
       1,
-      null,
+      'Valeurs incohérentes avec le relevé.',
       null
     );
+  });
+
+  it('refuse une correction SANS motif : erreur de validation, aucune écriture', async () => {
+    const incident = mockIncident({ edit_request: { state: 'INDISPONIBLE' } });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(mockArbitrationCase());
+
+    const result = await updateIncidentService(1, { rejectEditRequest: true }, 1, 'RESPONSABLE');
+    expect(result).toMatchObject({ ok: false, status: 400 });
+    expect(repo.rejectEditIncident).not.toHaveBeenCalled();
+    expect(arbitrationRepo.resolveArbitrationCase).not.toHaveBeenCalled();
   });
 
   it("RESPONSABLE peut invalider un incident clôturé et l'événement INCIDENT_INVALIDATED est loggué", async () => {
@@ -917,7 +977,7 @@ describe('updateIncidentService – RESPONSABLE', () => {
 });
 
 describe('updateIncidentService – MAINTENANCE', () => {
-  it('MAINTENANCE ne peut pas passer en PENDING sans diagnostic', async () => {
+  it('MAINTENANCE ne peut pas passer en PENDING sans motif de mise en attente', async () => {
     const incident = mockIncident({ is_taken: true });
     const line = mockLine();
     jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
@@ -928,9 +988,9 @@ describe('updateIncidentService – MAINTENANCE', () => {
     if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
   });
 
-  it("MAINTENANCE peut passer en PENDING avec diagnostic et l'événement STATUS_CHANGED est loggué", async () => {
+  it("MAINTENANCE passe en PENDING avec un motif de mise en attente ; l'événement porte waitingReason (C-05)", async () => {
     const incident = mockIncident({ is_taken: true });
-    const updated = mockIncident({ status: 'PENDING', diagnostic: 'Capteur défaillant' });
+    const updated = mockIncident({ status: 'PENDING', waiting_reason: 'Capteur défaillant' });
     const line = mockLine();
     jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
@@ -940,16 +1000,59 @@ describe('updateIncidentService – MAINTENANCE', () => {
 
     const result = await updateIncidentService(
       1,
-      { status: 'PENDING', diagnostic: 'Capteur défaillant' },
+      { status: 'PENDING', waitingReason: 'Capteur défaillant' },
       1,
       'MAINTENANCE'
     );
     expect(result.ok).toBe(true);
+    // Le motif est écrit dans waiting_reason (jamais dans diagnostic)…
+    expect(repo.updateIncidentData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          status: 'PENDING',
+          waitingReason: 'Capteur défaillant',
+        }),
+      }),
+      null
+    );
+    // …et l'événement en garde la trace sous waitingReason.
     expect(events.logIncidentEvent).toHaveBeenCalledWith(
       1,
       1,
       'INCIDENT_SET_PENDING',
-      expect.objectContaining({ from: 'OPEN', to: 'PENDING' }),
+      expect.objectContaining({ from: 'OPEN', to: 'PENDING', waitingReason: 'Capteur défaillant' }),
+      null
+    );
+  });
+
+  it('à la reprise, waiting_reason est effacé mais conservé dans l’événement INCIDENT_RESUMED (C-05)', async () => {
+    const incident = mockIncident({
+      is_taken: true,
+      status: 'PENDING',
+      waiting_reason: 'Attente pièce',
+    });
+    const line = mockLine();
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.updateIncidentData).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(mockIncident({ status: 'OPEN' }));
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
+
+    const result = await updateIncidentService(1, { status: 'OPEN' }, 1, 'MAINTENANCE');
+    expect(result.ok).toBe(true);
+    // Le motif courant est effacé…
+    expect(repo.updateIncidentData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({ status: 'OPEN', waitingReason: null }),
+      }),
+      null
+    );
+    // …mais l'événement de reprise en garde la trace.
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(
+      1,
+      1,
+      'INCIDENT_RESUMED',
+      expect.objectContaining({ from: 'PENDING', to: 'OPEN', waitingReason: 'Attente pièce' }),
       null
     );
   });
@@ -1485,7 +1588,12 @@ describe('updateIncidentService – cas limites', () => {
     jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(mockArbitrationCase());
     jest.mocked(repo.rejectEditIncident).mockResolvedValue(null);
 
-    const result = await updateIncidentService(1, { rejectEditRequest: true }, 1, 'RESPONSABLE');
+    const result = await updateIncidentService(
+      1,
+      { rejectEditRequest: true, decisionReason: 'Motif de refus.' },
+      1,
+      'RESPONSABLE'
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('NOT_FOUND');
   });

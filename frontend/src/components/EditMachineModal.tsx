@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import { LineMachine, ProductionLine } from '../types';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { checkLineConflicts, updateLine } from '../api/lines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import ErrorBanner from './ui/ErrorBanner';
@@ -80,9 +80,7 @@ export default function EditMachineModal({
 
       setStep('preview');
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
       setLoading(false);
     }
@@ -109,9 +107,7 @@ export default function EditMachineModal({
       });
       onSuccess(updated);
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
       setLoading(false);
     }
   }

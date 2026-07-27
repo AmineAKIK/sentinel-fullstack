@@ -117,6 +117,8 @@ export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   isPriority?: boolean;
   status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
   diagnostic?: string;
+  // Motif de mise en attente (RC3 lot 7) : concept distinct du diagnostic.
+  waitingReason?: string;
   interventionNote?: string;
   responsibleComment?: string;
   requestOnly?: boolean;
@@ -129,6 +131,8 @@ export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   rejectEditRequest?: boolean;
   rejectDeleteRequest?: boolean;
   withdrawEditRequest?: boolean;
+  withdrawCancelRequest?: boolean;
+  decisionReason?: string;
 };
 
 export async function updateWorkshopIncident(
@@ -158,8 +162,16 @@ export async function consultWorkshopArbitration(
   );
 }
 
-export async function cancelWorkshopIncident(id: number): Promise<void> {
-  return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {});
+export async function cancelWorkshopIncident(
+  id: number,
+  options: { expectArbitration?: boolean } = {}
+): Promise<void> {
+  // expectArbitration=true : confirmer une DEMANDE d'annulation précise (modale
+  // d'arbitrage). Si la demande a disparu (retrait/refus concurrent), le backend
+  // échoue proprement (409) au lieu d'annuler directement.
+  return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {
+    expectArbitration: options.expectArbitration === true,
+  });
 }
 
 export async function listIncidentEvents(

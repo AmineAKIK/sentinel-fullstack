@@ -26,6 +26,12 @@ async function loginAsResponsable(page: Page): Promise<void> {
 }
 
 async function expectNoSeriousViolations(page: Page): Promise<void> {
+  // Signal de disponibilité DÉTERMINISTE (pas un délai) : on attend que la page
+  // ne soit plus en chargement — aucune région `aria-busy="true"` — avant de
+  // scanner. Sinon axe pourrait analyser un état de squelette transitoire. Ce
+  // n'est ni un retry, ni une exclusion, ni un masquage : on scanne l'état
+  // fonctionnellement prêt, celui que voit réellement l'utilisateur.
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   const blocking = results.violations.filter(
     (violation) => violation.impact === 'serious' || violation.impact === 'critical'

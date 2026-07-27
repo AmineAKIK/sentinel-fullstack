@@ -37,10 +37,12 @@ describe('SupportChat', () => {
   });
 
   it('displays the API business error', async () => {
+    // Code RÉEL renvoyé par le backend d'assistance (503) ; le message serveur
+    // brut ne doit jamais s'afficher — c'est la traduction du code qui apparaît.
     const onSend = vi
       .fn()
       .mockRejectedValue(
-        new ApiResponseError('SUPPORT_UNAVAILABLE', 'Assistance momentanément indisponible.', 503)
+        new ApiResponseError('SERVICE_UNAVAILABLE', 'raw server text — do not show', 503)
       );
     render(<SupportChat onSend={onSend} />);
 
@@ -48,8 +50,9 @@ describe('SupportChat', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer le message' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Assistance momentanément indisponible.'
+      'Le service est momentanément indisponible. Réessayez plus tard.'
     );
+    expect(document.body.textContent).not.toContain('raw server text');
   });
 
   it('aborts the pending request when unmounted', () => {

@@ -8,11 +8,15 @@ import {
 } from '../../utils/serviceResult';
 import { withTransaction } from '../../db/transaction';
 import { logIncidentEvent } from './workshop.events';
+import {
+  buildVersionedCorrectionChanges,
+  isVersionedCorrectionPayload,
+} from './workshop.correctionEvents';
 import { canPerform, hasPendingArbitration } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import * as arbitrationRepository from './workshop.arbitration.repository';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
-import { autoFollowForResponsable } from './workshop.service.mutations';
+import { FIELD_LIMITS } from '../../domain/constants';
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
 
@@ -180,7 +184,10 @@ export async function validateIncidentSelectionService(data: {
 export async function createIncidentService(
   data: CreateIncidentInput,
   actorUserId: number,
-  actorRole: string
+  // Conservé pour la symétrie de signature avec les autres services de mutation
+  // et l'appel positionnel du contrôleur ; la création n'est plus conditionnée
+  // au rôle depuis la suppression du suivi implicite (C-07).
+  _actorRole: string
 ): Promise<ServiceResult<unknown>> {
   const result = await withTransaction(async (client) => {
     const [line] = await workshopRepository.lockActiveWorkshopLines([data.lineId], client);
@@ -214,7 +221,6 @@ export async function createIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(id, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -342,7 +348,6 @@ export async function editIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -389,12 +394,18 @@ export async function requestEditIncidentService(
 
     const id = await workshopRepository.requestEditIncident(incidentId, requestedChanges, client);
     if (!id) return { kind: 'not_found' as const };
+    // Payload d'événement versionné (RC3 §5.1) : le before est snapshoté ICI,
+    // dans la transaction, depuis la ligne courante `current` — jamais recalculé
+    // plus tard. La structure `edit_request` de la ligne (qui pilote
+    // l'application) reste inchangée ; seul l'événement porte l'avant/après.
+    const versioned = buildVersionedCorrectionChanges(requestedChanges, current);
     const requestEventId = await logIncidentEvent(
       incidentId,
       actorUserId,
       'EDIT_REQUESTED',
       {
-        changes: requestedChanges,
+        schemaVersion: versioned.schemaVersion,
+        changes: versioned.changes,
         fields: requestedChangeKeys(requestedChanges),
       },
       client
@@ -404,7 +415,10 @@ export async function requestEditIncidentService(
         incidentId,
         requestEventId,
         requestType: 'EDIT',
-        payload: requestedChanges,
+        // Diff versionné (before/after) figé à la demande : réutilisé tel quel par
+        // l'application et le refus pour conserver une trace fidèle. N'est PAS
+        // relu pour appliquer les valeurs (l'application se fonde sur edit_request).
+        payload: { schemaVersion: versioned.schemaVersion, changes: versioned.changes },
         requestedByUserId: actorUserId,
       },
       client
@@ -534,17 +548,22 @@ export async function approveEditIncidentService(
       null,
       client
     );
+    // Conserve EXACTEMENT le diff versionné figé à la demande (avant/après), et
+    // référence l'événement de demande. Repli sur l'ancien format si l'arbitrage
+    // ne portait pas encore de payload versionné (cas de données antérieures).
+    const requestPayload = isVersionedCorrectionPayload(arbitration.payload)
+      ? arbitration.payload
+      : { changes: requested, fields: requestedChangeKeys(requested) };
     await logIncidentEvent(
       incidentId,
       actorUserId,
       'EDIT_APPLIED',
       {
-        changes: requested,
-        fields: requestedChangeKeys(requested),
+        ...requestPayload,
+        requestEventId: arbitration.request_event_id ?? undefined,
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -564,8 +583,27 @@ export async function approveEditIncidentService(
 export async function rejectEditIncidentService(
   incidentId: number,
   actorUserId: number,
-  actorRole: string
+  actorRole: string,
+  decisionReason: string
 ): Promise<ServiceResult<unknown>> {
+  // Motif de refus OBLIGATOIRE (RC3 §6, contrat de correction). Normalisé par
+  // trim, non vide, borné comme côté frontend (FIELD_LIMITS.COMMENT). L'erreur
+  // porte un champ SÉMANTIQUE public stable (decisionReason), jamais le nom du
+  // flag interne rejectEditRequest.
+  const reason = (decisionReason ?? '').trim();
+  if (reason.length === 0) {
+    return badRequest('Un motif de refus est obligatoire.', {
+      field: 'decisionReason',
+      reason: 'REQUIRED',
+    });
+  }
+  if (reason.length > FIELD_LIMITS.COMMENT) {
+    return badRequest('Le motif de refus est trop long.', {
+      field: 'decisionReason',
+      reason: 'TOO_LONG',
+      max: FIELD_LIMITS.COMMENT,
+    });
+  }
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
@@ -584,19 +622,29 @@ export async function rejectEditIncidentService(
       'EDIT',
       'REJECTED',
       actorUserId,
-      null,
+      reason,
       client
     );
+    // Conserve le diff versionné figé à la demande + la référence de demande + le
+    // motif de décision, pour une trace fidèle du refus.
+    const requestPayload = isVersionedCorrectionPayload(arbitration.payload)
+      ? arbitration.payload
+      : {
+          rejectedFields: requestedChangeKeys(
+            current.edit_request as Record<string, unknown> | null
+          ),
+        };
     await logIncidentEvent(
       incidentId,
       actorUserId,
       'EDIT_REJECTED',
       {
-        rejectedFields: requestedChangeKeys(current.edit_request as Record<string, unknown> | null),
+        ...requestPayload,
+        requestEventId: arbitration.request_event_id ?? undefined,
+        decisionReason: reason,
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 

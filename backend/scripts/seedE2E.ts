@@ -192,6 +192,32 @@ async function createArbitrationIncidents(lineId: number, operatorId: number): P
     'OPERATOR'
   );
   if (!editRequest.ok) throw new Error(`Demande correction E2E: ${editRequest.message}`);
+
+  // Incident dédié à la recette de RETRAIT d'annulation (RC3 lot 5, lot 10) :
+  // l'opérateur a une demande d'annulation active qu'il pourra retirer depuis
+  // l'UI. Sur une tête distincte pour coexister avec les incidents ci-dessus.
+  const withdrawIncident = await createIncidentService(
+    {
+      lineId,
+      machineId: E2E_MACHINE_ID,
+      robotLabel: '1',
+      headNumber: 3,
+      state: 'INDISPONIBLE',
+      comment: 'Incident E2E destiné au retrait de demande d’annulation.',
+      currentProduct: 'E2E-RETRAIT',
+    },
+    operatorId,
+    'OPERATOR'
+  );
+  if (!withdrawIncident.ok) throw new Error(`Création retrait E2E: ${withdrawIncident.message}`);
+  const withdrawIncidentId = createdIncidentId(withdrawIncident.data, 'Création retrait E2E');
+  const withdrawRequest = await requestCancelIncidentService(
+    withdrawIncidentId,
+    'Doublon E2E à retirer par le demandeur.',
+    operatorId,
+    'OPERATOR'
+  );
+  if (!withdrawRequest.ok) throw new Error(`Demande retrait E2E: ${withdrawRequest.message}`);
 }
 
 async function main(): Promise<void> {

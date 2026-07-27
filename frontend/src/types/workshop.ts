@@ -20,6 +20,7 @@ export interface WorkshopIncident {
   is_priority: boolean;
   status: IncidentStatus;
   diagnostic: string | null;
+  waiting_reason: string | null;
   intervention_note: string | null;
   responsible_comment: string | null;
   edit_request: Record<string, unknown> | null;
@@ -74,8 +75,12 @@ export interface WorkshopHistoryEvent extends WorkshopIncidentEvent {
   machine_id: string;
   robot_label: string;
   head_number: number;
-  state: IncidentState;
-  status: IncidentStatus;
+  // Statut/état COURANTS de l'incident (pas un snapshot au moment de l'événement).
+  // Renommés explicitement pour empêcher toute confusion avec le statut
+  // événementiel : une ligne d'événement n'affiche une transition que si son
+  // payload porte un before/after ou from/to (RC3 §5.3).
+  current_state: IncidentState;
+  current_status: IncidentStatus;
 }
 
 export interface WorkshopIncidentMetrics {
@@ -114,6 +119,10 @@ export interface WorkshopBoardIncident {
   display_order: number;
   created_at: string;
   updated_at: string;
+  // Le Board ne reçoit QUE l'existence d'un arbitrage (type de demande), jamais
+  // les identités ni les motifs (projection Board minimale, RC3 lot 5).
+  has_edit_arbitration?: boolean;
+  has_cancel_arbitration?: boolean;
 }
 
 export interface WorkshopBoardMetrics {

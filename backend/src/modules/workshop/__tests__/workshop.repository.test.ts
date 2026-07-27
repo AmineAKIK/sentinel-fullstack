@@ -58,6 +58,31 @@ describe('getBoardData', () => {
       'Sécuriser la zone avant intervention.'
     );
   });
+
+  it('expose uniquement l’EXISTENCE d’un arbitrage au board, jamais les identités ni les motifs', async () => {
+    mockedPool.query
+      .mockResolvedValueOnce(result([{ id: 1, line_number: 'L01' }]))
+      .mockResolvedValueOnce(
+        result([{ id: 10, line_id: 1, has_edit_arbitration: false, has_cancel_arbitration: true }])
+      )
+      .mockResolvedValueOnce(
+        result([{ total: 1, open_count: 1, pending_count: 0, open_over_7d: 0 }])
+      );
+
+    const boardData = await getBoardData();
+    const incidentQuery = String(mockedPool.query.mock.calls[1]?.[0]);
+
+    // La projection dérive un simple booléen par type de demande…
+    expect(incidentQuery).toContain('(edit_request IS NOT NULL) AS has_edit_arbitration');
+    expect(incidentQuery).toContain('(cancel_request = TRUE) AS has_cancel_arbitration');
+    // …et n'expose ni le contenu de la demande, ni le motif d'annulation, ni un
+    // quelconque identifiant de demandeur ou d'arbitre.
+    expect(incidentQuery).not.toContain('cancel_request_reason');
+    expect(incidentQuery).not.toContain('edit_request,');
+    expect(incidentQuery).not.toMatch(/\bdecided_by\b/);
+    expect(boardData.incidents[0]?.has_cancel_arbitration).toBe(true);
+    expect(boardData.incidents[0]?.has_edit_arbitration).toBe(false);
+  });
 });
 
 describe('incident line lock protocol', () => {
@@ -163,6 +188,7 @@ describe('updateIncidentData ownership transfer', () => {
         is_priority: false,
         status: 'OPEN',
         diagnostic: null,
+        waiting_reason: null,
         intervention_note: null,
         responsible_comment: null,
         edit_request: null,
@@ -210,6 +236,7 @@ describe('updateIncidentData ownership transfer', () => {
       is_priority: false,
       status: 'OPEN' as const,
       diagnostic: null,
+      waiting_reason: null,
       intervention_note: null,
       responsible_comment: null,
       edit_request: null,

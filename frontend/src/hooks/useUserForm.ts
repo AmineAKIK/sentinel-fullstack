@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { checkBadgeAvailability } from '../api/accounts';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { UserFormData } from '../components/UserForm';
 import { isDigitsOnly } from '../utils/identifiers';
 
@@ -82,9 +82,7 @@ export function useUserForm(): UseUserFormReturn {
       }
       setStep('preview');
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Modal from './Modal';
 import LineForm, { EMPTY_LINE_FORM, LineFormData } from './LineForm';
 import { checkLineConflicts, createLine } from '../api/lines';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { ProductionLine } from '../types';
 import DetailField from './ui/DetailField';
 import ErrorBanner from './ui/ErrorBanner';
@@ -55,9 +55,7 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
       }
       setStep('preview');
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
       setLoading(false);
     }
@@ -76,9 +74,7 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
       });
       onSuccess(line);
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
       setLoading(false);
     }

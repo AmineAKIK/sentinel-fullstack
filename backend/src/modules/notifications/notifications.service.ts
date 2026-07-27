@@ -5,6 +5,7 @@ import { getAdminNotifPref } from '../adminCredentials/adminCredentials.reposito
 import * as adminResetTemplate from './templates/admin-password-reset-requested';
 import * as actionRequiredTemplate from './templates/responsable-action-required';
 import * as incidentUpdateTemplate from './templates/incident-update';
+import { htmlToText } from './templates/layout';
 
 // ─── Résultat de livraison ─────────────────────────────────────────────────────
 //
@@ -112,6 +113,11 @@ async function sendMail(
     return { outcome: alreadyDelivered.size > 0 ? 'SENT' : 'SKIPPED_NO_RECIPIENT', delivered: [] };
   }
 
+  // Alternative texte brut (C-09) : le message reste lisible quand le client
+  // bloque le HTML/les images. Nodemailer émet alors un `multipart/alternative`
+  // (text + html) plutôt qu'un HTML seul.
+  const text = htmlToText(html);
+
   // Un message par destinataire : aucune adresse professionnelle n'est
   // divulguée aux autres personnes notifiées via l'en-tête To.
   const results = await Promise.allSettled(
@@ -121,6 +127,7 @@ async function sendMail(
         to: recipient,
         subject,
         html,
+        text,
       })
     )
   );
@@ -287,7 +294,7 @@ export async function notifyFollowersIncidentTaken(
 export async function notifyFollowersIncidentSetPending(
   incidentId: number,
   actorUserId: number,
-  diagnostic: string,
+  waitingReason: string,
   alreadyDelivered: ReadonlySet<string> = new Set()
 ): Promise<DeliveryResult> {
   if (!(await getAdminNotifPref('notif_operateurs')))
@@ -307,7 +314,7 @@ export async function notifyFollowersIncidentSetPending(
       lineNumber: incident.line_number,
       machineId: incident.machine_id,
       eventLabel: 'Incident suspendu',
-      detail: `Diagnostic : ${diagnostic}`,
+      detail: `Motif de mise en attente : ${waitingReason}`,
       actorName,
       workshopUrl: `${clientOrigin()}/workshop/pilotage`,
     }),
@@ -574,6 +581,7 @@ export async function notifyDeclarantEditApproved(
 export async function notifyDeclarantEditRejected(
   incidentId: number,
   actorUserId: number,
+  decisionReason = '',
   alreadyDelivered: ReadonlySet<string> = new Set()
 ): Promise<DeliveryResult> {
   if (!(await getAdminNotifPref('notif_operateurs')))
@@ -587,6 +595,13 @@ export async function notifyDeclarantEditRejected(
   const email = await getUserEmail(incident.user_id);
   if (!email) return { outcome: 'SKIPPED_NO_RECIPIENT', delivered: [] };
 
+  // Le motif de refus fait partie du contrat de traçabilité (RC3 §6) : il
+  // apparaît dans la notification, au même titre que dans l'Historique/Journal.
+  const reason = decisionReason.trim();
+  const detail = reason
+    ? `Refusée par ${actorName} — Motif : ${reason}`
+    : `Refusée par ${actorName}`;
+
   return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate('Correction refusée', incidentId),
@@ -595,7 +610,7 @@ export async function notifyDeclarantEditRejected(
       lineNumber: incident.line_number,
       machineId: incident.machine_id,
       eventLabel: 'Votre demande de correction a été refusée',
-      detail: `Refusée par ${actorName}`,
+      detail,
       actorName,
       workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     }),
@@ -638,6 +653,7 @@ export async function notifyDeclarantCancelApproved(
 export async function notifyDeclarantCancelRejected(
   incidentId: number,
   actorUserId: number,
+  decisionReason = '',
   alreadyDelivered: ReadonlySet<string> = new Set()
 ): Promise<DeliveryResult> {
   if (!(await getAdminNotifPref('notif_operateurs')))
@@ -651,6 +667,12 @@ export async function notifyDeclarantCancelRejected(
   const email = await getUserEmail(incident.user_id);
   if (!email) return { outcome: 'SKIPPED_NO_RECIPIENT', delivered: [] };
 
+  // Motif de refus inclus dans la notification (RC3 §6), comme pour la correction.
+  const reason = decisionReason.trim();
+  const detail = reason
+    ? `Refusée par ${actorName} — Motif : ${reason}`
+    : `Refusée par ${actorName}`;
+
   return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate("Demande d'annulation refusée", incidentId),
@@ -659,7 +681,7 @@ export async function notifyDeclarantCancelRejected(
       lineNumber: incident.line_number,
       machineId: incident.machine_id,
       eventLabel: "Votre demande d'annulation a été refusée",
-      detail: `Refusée par ${actorName}`,
+      detail,
       actorName,
       workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     }),

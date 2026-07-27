@@ -30,7 +30,8 @@ import ChevronDownIcon from './icons/ChevronDownIcon';
 import CloseIcon from './icons/CloseIcon';
 import StarIcon from './icons/StarIcon';
 import ErrorBanner from './ui/ErrorBanner';
-import { apiErrorMessage } from '../api/client';
+import { translateApiError } from '../api/errorMessages';
+import { useMutationFeedback } from './ui/MutationFeedback';
 
 interface IncidentDetailPanelProps {
   incident: WorkshopIncident;
@@ -249,16 +250,31 @@ export default function IncidentDetailPanel({
   const [actionError, setActionError] = useState('');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const pendingActionRef = useRef(false);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const { notifySuccess } = useMutationFeedback();
 
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
     setActionError('');
   }, [incident.id, incident.responsible_comment]);
 
+  // Ouverture / navigation du dossier : on déplace le focus sur le titre du
+  // panneau pour qu'un utilisateur au clavier entre bien dans le dossier
+  // fraîchement ouvert (et puisse le lire/naviguer), au lieu de rester sur la
+  // carte de la liste. Le titre est focusable programmatiquement (tabIndex=-1)
+  // sans entrer dans l'ordre de tabulation (lot 8, accessibilité).
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, [incident.id]);
+
+  // Runner des actions du panneau : verrou anti-double (pendingActionRef), état
+  // « en cours » (pendingAction), erreur locale TRADUITE près de l'action, et
+  // succès métier annoncé globalement lorsqu'un message est fourni.
   async function runPanelAction(
     actionName: string,
     action: () => Promise<unknown>,
-    fallback: string
+    fallback: string,
+    successMessage?: string
   ): Promise<void> {
     if (pendingActionRef.current) return;
     pendingActionRef.current = true;
@@ -266,8 +282,10 @@ export default function IncidentDetailPanel({
     setActionError('');
     try {
       await action();
+      if (successMessage) notifySuccess(successMessage);
     } catch (requestError) {
-      setActionError(apiErrorMessage(requestError, fallback));
+      // `fallback` reste le repli métier si l'erreur n'est pas une ApiResponseError.
+      setActionError(requestError ? translateApiError(requestError) : fallback);
     } finally {
       pendingActionRef.current = false;
       setPendingAction(null);
@@ -282,6 +300,7 @@ export default function IncidentDetailPanel({
     canResponsableEdit,
     canWithdrawEdit,
     canRequestCancel,
+    canWithdrawCancel,
     canCancel,
     canTake,
     canSetPending,
@@ -304,9 +323,13 @@ export default function IncidentDetailPanel({
   const takenByName = incident.taken_by_first_name
     ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
     : '';
+  // Le motif de mise en attente n'a de sens que tant que l'incident est
+  // suspendu (à la reprise il est effacé, mais reste dans l'historique).
+  const waitingReason = incident.status === 'PENDING' ? incident.waiting_reason : null;
   const hasNarrative =
     Boolean(incident.comment) ||
     Boolean(incident.diagnostic) ||
+    Boolean(waitingReason) ||
     Boolean(incident.intervention_note);
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
@@ -316,7 +339,7 @@ export default function IncidentDetailPanel({
       <div className="incident-detail-topbar">
         <div className="incident-detail-heading">
           <span className="incident-detail-eyebrow">Dossier incident</span>
-          <h2 className="incident-detail-title">
+          <h2 className="incident-detail-title" ref={titleRef} tabIndex={-1}>
             Ligne {incident.line_number} · {incident.machine_id}
           </h2>
         </div>
@@ -517,9 +540,10 @@ export default function IncidentDetailPanel({
         </DrawerSection>
 
         {hasNarrative && (
-          <DrawerSection title="Narratif atelier">
+          <DrawerSection title="Suivi de l'incident">
             <div className="incident-narrative-list">
               <NarrativeItem label="Signalement" value={incident.comment} primary />
+              <NarrativeItem label="Motif de mise en attente" value={waitingReason} />
               <NarrativeItem label="Diagnostic" value={incident.diagnostic} />
               <NarrativeItem label="Intervention" value={incident.intervention_note} />
             </div>
@@ -562,7 +586,8 @@ export default function IncidentDetailPanel({
                           patchIncident(incident.id, {
                             responsibleComment: responsibleDraft.trim(),
                           }),
-                        "Impossible d'enregistrer la consigne."
+                        "Impossible d'enregistrer la consigne.",
+                        'Consigne enregistrée.'
                       )
                     }
                     disabled={!responsibleDraft.trim() || pendingAction !== null}
@@ -615,6 +640,22 @@ export default function IncidentDetailPanel({
                   }
                 >
                   {canCancel ? "Annuler l'incident" : "Demander l'annulation"}
+                </button>
+              )}
+              {canWithdrawCancel && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() =>
+                    void runPanelAction(
+                      'withdraw-cancel',
+                      () => patchIncident(incident.id, { withdrawCancelRequest: true }),
+                      "Impossible de retirer la demande d'annulation.",
+                      'Demande d’annulation retirée.'
+                    )
+                  }
+                  disabled={pendingAction !== null}
+                >
+                  Retirer ma demande
                 </button>
               )}
               {canInvalidateClosed && (

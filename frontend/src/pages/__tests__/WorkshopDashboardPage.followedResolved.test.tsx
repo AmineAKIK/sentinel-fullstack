@@ -70,6 +70,7 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
     is_priority: false,
     status: 'OPEN',
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: null,
     responsible_comment: null,
     edit_request: null,

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { verifyAdminPassword } from '../api/adminSecurity';
 import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import ConfirmModal from './ConfirmModal';
 import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../utils/passwordPolicy';
 
@@ -54,7 +55,7 @@ export default function AdminPasswordConfirmModal({
         } else if (err.code === 'SESSION_REVOKED') {
           // Le gestionnaire global 401 redirige avec le motif structuré.
         } else {
-          setError(err.message);
+          setError(apiErrorMessage(err, 'Une erreur est survenue.'));
         }
       } else {
         setError('Une erreur inattendue est survenue.');

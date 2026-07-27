@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { getIncidentMetrics, listWorkshopIncidents, listWorkshopLines } from '../api/workshop';
 import { ProductionLine, WorkshopIncident, WorkshopIncidentMetrics } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
@@ -20,9 +20,9 @@ export interface IncidentsDataState {
 }
 
 function dashboardErrorMessage(error: unknown): string {
-  return error instanceof ApiResponseError
-    ? error.message
-    : 'Impossible de charger le tableau de bord.';
+  // C-03 : jamais le message brut d'une erreur API ; traduction publique, ou
+  // repli français métier pour une erreur non API.
+  return apiErrorMessage(error, 'Impossible de charger le tableau de bord.');
 }
 
 export function useIncidentsData(): IncidentsDataState {

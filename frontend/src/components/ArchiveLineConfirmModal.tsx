@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { archiveLine, getLineImpact } from '../api/lines';
 import { ProductionLine } from '../types';
-import { apiErrorMessage } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 
 interface ArchiveLineConfirmModalProps {
   line: ProductionLine;

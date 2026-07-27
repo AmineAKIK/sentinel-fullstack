@@ -3,7 +3,7 @@ import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
 import CharCounter from './ui/CharCounter';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
-import { apiErrorMessage } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 
 type TextConfirmModalProps = {
   title: string;

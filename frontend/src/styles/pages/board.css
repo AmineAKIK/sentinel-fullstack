@@ -751,6 +751,16 @@
   color: var(--color-success);
 }
 
+/* Indicateur d'arbitrage sur le Board : calme et non interactif. Signale
+   qu'une demande attend un arbitrage, sans exposer d'identité, de motif ni
+   de commande — le Board reste un écran de consultation. */
+.board-chip-arbitration {
+  border: 1px solid var(--color-primary-border);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+  padding: 4px 8px;
+}
+
 .board-line-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: minmax(112px, auto);

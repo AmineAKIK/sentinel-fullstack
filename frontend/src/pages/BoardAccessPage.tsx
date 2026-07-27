@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createBoardSession, getBoardAccess } from '../api/board';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import WorkshopBoardPage from './WorkshopBoardPage';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../utils/passwordPolicy';
@@ -47,9 +47,7 @@ export default function BoardAccessPage() {
       setCode('');
       setState('ready');
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Accès impossible. Vérifiez votre code.'
-      );
+      setError(apiErrorMessage(err, 'Accès impossible. Vérifiez votre code.'));
     } finally {
       setLoading(false);
     }

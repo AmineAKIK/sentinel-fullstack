@@ -28,6 +28,7 @@ export {
   setResponsibleCommentService,
   requestCancelIncidentService,
   rejectCancelIncidentService,
+  withdrawCancelIncidentService,
   cancelIncidentService,
   followIncidentService,
   unfollowIncidentService,
@@ -58,6 +59,7 @@ import {
   setResponsibleCommentService,
   requestCancelIncidentService,
   rejectCancelIncidentService,
+  withdrawCancelIncidentService,
 } from './workshop.service.mutations';
 
 // ─── Lecture / board / lignes ─────────────────────────────────────────────────
@@ -243,8 +245,14 @@ export async function updateIncidentService(
   if (updates.isTaken !== undefined) return unexpectedFieldsError();
 
   if (updates.status === 'PENDING') {
-    if (!hasOnlyKeys(keys, ['status', 'diagnostic'])) return unexpectedFieldsError();
-    return setPendingIncidentService(id, updates.diagnostic, actorUserId, actorRole);
+    if (!hasOnlyKeys(keys, ['status', 'waitingReason'])) return unexpectedFieldsError();
+    // À la suspension, un motif nul est traité comme absent (motif obligatoire).
+    return setPendingIncidentService(
+      id,
+      updates.waitingReason ?? undefined,
+      actorUserId,
+      actorRole
+    );
   }
   if (updates.status === 'OPEN') {
     if (!hasOnlyKeys(keys, ['status'])) return unexpectedFieldsError();
@@ -309,14 +317,15 @@ export async function updateIncidentService(
   if (updates.applyEditRequest !== undefined) return unexpectedFieldsError();
 
   if (updates.rejectEditRequest === true) {
-    if (!hasOnlyKeys(keys, ['rejectEditRequest'])) return unexpectedFieldsError();
-    return rejectEditIncidentService(id, actorUserId, actorRole);
+    if (!hasOnlyKeys(keys, ['rejectEditRequest', 'decisionReason'])) return unexpectedFieldsError();
+    return rejectEditIncidentService(id, actorUserId, actorRole, updates.decisionReason ?? '');
   }
   if (updates.rejectEditRequest !== undefined) return unexpectedFieldsError();
 
   if (updates.rejectDeleteRequest === true) {
-    if (!hasOnlyKeys(keys, ['rejectDeleteRequest'])) return unexpectedFieldsError();
-    return rejectCancelIncidentService(id, actorUserId, actorRole);
+    if (!hasOnlyKeys(keys, ['rejectDeleteRequest', 'decisionReason']))
+      return unexpectedFieldsError();
+    return rejectCancelIncidentService(id, actorUserId, actorRole, updates.decisionReason ?? '');
   }
   if (updates.rejectDeleteRequest !== undefined) return unexpectedFieldsError();
 
@@ -325,6 +334,12 @@ export async function updateIncidentService(
     return withdrawEditRequestService(id, actorUserId, actorRole);
   }
   if (updates.withdrawEditRequest !== undefined) return unexpectedFieldsError();
+
+  if (updates.withdrawCancelRequest === true) {
+    if (!hasOnlyKeys(keys, ['withdrawCancelRequest'])) return unexpectedFieldsError();
+    return withdrawCancelIncidentService(id, actorUserId, actorRole);
+  }
+  if (updates.withdrawCancelRequest !== undefined) return unexpectedFieldsError();
 
   if (!hasOnlyKeys(keys, EDIT_FIELD_KEYS)) return unexpectedFieldsError();
   const editFields = pickEditPayload(updates);

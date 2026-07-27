@@ -67,6 +67,25 @@ export default function BoardIncidentGrid({
                 {incident.is_priority && (
                   <span className="board-chip board-chip-priority">Urgent</span>
                 )}
+                {/* Indicateur d'arbitrage : même libellé court que la carte
+                    atelier et le panneau, en lecture seule. Le Board n'expose
+                    jamais de commande d'arbitrage ni aucune identité/motif. */}
+                {incident.has_cancel_arbitration && (
+                  <span
+                    className="board-chip board-chip-arbitration"
+                    aria-label="Annulation à arbitrer"
+                  >
+                    Annulation à arbitrer
+                  </span>
+                )}
+                {incident.has_edit_arbitration && (
+                  <span
+                    className="board-chip board-chip-arbitration"
+                    aria-label="Modification à arbitrer"
+                  >
+                    Modification à arbitrer
+                  </span>
+                )}
               </div>
             </div>
             <div className={`board-incident-product${currentProduct ? '' : ' is-missing'}`}>

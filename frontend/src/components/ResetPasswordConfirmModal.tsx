@@ -2,7 +2,7 @@ import { useState } from 'react';
 import ConfirmModal from './ConfirmModal';
 import SuccessBanner from './ui/SuccessBanner';
 import { resetAccountPassword } from '../api/accounts';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { SentinelUser } from '../types';
 import { formatDateTime } from '../utils/date';
 
@@ -28,9 +28,7 @@ export default function ResetPasswordConfirmModal({
       const updated = await resetAccountPassword(user.id);
       setUpdatedUser(updated);
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur inattendue est survenue.'
-      );
+      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
       setLoading(false);
     }

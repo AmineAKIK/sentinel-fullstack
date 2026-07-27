@@ -61,8 +61,9 @@ test('cycle de vie complet d’un incident : création → prise en charge → s
   await expect(maintenancePage.getByRole('button', { name: 'Suspendre' })).toBeVisible();
 
   await maintenancePage.getByRole('button', { name: 'Suspendre' }).click();
+  // Terminologie RC3 lot 7/9 : « Motif de mise en attente » (plus « Justification »).
   await maintenancePage
-    .getByPlaceholder('Expliquez la raison de la suspension')
+    .getByLabel('Motif de mise en attente *')
     .fill('Attente pièce détachée (E2E).');
   await maintenancePage.getByRole('button', { name: 'Suspendre', exact: true }).last().click();
   await expect(maintenancePage.getByRole('button', { name: 'Reprendre' })).toBeVisible();

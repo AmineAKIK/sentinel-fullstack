@@ -179,7 +179,9 @@ export async function deliverNotificationOutboxItem(
         notifyFollowersIncidentSetPending(
           incidentId,
           actorUserId,
-          payloadString(item.payload, 'diagnostic'),
+          // Nouvelles traces : `waitingReason`. Anciennes traces (avant lot 7) :
+          // `diagnostic`, réinterprété comme motif de mise en attente.
+          payloadString(item.payload, 'waitingReason') || payloadString(item.payload, 'diagnostic'),
           alreadyDelivered
         )
       );
@@ -238,12 +240,22 @@ export async function deliverNotificationOutboxItem(
       break;
     case 'EDIT_REJECTED':
       await runner.run('declarant_edit_rejected', (alreadyDelivered) =>
-        notifyDeclarantEditRejected(incidentId, actorUserId, alreadyDelivered)
+        notifyDeclarantEditRejected(
+          incidentId,
+          actorUserId,
+          payloadString(item.payload, 'decisionReason'),
+          alreadyDelivered
+        )
       );
       break;
     case 'CANCEL_REQUEST_REJECTED':
       await runner.run('declarant_cancel_rejected', (alreadyDelivered) =>
-        notifyDeclarantCancelRejected(incidentId, actorUserId, alreadyDelivered)
+        notifyDeclarantCancelRejected(
+          incidentId,
+          actorUserId,
+          payloadString(item.payload, 'decisionReason'),
+          alreadyDelivered
+        )
       );
       break;
     default:

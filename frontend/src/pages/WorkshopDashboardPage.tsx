@@ -231,6 +231,7 @@ export default function WorkshopDashboardPage() {
         incident.machine_brand,
         incident.comment,
         incident.diagnostic,
+        incident.waiting_reason,
         incident.responsible_comment,
       ]
         .filter(Boolean)

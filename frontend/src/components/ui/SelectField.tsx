@@ -35,18 +35,70 @@ export default function SelectField({
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : null;
 
-  // Position the menu using fixed coords relative to the trigger
+  // Position the menu using fixed coords relative to the trigger. When there
+  // isn't enough room below (trigger low in the viewport), open UPWARD. In both
+  // directions, `maxHeight` is clamped to the space ACTUALLY available on the
+  // chosen side (never floored above it), so the menu — and every option —
+  // stays fully inside the viewport and clickable, even when both sides are
+  // short (small viewport, high zoom, mobile landscape).
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setMenuStyle({
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-      zIndex: 1200,
-    });
-  }, [open]);
+
+    // Marge explicite conservée au bord du viewport (jamais collé au bord).
+    const gap = 4;
+    const viewportMargin = 8;
+
+    function computeMenuStyle(): React.CSSProperties {
+      const rect = triggerRef.current!.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const spaceBelow = Math.max(0, viewportH - rect.bottom - gap - viewportMargin);
+      const spaceAbove = Math.max(0, rect.top - gap - viewportMargin);
+      // Hauteur souhaitée (contenu réel, sans borne artificielle).
+      const desired = options.length * 40 + 8;
+      const openUp = spaceBelow < desired && spaceAbove > spaceBelow;
+      // Borne STRICTE à l'espace réellement disponible du côté choisi : jamais
+      // un plancher qui autoriserait un débordement (ex. Math.max(120, …)).
+      const available = openUp ? spaceAbove : spaceBelow;
+      const maxHeight = Math.max(0, Math.min(desired, available));
+
+      return openUp
+        ? {
+            position: 'fixed',
+            bottom: viewportH - rect.top + gap,
+            left: rect.left,
+            width: rect.width,
+            maxHeight,
+            overflowY: 'auto',
+            zIndex: 1200,
+          }
+        : {
+            position: 'fixed',
+            top: rect.bottom + gap,
+            left: rect.left,
+            width: rect.width,
+            maxHeight,
+            overflowY: 'auto',
+            zIndex: 1200,
+          };
+    }
+
+    setMenuStyle(computeMenuStyle());
+
+    // Un scroll de page (y compris dans un conteneur défilant ancêtre, d'où la
+    // phase de capture) ou un redimensionnement change la position du
+    // déclencheur : on RECALCULE la position plutôt que de garder des
+    // coordonnées obsolètes, pour ne jamais déborder à nouveau du viewport ni
+    // fermer le menu de façon inattendue pendant l'interaction.
+    function handleViewportChange() {
+      setMenuStyle(computeMenuStyle());
+    }
+    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
+    return () => {
+      window.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
+    };
+  }, [open, options.length]);
 
   useEffect(() => {
     if (!open) return undefined;

@@ -12,21 +12,38 @@ function requestTimeoutMs(): number {
     : DEFAULT_TIMEOUT_MS;
 }
 
+/**
+ * Détails d'erreur structurés et publics (lot 2 RC3). `field`/`reason` sont des
+ * identifiants sémantiques stables ; ils servent à traduire et à cibler un champ,
+ * jamais à être affichés tels quels.
+ */
+export interface ApiErrorDetails {
+  field?: string;
+  reason?: string;
+  min?: number;
+  max?: number;
+  count?: number;
+}
+
 export class ApiResponseError extends Error {
   code: string;
   status: number;
+  details?: ApiErrorDetails;
 
-  constructor(code: string, message: string, status: number) {
+  constructor(code: string, message: string, status: number, details?: ApiErrorDetails) {
     super(message);
     this.name = 'ApiResponseError';
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
-export function apiErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiResponseError ? error.message : fallback;
-}
+// `apiErrorMessage` a été retiré de ce module : renvoyer `error.message` brut
+// viole le contrat d'erreur public (C-03). L'unique voie de restitution est
+// `translateApiError` / `apiErrorMessage` depuis `./errorMessages`, qui ne
+// laissent jamais fuiter le message brut, `details.field`/`reason` ni le
+// snake_case.
 
 let onUnauthorized: ((error: ApiResponseError) => void) | null = null;
 export function setOn401Handler(handler: ((error: ApiResponseError) => void) | null): void {
@@ -61,15 +78,19 @@ async function request<T>(
     if (!res.ok) {
       let code = 'SERVER_ERROR';
       let message = 'Une erreur est survenue.';
+      let details: ApiErrorDetails | undefined;
       try {
-        const data = (await res.json()) as { error?: { code?: string; message?: string } };
+        const data = (await res.json()) as {
+          error?: { code?: string; message?: string; details?: ApiErrorDetails };
+        };
         if (data?.error?.code) code = data.error.code;
         if (data?.error?.message) message = data.error.message;
+        if (data?.error?.details) details = data.error.details;
       } catch (error) {
         if (timedOut || signal?.aborted) throw error;
         // Le contrat d'erreur de secours reste volontairement générique.
       }
-      const error = new ApiResponseError(code, message, res.status);
+      const error = new ApiResponseError(code, message, res.status, details);
       if (res.status === 401 && code !== 'REAUTHENTICATION_FAILED') onUnauthorized?.(error);
       throw error;
     }

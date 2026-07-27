@@ -75,6 +75,22 @@ describe('notifications service email privacy', () => {
     }
   });
 
+  it('joint une alternative texte brut à chaque envoi (C-09, lisible sans HTML)', async () => {
+    mockNotificationQueries(['responsable-a@example.test']);
+
+    await notifyResponsablesEditRequested(42, 7, 'Détail de la correction');
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const [message] = sendMail.mock.calls[0];
+    // Multipart alternative : html ET texte, le texte ne portant aucun balisage.
+    expect(typeof message.html).toBe('string');
+    expect(typeof message.text).toBe('string');
+    expect(message.text.length).toBeGreaterThan(0);
+    expect(message.text).not.toMatch(/<[^>]+>/);
+    // L'information utile passée au gabarit se retrouve dans la partie texte.
+    expect(message.text).toContain('Détail de la correction');
+  });
+
   it("ne journalise ni le destinataire ni le message brut d'une erreur SMTP", async () => {
     mockNotificationQueries(['responsable-prive@example.test']);
     sendMail.mockRejectedValueOnce(new Error('SMTP rejected responsable-prive@example.test'));

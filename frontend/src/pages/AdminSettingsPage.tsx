@@ -14,7 +14,7 @@ import {
   AppSettings,
   AppSettingsPatch,
 } from '../api/adminSettings';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage, translateApiError, fieldInError } from '../api/errorMessages';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
 import SuccessBanner from '../components/ui/SuccessBanner';
@@ -75,6 +75,17 @@ const DEFAULT_PREFS: AdminNotifPrefs = {
   notif_responsables: true,
   notif_techniciens: true,
   notif_operateurs: true,
+};
+
+// Champ public (details.field renvoyé par l'API) → id DOM de l'input concerné,
+// pour ramener le focus sur une erreur de validation identifiable.
+const APP_SETTING_FIELD_DOM_ID: Record<string, string> = {
+  adminSessionDuration: 'sessionDuration',
+  workshopSessionDuration: 'workshopSessionHours',
+  boardSessionDuration: 'boardSessionTtl',
+  loginMaxAttempts: 'loginMaxAttempts',
+  setupCodeDuration: 'setupCodeTtl',
+  boardLabel: 'boardLabel',
 };
 
 const NOTIF_ITEMS: { key: keyof AdminNotifPrefs; label: string; description: string }[] = [
@@ -170,7 +181,7 @@ export default function AdminSettingsPage() {
         state: { reason: 'Mot de passe modifié. Reconnectez-vous.' },
       });
     } catch (err) {
-      setPwdError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setPwdError(apiErrorMessage(err, 'Une erreur est survenue.'));
     } finally {
       setPwdLoading(false);
     }
@@ -251,7 +262,7 @@ export default function AdminSettingsPage() {
       setEmailSuccess('Email mis à jour.');
       scheduleSuccessClear('email', () => setEmailSuccess(''), 4000);
     } catch (err) {
-      setEmailError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setEmailError(apiErrorMessage(err, 'Une erreur est survenue.'));
     } finally {
       setEmailLoading(false);
     }
@@ -388,7 +399,7 @@ export default function AdminSettingsPage() {
       setBoardSuccess('Code mis à jour. Sessions révoquées.');
       scheduleSuccessClear('board', () => setBoardSuccess(''), 5000);
     } catch (err) {
-      setBoardError(err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.');
+      setBoardError(apiErrorMessage(err, 'Une erreur est survenue.'));
     } finally {
       setBoardSubmitting(false);
     }
@@ -512,9 +523,18 @@ export default function AdminSettingsPage() {
       setAppSettingsSuccess(parts.join(' '));
       scheduleSuccessClear('app', () => setAppSettingsSuccess(''), 5000);
     } catch (err) {
-      setAppSettingsError(
-        err instanceof ApiResponseError ? err.message : 'Une erreur est survenue.'
-      );
+      // Message métier traduit (jamais le message brut du backend). Les saisies
+      // sont conservées : appSettingsDraft n'est pas réinitialisé sur erreur.
+      setAppSettingsError(translateApiError(err));
+      // Focus ramené vers le champ concerné lorsqu'il est identifiable. On mappe
+      // le champ public (details.field) vers l'id DOM de l'input existant.
+      const field = fieldInError(err);
+      const domId = field ? APP_SETTING_FIELD_DOM_ID[field] : undefined;
+      if (domId) {
+        requestAnimationFrame(() => {
+          document.getElementById(domId)?.focus();
+        });
+      }
     } finally {
       setAppSettingsSaving(false);
     }
@@ -1068,7 +1088,7 @@ export default function AdminSettingsPage() {
                           className="form-input"
                           type="text"
                           value=""
-                          placeholder='Désactivez "Session illimitée" pour choisir une durée'
+                          placeholder="Désactivez « sans expiration automatique » pour choisir une durée"
                           disabled
                           readOnly
                         />
@@ -1167,10 +1187,16 @@ export default function AdminSettingsPage() {
 
                   <div className="notif-toggle-item" style={{ margin: '8px 0 4px' }}>
                     <div className="notif-toggle-label">
-                      <strong>Session board illimitée</strong>
-                      <span>Pour écrans kiosque allumés en permanence</span>
+                      <strong>Session Board sans expiration automatique</strong>
+                      <span>
+                        Reste active tant que le navigateur conserve sa session. Elle peut être
+                        révoquée immédiatement depuis cette page.
+                      </span>
                     </div>
-                    <label className="toggle-switch" aria-label="Session board illimitée">
+                    <label
+                      className="toggle-switch"
+                      aria-label="Session Board sans expiration automatique"
+                    >
                       <input
                         type="checkbox"
                         checked={appSettingsDraftValue('board_session_ttl_hours') === 0}

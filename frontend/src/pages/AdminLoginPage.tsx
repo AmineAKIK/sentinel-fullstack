@@ -2,7 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { unifiedLogin } from '../api/unifiedAuth';
 import { useAppAuth } from '../routes/AppAuthContext';
-import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { isDigitsOnly } from '../utils/identifiers';
@@ -78,9 +78,7 @@ export default function AdminLoginPage() {
       setSession({ accountType: 'admin', admin: { id: response.id, username: response.username } });
       navigate('/admin/accueil', { replace: true, state: null });
     } catch (err) {
-      setError(
-        err instanceof ApiResponseError ? err.message : 'Identifiant ou mot de passe incorrect.'
-      );
+      setError(apiErrorMessage(err, 'Identifiant ou mot de passe incorrect.'));
     } finally {
       setLoading(false);
     }

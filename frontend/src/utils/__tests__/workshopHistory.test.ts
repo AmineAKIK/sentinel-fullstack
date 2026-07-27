@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEventActor, formatEventDetail } from '../workshopHistory';
+import { formatEventActor, formatEventDetail, formatEventLabel } from '../workshopHistory';
 import type { WorkshopIncidentEvent } from '../../types';
 
 function event(overrides: Partial<WorkshopIncidentEvent> = {}): WorkshopIncidentEvent {
@@ -15,6 +15,21 @@ function event(overrides: Partial<WorkshopIncidentEvent> = {}): WorkshopIncident
     ...overrides,
   };
 }
+
+describe('formatEventLabel (lot 9 — aucune donnée technique)', () => {
+  it('traduit un type connu en libellé métier français', () => {
+    expect(formatEventLabel('INCIDENT_SET_PENDING')).toBe('Suspendu');
+    expect(formatEventLabel('CANCEL_REQUEST_WITHDRAWN')).toBe('Annulation retirée');
+  });
+
+  it('ne laisse JAMAIS fuiter un code technique brut pour un type inconnu', () => {
+    // Un type inconnu (trace ancienne ou ajout futur non libellé) doit retomber
+    // sur un générique sûr, jamais sur le code SCREAMING_SNAKE_CASE.
+    const label = formatEventLabel('SOME_FUTURE_RAW_CODE');
+    expect(label).toBe('Événement');
+    expect(label).not.toMatch(/[A-Z_]{4,}/);
+  });
+});
 
 describe('formatEventActor', () => {
   it('retourne "Systeme" si pas de prénom', () => {
@@ -86,12 +101,23 @@ describe('formatEventDetail', () => {
     expect(result).toBe('Fausse alarme');
   });
 
-  it('INCIDENT_SET_PENDING avec diagnostic tronqué à 60 chars', () => {
+  it('INCIDENT_SET_PENDING (nouveau) : waitingReason tronqué à 60 chars', () => {
+    const long = 'A'.repeat(80);
+    const result = formatEventDetail(
+      event({ event_type: 'INCIDENT_SET_PENDING', payload: { waitingReason: long } })
+    );
+    expect(result).toBe(`motif de mise en attente: ${'A'.repeat(60)}`);
+  });
+
+  it('INCIDENT_SET_PENDING (ancienne trace) : diagnostic relu comme motif de mise en attente', () => {
+    // Compatibilité de lecture : avant RC3 lot 7 le motif était stocké sous
+    // `diagnostic` ; il est réinterprété comme motif de mise en attente, jamais
+    // présenté comme un diagnostic.
     const long = 'A'.repeat(80);
     const result = formatEventDetail(
       event({ event_type: 'INCIDENT_SET_PENDING', payload: { diagnostic: long } })
     );
-    expect(result).toBe(`diagnostic: ${'A'.repeat(60)}`);
+    expect(result).toBe(`motif de mise en attente: ${'A'.repeat(60)}`);
   });
 
   it('INCIDENT_CLOSED avec interventionNote', () => {
@@ -110,5 +136,56 @@ describe('formatEventDetail', () => {
 
   it('retourne "" pour type sans traitement', () => {
     expect(formatEventDetail(event({ event_type: 'INCIDENT_CREATED', payload: {} }))).toBe('');
+  });
+
+  // ─── Restitution des corrections versionnées (lot 4 RC3) ────────────────────
+
+  it('restitue une demande de correction en avant → après avec libellés métier', () => {
+    const detail = formatEventDetail(
+      event({
+        event_type: 'EDIT_REQUESTED',
+        payload: {
+          schemaVersion: 2,
+          changes: {
+            state: { before: 'DEGRADEE', after: 'INDISPONIBLE' },
+            currentProduct: { before: 'TBM', after: 'E365' },
+          },
+        },
+      })
+    );
+    expect(detail).toContain('État : Dégradée → Indisponible');
+    expect(detail).toContain('Produit en cours : TBM → E365');
+  });
+
+  it('affiche le motif de décision d’un refus de correction versionné', () => {
+    const detail = formatEventDetail(
+      event({
+        event_type: 'EDIT_REJECTED',
+        payload: {
+          schemaVersion: 2,
+          changes: { state: { before: 'DEGRADEE', after: 'INDISPONIBLE' } },
+          decisionReason: 'Valeurs incohérentes.',
+        },
+      })
+    );
+    expect(detail).toContain('État : Dégradée → Indisponible');
+    expect(detail).toContain('Motif : Valeurs incohérentes.');
+  });
+
+  it('n’invente rien pour un événement de correction historique sans payload versionné', () => {
+    const detail = formatEventDetail(
+      event({
+        event_type: 'EDIT_REQUESTED',
+        payload: { changes: { state: 'INDISPONIBLE' }, fields: ['state'] },
+      })
+    );
+    expect(detail).toBe('Détail non enregistré pour cet événement antérieur.');
+  });
+
+  it('n’affiche jamais une transition sans before/after dans le payload', () => {
+    // Un événement sans payload de transition ne fabrique pas de flèche.
+    expect(formatEventDetail(event({ event_type: 'INCIDENT_TAKEN', payload: {} }))).not.toContain(
+      '→'
+    );
   });
 });

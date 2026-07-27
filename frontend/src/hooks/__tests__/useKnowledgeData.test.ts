@@ -32,6 +32,7 @@ function incident(id: number, updatedAt: string): WorkshopIncident {
     is_priority: false,
     status: 'CLOSED',
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: 'Capteur remplacé',
     responsible_comment: null,
     edit_request: null,

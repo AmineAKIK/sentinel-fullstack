@@ -25,7 +25,7 @@ const pendingStatusSql = statusEqualsSql('status', 'PENDING');
 
 const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
             wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
-            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
+            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.waiting_reason, wi.intervention_note,
             wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
             wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at`;
 
@@ -137,6 +137,7 @@ export interface WorkshopIncidentRow extends CurrentIncident {
   current_product: string | null;
   is_priority: boolean;
   diagnostic: string | null;
+  waiting_reason: string | null;
   intervention_note: string | null;
   responsible_comment: string | null;
   edit_request: unknown | null;
@@ -390,9 +391,13 @@ export async function getBoardData() {
        ORDER BY line_number ASC`
     ),
     pool.query(
+      // Le Board reçoit UNIQUEMENT l'existence d'un arbitrage (type de demande),
+      // jamais les identités ni les motifs (RC3 §6, projection Board minimale).
       `SELECT id, line_id, line_number, machine_id, robot_label,
               head_number, state, current_product, is_taken, is_priority,
-              responsible_comment, status, display_order, created_at, updated_at
+              responsible_comment, status, display_order, created_at, updated_at,
+              (edit_request IS NOT NULL) AS has_edit_arbitration,
+              (cancel_request = TRUE) AS has_cancel_arbitration
        FROM workshop_incidents
        WHERE ${activeIncidentStatusSql}
        ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC`
@@ -908,6 +913,8 @@ export async function updateIncidentData(
   if (updates.status !== undefined) setIfChanged('status', updates.status, current.status);
   if (updates.diagnostic !== undefined)
     setIfChanged('diagnostic', updates.diagnostic, current.diagnostic);
+  if (updates.waitingReason !== undefined)
+    setIfChanged('waiting_reason', updates.waitingReason, current.waiting_reason);
   if (updates.interventionNote !== undefined)
     setIfChanged('intervention_note', updates.interventionNote, current.intervention_note);
   if (input.role === 'RESPONSABLE' && updates.responsibleComment !== undefined) {
@@ -964,7 +971,7 @@ export async function listHistoryEvents(query: QueryParams): Promise<CursorPage<
   const { rows } = await pool.query(
     `SELECT we.id, we.incident_id, we.event_type, we.payload, we.created_at,
             wi.line_id, wi.line_number, wi.machine_id, wi.robot_label, wi.head_number,
-            wi.state, wi.status,
+            wi.state AS current_state, wi.status AS current_status,
             COALESCE(we.actor_first_name,    su.first_name)    AS first_name,
             COALESCE(we.actor_last_name,     su.last_name)     AS last_name,
             COALESCE(we.actor_role,          su.role)          AS role,

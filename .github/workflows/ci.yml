@@ -97,7 +97,14 @@ jobs:
       NODE_ENV: test
       LOG_LEVEL: warn
     steps:
+      # fetch-depth: 0 + tags : la preuve de provenance des migrations 001..048
+      # (waitingReasonUpgrade048to050) compare au tag immuable v1.0.0-rc.2, qui
+      # n'existe pas dans un checkout superficiel. Elle est ainsi OBLIGATOIRE
+      # (aucun skip) et échoue si le tag manque.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}

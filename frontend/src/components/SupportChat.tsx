@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { apiErrorMessage } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import type { ChatMessage } from '../api/support';
 import { renderMarkdown } from '../utils/markdownParser';
 

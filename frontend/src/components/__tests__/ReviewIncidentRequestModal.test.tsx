@@ -21,6 +21,7 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
     is_priority: true,
     status: 'OPEN',
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: null,
     responsible_comment: 'Prioriser si la ligne bloque.',
     edit_request: { state: 'DEGRADEE' },
@@ -167,7 +168,8 @@ describe('ReviewIncidentRequestModal', () => {
     expect(screen.getByText('Annulation opérateur')).toBeDefined();
     expect(screen.getByText('Motif opérateur')).toBeDefined();
     expect(screen.getByText('doublon')).toBeDefined();
-    expect(screen.getByRole('button', { name: "Annuler l'incident" })).toBeDefined();
+    // Le bouton destructif final est renommé « Confirmer l'annulation » (RC3 §6).
+    expect(screen.getByRole('button', { name: "Confirmer l'annulation" })).toBeDefined();
   });
 
   it('adapte la consultation quand deux demandes sont ouvertes sur le même incident', () => {
@@ -232,5 +234,146 @@ describe('ReviewIncidentRequestModal', () => {
     expect(actionGroups[1].classList.contains('arbitration-footer-group--decision')).toBe(true);
     expect(actionGroups[1].textContent).toContain('Refuser la demande');
     expect(actionGroups[1].textContent).toContain('Appliquer la correction');
+  });
+
+  // ─── Motif du refus (lot 4 RC3) ────────────────────────────────────────────
+
+  it('n’affiche le champ « Motif du refus » qu’après le choix de refuser', () => {
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={vi.fn()}
+        onApplyEdit={vi.fn()}
+      />
+    );
+    // Avant : pas de champ motif.
+    expect(screen.queryByLabelText('Motif du refus')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    // Après : le champ apparaît, la confirmation destructive aussi.
+    expect(screen.getByLabelText('Motif du refus')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Confirmer le refus' })).toBeDefined();
+  });
+
+  it('bloque la confirmation tant que le motif est vide ou composé d’espaces', () => {
+    const onRejectEdit = vi.fn();
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={onRejectEdit}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    const confirm = screen.getByRole('button', { name: 'Confirmer le refus' });
+    expect(confirm).toBeDisabled();
+
+    // Espaces uniquement : toujours bloqué, aucun appel.
+    fireEvent.change(screen.getByLabelText('Motif du refus'), { target: { value: '   ' } });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(onRejectEdit).not.toHaveBeenCalled();
+  });
+
+  it('confirme le refus avec le motif normalisé (trim)', () => {
+    const onRejectEdit = vi.fn();
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={onRejectEdit}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    fireEvent.change(screen.getByLabelText('Motif du refus'), {
+      target: { value: '  Valeurs incohérentes avec le relevé.  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer le refus' }));
+    expect(onRejectEdit).toHaveBeenCalledWith('Valeurs incohérentes avec le relevé.');
+  });
+
+  it('conserve la saisie du motif quand une erreur est affichée (échec)', () => {
+    const { rerender } = render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectEdit={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    fireEvent.change(screen.getByLabelText('Motif du refus'), { target: { value: 'Motif saisi' } });
+
+    // Le parent réaffiche la modale avec une erreur (échec réseau/métier).
+    rerender(
+      <ReviewIncidentRequestModal
+        incident={mockIncident()}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error="Le motif du refus est obligatoire."
+        onClose={vi.fn()}
+        onRejectEdit={vi.fn()}
+      />
+    );
+    // La saisie n'est pas perdue et l'erreur est visible.
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Motif du refus').value).toBe('Motif saisi');
+    expect(screen.getByText('Le motif du refus est obligatoire.')).toBeDefined();
+  });
+
+  // ─── Motif du refus d'ANNULATION (lot 5, même exigence que la correction) ───
+
+  it('le refus d’annulation exige aussi un motif saisi et normalisé', () => {
+    const onRejectDelete = vi.fn();
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident({
+          edit_request: null,
+          cancel_request: true,
+          cancel_request_reason: 'doublon',
+          arbitration: {
+            cancel: {
+              caseId: 22,
+              requestEventId: 43,
+              requestedAt: '2026-06-28T11:10:00.000Z',
+              state: 'ACTIVE',
+            },
+          },
+        })}
+        lines={[]}
+        type="delete"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectDelete={onRejectDelete}
+        onApproveDelete={vi.fn()}
+      />
+    );
+    // Le bouton final destructif porte bien le libellé de confirmation.
+    expect(screen.getByRole('button', { name: "Confirmer l'annulation" })).toBeDefined();
+    // Choisir de refuser révèle le champ motif ; vide → confirmation bloquée.
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    const confirm = screen.getByRole('button', { name: 'Confirmer le refus' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Motif du refus'), {
+      target: { value: '  Incident bien réel.  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer le refus' }));
+    expect(onRejectDelete).toHaveBeenCalledWith('Incident bien réel.');
   });
 });

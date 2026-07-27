@@ -209,11 +209,14 @@ export async function updateLineService(
     if (result.kind === 'line_conflict') return lineAlreadyExists();
     if (result.kind === 'machine_conflict') return machineAlreadyExists();
     if (result.kind === 'in_use') {
+      // Le compteur public passe par `details.count` : le frontend reconstruit
+      // le message précis à partir du CODE (C-03), sans rendre ce `message` brut.
       return {
         ok: false,
         status: 409,
         code: 'RESOURCE_IN_USE',
         message: `Impossible de modifier la structure de cette ligne : ${result.activeIncidents} incident(s) actif(s) y sont encore liés.`,
+        details: { reason: 'LINE_STRUCTURE_LOCKED', count: result.activeIncidents },
       };
     }
     return { ok: true, data: result.line };

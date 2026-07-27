@@ -32,6 +32,9 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   isPriority: z.boolean().optional(),
   status: IncidentStatusEnum.optional(),
   diagnostic: z.string().trim().max(FIELD_LIMITS.NOTE).optional(),
+  // Motif de mise en attente (RC3 lot 7) : concept métier distinct du
+  // diagnostic. Écrit à la suspension, effacé (null) à la reprise.
+  waitingReason: z.string().trim().max(FIELD_LIMITS.NOTE).nullable().optional(),
   interventionNote: z.string().trim().max(FIELD_LIMITS.NOTE).optional(),
   responsibleComment: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
   requestOnly: z.boolean().optional(),
@@ -44,6 +47,10 @@ export const updateIncidentSchema = createIncidentSchema.partial().extend({
   rejectEditRequest: z.boolean().optional(),
   rejectDeleteRequest: z.boolean().optional(),
   withdrawEditRequest: z.boolean().optional(),
+  withdrawCancelRequest: z.boolean().optional(),
+  // Motif de décision obligatoire lors d'un refus de correction ou d'annulation
+  // (RC3, lots 4 et 5).
+  decisionReason: z.string().trim().max(FIELD_LIMITS.COMMENT).optional(),
 });
 
 export const incidentWorkspaceQuerySchema = z.object({

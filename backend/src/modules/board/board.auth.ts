@@ -248,9 +248,15 @@ boardRouter.post('/session', async (req, res) => {
 
     const { board_label, board_session_ttl_hours } = appSettings;
     const boardSessionVersion = boardSettings?.board_session_version ?? 0;
+    // 0 est le marqueur interne « sans expiration automatique » : on le traduit
+    // en 'unlimited' pour le JWT (aucun exp) et pour le cookie (aucun maxAge, donc
+    // cookie de session qui expire à la fermeture du navigateur). La révocation
+    // immédiate reste assurée par board_session_version.
+    const tokenDuration: number | 'unlimited' =
+      board_session_ttl_hours === 0 ? 'unlimited' : board_session_ttl_hours;
     const token = signAuthToken(
       { label: board_label, boardSessionVersion },
-      board_session_ttl_hours,
+      tokenDuration,
       'board'
     );
     if (!token) {
@@ -258,7 +264,11 @@ boardRouter.post('/session', async (req, res) => {
       return;
     }
 
-    setBoardCookie(res, token, board_session_ttl_hours * 60 * 60 * 1000);
+    setBoardCookie(
+      res,
+      token,
+      tokenDuration === 'unlimited' ? 'unlimited' : board_session_ttl_hours * 60 * 60 * 1000
+    );
     res.json({ access: true, label: board_label, expiresInHours: board_session_ttl_hours });
   } catch (err) {
     logger.error({ err }, 'Board session error');

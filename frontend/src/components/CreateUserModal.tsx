@@ -5,6 +5,7 @@ import UserForm from './UserForm';
 import { createAccount } from '../api/accounts';
 import { SentinelUser, Role } from '../types';
 import { ApiResponseError } from '../api/client';
+import { apiErrorMessage } from '../api/errorMessages';
 import { formatDateTime } from '../utils/date';
 import { useUserForm } from '../hooks/useUserForm';
 
@@ -55,7 +56,7 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
           setBadgeError('Ce numéro de badge existe déjà.');
           return;
         }
-        setError(err.message);
+        setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
       } else {
         setError('Une erreur inattendue est survenue.');
       }
