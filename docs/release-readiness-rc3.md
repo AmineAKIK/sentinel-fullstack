@@ -666,6 +666,41 @@ VPS distant reste `BLOCKED_EXTERNAL` et n'est pas prétendu exécuté.
 Non exécuté localement (dépend du VPS/CI distante) : jobs CI distants sur le SHA
 candidat, déploiement, HTTPS/HSTS, SMTP, captures RC3 déployée.
 
+### 4.2 Analyse des advisories React Router (avant push RC3)
+
+`npm audit --omit=dev --json` (frontend) : **2 vulnérabilités modérées, 0
+high/critical** (l'audit CI `--audit-level=high` passe donc, sortie 0).
+
+| Advisory                                                                                                                                                   | Sévérité | Paquet             | Versions affectées  | Corrigé dans |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ | ------------------- | ------------ |
+| [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6) (CVE-2025-68470 bypass) — open redirect via backslash dans `<Link>`/`useNavigate` | modérée  | `react-router`     | `>=6.0.0 <7.18.0`   | `7.18.0`     |
+| [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg) — Arbitrary Constructor Injection via `deserializeErrors()` (hydratation SSR)     | modérée  | `react-router`     | `>=6.4.0 <7.18.0`   | `7.18.0`     |
+| [GHSA-jjmj-jmhj-qwj2](https://github.com/advisories/GHSA-jjmj-jmhj-qwj2) — open redirect menant à XSS                                                      | modérée  | `react-router-dom` | `>=6.30.2 <=6.30.4` | `7.18.0`     |
+
+- **Installé :** `react-router` et `react-router-dom` **6.30.4** (déclaré
+  `react-router-dom: ^6.21.3`) — **transitif** pour `react-router`, direct pour
+  `react-router-dom`. Chemins : `node_modules/react-router` (effets sur
+  `react-router-dom`) et `node_modules/react-router-dom`.
+- **Correctif proposé par npm :** montée vers `7.18.0`. **Le plus haut 6.x publié
+  est `6.30.4` (déjà installé) : aucun correctif dans le même major.** La
+  correction impose donc **React Router 6 → 7 (changement MAJEUR)**.
+- **Impact sur les routes réellement utilisées :**
+  - **Pas de SSR** dans l'application (Vite SPA pure : ni `renderToString`,
+    `hydrateRoot`, `StaticRouter`, ni `deserializeErrors`) → **GHSA-337j non
+    atteignable**.
+  - **Aucune cible de navigation contrôlée par l'utilisateur** : tous les
+    `<Link to=…>` sont des chemins internes littéraux ; tous les `navigate(…)`
+    ciblent des chemins littéraux ou construits à partir d'**identifiants
+    numériques internes** (`user.id`, `incident.id`, `event.id`). Les
+    `searchParams.get(...)` ne servent que de **valeurs de filtre**, jamais de
+    cible de redirection. Aucun paramètre `redirect`/`returnTo`/`next` →
+    **open-redirect non atteignable en pratique**.
+- **Décision (pas d'acceptation de risque unilatérale) :** la seule correction
+  disponible est une **montée majeure RR7**, qui sort du périmètre RC3 (gel
+  fonctionnel, diff limité). **Aucune mise à niveau appliquée** avant le push.
+  La montée RR6→RR7 est **différée** et laissée à décision explicite (hors RC3).
+  L'audit reste vert au seuil `high` de la CI.
+
 ## 5. Journal des lots
 
 | Lot  | Objet                                                | Commit                                                                            | État                                                                                                                                                       |
