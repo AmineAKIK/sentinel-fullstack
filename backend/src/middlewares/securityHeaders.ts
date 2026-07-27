@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { BASE_SECURITY_HEADERS, STRICT_TRANSPORT_SECURITY } from './securityHeaderPolicy';
 
 const NON_CACHEABLE_API_PREFIXES = ['/api/auth', '/api/admin', '/api/workshop', '/api/board'];
 
@@ -9,16 +10,13 @@ function isNonCacheableApiPath(path: string): boolean {
 }
 
 export function securityHeaders(req: Request, res: Response, next: NextFunction): void {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
-  );
+  // Valeurs canoniques uniques (cf. securityHeaderPolicy) : le Nginx frontend
+  // pose les mêmes sur les réponses statiques, sans jamais les dupliquer.
+  for (const [name, value] of BASE_SECURITY_HEADERS) {
+    res.setHeader(name, value);
+  }
   if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Strict-Transport-Security', STRICT_TRANSPORT_SECURITY);
   }
   if (isNonCacheableApiPath(req.path)) {
     res.setHeader('Cache-Control', 'no-store');

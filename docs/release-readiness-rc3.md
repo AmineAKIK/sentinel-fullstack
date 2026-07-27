@@ -494,9 +494,52 @@ autre opérateur`) ;
 - **Correction (lot 9/annexe) :** identifier l'autorité de chaque en-tête,
   conserver une seule valeur effective, vérifier le résultat public. Ne retarde
   aucun P0/P1.
-- **Tests :** vérification qu'un seul exemplaire effectif est servi.
-- **Preuve finale :** _(à compléter — P2)_
-- **État :** OPEN
+- **Cartographie des autorités (établie) :**
+  - **Proxy d'entrée TLS** — Caddy (`Caddyfile`, topologie A) ou Nginx hôte
+    (topologie B) : **reverse-proxy uniquement, n'ajoute AUCUN de ces en-têtes**
+    (vérifié : aucun `add_header`/`header` de sécurité dans `Caddyfile`,
+    `docker-compose.host-proxy.example.yml`, `frontend/nginx-main.conf`).
+  - **Nginx frontend `:8080`** (`frontend/nginx.conf`) : autorité du **document
+    applicatif et des statiques** (HTML/JS/CSS/polices).
+  - **API Node `:3000`** (`securityHeaders.ts`) : autorité des réponses
+    **`/api/*`**.
+  - Les deux autorités posent leurs en-têtes sur des réponses **disjointes** :
+    il n'y a **jamais deux exemplaires du même en-tête** sur une seule réponse.
+    Le risque réel était la **dérive** entre les deux copies.
+- **Défaut réel trouvé et corrigé :** la CSP avait **dérivé** —
+  backend `font-src 'self'` vs Nginx `font-src 'self' data:`. Valeur effective
+  unique retenue : `font-src 'self' data:` (l'application intègre ses polices en
+  data-URI ; retirer `data:` casserait les polices — aucune protection retirée).
+  Les valeurs canoniques sont désormais figées dans **une source unique**,
+  `backend/src/middlewares/securityHeaderPolicy.ts`, dont le middleware Node
+  dérive ; un test de contrat vérifie que le Nginx frontend sert exactement ces
+  mêmes valeurs.
+- **Tests (exécutés) :** `securityHeaders.test.ts` (15 cas) —
+  en-têtes canoniques (`X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy`, `Permissions-Policy`, CSP) posés sur une réponse API ; HSTS
+  seulement en `production` ; **contrat anti-dérive** : chaque `add_header` du
+  Nginx frontend doit égaler la valeur canonique (prouvé rouge en réintroduisant
+  la dérive `font-src`, puis vert). Cache : `no-store` sur les espaces
+  authentifiés, health non forcé hors cache.
+- **Preuve finale sur composition de production :**
+  `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` — la valeur effective **HSTS**
+  n'est émise qu'en `NODE_ENV=production` derrière le TLS d'extrémité (Caddy /
+  Nginx hôte). Après déploiement, vérifier sur `https://<vps>` :
+
+  ```bash
+  # Un seul exemplaire de chaque en-tête, valeurs canoniques, sur les 3 cas.
+  for path in / /api/health /api/workshop/incidents; do
+    echo "== $path =="
+    curl -sSI "https://<vps>$path" | grep -iE \
+      'content-security-policy|strict-transport-security|x-frame-options|x-content-type-options|referrer-policy|permissions-policy|cache-control'
+  done
+  # Aucune ligne d'en-tête ne doit apparaître en double ; HSTS présent en HTTPS ;
+  # /api/workshop/incidents (401 sans session) doit porter Cache-Control: no-store.
+  ```
+
+- **État :** IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION (autorité unique par
+  réponse + anti-dérive prouvés localement ; confirmation HTTPS/HSTS à faire sur
+  le VPS déployé).
 
 ### C-09 — Notification e-mail dépendante des images distantes
 
