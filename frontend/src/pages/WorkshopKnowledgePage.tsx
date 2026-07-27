@@ -360,6 +360,7 @@ export default function WorkshopKnowledgePage() {
               {loading ? (
                 <div
                   className="kb-list-skeleton"
+                  role="status"
                   aria-busy="true"
                   aria-label="Chargement des fiches"
                 >

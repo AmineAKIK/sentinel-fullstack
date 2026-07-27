@@ -139,6 +139,7 @@ export default function WorkshopHistoryPage() {
               <div className="history-incident-list">
                 {loading ? (
                   <div
+                    role="status"
                     aria-busy="true"
                     aria-label="Chargement des incidents"
                     style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}

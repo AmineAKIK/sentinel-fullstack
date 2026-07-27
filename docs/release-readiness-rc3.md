@@ -577,6 +577,37 @@ autre opérateur`) ;
   partie texte brut prouvées localement ; confirmation SMTP réelle à faire après
   déploiement).
 
+### C-10 — Violation axe sérieuse sur l'état de chargement (Historique/Connaissance)
+
+- **Sévérité :** P1 (contrat UX/accessibilité — Porte C exige zéro violation axe
+  sérieuse).
+- **Preuve reproduite (diagnostic axe, scan pendant le chargement) :**
+  - **Règle :** `aria-prohibited-attr` — impact **serious** (wcag2a).
+  - **Pages :** `/workshop/history` et `/workshop/knowledge`.
+  - **État de chargement :** pendant l'affichage du squelette (`loading===true`).
+  - **Sélecteurs :** `div[aria-label="Chargement des incidents"]` /
+    `.kb-list-skeleton`.
+  - **HTML :** `<div aria-busy="true" aria-label="Chargement des fiches">` — un
+    `<div>` générique **sans rôle** ne peut pas porter `aria-label`.
+  - Caractère « transitoire » = le chargement est bref ; la violation était bien
+    **réelle** tant que le squelette s'affichait (captée en forçant l'état de
+    chargement via throttling réseau : `ariaBusyCount = 1`, violation présente).
+- **Correction (cause, sans masquage) :** ajout de `role="status"` sur les deux
+  conteneurs de chargement — `aria-label` devient permis et le rôle de région
+  live « status » est la sémantique correcte pour un chargement. Aucune
+  protection retirée, aucun retry, aucune exclusion axe, aucun délai arbitraire.
+- **Signal de disponibilité déterministe (recette) :** `expectNoSeriousViolations`
+  attend désormais `[aria-busy="true"]` à 0 avant de scanner — on analyse l'état
+  fonctionnellement prêt vu par l'utilisateur, pas un squelette transitoire.
+- **Preuve (exécutée) :**
+  - Diagnostic : squelette **forcé visible** (throttle réseau), scan immédiat →
+    `aria-prohibited-attr` **disparue** sur les deux pages après `role="status"`
+    (4 itérations, `ariaBusyCount = 1`, 0 violation).
+  - `accessibility.spec.ts` sur **plusieurs démarrages réellement froids**
+    (bases `_e2e` jetables distinctes) : **12/12 vert, 0 violation** à chaque
+    run (3 runs à froid).
+- **État :** VERIFIED.
+
 ## 4. Portes de validation
 
 - **Porte A — Contrats :** matrice complète, terminologie figée, payload
