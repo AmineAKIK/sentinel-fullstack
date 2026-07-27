@@ -20,8 +20,9 @@ concept métier, session Board sans expiration, cartes et panneau accessibles).
   rapport direct ;
 - chaque correction est livrée avec ses tests comportementaux et sa documentation
   dans le même lot ;
-- les migrations `001` à `048` sont **immuables** ; toute évolution SQL commence à
-  `049` ;
+- les migrations existantes `001` à `048` restent **inchangées** (ni
+  modification ni suppression) ; les seules migrations RC3 ajoutées sont `049`
+  et `050` ;
 - un constat passe à `VERIFIED` seulement après revue du diff, tests requis et CI
   verte sur le commit qui le corrige ;
 - un résultat local ne remplace pas une preuve PostgreSQL, navigateur ou VPS quand
@@ -123,14 +124,30 @@ message et une issue adaptés. Le texte ne pilote jamais la logique applicative.
 
 ### 2.5 Stratégie de migrations
 
-- `001..048` immuables.
-- `049_allow_board_session_without_automatic_expiry.sql` (lot 3) : autorise le
-  marqueur interne `0` (sans expiration), append-only.
-- `050_add_incident_waiting_reason.sql` (lot 7) : ajoute `waiting_reason`,
-  backfill des seuls incidents actuellement `PENDING` depuis `diagnostic`,
-  append-only.
-- Toutes deux testées sur base vierge et sur copie de la base RC2 (upgrade
-  048→050).
+- **Migrations existantes `001` à `048` : inchangées** (ni modification ni
+  suppression).
+- **Migrations RC3 ajoutées : `049` et `050` uniquement.**
+  - `049_allow_board_session_without_automatic_expiry.sql` (lot 3) : autorise le
+    marqueur interne `0` (sans expiration), append-only.
+  - `050_model_waiting_reason_separately_from_diagnostic.sql` (lot 7) : ajoute
+    `waiting_reason`, backfill des seuls incidents actuellement `PENDING` depuis
+    `diagnostic` puis efface leur `diagnostic`, append-only.
+- **Preuve du diff des migrations** (`git diff --name-status origin/main...HEAD
+  -- backend/migrations/`) : exactement deux entrées, toutes deux en statut `A`
+  (ajout) —
+  `A backend/migrations/049_allow_board_session_without_automatic_expiry.sql`,
+  `A backend/migrations/050_model_waiting_reason_separately_from_diagnostic.sql`.
+  Aucune entrée `M` (modifiée) ni `D` (supprimée). Contrôle complémentaire :
+  `git diff --stat origin/main...HEAD -- 'backend/migrations/0[0-3][0-9]_*.sql'
+  'backend/migrations/04[0-8]_*.sql'` renvoie un diff **vide** — `001` à `048`
+  sont strictement identiques à `origin/main`.
+- **Validation des migrations :**
+  - `049 → 050` avec données ciblées `PENDING` : **déjà exécutée** sur
+    PostgreSQL réel jetable (runMigrations 001→050 sur base vierge, puis backfill
+    rejoué sur lignes de forme ancienne ; cf. C-05).
+  - `048 → 050` (montée depuis une base réellement figée à `048`) : **à exécuter
+    au lot 11** si elle n'a pas encore été faite exactement sous cette forme —
+    non couverte par la validation base-vierge ci-dessus.
 
 ## 3. Matrice des constats
 
@@ -294,8 +311,8 @@ les révocations sont finalisés au lot 3.
   de mise en attente » ; backfill des seuls incidents `PENDING` ; compatibilité de
   lecture des anciennes traces ; à la reprise, motif courant masqué mais conservé
   dans l'événement.
-- **Tests :** migration base vierge + upgrade ; nouvelle mise en attente écrit
-  `waiting_reason` ; reprise ; alignement des surfaces.
+- **Tests :** migration base vierge + montée depuis base figée ; nouvelle mise
+  en attente écrit `waiting_reason` ; reprise ; alignement des surfaces.
 - **Décision métier (utilisateur, lot 7) :** `diagnostic` et « motif de mise en
   attente » sont deux concepts distincts. La migration 050 ne recopie que la
   valeur des incidents **actuellement** `PENDING` vers `waiting_reason` puis
@@ -307,13 +324,18 @@ les révocations sont finalisés au lot 3.
   attente écrit uniquement `waiting_reason` ; la reprise efface la valeur
   courante mais l'événement conserve le motif.
 - **Preuve finale (exécutée) :**
-  - _Migration 050 sur PostgreSQL réel_ —
+  - _Migration 050 sur PostgreSQL réel — validation `049 → 050` avec données
+    ciblées `PENDING` (DÉJÀ EXÉCUTÉE)_ —
     `src/integration/__tests__/waitingReasonMigration.integration.test.ts` :
     la colonne `waiting_reason` (type `text`) existe après migration d'une base
-    vierge ; le backfill recopie le motif des **seuls** incidents `PENDING`
-    puis efface leur `diagnostic` (un incident `OPEN` porteur d'un vrai
-    diagnostic n'est pas touché) ; une nouvelle mise en attente écrit
-    `waiting_reason` et jamais `diagnostic`.
+    vierge (`runMigrations` 001→050) ; le backfill recopie le motif des
+    **seuls** incidents `PENDING` puis efface leur `diagnostic` (un incident
+    `OPEN` porteur d'un vrai diagnostic n'est pas touché) ; une nouvelle mise en
+    attente écrit `waiting_reason` et jamais `diagnostic`.
+  - _Validation finale `048 → 050` (montée depuis une base réellement figée à
+    `048`) : À EXÉCUTER AU LOT 11_ si elle n'a pas encore été faite exactement
+    sous cette forme — la preuve ci-dessus part d'une base vierge, pas d'une
+    base préexistante arrêtée à `048`.
   - _Cycle service (unitaire)_ — `workshop.service.test.ts` :
     PENDING sans motif refusé (`VALIDATION_ERROR`) ; PENDING avec motif écrit
     `updates.waitingReason` et loggue l'événement `INCIDENT_SET_PENDING` avec
@@ -469,13 +491,19 @@ les révocations sont finalisés au lot 3.
 - **Porte A — Contrats :** matrice complète, terminologie figée, payload
   événementiel figé, stratégie migrations approuvée. → **fermée par ce document
   (lot 0).**
-- **Porte B — Intégrité métier :** correction et annulation complètes, aucun suivi
-  implicite, événements fidèles, tests PostgreSQL concurrents verts.
+- **Porte B — Intégrité métier :** VALIDÉE. Correction et annulation complètes,
+  aucun suivi implicite, mise en attente comme concept métier, événements
+  fidèles, tests PostgreSQL concurrents verts. **Aucun défaut ouvert sur le
+  périmètre de la Porte B** (C-01, C-05, C-06, C-07 = VERIFIED). Les constats
+  C-08/C-09 (P2) et les constats des lots 8-11 (dont C-08/C-09 pour la partie UX
+  et sécurité) restent `OPEN`/`PENDING` et hors périmètre de cette porte.
 - **Porte C — UX :** cinq états sur toutes les mutations, aucun message technique
   visible, cartes et panneau conformes, zéro violation axe critique.
-- **Porte D — Release :** migrations testées (base vierge + 048→050), six jobs CI
-  verts sur le SHA candidat, aucun avertissement significatif, recette multi-rôle,
-  captures depuis la RC3 déployée, dossier synchronisé sur le commit final.
+- **Porte D — Release :** migrations testées (base vierge `001→050` **déjà
+  faite** ; montée `048→050` sur base figée à `048` **à exécuter au lot 11**),
+  six jobs CI verts sur le SHA candidat, aucun avertissement significatif,
+  recette multi-rôle, captures depuis la RC3 déployée, dossier synchronisé sur
+  le commit final.
 
 ## 5. Journal des lots
 
