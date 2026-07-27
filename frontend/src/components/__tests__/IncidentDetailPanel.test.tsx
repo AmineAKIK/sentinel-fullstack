@@ -139,6 +139,17 @@ describe('IncidentDetailPanel', () => {
     expect(screen.queryByRole('heading', { name: 'Notes' })).toBeNull();
   });
 
+  it('déplace le focus sur le titre du dossier à l’ouverture (clavier, lot 8)', () => {
+    renderPanel({ incident: mockIncident({ line_number: '117', machine_id: 'MCH-2117' }) });
+
+    const title = screen.getByRole('heading', { name: 'Ligne 117 · MCH-2117' });
+    // Focusable programmatiquement sans entrer dans l'ordre de tabulation…
+    expect(title.getAttribute('tabindex')).toBe('-1');
+    // …et effectivement focalisé quand le dossier s'ouvre : l'utilisateur
+    // clavier entre dans le panneau au lieu de rester sur la carte.
+    expect(document.activeElement).toBe(title);
+  });
+
   it('nomme explicitement l’action destructive responsable', () => {
     renderPanel();
 

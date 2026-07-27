@@ -517,7 +517,7 @@ les révocations sont finalisés au lot 3.
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136) | FAIT (C-06 VERIFIED sur PostgreSQL jetable) |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` (1bd197f) | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel) |
 | 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff) | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel) |
-| 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |
+| 8 | Cartes et panneau (clavier, focus, scroll) | `fix(ux): make incident cards and dossier navigation predictable` | PRÊT — scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts ; en attente de commit |
 | 9 | Terminologie et restitution | `fix(copy): align workshop labels with the incident lifecycle` | À FAIRE |
 | 10 | Recette comportementale et axe | `test: cover rc3 multi-role ux and audit contracts` | À FAIRE |
 | 11 | Documentation et candidate | `docs: synchronize the jury evidence with rc3` | À FAIRE |

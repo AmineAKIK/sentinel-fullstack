@@ -250,12 +250,22 @@ export default function IncidentDetailPanel({
   const [actionError, setActionError] = useState('');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const pendingActionRef = useRef(false);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
   const { notifySuccess } = useMutationFeedback();
 
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
     setActionError('');
   }, [incident.id, incident.responsible_comment]);
+
+  // Ouverture / navigation du dossier : on déplace le focus sur le titre du
+  // panneau pour qu'un utilisateur au clavier entre bien dans le dossier
+  // fraîchement ouvert (et puisse le lire/naviguer), au lieu de rester sur la
+  // carte de la liste. Le titre est focusable programmatiquement (tabIndex=-1)
+  // sans entrer dans l'ordre de tabulation (lot 8, accessibilité).
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, [incident.id]);
 
   // Runner des actions du panneau : verrou anti-double (pendingActionRef), état
   // « en cours » (pendingAction), erreur locale TRADUITE près de l'action, et
@@ -329,7 +339,7 @@ export default function IncidentDetailPanel({
       <div className="incident-detail-topbar">
         <div className="incident-detail-heading">
           <span className="incident-detail-eyebrow">Dossier incident</span>
-          <h2 className="incident-detail-title">
+          <h2 className="incident-detail-title" ref={titleRef} tabIndex={-1}>
             Ligne {incident.line_number} · {incident.machine_id}
           </h2>
         </div>
