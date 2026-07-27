@@ -427,7 +427,7 @@ les révocations sont finalisés au lot 3.
 | 2 | Erreurs publiques stables | `8932ae9` | FAIT |
 | 3 | Session Board sans expiration | migration `049` + `fix(board)` (1249c3a) + validation PG | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
-| 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | PRÊT — backend/concurrence/frontend/restitution verts (C-06 VERIFIED), en attente de commit |
+| 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136) | FAIT (C-06 VERIFIED sur PostgreSQL jetable) |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |
 | 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | À FAIRE |
 | 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |
