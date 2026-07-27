@@ -30,9 +30,9 @@ au SHA candidat final avant la Porte D.
 | Fichiers suivis                       | 510    | `git ls-files \| wc -l`                                                              |
 | Backend unit                          | 507    | `jest --selectProjects unit`                                                         |
 | Backend intégration (PostgreSQL réel) | 137    | `jest --selectProjects integration` (20 suites)                                      |
-| Frontend                              | 460    | `vitest run`                                                                         |
+| Frontend                              | 462    | `vitest run`                                                                         |
 | E2E Playwright                        | 34     | `playwright test --list`                                                             |
-| Total tests                           | 1138   | somme (ensembles disjoints)                                                          |
+| Total tests                           | 1140   | somme (ensembles disjoints)                                                          |
 
 ## 1. Règles de pilotage
 
