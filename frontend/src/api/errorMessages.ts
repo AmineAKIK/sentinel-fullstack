@@ -102,6 +102,25 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+// Ressource verrouillée par des incidents actifs : le compteur vient de
+// `details.count` (public), jamais du message brut. Reconstruit un message
+// précis depuis le CODE + la raison (C-03).
+function describeResourceInUse(details: ApiErrorDetails | undefined): string | null {
+  const count = typeof details?.count === 'number' ? details.count : null;
+  switch (details?.reason) {
+    case 'LINE_STRUCTURE_LOCKED':
+      return count !== null
+        ? `Impossible de modifier la structure de cette ligne : ${count} incident(s) actif(s) y sont encore liés.`
+        : 'Impossible de modifier la structure de cette ligne : des incidents actifs y sont encore liés.';
+    case 'USER_HAS_ACTIVE_INCIDENTS':
+      return count !== null
+        ? `Ce technicien a ${count} incident(s) actif(s) en cours. Réassignez-les ou clôturez-les avant de continuer.`
+        : 'Ce technicien a des incidents actifs en cours. Réassignez-les ou clôturez-les avant de continuer.';
+    default:
+      return null;
+  }
+}
+
 export function translateApiError(error: unknown): string {
   if (!(error instanceof ApiResponseError)) return GENERIC_ERROR_MESSAGE;
 
@@ -111,6 +130,12 @@ export function translateApiError(error: unknown): string {
     if (described) return described;
     // Validation sans details reconnaissables : générique sûr (jamais le message brut).
     return GENERIC_ERROR_MESSAGE;
+  }
+
+  // 1b) Ressource verrouillée : message précis reconstruit depuis details.count.
+  if (error.code === 'RESOURCE_IN_USE') {
+    const described = describeResourceInUse(error.details);
+    if (described) return described;
   }
 
   // 2) Code métier global connu.

@@ -64,6 +64,8 @@ async function guardNoActiveTakenIncidents(
       status: 409,
       code: 'RESOURCE_IN_USE',
       message: `Impossible de ${action} : ce technicien a ${count} incident${count > 1 ? 's' : ''} actif${count > 1 ? 's' : ''} en cours. Réassignez-les ou clôturez-les avant de continuer.`,
+      // Compteur public via details.count : traduit côté frontend (C-03).
+      details: { reason: 'USER_HAS_ACTIVE_INCIDENTS', count },
     };
   }
   return null;

@@ -42,7 +42,14 @@ export type PublicField =
  * français ; ces valeurs ne sont jamais affichées telles quelles.
  */
 export type ErrorReason =
-  'OUT_OF_RANGE' | 'REQUIRED' | 'TOO_LONG' | 'INVALID_FORMAT' | 'NO_CHANGES';
+  | 'OUT_OF_RANGE'
+  | 'REQUIRED'
+  | 'TOO_LONG'
+  | 'INVALID_FORMAT'
+  | 'NO_CHANGES'
+  // Ressource verrouillée par des incidents actifs (compteur via details.count).
+  | 'LINE_STRUCTURE_LOCKED'
+  | 'USER_HAS_ACTIVE_INCIDENTS';
 
 export interface ErrorDetails {
   field?: PublicField;
@@ -50,6 +57,12 @@ export interface ErrorDetails {
   /** Bornes, uniquement lorsqu'elles sont utiles et non sensibles. */
   min?: number;
   max?: number;
+  /**
+   * Compteur public non sensible (ex. nombre d'incidents actifs bloquant une
+   * action). Permet au frontend de reconstruire un message précis à partir du
+   * CODE, sans jamais rendre le `message` brut du backend (C-03).
+   */
+  count?: number;
 }
 
 export interface ApiError {

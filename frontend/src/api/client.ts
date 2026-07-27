@@ -22,6 +22,7 @@ export interface ApiErrorDetails {
   reason?: string;
   min?: number;
   max?: number;
+  count?: number;
 }
 
 export class ApiResponseError extends Error {

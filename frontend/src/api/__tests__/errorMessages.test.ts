@@ -170,4 +170,24 @@ describe('apiErrorMessage — abstraction sûre (C-03)', () => {
     );
     expect(apiErrorMessage('boom', 'Impossible de charger.')).toBe('Impossible de charger.');
   });
+
+  it('RESOURCE_IN_USE (ligne verrouillée) : message précis reconstruit depuis details.count', () => {
+    const err = new ApiResponseError('RESOURCE_IN_USE', 'raw server text — do not show', 409, {
+      reason: 'LINE_STRUCTURE_LOCKED',
+      count: 3,
+    });
+    const text = translateApiError(err);
+    expect(text).toBe(
+      'Impossible de modifier la structure de cette ligne : 3 incident(s) actif(s) y sont encore liés.'
+    );
+    expect(text).not.toContain('raw server text');
+  });
+
+  it('RESOURCE_IN_USE (technicien) : message précis depuis details.count', () => {
+    const err = new ApiResponseError('RESOURCE_IN_USE', 'raw', 409, {
+      reason: 'USER_HAS_ACTIVE_INCIDENTS',
+      count: 2,
+    });
+    expect(translateApiError(err)).toMatch(/2 incident\(s\) actif\(s\) en cours/);
+  });
 });
