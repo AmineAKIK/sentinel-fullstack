@@ -1,9 +1,11 @@
 # Préparation de la release Sentinel v1.0.0-rc.3
 
 **Statut : NO-GO** — le produit versionné est prêt (Portes A/B VERIFIED,
-Porte C VERIFIED sous réserve de la confirmation navigateur/HTTPS déployée) ;
-la Porte D reste `BLOCKED_EXTERNAL` (CI distante, VPS, HTTPS/HSTS, SMTP, captures
-RC3 déployée). Aucun défaut ouvert non tracé sur le périmètre RC3.
+Porte C VERIFIED sous réserve de la confirmation navigateur/HTTPS déployée).
+La CI distante (6 jobs) est vérifiée verte sur le SHA candidat ; la Porte D
+reste `BLOCKED_EXTERNAL` uniquement sur ce qui reste réellement externe (VPS,
+HTTPS/HSTS, SMTP, captures RC3 déployée). Aucun défaut ouvert non tracé sur le
+périmètre RC3.
 
 **Branche de stabilisation :** `release/v1.0.0-rc3`
 
@@ -27,12 +29,12 @@ au SHA candidat final avant la Porte D.
 | Tables applicatives                   | 14     | `CREATE TABLE` distinctes dans les migrations                                        |
 | Tables totales                        | 15     | 14 + `schema_migrations` (créée par `migrate.ts`)                                    |
 | Jobs CI                               | 6      | clés sous `jobs:` de `ci.yml` : backend, frontend, integration, e2e, containers, ops |
-| Fichiers suivis                       | 510    | `git ls-files \| wc -l`                                                              |
-| Backend unit                          | 507    | `jest --selectProjects unit`                                                         |
+| Fichiers suivis                       | 511    | `git ls-files \| wc -l`                                                              |
+| Backend unit                          | 507    | `jest --selectProjects unit` (48 suites)                                             |
 | Backend intégration (PostgreSQL réel) | 137    | `jest --selectProjects integration` (20 suites)                                      |
-| Frontend                              | 462    | `vitest run`                                                                         |
-| E2E Playwright                        | 34     | `playwright test --list`                                                             |
-| Total tests                           | 1140   | somme (ensembles disjoints)                                                          |
+| Frontend                              | 468    | `vitest run` (54 fichiers)                                                           |
+| E2E Playwright                        | 34     | `playwright test --list` (10 fichiers)                                              |
+| Total tests                           | 1146   | somme (ensembles disjoints)                                                          |
 
 ## 1. Règles de pilotage
 
@@ -356,12 +358,15 @@ les révocations sont finalisés au lot 3.
     `OPEN` porteur d'un vrai diagnostic n'est pas touché) ; une nouvelle mise en
     attente écrit `waiting_reason` et jamais `diagnostic`.
   - _Validation finale `048 → 050` (montée depuis une base réellement figée à
-    `048`) : EXÉCUTÉE au lot 11_ —
+    `048`) : EXÉCUTÉE au lot 11, provenance rendue OBLIGATOIRE en CI_ —
     `src/integration/__tests__/waitingReasonUpgrade048to050.integration.test.ts` :
-    migrations 001..048 appliquées dans un schéma dédié (état d'avant RC3),
-    incident `PENDING` « ancienne forme » seedé (motif dans `diagnostic`, colonne
-    `waiting_reason` absente vérifiée), puis 049 et 050 appliquées ; après
-    montée, `waiting_reason` porte le motif et `diagnostic` est effacé.
+    migrations 001..048 appliquées dans un schéma dédié, vérifiées
+    **byte-identiques au tag immuable `v1.0.0-rc.2`** (jamais la branche mutable
+    `release/v1.0.0-rc2` — cf. §4.1), incident `PENDING` « ancienne forme » seedé
+    (motif dans `diagnostic`, colonne `waiting_reason` absente vérifiée), puis
+    049 et 050 appliquées ; après montée, `waiting_reason` porte le motif et
+    `diagnostic` est effacé. Le job CI d'intégration fait `fetch-depth: 0` pour
+    que le tag soit disponible ; aucun `it.skip` conditionnel.
   - _Cycle service (unitaire)_ — `workshop.service.test.ts` :
     PENDING sans motif refusé (`VALIDATION_ERROR`) ; PENDING avec motif écrit
     `updates.waitingReason` et loggue l'événement `INCIDENT_SET_PENDING` avec
@@ -376,9 +381,10 @@ les révocations sont finalisés au lot 3.
     quand `diagnostic` est vide. Modale de suspension : libellé « Motif de mise
     en attente ». Notification followers : « Motif de mise en attente : … »,
     avec repli de lecture sur l'ancienne clé `diagnostic`.
-- **Résultats globaux (exécutés) :** backend unit 493/493 ; intégration
-  PostgreSQL réelle 135/135 (19 suites) ; frontend 448/448 (52 fichiers) ;
-  ESLint + Prettier + typecheck propres.
+- **Résultats à la clôture du lot 7 (historique, snapshot au commit `1e0f8ff`) :**
+  backend unit 493/493 ; intégration PostgreSQL réelle 135/135 (19 suites) ;
+  frontend 448/448 (52 fichiers) ; ESLint + Prettier + typecheck propres. Les
+  totaux courants du dépôt sont dans « Faits mesurés » en tête de document.
 - **État :** VERIFIED
 
 ### C-06 — Arbitrages visibles de façon inégale ; retrait d'annulation absent
@@ -636,8 +642,9 @@ autre opérateur`) ;
   conteneurs de production (images non-root, labels révision, artefact runtime
   minimal, Nginx non privilégié, favicon), préflight + matrice de rejet, parsing
   `.env` sûr, exercice backup/restore jetable, migrations base vierge et montée
-  `048 → 049 → 050` depuis la fixture RC2 figée. Migrations : base vierge
-  `001→050` **faite** ; montée `048→050` **faite** (cf. C-05).
+  `048 → 049 → 050` depuis la fixture RC2 figée (tag immuable `v1.0.0-rc.2`).
+  Migrations : base vierge `001→050` **faite** ; montée `048→050` **faite**
+  (cf. C-05).
 
 ### 4.1 Contrôles locaux exécutés (équivalents des jobs CI, HEAD courant)
 
@@ -662,11 +669,13 @@ VPS distant reste `BLOCKED_EXTERNAL` et n'est pas prétendu exécuté.
 | Images prod + non-root + labels + runtime minimal + Nginx non privilégié + favicon (containers) | `docker build … ; docker image inspect … ; docker run … nginx -t` | backend=`node`, frontend=`nginx`, révision=SHA, aucun artefact de test, `server.js` présent, `nginx -t` OK, favicon présent | 0      |
 | Backup/restore jetable (ops)                                                                    | `./scripts/test-backup-restore.sh`                                | 11/11, isolation prouvée                                                                                                    | 0      |
 | Intégration + migrations (integration)                                                          | `npm run test:integration`                                        | 137/137 (20 suites)                                                                                                         | 0      |
-| Montée 048→049→050 (fixture RC2 figée)                                                          | `jest … waitingReasonUpgrade048to050` sur PG jetable              | 2/2 (001..048 byte-identiques à `release/v1.0.0-rc2` + backfill vérifié)                                                    | 0      |
+| Montée 048→049→050 (fixture RC2 figée)                                                          | `jest … waitingReasonUpgrade048to050` sur PG jetable              | 2/2 (001..048 byte-identiques au tag immuable `v1.0.0-rc.2` + backfill vérifié)                                             | 0      |
 | Résidu Docker                                                                                   | inspection après tous les contrôles                               | 0 conteneur/volume/image `:ci`/dangling résiduel                                                                            | —      |
 
-Non exécuté localement (dépend du VPS/CI distante) : jobs CI distants sur le SHA
-candidat, déploiement, HTTPS/HSTS, SMTP, captures RC3 déployée.
+La CI distante (6 jobs) est désormais vérifiée verte sur le SHA candidat (cf.
+rapport de PR) — elle n'est donc plus un élément non vérifié. Restent
+uniquement externes, non exécutables localement : déploiement VPS, HTTPS/HSTS
+d'extrémité, SMTP réel, navigateurs réels, et captures depuis la RC3 déployée.
 
 ### 4.2 Analyse des advisories React Router (avant push RC3)
 
