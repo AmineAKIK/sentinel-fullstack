@@ -859,6 +859,36 @@ describe('updateIncidentService – RESPONSABLE', () => {
     );
   });
 
+  it("n'ajoute JAMAIS de suivi implicite au responsable lorsqu'il agit (C-07)", async () => {
+    // Le suivi (l'étoile) est le SEUL opt-in explicite : arbitrer, prioriser,
+    // consigner, corriger, annuler ne doit jamais suivre l'incident au nom du
+    // responsable. Preuve sur une action représentative de chaque fichier de
+    // service (approbation de correction ici, priorité ci-dessous).
+    const incident = mockIncident({ edit_request: { state: 'INDISPONIBLE' } });
+    const updated = mockIncident({ state: 'INDISPONIBLE' });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(arbitrationRepo.getOpenArbitrationCase).mockResolvedValue(mockArbitrationCase());
+    jest.mocked(repo.lockActiveWorkshopLines).mockResolvedValue([mockLine()]);
+    jest.mocked(repo.applyEditRequestIncident).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(updated);
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
+
+    const approve = await updateIncidentService(1, { applyEditRequest: true }, 1, 'RESPONSABLE');
+    expect(approve.ok).toBe(true);
+    expect(repo.followIncidentData).not.toHaveBeenCalled();
+
+    jest.mocked(repo.followIncidentData).mockClear();
+
+    const priorityIncident = mockIncident({ is_priority: false });
+    jest.mocked(repo.getIncidentById).mockResolvedValue(priorityIncident);
+    jest.mocked(repo.updateIncidentData).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(mockIncident({ is_priority: true }));
+
+    const priority = await updateIncidentService(1, { isPriority: true }, 1, 'RESPONSABLE');
+    expect(priority.ok).toBe(true);
+    expect(repo.followIncidentData).not.toHaveBeenCalled();
+  });
+
   it("RESPONSABLE peut refuser une correction et l'événement EDIT_REJECTED est loggué", async () => {
     const incident = mockIncident({ edit_request: { state: 'INDISPONIBLE' } });
     const updated = mockIncident({ edit_request: null });

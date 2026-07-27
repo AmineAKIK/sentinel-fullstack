@@ -376,8 +376,33 @@ les révocations sont finalisés au lot 3.
   destinataires de notification.
 - **Tests :** action responsable n'active pas l'étoile ; clic explicite
   active/retire ; destinataires conformes.
-- **Preuve finale :** _(à compléter — lot 6)_
-- **État :** OPEN
+- **Preuve finale (exécutée) :**
+  - `autoFollowForResponsable` et ses 9 appels supprimés (4 dans
+    `workshop.service.mutations.ts` : setPriority, setResponsibleComment,
+    rejectCancel, cancel ; 5 dans `workshop.service.edit.ts` : createIncident,
+    editIncident, approveEdit, rejectEdit) ; `grep` confirme zéro référence
+    restante. Aucune autre logique (table `workshop_incident_followers`,
+    follow/unfollow explicites) modifiée.
+  - _Cycle rouge → vert (unitaire)_ —
+    `workshop.service.test.ts` (« n'ajoute JAMAIS de suivi implicite au
+    responsable lorsqu'il agit (C-07) ») : rouge d'abord (approbation de
+    correction appelait `followIncidentData(1,1,null)`), vert après suppression ;
+    couvre approbation de correction et priorité.
+  - _Preuve PostgreSQL réelle_ —
+    `src/integration/__tests__/explicitFollow.integration.test.ts` :
+    prioriser un incident n'ajoute pas le responsable aux suiveurs
+    (`activeFollowerCount = 0`) ; un suivi explicite préexistant est préservé,
+    ni retiré ni dupliqué, quand le responsable agit ensuite (`= 1`).
+  - _Destinataires de notification_ — `getFollowersEmails`
+    (`notifications.service.ts:47`) lit directement
+    `workshop_incident_followers` (suivis explicites uniquement) ; les canaux
+    « followers » (TAKEN/PENDING/CLOSED/CANCELED) sont donc désormais alimentés
+    par le seul opt-in, sans logique de destinataire à modifier. Aucun suivi
+    implicite côté frontend (seul `handleToggleFollow`, l'étoile, déclenche un
+    suivi).
+- **Résultats globaux (exécutés) :** backend unit 492/492 ; intégration
+  PostgreSQL réelle 132/132 (18 suites) ; ESLint + Prettier + typecheck propres.
+- **État :** VERIFIED
 
 ### C-08 — En-têtes de sécurité publics en double
 
@@ -428,7 +453,7 @@ les révocations sont finalisés au lot 3.
 | 3 | Session Board sans expiration | migration `049` + `fix(board)` (1249c3a) + validation PG | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136) | FAIT (C-06 VERIFIED sur PostgreSQL jetable) |
-| 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |
+| 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | PRÊT — C-07 VERIFIED (unitaire rouge→vert + PG réel), en attente de commit |
 | 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | À FAIRE |
 | 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |
 | 9 | Terminologie et restitution | `fix(copy): align workshop labels with the incident lifecycle` | À FAIRE |

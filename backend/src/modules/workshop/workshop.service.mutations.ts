@@ -28,16 +28,6 @@ function unchangedSelectionFields(current: WorkshopIncidentRow) {
   };
 }
 
-export async function autoFollowForResponsable(
-  incidentId: number,
-  actorUserId: number,
-  actorRole: string,
-  client: Parameters<typeof workshopRepository.followIncidentData>[2]
-): Promise<void> {
-  if (actorRole !== 'RESPONSABLE') return;
-  await workshopRepository.followIncidentData(incidentId, actorUserId, client);
-}
-
 // ─── Prise en charge (TAKE) ───────────────────────────────────────────────────
 
 export async function takeIncidentService(
@@ -353,7 +343,6 @@ export async function setPriorityIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id, changed: true };
   });
 
@@ -406,7 +395,6 @@ export async function setResponsibleCommentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id, changed: true };
   });
 
@@ -599,7 +587,6 @@ export async function rejectCancelIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -684,7 +671,6 @@ export async function cancelIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, mode: action, takenByUserId: incident.taken_by_user_id };
   });
 

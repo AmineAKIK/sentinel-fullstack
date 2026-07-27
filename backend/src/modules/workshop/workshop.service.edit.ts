@@ -16,7 +16,6 @@ import { canPerform, hasPendingArbitration } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
 import * as arbitrationRepository from './workshop.arbitration.repository';
 import { CreateIncidentInput, UpdateIncidentInput } from './workshop.validation';
-import { autoFollowForResponsable } from './workshop.service.mutations';
 import { FIELD_LIMITS } from '../../domain/constants';
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
@@ -185,7 +184,10 @@ export async function validateIncidentSelectionService(data: {
 export async function createIncidentService(
   data: CreateIncidentInput,
   actorUserId: number,
-  actorRole: string
+  // Conservé pour la symétrie de signature avec les autres services de mutation
+  // et l'appel positionnel du contrôleur ; la création n'est plus conditionnée
+  // au rôle depuis la suppression du suivi implicite (C-07).
+  _actorRole: string
 ): Promise<ServiceResult<unknown>> {
   const result = await withTransaction(async (client) => {
     const [line] = await workshopRepository.lockActiveWorkshopLines([data.lineId], client);
@@ -219,7 +221,6 @@ export async function createIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(id, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -347,7 +348,6 @@ export async function editIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -564,7 +564,6 @@ export async function approveEditIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
@@ -646,7 +645,6 @@ export async function rejectEditIncidentService(
       },
       client
     );
-    await autoFollowForResponsable(incidentId, actorUserId, actorRole, client);
     return { kind: 'ok' as const, id };
   });
 
