@@ -488,7 +488,7 @@ les révocations sont finalisés au lot 3.
 | 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136) | FAIT (C-06 VERIFIED sur PostgreSQL jetable) |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` (1bd197f) | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel) |
-| 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | PRÊT — C-05 VERIFIED (migration 050 + PG réel), en attente de commit |
+| 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff) | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel) |
 | 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |
 | 9 | Terminologie et restitution | `fix(copy): align workshop labels with the incident lifecycle` | À FAIRE |
 | 10 | Recette comportementale et axe | `test: cover rc3 multi-role ux and audit contracts` | À FAIRE |
