@@ -546,11 +546,36 @@ autre opérateur`) ;
 - **Sévérité :** P2
 - **Preuve initiale :** certains clients bloquent les images distantes ; le sujet,
   les données essentielles et le lien doivent rester compréhensibles sans image.
-- **Fichiers concernés :** gabarits de notification.
-- **Correction (P2) :** garantir la lisibilité sans chargement d'image.
-- **Tests :** contenu essentiel présent hors image.
-- **Preuve finale :** _(à compléter — P2)_
-- **État :** OPEN
+- **Fichiers concernés :** gabarits de notification (`templates/*.ts`),
+  `notifications.service.ts` (`sendMail`).
+- **Correction (RC3) :**
+  - **Aucune information indispensable dans une image** — état constaté et figé
+    par test : aucun gabarit ne contient de `<img>` ni de `background-image` ;
+    l'en-tête « SENTINEL » est du texte. Tout le contenu essentiel (sujet, type
+    de décision, incident, ligne, machine, acteur, motif utile, lien) est déjà
+    du texte dans le HTML.
+  - **Alternative texte brut ajoutée** — `htmlToText` dérive une partie texte
+    lisible depuis le HTML (liens conservés « libellé : URL », entités
+    décodées, balisage retiré) ; `sendMail` la passe désormais à Nodemailer
+    (`text`), qui émet un `multipart/alternative` (text + html). Le message
+    reste donc lisible même si le client bloque le HTML ou les images.
+- **Tests (exécutés) :**
+  - `templates.test.ts` (C-09) — aucun gabarit ne dépend d'une image ;
+    l'alternative texte porte incident/ligne/machine/acteur/motif + l'URL du
+    lien, sans balisage résiduel ; les entités HTML sont redécodées
+    (« A & B », `M<1>`, guillemets, apostrophe) sans exposer de balisage.
+  - `notifications.service.test.ts` (C-09) — chaque envoi joint une partie
+    `text` non vide, sans balise, contenant l'information utile passée au
+    gabarit.
+- **Preuve RC2 (client réel) :** l'affichage lisible sans image a été observé sur
+  un client de messagerie réel en RC2 (preuve RC2, non re-exécutée ici).
+- **Vérification SMTP RC3 (après déploiement) :** envoyer une notification via le
+  SMTP de production et confirmer, dans un client réel avec images bloquées, que
+  le sujet, le type de décision, l'incident, la ligne, la machine, l'acteur, le
+  motif et le lien restent lisibles — en HTML **et** en partie texte brut.
+- **État :** IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION (lisibilité sans image +
+  partie texte brut prouvées localement ; confirmation SMTP réelle à faire après
+  déploiement).
 
 ## 4. Portes de validation
 

@@ -5,6 +5,7 @@ import { getAdminNotifPref } from '../adminCredentials/adminCredentials.reposito
 import * as adminResetTemplate from './templates/admin-password-reset-requested';
 import * as actionRequiredTemplate from './templates/responsable-action-required';
 import * as incidentUpdateTemplate from './templates/incident-update';
+import { htmlToText } from './templates/layout';
 
 // ─── Résultat de livraison ─────────────────────────────────────────────────────
 //
@@ -112,6 +113,11 @@ async function sendMail(
     return { outcome: alreadyDelivered.size > 0 ? 'SENT' : 'SKIPPED_NO_RECIPIENT', delivered: [] };
   }
 
+  // Alternative texte brut (C-09) : le message reste lisible quand le client
+  // bloque le HTML/les images. Nodemailer émet alors un `multipart/alternative`
+  // (text + html) plutôt qu'un HTML seul.
+  const text = htmlToText(html);
+
   // Un message par destinataire : aucune adresse professionnelle n'est
   // divulguée aux autres personnes notifiées via l'en-tête To.
   const results = await Promise.allSettled(
@@ -121,6 +127,7 @@ async function sendMail(
         to: recipient,
         subject,
         html,
+        text,
       })
     )
   );
