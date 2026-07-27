@@ -128,7 +128,7 @@ describe('IncidentDetailPanel', () => {
 
     expect(screen.getByRole('heading', { name: 'Décision requise' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Dossier' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Narratif atelier' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: "Suivi de l'incident" })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Contexte machine' })).toBeDefined();
     expect(screen.getAllByText('Urgent')).toHaveLength(1);
     expect(screen.getAllByText('Ouvert')).toHaveLength(1);

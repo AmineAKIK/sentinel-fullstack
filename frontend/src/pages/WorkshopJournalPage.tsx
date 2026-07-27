@@ -10,6 +10,7 @@ import {
   formatDateTime,
   formatEventActor,
   formatEventDetail,
+  formatEventLabel,
 } from '../utils/workshopHistory';
 import {
   lineFilterChip,
@@ -221,7 +222,7 @@ export default function WorkshopJournalPage() {
                   }}
                   aria-label="Retirer le filtre action"
                 >
-                  <span>Action : {EVENT_LABELS[eventTypeFilter] ?? eventTypeFilter}</span>
+                  <span>Action : {formatEventLabel(eventTypeFilter)}</span>
                   <span aria-hidden="true">×</span>
                 </button>
               )}
@@ -289,7 +290,7 @@ export default function WorkshopJournalPage() {
                         <tr key={event.id}>
                           <td>{formatDateTime(event.created_at)}</td>
                           <td>
-                            {EVENT_LABELS[event.event_type] ?? event.event_type}
+                            {formatEventLabel(event.event_type)}
                             {detail && <div className="muted">{detail}</div>}
                           </td>
                           <td>
@@ -330,7 +331,7 @@ export default function WorkshopJournalPage() {
                   return (
                     <div key={event.id} className="history-journal-card">
                       <div className="history-journal-card-top">
-                        <strong>{EVENT_LABELS[event.event_type] ?? event.event_type}</strong>
+                        <strong>{formatEventLabel(event.event_type)}</strong>
                         <span className="muted">{formatDateTime(event.created_at)}</span>
                       </div>
                       {detail && <span className="muted">{detail}</span>}

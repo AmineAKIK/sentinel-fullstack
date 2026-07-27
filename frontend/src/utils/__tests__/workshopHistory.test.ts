@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEventActor, formatEventDetail } from '../workshopHistory';
+import { formatEventActor, formatEventDetail, formatEventLabel } from '../workshopHistory';
 import type { WorkshopIncidentEvent } from '../../types';
 
 function event(overrides: Partial<WorkshopIncidentEvent> = {}): WorkshopIncidentEvent {
@@ -15,6 +15,21 @@ function event(overrides: Partial<WorkshopIncidentEvent> = {}): WorkshopIncident
     ...overrides,
   };
 }
+
+describe('formatEventLabel (lot 9 — aucune donnée technique)', () => {
+  it('traduit un type connu en libellé métier français', () => {
+    expect(formatEventLabel('INCIDENT_SET_PENDING')).toBe('Suspendu');
+    expect(formatEventLabel('CANCEL_REQUEST_WITHDRAWN')).toBe('Annulation retirée');
+  });
+
+  it('ne laisse JAMAIS fuiter un code technique brut pour un type inconnu', () => {
+    // Un type inconnu (trace ancienne ou ajout futur non libellé) doit retomber
+    // sur un générique sûr, jamais sur le code SCREAMING_SNAKE_CASE.
+    const label = formatEventLabel('SOME_FUTURE_RAW_CODE');
+    expect(label).toBe('Événement');
+    expect(label).not.toMatch(/[A-Z_]{4,}/);
+  });
+});
 
 describe('formatEventActor', () => {
   it('retourne "Systeme" si pas de prénom', () => {

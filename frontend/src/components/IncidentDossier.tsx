@@ -4,10 +4,10 @@ import EmptyState from './ui/EmptyState';
 import { WorkshopIncident, WorkshopIncidentEvent } from '../types';
 import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
 import {
-  EVENT_LABELS,
   formatDateTime,
   formatEventActor,
   formatEventDetail,
+  formatEventLabel,
 } from '../utils/workshopHistory';
 import { formatIncidentDuration } from '../utils/durationFormat';
 
@@ -165,7 +165,7 @@ export default function IncidentDossier({
               >
                 <div className="timeline-date">{formatDateTime(event.created_at)}</div>
                 <div className="timeline-content">
-                  <strong>{EVENT_LABELS[event.event_type] ?? event.event_type}</strong>
+                  <strong>{formatEventLabel(event.event_type)}</strong>
                   {detail && <span>{detail}</span>}
                   <span className="muted">{formatEventActor(event)}</span>
                 </div>

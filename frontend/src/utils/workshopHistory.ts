@@ -1,8 +1,16 @@
 import { WorkshopIncidentEvent } from '../types';
-import { STATE_LABELS as STATE_LABELS_MAP } from './labels';
+import { STATE_LABELS as STATE_LABELS_MAP, WORKSHOP_EVENT_LABELS } from './labels';
 export { formatDateTime, formatSeconds } from './date';
 export { STATE_LABELS, STATUS_LABELS } from './labels';
 export { WORKSHOP_EVENT_LABELS as EVENT_LABELS } from './labels';
+
+// Libellé métier d'un type d'événement, TOUJOURS en français et JAMAIS le code
+// technique brut (lot 9). Un type inconnu (trace ancienne ou ajout futur non
+// libellé) retombe sur un générique sûr plutôt que d'exposer p. ex.
+// « INCIDENT_SET_PENDING » à l'utilisateur.
+export function formatEventLabel(eventType: string): string {
+  return WORKSHOP_EVENT_LABELS[eventType] ?? 'Événement';
+}
 
 export type HistoryPeriod = 'today' | '7d' | '30d' | 'lifetime' | 'custom';
 

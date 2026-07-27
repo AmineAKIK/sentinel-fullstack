@@ -540,7 +540,7 @@ export default function IncidentDetailPanel({
         </DrawerSection>
 
         {hasNarrative && (
-          <DrawerSection title="Narratif atelier">
+          <DrawerSection title="Suivi de l'incident">
             <div className="incident-narrative-list">
               <NarrativeItem label="Signalement" value={incident.comment} primary />
               <NarrativeItem label="Motif de mise en attente" value={waitingReason} />
