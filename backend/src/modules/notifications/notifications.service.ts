@@ -646,6 +646,7 @@ export async function notifyDeclarantCancelApproved(
 export async function notifyDeclarantCancelRejected(
   incidentId: number,
   actorUserId: number,
+  decisionReason = '',
   alreadyDelivered: ReadonlySet<string> = new Set()
 ): Promise<DeliveryResult> {
   if (!(await getAdminNotifPref('notif_operateurs')))
@@ -659,6 +660,12 @@ export async function notifyDeclarantCancelRejected(
   const email = await getUserEmail(incident.user_id);
   if (!email) return { outcome: 'SKIPPED_NO_RECIPIENT', delivered: [] };
 
+  // Motif de refus inclus dans la notification (RC3 §6), comme pour la correction.
+  const reason = decisionReason.trim();
+  const detail = reason
+    ? `Refusée par ${actorName} — Motif : ${reason}`
+    : `Refusée par ${actorName}`;
+
   return sendMail(
     email,
     incidentUpdateTemplate.subjectIncidentUpdate("Demande d'annulation refusée", incidentId),
@@ -667,7 +674,7 @@ export async function notifyDeclarantCancelRejected(
       lineNumber: incident.line_number,
       machineId: incident.machine_id,
       eventLabel: "Votre demande d'annulation a été refusée",
-      detail: `Refusée par ${actorName}`,
+      detail,
       actorName,
       workshopUrl: `${clientOrigin()}/workshop/dashboard`,
     }),

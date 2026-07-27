@@ -97,26 +97,46 @@ export default function IncidentCard({
           )}
         </div>
       </div>
-      {isResponsable && (Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
+      {/* L'existence d'un arbitrage est un FAIT OPÉRATIONNEL COMMUN : l'indicateur
+          « à arbitrer » est visible par TOUS les rôles. Seule la COMMANDE (bouton
+          cliquable qui ouvre l'arbitrage) est réservée au responsable ; les autres
+          rôles voient un badge non interactif. */}
+      {(Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
         <div className="incident-card-actions">
-          {incident.edit_request && (
-            <button
-              type="button"
-              className="incident-request-action incident-request-action--edit"
-              onClick={(event) => onReviewEdit(event, incident)}
-            >
-              {editArbitrationWaiting ? 'Correction en attente' : 'Correction demandée'}
-            </button>
-          )}
-          {incident.cancel_request && (
-            <button
-              type="button"
-              className="incident-request-action incident-request-action--delete"
-              onClick={(event) => onReviewDelete(event, incident)}
-            >
-              {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation demandée'}
-            </button>
-          )}
+          {incident.edit_request &&
+            (isResponsable ? (
+              <button
+                type="button"
+                className="incident-request-action incident-request-action--edit"
+                onClick={(event) => onReviewEdit(event, incident)}
+              >
+                {editArbitrationWaiting ? 'Correction en attente' : 'Modification à arbitrer'}
+              </button>
+            ) : (
+              <span
+                className="incident-request-action incident-request-action--edit incident-request-action--readonly"
+                aria-label="Modification à arbitrer"
+              >
+                Modification à arbitrer
+              </span>
+            ))}
+          {incident.cancel_request &&
+            (isResponsable ? (
+              <button
+                type="button"
+                className="incident-request-action incident-request-action--delete"
+                onClick={(event) => onReviewDelete(event, incident)}
+              >
+                {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation à arbitrer'}
+              </button>
+            ) : (
+              <span
+                className="incident-request-action incident-request-action--delete incident-request-action--readonly"
+                aria-label="Annulation à arbitrer"
+              >
+                Annulation à arbitrer
+              </span>
+            ))}
         </div>
       )}
 

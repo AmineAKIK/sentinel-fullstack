@@ -76,6 +76,7 @@ export const WORKSHOP_EVENT_LABELS: Record<string, string> = {
   EDIT_REQUEST_WITHDRAWN: 'Correction retirée',
   CANCEL_REQUESTED: 'Annulation demandée',
   CANCEL_REQUEST_REJECTED: 'Annulation refusée',
+  CANCEL_REQUEST_WITHDRAWN: 'Annulation retirée',
   DELETE_REQUESTED: 'Annulation demandée',
   DELETE_REQUEST_REJECTED: 'Annulation refusée',
   PRIORITY_CHANGED: 'Priorité modifiée',

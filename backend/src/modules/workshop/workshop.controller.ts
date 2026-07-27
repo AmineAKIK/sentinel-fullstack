@@ -266,10 +266,16 @@ export async function cancelIncident(req: Request, res: Response): Promise<void>
   try {
     const id = parseIdParam(req.params.id);
     if (sendServiceError(res, id)) return;
+    // La modale d'arbitrage confirme une DEMANDE précise : elle envoie
+    // expectArbitration=true. Si la demande a disparu (retrait/refus concurrent),
+    // l'action échoue proprement au lieu de basculer en annulation directe.
+    const expectation =
+      (req.body as { expectArbitration?: unknown })?.expectArbitration === true ? 'approve' : 'any';
     const result = await cancelIncidentService(
       id.data,
       req.workshopUser!.userId,
-      req.workshopUser!.role
+      req.workshopUser!.role,
+      expectation
     );
     if (sendServiceError(res, result)) return;
     res.json(result.data);

@@ -30,7 +30,8 @@ export type WorkshopAction =
   | 'setPriority'
   | 'responsibleComment'
   | 'invalidateClosed'
-  | 'withdrawEdit';
+  | 'withdrawEdit'
+  | 'withdrawCancel';
 
 function isActiveIncident(incident: WorkshopIncident): boolean {
   return (
@@ -84,6 +85,16 @@ export function canPerform(
         isActiveIncident(incident) &&
         !hasPendingArbitration(incident) &&
         !incident.is_taken &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
+    case 'withdrawCancel':
+      // Le demandeur retire sa propre demande d'annulation tant qu'elle est en
+      // attente (symétrique à withdrawEdit).
+      return (
+        role === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        incident.cancel_request === true &&
         actorId !== undefined &&
         incident.user_id === actorId
       );

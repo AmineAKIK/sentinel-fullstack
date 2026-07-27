@@ -390,9 +390,13 @@ export async function getBoardData() {
        ORDER BY line_number ASC`
     ),
     pool.query(
+      // Le Board reçoit UNIQUEMENT l'existence d'un arbitrage (type de demande),
+      // jamais les identités ni les motifs (RC3 §6, projection Board minimale).
       `SELECT id, line_id, line_number, machine_id, robot_label,
               head_number, state, current_product, is_taken, is_priority,
-              responsible_comment, status, display_order, created_at, updated_at
+              responsible_comment, status, display_order, created_at, updated_at,
+              (edit_request IS NOT NULL) AS has_edit_arbitration,
+              (cancel_request = TRUE) AS has_cancel_arbitration
        FROM workshop_incidents
        WHERE ${activeIncidentStatusSql}
        ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC`

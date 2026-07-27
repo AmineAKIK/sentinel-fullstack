@@ -314,8 +314,53 @@ les révocations sont finalisés au lot 3.
   obligatoire et persistant.
 - **Tests :** PostgreSQL concurrents (un seul gagnant, retrait interdit à un autre
   opérateur) ; visibilité multi-rôle ; Board minimal sans données privées.
-- **Preuve finale :** _(à compléter — lot 5)_
-- **État :** OPEN
+- **Preuve finale (exécutée) :**
+  - _Concurrence PostgreSQL réelle_ —
+    `src/integration/__tests__/cancellationArbitration.integration.test.ts`
+    (8 cas, verts sur PostgreSQL jetable) :
+    - retrait par le demandeur (`retire la demande d'annulation …`) ;
+    - retrait interdit à un autre opérateur → 403 (`interdit le retrait à un
+      autre opérateur`) ;
+    - refus sans motif / motif d'espaces refusés (motif obligatoire) ;
+    - **retrait vs confirmation d'annulation** : exactement un gagnant, jamais
+      d'état contradictoire (boucle 6×) ;
+    - **deux retraits simultanés** : un seul succès, un seul événement
+      `CANCEL_REQUEST_WITHDRAWN`, zéro doublon d'outbox, perdant en code métier
+      stable (`CONFLICT`, jamais 500) ;
+    - **décision finale d'annulation** : motif initial `Doublon de signalement.`
+      préservé, arbitrage `APPROVED` + `decided_by`/`decided_at`, incident
+      `CANCELED`, événements cohérents, incident encore présent en Historique.
+  - _Projection Board minimale sur PostgreSQL réel_ —
+    `src/integration/__tests__/boardArbitrationProjection.integration.test.ts` :
+    `getBoardData` dérive `has_edit_arbitration` / `has_cancel_arbitration`
+    (booléens) et n'expose ni motif (`cancel_request_reason`), ni contenu de
+    demande (`edit_request`), ni identité (`user_id`, `decided_by`).
+  - _Contrat SQL de la projection_ —
+    `src/modules/workshop/__tests__/workshop.repository.test.ts`
+    (« expose uniquement l'EXISTENCE d'un arbitrage au board »).
+  - _Indicateur carte, parité inter-rôles_ —
+    `frontend/src/components/__tests__/IncidentCard.test.tsx` : bouton cliquable
+    pour le responsable (commande) vs `<span>` `--readonly` pour les autres
+    rôles, même libellé court « Annulation à arbitrer » / « Modification à
+    arbitrer ».
+  - _Indicateur Board, lecture seule sans commande_ —
+    `frontend/src/components/__tests__/BoardIncidentGrid.test.tsx` : chip
+    `aria-label` « … à arbitrer », **aucun** `button` sur le Board.
+  - _Panneau : retrait + parité + aucune commande aux rôles non autorisés_ —
+    `frontend/src/components/__tests__/IncidentDetailPanel.test.tsx` (bloc
+    « retrait de la demande d'annulation (lot 5) ») : bouton « Retirer ma
+    demande » visible au seul demandeur d'une demande active, disparu sinon ;
+    envoi de `{ withdrawCancelRequest: true }` + retour de succès accessible ;
+    verrou anti-double-clic (bouton `disabled`, `patchIncident` appelé une
+    fois) ; erreur métier traduite (`CONFLICT`) sans fuite du message brut et
+    bouton de nouveau actionnable après échec ; rôle non autorisé
+    (MAINTENANCE) voit « Demande en cours » mais aucun bouton « Arbitrer » /
+    « Reprendre ».
+- **Résultats globaux (exécutés) :** backend unit 491/491 ; intégration
+  PostgreSQL réelle 130/130 (17 suites) ; frontend 446/446 (52 fichiers),
+  couverture ≥ 80 % (statements 89,29 % / branches 82,02 % / fonctions 91,18 %
+  / lignes 91,63 %) ; ESLint + Prettier propres.
+- **État :** VERIFIED
 
 ### C-07 — Suivi implicite (`autoFollowForResponsable`)
 
@@ -382,7 +427,7 @@ les révocations sont finalisés au lot 3.
 | 2 | Erreurs publiques stables | `8932ae9` | FAIT |
 | 3 | Session Board sans expiration | migration `049` + `fix(board)` (1249c3a) + validation PG | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
-| 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | À FAIRE |
+| 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` | PRÊT — backend/concurrence/frontend/restitution verts (C-06 VERIFIED), en attente de commit |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` | À FAIRE |
 | 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | À FAIRE |
 | 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |

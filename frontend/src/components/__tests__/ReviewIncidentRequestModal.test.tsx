@@ -167,7 +167,8 @@ describe('ReviewIncidentRequestModal', () => {
     expect(screen.getByText('Annulation opérateur')).toBeDefined();
     expect(screen.getByText('Motif opérateur')).toBeDefined();
     expect(screen.getByText('doublon')).toBeDefined();
-    expect(screen.getByRole('button', { name: "Annuler l'incident" })).toBeDefined();
+    // Le bouton destructif final est renommé « Confirmer l'annulation » (RC3 §6).
+    expect(screen.getByRole('button', { name: "Confirmer l'annulation" })).toBeDefined();
   });
 
   it('adapte la consultation quand deux demandes sont ouvertes sur le même incident', () => {
@@ -330,9 +331,48 @@ describe('ReviewIncidentRequestModal', () => {
       />
     );
     // La saisie n'est pas perdue et l'erreur est visible.
-    expect((screen.getByLabelText('Motif du refus') as HTMLTextAreaElement).value).toBe(
-      'Motif saisi'
-    );
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Motif du refus').value).toBe('Motif saisi');
     expect(screen.getByText('Le motif du refus est obligatoire.')).toBeDefined();
+  });
+
+  // ─── Motif du refus d'ANNULATION (lot 5, même exigence que la correction) ───
+
+  it('le refus d’annulation exige aussi un motif saisi et normalisé', () => {
+    const onRejectDelete = vi.fn();
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident({
+          edit_request: null,
+          cancel_request: true,
+          cancel_request_reason: 'doublon',
+          arbitration: {
+            cancel: {
+              caseId: 22,
+              requestEventId: 43,
+              requestedAt: '2026-06-28T11:10:00.000Z',
+              state: 'ACTIVE',
+            },
+          },
+        })}
+        lines={[]}
+        type="delete"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+        onRejectDelete={onRejectDelete}
+        onApproveDelete={vi.fn()}
+      />
+    );
+    // Le bouton final destructif porte bien le libellé de confirmation.
+    expect(screen.getByRole('button', { name: "Confirmer l'annulation" })).toBeDefined();
+    // Choisir de refuser révèle le champ motif ; vide → confirmation bloquée.
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser la demande' }));
+    const confirm = screen.getByRole('button', { name: 'Confirmer le refus' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Motif du refus'), {
+      target: { value: '  Incident bien réel.  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer le refus' }));
+    expect(onRejectDelete).toHaveBeenCalledWith('Incident bien réel.');
   });
 });

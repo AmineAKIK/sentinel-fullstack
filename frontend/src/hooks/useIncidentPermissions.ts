@@ -19,6 +19,7 @@ export function useIncidentPermissions(
   const canResponsableEdit = canPerform(userRole, 'responsableEdit', incident);
   const canWithdrawEdit = canPerform(userRole, 'withdrawEdit', incident, userId);
   const canRequestCancel = canPerform(userRole, 'requestCancel', incident, userId);
+  const canWithdrawCancel = canPerform(userRole, 'withdrawCancel', incident, userId);
   const canCancel = canPerform(userRole, 'cancel', incident);
   const canTake = canPerform(userRole, 'take', incident, userId);
   const canSetPending = canPerform(userRole, 'setPending', incident);
@@ -42,7 +43,8 @@ export function useIncidentPermissions(
   const hasWorkflowActions = canTake || canSetPending || canResume || canClose || canSetPriority;
   const hasStandardActions =
     canRequestEdit || canDirectEdit || canResponsableEdit || canWithdrawEdit;
-  const hasDangerActions = canRequestCancel || canCancel || canInvalidateClosed;
+  const hasDangerActions =
+    canRequestCancel || canWithdrawCancel || canCancel || canInvalidateClosed;
   const hasResponsibleInstruction =
     Boolean(incident.responsible_comment) || canEditResponsibleComment;
 
@@ -52,6 +54,7 @@ export function useIncidentPermissions(
     canResponsableEdit,
     canWithdrawEdit,
     canRequestCancel,
+    canWithdrawCancel,
     canCancel,
     canTake,
     canSetPending,

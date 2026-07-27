@@ -290,6 +290,7 @@ export default function IncidentDetailPanel({
     canResponsableEdit,
     canWithdrawEdit,
     canRequestCancel,
+    canWithdrawCancel,
     canCancel,
     canTake,
     canSetPending,
@@ -624,6 +625,22 @@ export default function IncidentDetailPanel({
                   }
                 >
                   {canCancel ? "Annuler l'incident" : "Demander l'annulation"}
+                </button>
+              )}
+              {canWithdrawCancel && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() =>
+                    void runPanelAction(
+                      'withdraw-cancel',
+                      () => patchIncident(incident.id, { withdrawCancelRequest: true }),
+                      "Impossible de retirer la demande d'annulation.",
+                      'Demande d’annulation retirée.'
+                    )
+                  }
+                  disabled={pendingAction !== null}
+                >
+                  Retirer ma demande
                 </button>
               )}
               {canInvalidateClosed && (

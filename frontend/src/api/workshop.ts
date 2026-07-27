@@ -129,6 +129,7 @@ export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   rejectEditRequest?: boolean;
   rejectDeleteRequest?: boolean;
   withdrawEditRequest?: boolean;
+  withdrawCancelRequest?: boolean;
   decisionReason?: string;
 };
 
@@ -159,8 +160,16 @@ export async function consultWorkshopArbitration(
   );
 }
 
-export async function cancelWorkshopIncident(id: number): Promise<void> {
-  return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {});
+export async function cancelWorkshopIncident(
+  id: number,
+  options: { expectArbitration?: boolean } = {}
+): Promise<void> {
+  // expectArbitration=true : confirmer une DEMANDE d'annulation précise (modale
+  // d'arbitrage). Si la demande a disparu (retrait/refus concurrent), le backend
+  // échoue proprement (409) au lieu d'annuler directement.
+  return api.post<void>(`/api/workshop/incidents/${id}/cancel`, {
+    expectArbitration: options.expectArbitration === true,
+  });
 }
 
 export async function listIncidentEvents(

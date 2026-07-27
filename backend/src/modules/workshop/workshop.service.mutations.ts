@@ -6,6 +6,7 @@ import {
   ServiceResult,
 } from '../../utils/serviceResult';
 import { withTransaction } from '../../db/transaction';
+import { FIELD_LIMITS } from '../../domain/constants';
 import { logIncidentEvent } from './workshop.events';
 import { canPerform, hasCancelRequest, hasPendingArbitration } from './workshop.policy';
 import * as workshopRepository from './workshop.repository';
@@ -477,13 +478,92 @@ export async function requestCancelIncidentService(
   };
 }
 
+// ─── Retrait annulation par le demandeur (WITHDRAW_CANCEL) ───────────────────
+
+export async function withdrawCancelIncidentService(
+  incidentId: number,
+  actorUserId: number,
+  actorRole: string
+): Promise<ServiceResult<unknown>> {
+  const result = await withTransaction(async (client) => {
+    const current = await workshopRepository.getIncidentById(incidentId, client);
+    if (!current) return { kind: 'not_found' as const };
+    const arbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+    if (!arbitration || arbitration.request_type !== 'CANCEL') {
+      return { kind: 'bad_request' as const };
+    }
+    // Seul le demandeur, tant que la demande est en attente. La policy vérifie
+    // l'appartenance ; l'existence d'un arbitrage CANCEL ouvert garantit le WAITING.
+    if (!canPerform(actorRole, 'WITHDRAW_CANCEL', current, actorUserId))
+      return { kind: 'forbidden' as const };
+
+    // Résout d'ABORD l'arbitrage : c'est la garde d'unicité. Sous verrou de ligne
+    // (getIncidentById FOR UPDATE), une seule transaction concurrente peut faire
+    // passer le cas de ACTIVE/CONSULTED à WITHDRAWN. Si aucune ligne n'est
+    // résolue, une opération concurrente (refus ou confirmation) a déjà tranché :
+    // on perd la course proprement, sans effet de bord.
+    const resolvedCaseId = await arbitrationRepository.resolveArbitrationCase(
+      incidentId,
+      'CANCEL',
+      'WITHDRAWN',
+      actorUserId,
+      'Retrait par le demandeur',
+      client
+    );
+    if (resolvedCaseId === null) return { kind: 'already_resolved' as const };
+
+    const id = await workshopRepository.rejectCancelIncident(incidentId, client);
+    if (!id) return { kind: 'not_found' as const };
+    await logIncidentEvent(
+      incidentId,
+      actorUserId,
+      'CANCEL_REQUEST_WITHDRAWN',
+      {
+        withdrawnBy: actorUserId,
+      },
+      client
+    );
+    return { kind: 'ok' as const, id };
+  });
+
+  if (result.kind === 'not_found') return notFound('Incident introuvable.');
+  if (result.kind === 'forbidden') return forbidden('Retrait non autorisé.');
+  if (result.kind === 'bad_request')
+    return badRequest("Aucune demande d'annulation active à retirer.");
+  if (result.kind === 'already_resolved') {
+    // Course perdue : une décision concurrente (refus/confirmation) a déjà tranché.
+    return conflict('CONFLICT', "Cette demande d'annulation a déjà été traitée.");
+  }
+  return {
+    ok: true,
+    data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
+  };
+}
+
 // ─── Refus annulation (REJECT_CANCEL) ────────────────────────────────────────
 
 export async function rejectCancelIncidentService(
   incidentId: number,
   actorUserId: number,
-  actorRole: string
+  actorRole: string,
+  decisionReason: string
 ): Promise<ServiceResult<unknown>> {
+  // Motif de refus OBLIGATOIRE (RC3 §6), aligné sur le refus de correction (lot 4).
+  // Erreur structurée avec un champ public stable (decisionReason).
+  const reason = (decisionReason ?? '').trim();
+  if (reason.length === 0) {
+    return badRequest('Un motif de refus est obligatoire.', {
+      field: 'decisionReason',
+      reason: 'REQUIRED',
+    });
+  }
+  if (reason.length > FIELD_LIMITS.COMMENT) {
+    return badRequest('Le motif de refus est trop long.', {
+      field: 'decisionReason',
+      reason: 'TOO_LONG',
+      max: FIELD_LIMITS.COMMENT,
+    });
+  }
   const result = await withTransaction(async (client) => {
     const current = await workshopRepository.getIncidentById(incidentId, client);
     if (!current) return { kind: 'not_found' as const };
@@ -496,22 +576,26 @@ export async function rejectCancelIncidentService(
       return { kind: 'bad_request' as const, msg: "Aucune demande d'annulation à refuser." };
     }
 
-    const id = await workshopRepository.rejectCancelIncident(incidentId, client);
-    if (!id) return { kind: 'not_found' as const };
-    await arbitrationRepository.resolveArbitrationCase(
+    // Garde d'unicité : résoudre l'arbitrage d'abord (une seule transaction sous
+    // verrou peut faire ACTIVE/CONSULTED → REJECTED). Sinon course perdue.
+    const resolvedCaseId = await arbitrationRepository.resolveArbitrationCase(
       incidentId,
       'CANCEL',
       'REJECTED',
       actorUserId,
-      null,
+      reason,
       client
     );
+    if (resolvedCaseId === null) return { kind: 'already_resolved' as const };
+    const id = await workshopRepository.rejectCancelIncident(incidentId, client);
+    if (!id) return { kind: 'not_found' as const };
     await logIncidentEvent(
       incidentId,
       actorUserId,
       'CANCEL_REQUEST_REJECTED',
       {
         requestedReason: current.cancel_request_reason,
+        decisionReason: reason,
       },
       client
     );
@@ -523,6 +607,9 @@ export async function rejectCancelIncidentService(
   if (result.kind === 'forbidden')
     return forbidden('Seul le responsable peut refuser une annulation.');
   if (result.kind === 'bad_request') return badRequest(result.msg);
+  if (result.kind === 'already_resolved') {
+    return conflict('CONFLICT', "Cette demande d'annulation a déjà été traitée.");
+  }
   return {
     ok: true,
     data: await workshopRepository.fetchIncidentWithUsersForActor(result.id, actorUserId),
@@ -534,12 +621,23 @@ export async function rejectCancelIncidentService(
 export async function cancelIncidentService(
   incidentId: number,
   actorUserId: number,
-  actorRole: string
+  actorRole: string,
+  // 'approve' : confirmer une demande d'annulation précise (depuis la modale
+  // d'arbitrage) — si cette demande a disparu (retrait/refus concurrent), l'action
+  // échoue proprement au lieu de basculer en annulation directe. 'direct' :
+  // annulation directe autorisée (RESPONSABLE/MAINTENANCE selon la policy).
+  expectation: 'approve' | 'direct' | 'any' = 'any'
 ): Promise<ServiceResult<{ message: string }>> {
   const result = await withTransaction(async (client) => {
     const incident = await workshopRepository.getIncidentCancelSnapshot(incidentId, client);
     if (!incident) return { kind: 'not_found' as const };
     const arbitration = await arbitrationRepository.getOpenArbitrationCase(incidentId, client);
+
+    // Confirmation d'une demande précise : si la demande d'annulation n'est plus
+    // ouverte (retrait/refus concurrent), on ne bascule PAS en annulation directe.
+    if (expectation === 'approve' && (!arbitration || arbitration.request_type !== 'CANCEL')) {
+      return { kind: 'already_resolved' as const };
+    }
 
     if (arbitration && arbitration.request_type !== 'CANCEL') {
       return { kind: 'arbitration_required' as const };
@@ -556,11 +654,12 @@ export async function cancelIncidentService(
     }
     if (!canPerform(actorRole, action, incident)) return { kind: 'forbidden' as const };
 
-    const ok = await workshopRepository.cancelIncidentData(incidentId, client);
-    if (!ok) return { kind: 'not_found' as const };
-
+    // En approbation d'une demande, on résout l'arbitrage EN PREMIER : c'est la
+    // garde d'unicité sous verrou de ligne. Si aucune ligne ACTIVE/CONSULTED
+    // n'est résolue, une opération concurrente (retrait/refus) a déjà tranché —
+    // on n'annule PAS l'incident et on perd la course proprement.
     if (action === 'APPROVE_CANCEL') {
-      await arbitrationRepository.resolveArbitrationCase(
+      const resolvedCaseId = await arbitrationRepository.resolveArbitrationCase(
         incidentId,
         'CANCEL',
         'APPROVED',
@@ -568,7 +667,11 @@ export async function cancelIncidentService(
         null,
         client
       );
+      if (resolvedCaseId === null) return { kind: 'already_resolved' as const };
     }
+
+    const ok = await workshopRepository.cancelIncidentData(incidentId, client);
+    if (!ok) return { kind: 'not_found' as const };
 
     await logIncidentEvent(
       incidentId,
@@ -589,6 +692,9 @@ export async function cancelIncidentService(
   if (result.kind === 'arbitration_required') return arbitrationRequiredResult();
   if (result.kind === 'forbidden')
     return forbidden('Annulation non autorisée pour ce rôle ou ce statut.');
+  if (result.kind === 'already_resolved') {
+    return conflict('CONFLICT', "Cette demande d'annulation a déjà été traitée.");
+  }
   return { ok: true, data: { message: 'Incident annulé.' } };
 }
 

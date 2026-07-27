@@ -77,6 +77,7 @@ export const INCIDENT_ACTIONS = [
   'EDIT_AFTER_TAKE',
   'RESPONSABLE_EDIT',
   'WITHDRAW_EDIT',
+  'WITHDRAW_CANCEL',
 ] as const;
 export type IncidentAction = (typeof INCIDENT_ACTIONS)[number];
 

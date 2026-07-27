@@ -82,4 +82,32 @@ describe('BoardIncidentGrid', () => {
   it('interdit les ellipses dans les informations du board', () => {
     expect(boardStyles).not.toContain('text-overflow: ellipsis');
   });
+
+  it('affiche « Annulation à arbitrer » en lecture seule, sans commande ni identité', () => {
+    const { container } = renderGrid([mockIncident({ has_cancel_arbitration: true })]);
+
+    const chip = screen.getByLabelText('Annulation à arbitrer');
+    expect(chip).toBeDefined();
+    // Libellé court identique à la carte atelier et au panneau.
+    expect(chip.textContent).toBe('Annulation à arbitrer');
+    // Aucune commande d'arbitrage : jamais de bouton sur le Board.
+    expect(container.querySelector('button')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('affiche « Modification à arbitrer » en lecture seule', () => {
+    const { container } = renderGrid([mockIncident({ has_edit_arbitration: true })]);
+
+    const chip = screen.getByLabelText('Modification à arbitrer');
+    expect(chip).toBeDefined();
+    expect(chip.textContent).toBe('Modification à arbitrer');
+    expect(container.querySelector('button')).toBeNull();
+  });
+
+  it('n’affiche aucun indicateur d’arbitrage sans demande en attente', () => {
+    renderGrid([mockIncident()]);
+
+    expect(screen.queryByLabelText('Annulation à arbitrer')).toBeNull();
+    expect(screen.queryByLabelText('Modification à arbitrer')).toBeNull();
+  });
 });

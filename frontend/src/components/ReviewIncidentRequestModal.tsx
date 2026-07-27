@@ -27,7 +27,7 @@ interface ReviewIncidentRequestModalProps {
   onApplyEdit?: () => void;
   onRejectEdit?: (decisionReason: string) => void;
   onApproveDelete?: () => void;
-  onRejectDelete?: () => void;
+  onRejectDelete?: (decisionReason: string) => void;
 }
 
 // Formulaire de motif de refus (RC3, lot 4). Affiché uniquement lorsque le refus
@@ -157,7 +157,10 @@ export default function ReviewIncidentRequestModal({
       rejectInputRef.current?.focus();
       return;
     }
-    onRejectEdit?.(reason);
+    // Même formulaire de motif pour les deux contrats, routé selon le type — les
+    // contrats métier restent distincts côté service.
+    if (type === 'edit') onRejectEdit?.(reason);
+    else onRejectDelete?.(reason);
   }
 
   const requested = useMemo(() => {
@@ -272,22 +275,39 @@ export default function ReviewIncidentRequestModal({
             </button>
           )}
         </div>
-        <div className="arbitration-footer-group arbitration-footer-group--decision">
-          {allowDeleteReject && (
-            <button className="btn btn-secondary" onClick={onRejectDelete} disabled={loading}>
-              Refuser la demande
-            </button>
-          )}
-          {allowDeleteApproval && (
-            <button
-              className="btn btn-danger"
-              onClick={onApproveDelete}
-              disabled={loading || deleteApprovalDisabled}
-            >
-              {loading ? 'Annulation…' : "Annuler l'incident"}
-            </button>
-          )}
-        </div>
+        {rejectMode ? (
+          <RejectReasonForm
+            value={rejectReason}
+            onChange={setRejectReason}
+            onConfirm={confirmReject}
+            onCancel={() => setRejectMode(false)}
+            loading={loading}
+            inputRef={rejectInputRef}
+          />
+        ) : (
+          <div className="arbitration-footer-group arbitration-footer-group--decision">
+            {allowDeleteReject && (
+              <button
+                className="btn btn-secondary"
+                onClick={enterRejectMode}
+                disabled={loading}
+                type="button"
+              >
+                Refuser la demande
+              </button>
+            )}
+            {allowDeleteApproval && (
+              <button
+                className="btn btn-danger"
+                onClick={onApproveDelete}
+                disabled={loading || deleteApprovalDisabled}
+                type="button"
+              >
+                {loading ? 'Annulation…' : "Confirmer l'annulation"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
 

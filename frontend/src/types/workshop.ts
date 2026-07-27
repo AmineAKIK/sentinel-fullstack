@@ -118,6 +118,10 @@ export interface WorkshopBoardIncident {
   display_order: number;
   created_at: string;
   updated_at: string;
+  // Le Board ne reçoit QUE l'existence d'un arbitrage (type de demande), jamais
+  // les identités ni les motifs (projection Board minimale, RC3 lot 5).
+  has_edit_arbitration?: boolean;
+  has_cancel_arbitration?: boolean;
 }
 
 export interface WorkshopBoardMetrics {

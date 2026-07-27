@@ -22,6 +22,7 @@ const SUCCESS = {
   CLOSE: 'Incident clôturé et conservé dans l’historique.',
   INVALIDATE: 'Incident invalidé et conservé dans l’historique.',
   REQUEST_DELETE: 'Demande d’annulation envoyée.',
+  WITHDRAW_CANCEL: 'Demande d’annulation retirée.',
   APPLY_EDIT: 'Modification appliquée.',
   REJECT_EDIT: 'Demande de modification refusée.',
   APPROVE_DELETE: 'Incident annulé et conservé dans l’historique.',
@@ -93,8 +94,11 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
   // Annule côté serveur puis applique le patch optimiste local (statut
   // CANCELED, reset de la demande d'annulation) — commun aux 3 chemins qui
   // mènent à une annulation confirmée (approbation, annulation directe RESPONSABLE/MAINTENANCE).
-  async function applyCancelation(id: number) {
-    await cancelWorkshopIncident(id);
+  // `expectArbitration` distingue l'approbation d'une demande (true) de
+  // l'annulation directe (false) : côté serveur, une approbation dont la demande
+  // a disparu échoue proprement au lieu d'annuler directement.
+  async function applyCancelation(id: number, expectArbitration = false) {
+    await cancelWorkshopIncident(id, { expectArbitration });
     setIncidents((prev) =>
       sortIncidents(
         prev.map((item) =>
@@ -200,18 +204,19 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewLoading(true);
     modal.setReviewError('');
     try {
-      await applyCancelation(modal.state.reviewIncident.id);
+      // Approbation d'une demande précise : expectArbitration=true.
+      await applyCancelation(modal.state.reviewIncident.id, true);
       modal.closeReview();
       feedback.notifySuccess(SUCCESS.APPROVE_DELETE);
     } catch (_err) {
-      modal.setReviewError(apiErrorMessage(_err, "Impossible d'annuler l'incident."));
+      modal.setReviewError(translateApiError(_err));
     } finally {
       reviewActionRef.current = false;
       modal.setReviewLoading(false);
     }
   }
 
-  async function handleRejectDeleteRequest() {
+  async function handleRejectDeleteRequest(decisionReason: string) {
     if (!modal.state.reviewIncident || reviewActionRef.current) return;
     reviewActionRef.current = true;
     modal.setReviewLoading(true);
@@ -219,17 +224,39 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     try {
       const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
         rejectDeleteRequest: true,
+        decisionReason,
       });
       upsertIncident(updated);
       void refreshMetrics();
       modal.closeReview();
       feedback.notifySuccess(SUCCESS.REJECT_DELETE);
     } catch (requestError) {
-      modal.setReviewError(apiErrorMessage(requestError, "Impossible de refuser l'annulation."));
+      // Erreur traduite (details.field=decisionReason) ; modale ouverte, saisie
+      // du motif conservée.
+      modal.setReviewError(translateApiError(requestError));
     } finally {
       reviewActionRef.current = false;
       modal.setReviewLoading(false);
     }
+  }
+
+  // Retrait de sa propre demande d'annulation par le demandeur (tant qu'elle est
+  // en attente). Mutation simple : succès/erreur globaux + verrou anti-double.
+  async function handleWithdrawCancelRequest(incident: WorkshopIncident) {
+    await runSimple(
+      async () => {
+        const updated = await updateWorkshopIncident(incident.id, {
+          withdrawCancelRequest: true,
+        });
+        upsertIncident(updated);
+        void refreshMetrics();
+      },
+      {
+        successMessage: SUCCESS.WITHDRAW_CANCEL,
+        errorFallback: "Impossible de retirer la demande d'annulation.",
+        closeOnSuccess: false,
+      }
+    );
   }
 
   async function handleSetPending(reason: string) {
@@ -333,18 +360,19 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal.setReviewError('');
     try {
       if (mode === 'approve' && modal.state.reviewIncident) {
-        await applyCancelation(modal.state.reviewIncident.id);
+        // Approbation d'une demande précise.
+        await applyCancelation(modal.state.reviewIncident.id, true);
         modal.closeReview();
         feedback.notifySuccess(SUCCESS.APPROVE_DELETE);
         return;
       }
       if (mode === 'direct' && selectedIncident) {
-        await applyCancelation(selectedIncident.id);
+        await applyCancelation(selectedIncident.id, false);
         modal.closeModal();
         feedback.notifySuccess(SUCCESS.APPROVE_DELETE);
       }
     } catch (err) {
-      modal.setReviewError(apiErrorMessage(err, "Impossible d'annuler l'incident."));
+      modal.setReviewError(translateApiError(err));
     } finally {
       reviewActionRef.current = false;
       modal.setReviewLoading(false);
@@ -359,6 +387,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     handleRejectEditRequest,
     handleApproveDeleteRequest,
     handleRejectDeleteRequest,
+    handleWithdrawCancelRequest,
     handleSetPending,
     handleResumeIncident,
     handleCloseIncident,

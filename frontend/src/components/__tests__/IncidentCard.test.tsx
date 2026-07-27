@@ -112,7 +112,7 @@ describe('IncidentCard – rendu', () => {
     expect(screen.getByText('Produit non renseigné')).toBeDefined();
   });
 
-  it('affiche le bouton "Correction demandée" si responsable et edit_request présent', () => {
+  it('affiche le bouton « Modification à arbitrer » si responsable et edit_request présent', () => {
     render(
       <IncidentCard
         incident={mockIncident({ edit_request: { state: 'ARRET' } })}
@@ -120,7 +120,7 @@ describe('IncidentCard – rendu', () => {
         isResponsable
       />
     );
-    expect(screen.getByText('Correction demandée')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Modification à arbitrer' })).toBeDefined();
   });
 
   it('signale une correction déjà prise en consultation', () => {
@@ -155,7 +155,7 @@ describe('IncidentCard – rendu', () => {
     expect(screen.queryByText('Correction demandée')).toBeNull();
   });
 
-  it('affiche le bouton "Annulation demandée" si responsable et cancel_request', () => {
+  it('affiche le bouton « Annulation à arbitrer » si responsable et cancel_request', () => {
     render(
       <IncidentCard
         incident={mockIncident({ cancel_request: true })}
@@ -163,7 +163,39 @@ describe('IncidentCard – rendu', () => {
         isResponsable
       />
     );
-    expect(screen.getByText('Annulation demandée')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Annulation à arbitrer' })).toBeDefined();
+  });
+
+  it('rend l’indicateur d’arbitrage cliquable pour le responsable (commande)', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ cancel_request: true, edit_request: { state: 'ARRET' } })}
+        {...defaultProps}
+        isResponsable
+      />
+    );
+    // Le responsable dispose d'une commande d'arbitrage : de vrais boutons.
+    expect(screen.getByRole('button', { name: 'Annulation à arbitrer' }).tagName).toBe('BUTTON');
+    expect(screen.getByRole('button', { name: 'Modification à arbitrer' }).tagName).toBe('BUTTON');
+  });
+
+  it('rend l’indicateur d’arbitrage EN LECTURE SEULE pour les rôles non responsables', () => {
+    const { container } = render(
+      <IncidentCard
+        incident={mockIncident({ cancel_request: true, edit_request: { state: 'ARRET' } })}
+        {...defaultProps}
+        isResponsable={false}
+      />
+    );
+    // Même libellé court — parité carte/panneau/Board — mais aucune commande.
+    const cancelIndicator = screen.getByLabelText('Annulation à arbitrer');
+    const editIndicator = screen.getByLabelText('Modification à arbitrer');
+    expect(cancelIndicator.tagName).toBe('SPAN');
+    expect(editIndicator.tagName).toBe('SPAN');
+    expect(cancelIndicator.className).toContain('incident-request-action--readonly');
+    // Aucun bouton d'arbitrage exposé : les seuls boutons éventuels ne portent
+    // pas de commande d'arbitrage.
+    expect(container.querySelector('.incident-request-action button')).toBeNull();
   });
 
   it('présente le suivi responsable comme une action compacte, pas comme une rangée de tags', () => {
@@ -216,7 +248,7 @@ describe('IncidentCard – interactions', () => {
         isResponsable
       />
     );
-    fireEvent.click(screen.getByText('Correction demandée'));
+    fireEvent.click(screen.getByRole('button', { name: 'Modification à arbitrer' }));
     expect(onReviewEdit).toHaveBeenCalledTimes(1);
     expect(onClick).not.toHaveBeenCalled();
   });

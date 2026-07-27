@@ -65,6 +65,17 @@ export function canPerform(
         actorId !== undefined &&
         incident.user_id === actorId
       );
+    case 'WITHDRAW_CANCEL':
+      // Seul le demandeur (l'opérateur déclarant) retire sa propre demande
+      // d'annulation, tant qu'elle est en attente d'arbitrage. Symétrique à
+      // WITHDRAW_EDIT : même contrôle d'appartenance via incident.user_id.
+      return (
+        workshopRole === 'OPERATOR' &&
+        isActiveIncident(incident) &&
+        hasCancelRequest(incident) &&
+        actorId !== undefined &&
+        incident.user_id === actorId
+      );
     case 'REQUEST_CANCEL':
       // OPERATOR can only cancel their own declaration, and only while untaken.
       // Once MAINTENANCE takes it, cancellation goes through RESPONSABLE approval.
