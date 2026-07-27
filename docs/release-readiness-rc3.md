@@ -13,6 +13,24 @@ démontrables les fonctions déjà présentes (retour d'action, erreurs publique
 traçabilité fidèle, arbitrages visibles, suivi explicite, mise en attente comme
 concept métier, session Board sans expiration, cartes et panneau accessibles).
 
+### Faits mesurés (reproductibles au SHA de tête RC3)
+
+Chiffres dérivés automatiquement du dépôt et des rapports de test, à réactualiser
+au SHA candidat final avant la Porte D.
+
+| Fait                                  | Valeur | Dérivation                                                                      |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| Migrations SQL                        | 50     | `ls backend/migrations/[0-9]*.sql \| wc -l` (001–048 inchangées + 049, 050)     |
+| Tables applicatives                   | 14     | `CREATE TABLE` distinctes dans les migrations                                   |
+| Tables totales                        | 15     | 14 + `schema_migrations` (créée par `migrate.ts`)                               |
+| Jobs CI                               | 5      | clés sous `jobs:` de `ci.yml` : backend, frontend, integration, containers, ops |
+| Fichiers suivis                       | 508    | `git ls-files \| wc -l`                                                         |
+| Backend unit                          | 493    | `jest --selectProjects unit`                                                    |
+| Backend intégration (PostgreSQL réel) | 136    | `jest --selectProjects integration` (20 suites)                                 |
+| Frontend                              | 454    | `vitest run`                                                                    |
+| E2E Playwright                        | 34     | `playwright test --list`                                                        |
+| Total tests                           | 1117   | somme (ensembles disjoints)                                                     |
+
 ## 1. Règles de pilotage
 
 - gel fonctionnel : aucun nouveau besoin produit n'entre dans cette branche ;
@@ -133,21 +151,23 @@ message et une issue adaptés. Le texte ne pilote jamais la logique applicative.
     `waiting_reason`, backfill des seuls incidents actuellement `PENDING` depuis
     `diagnostic` puis efface leur `diagnostic`, append-only.
 - **Preuve du diff des migrations** (`git diff --name-status origin/main...HEAD
-  -- backend/migrations/`) : exactement deux entrées, toutes deux en statut `A`
+-- backend/migrations/`) : exactement deux entrées, toutes deux en statut `A`
   (ajout) —
   `A backend/migrations/049_allow_board_session_without_automatic_expiry.sql`,
   `A backend/migrations/050_model_waiting_reason_separately_from_diagnostic.sql`.
   Aucune entrée `M` (modifiée) ni `D` (supprimée). Contrôle complémentaire :
   `git diff --stat origin/main...HEAD -- 'backend/migrations/0[0-3][0-9]_*.sql'
-  'backend/migrations/04[0-8]_*.sql'` renvoie un diff **vide** — `001` à `048`
+'backend/migrations/04[0-8]_*.sql'` renvoie un diff **vide** — `001` à `048`
   sont strictement identiques à `origin/main`.
-- **Validation des migrations :**
-  - `049 → 050` avec données ciblées `PENDING` : **déjà exécutée** sur
-    PostgreSQL réel jetable (runMigrations 001→050 sur base vierge, puis backfill
-    rejoué sur lignes de forme ancienne ; cf. C-05).
-  - `048 → 050` (montée depuis une base réellement figée à `048`) : **à exécuter
-    au lot 11** si elle n'a pas encore été faite exactement sous cette forme —
-    non couverte par la validation base-vierge ci-dessus.
+- **Validation des migrations (toutes exécutées sur PostgreSQL réel jetable) :**
+  - `001 → 050` sur base vierge, avec backfill vérifié sur données ciblées
+    `PENDING` (cf. C-05,
+    `waitingReasonMigration.integration.test.ts`).
+  - `048 → 050` depuis une base **réellement figée à `048`** : migrations
+    001..048 appliquées dans un schéma dédié, incident PENDING « ancienne forme »
+    seedé (motif dans `diagnostic`, pas de colonne `waiting_reason`), puis 049 et
+    050 appliquées et backfill vérifié (`waiting_reason` renseigné, `diagnostic`
+    effacé) — `waitingReasonUpgrade048to050.integration.test.ts` (lot 11).
 
 ## 3. Matrice des constats
 
@@ -179,8 +199,8 @@ Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (seco
   blocage vide/espaces, trim, conservation après échec) ; **intégration
   PostgreSQL réelle** `correctionArbitration` : événement `schemaVersion:2` avec
   before snapshoté, refus sans/avec-espaces refusé, refus valide conserve le diff
-  + motif + arbitrage + **outbox**, application conserve le même avant→après.
-  Backend unit 490, intégration 121/121 (PG jetable), frontend 433.
+  - motif + arbitrage + **outbox**, application conserve le même avant→après.
+    Backend unit 490, intégration 121/121 (PG jetable), frontend 433.
 - **Preuve finale :** commit _(lot 4, ci-dessous)_. Cycle rouge→vert exécuté sur
   PostgreSQL via `with-disposable-postgres.sh`.
 - **État :** VERIFIED (statut courant/événementiel séparé ; restitution finalisée
@@ -214,23 +234,23 @@ Sévérité : P0 (bloquant métier/traçabilité), P1 (contrat UX/API), P2 (seco
 
 **Couverture par mutation (contrat 5 états + verrou anti-double + tests) :**
 
-| Mutation | Où | Succès (message) | Échec | Verrou | Tests |
-| --- | --- | --- | --- | --- | --- |
-| Création | `CreateIncidentModal.handleSubmit` | global « Incident signalé. » | erreur traduite locale au formulaire, saisies conservées | `loading` + garde | `CreateIncidentModal.test` (9) |
-| Prise en charge | `useIncidentActions.handleConfirmTakeCharge` | global « Prise en charge enregistrée. » | `role="alert"` global, modale ouverte | `simpleActionRef` | `useIncidentActions.feedback.test` |
-| Mise en attente | `handleSetPending` | « Incident mis en attente. » | idem | idem | idem |
-| Reprise | `handleResumeIncident` | « Traitement repris. » | idem | idem | idem |
-| Clôture | `handleCloseIncident` | « Incident clôturé… » | idem | idem | idem |
-| Invalidation | `handleInvalidateIncident` | « Incident invalidé… » | idem | idem | idem |
-| Urgence | `handleToggleUrgent` | « Incident déclaré urgent / urgence retirée. » | idem | idem | idem |
-| Suivi | `handleToggleFollow` | « Suivi activé / désactivé. » | idem | idem | idem |
-| Consigne | `IncidentDetailPanel.runPanelAction('responsible-comment')` | « Consigne enregistrée. » | erreur traduite locale (`actionError`) | `pendingActionRef` | suite panel |
-| Correction demandée | flux `CreateIncidentModal`/edit + `handleRequestDelete` | catalogue | idem | idem | idem |
-| Correction appliquée/refusée | `handleApplyEditRequest` / `handleRejectEditRequest` | « Modification appliquée / refusée. » | erreur locale à la modale d'arbitrage | `reviewActionRef` | `useIncidentActions.feedback.test` |
-| Annulation demandée/retirée | `handleRequestDelete` (+ `withdrawCancelRequest` lot 5) | catalogue | idem | idem | idem |
-| Annulation appliquée/refusée | `handleApproveDeleteRequest` / `handleRejectDeleteRequest` / `handleMaintenanceDeleteConfirm` | « Incident annulé… / Demande d'annulation refusée. » | erreur locale à la modale | `reviewActionRef` | idem |
-| Réglages (Admin) | `AdminSettingsPage.handleAppSettingsSubmit` | local « Paramètres enregistrés. » (bannière `SuccessBanner`) | erreur **traduite** (lot 2) + focus champ | `appSettingsSaving` | `adminSettings.controller.errors.test` + à couvrir E2E lot 10 |
-| Révocations | `AdminSettingsPage` (mêmes handlers) | « Sessions … révoquées. » | idem | idem | idem |
+| Mutation                     | Où                                                                                            | Succès (message)                                             | Échec                                                    | Verrou              | Tests                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------- | ------------------- | ------------------------------------------------------------- |
+| Création                     | `CreateIncidentModal.handleSubmit`                                                            | global « Incident signalé. »                                 | erreur traduite locale au formulaire, saisies conservées | `loading` + garde   | `CreateIncidentModal.test` (9)                                |
+| Prise en charge              | `useIncidentActions.handleConfirmTakeCharge`                                                  | global « Prise en charge enregistrée. »                      | `role="alert"` global, modale ouverte                    | `simpleActionRef`   | `useIncidentActions.feedback.test`                            |
+| Mise en attente              | `handleSetPending`                                                                            | « Incident mis en attente. »                                 | idem                                                     | idem                | idem                                                          |
+| Reprise                      | `handleResumeIncident`                                                                        | « Traitement repris. »                                       | idem                                                     | idem                | idem                                                          |
+| Clôture                      | `handleCloseIncident`                                                                         | « Incident clôturé… »                                        | idem                                                     | idem                | idem                                                          |
+| Invalidation                 | `handleInvalidateIncident`                                                                    | « Incident invalidé… »                                       | idem                                                     | idem                | idem                                                          |
+| Urgence                      | `handleToggleUrgent`                                                                          | « Incident déclaré urgent / urgence retirée. »               | idem                                                     | idem                | idem                                                          |
+| Suivi                        | `handleToggleFollow`                                                                          | « Suivi activé / désactivé. »                                | idem                                                     | idem                | idem                                                          |
+| Consigne                     | `IncidentDetailPanel.runPanelAction('responsible-comment')`                                   | « Consigne enregistrée. »                                    | erreur traduite locale (`actionError`)                   | `pendingActionRef`  | suite panel                                                   |
+| Correction demandée          | flux `CreateIncidentModal`/edit + `handleRequestDelete`                                       | catalogue                                                    | idem                                                     | idem                | idem                                                          |
+| Correction appliquée/refusée | `handleApplyEditRequest` / `handleRejectEditRequest`                                          | « Modification appliquée / refusée. »                        | erreur locale à la modale d'arbitrage                    | `reviewActionRef`   | `useIncidentActions.feedback.test`                            |
+| Annulation demandée/retirée  | `handleRequestDelete` (+ `withdrawCancelRequest` lot 5)                                       | catalogue                                                    | idem                                                     | idem                | idem                                                          |
+| Annulation appliquée/refusée | `handleApproveDeleteRequest` / `handleRejectDeleteRequest` / `handleMaintenanceDeleteConfirm` | « Incident annulé… / Demande d'annulation refusée. »         | erreur locale à la modale                                | `reviewActionRef`   | idem                                                          |
+| Réglages (Admin)             | `AdminSettingsPage.handleAppSettingsSubmit`                                                   | local « Paramètres enregistrés. » (bannière `SuccessBanner`) | erreur **traduite** (lot 2) + focus champ                | `appSettingsSaving` | `adminSettings.controller.errors.test` + à couvrir E2E lot 10 |
+| Révocations                  | `AdminSettingsPage` (mêmes handlers)                                                          | « Sessions … révoquées. »                                    | idem                                                     | idem                | idem                                                          |
 
 Les surfaces Administration conservent leur bannière **locale** accessible
 (`SuccessBanner`/`ErrorBanner`) comme autorité de retour, désormais alimentée par
@@ -295,7 +315,7 @@ les révocations sont finalisés au lot 3.
   - **modes** : durée normale (12) persistée, sans-expiration (0) persistée,
     **révocation** = `board_session_version` incrémenté, retour à une durée (24) ;
   - unitaires : `jwt.boardSession` (`'unlimited'` → JWT sans `exp` ; durée → `exp`).
-  Suites d'intégration `boardSessionMigration` + `boardSessionSettings` : **8/8**.
+    Suites d'intégration `boardSessionMigration` + `boardSessionSettings` : **8/8**.
 - **État :** VERIFIED
 
 ### C-05 — Mise en attente stockée comme « diagnostic »
@@ -333,9 +353,12 @@ les révocations sont finalisés au lot 3.
     `OPEN` porteur d'un vrai diagnostic n'est pas touché) ; une nouvelle mise en
     attente écrit `waiting_reason` et jamais `diagnostic`.
   - _Validation finale `048 → 050` (montée depuis une base réellement figée à
-    `048`) : À EXÉCUTER AU LOT 11_ si elle n'a pas encore été faite exactement
-    sous cette forme — la preuve ci-dessus part d'une base vierge, pas d'une
-    base préexistante arrêtée à `048`.
+    `048`) : EXÉCUTÉE au lot 11_ —
+    `src/integration/__tests__/waitingReasonUpgrade048to050.integration.test.ts` :
+    migrations 001..048 appliquées dans un schéma dédié (état d'avant RC3),
+    incident `PENDING` « ancienne forme » seedé (motif dans `diagnostic`, colonne
+    `waiting_reason` absente vérifiée), puis 049 et 050 appliquées ; après
+    montée, `waiting_reason` porte le motif et `diagnostic` est effacé.
   - _Cycle service (unitaire)_ — `workshop.service.test.ts` :
     PENDING sans motif refusé (`VALIDATION_ERROR`) ; PENDING avec motif écrit
     `updates.waitingReason` et loggue l'événement `INCIDENT_SET_PENDING` avec
@@ -376,7 +399,7 @@ les révocations sont finalisés au lot 3.
     (8 cas, verts sur PostgreSQL jetable) :
     - retrait par le demandeur (`retire la demande d'annulation …`) ;
     - retrait interdit à un autre opérateur → 403 (`interdit le retrait à un
-      autre opérateur`) ;
+autre opérateur`) ;
     - refus sans motif / motif d'espaces refusés (motif obligatoire) ;
     - **retrait vs confirmation d'annulation** : exactement un gagnant, jamais
       d'état contradictoire (boucle 6×) ;
@@ -499,25 +522,26 @@ les révocations sont finalisés au lot 3.
   et sécurité) restent `OPEN`/`PENDING` et hors périmètre de cette porte.
 - **Porte C — UX :** cinq états sur toutes les mutations, aucun message technique
   visible, cartes et panneau conformes, zéro violation axe critique.
-- **Porte D — Release :** migrations testées (base vierge `001→050` **déjà
-  faite** ; montée `048→050` sur base figée à `048` **à exécuter au lot 11**),
-  six jobs CI verts sur le SHA candidat, aucun avertissement significatif,
+- **Porte D — Release :** migrations testées (base vierge `001→050` **faite** ;
+  montée `048→050` sur base figée à `048` **faite** — cf. C-05),
+  **cinq** jobs CI (backend, frontend, integration, containers, ops) verts sur
+  le SHA candidat, aucun avertissement significatif,
   recette multi-rôle, captures depuis la RC3 déployée, dossier synchronisé sur
   le commit final.
 
 ## 5. Journal des lots
 
-| Lot | Objet | Commit | État |
-| --- | --- | --- | --- |
-| 0 | Matrice et contrats RC3 | `docs: establish rc3 ux and traceability contracts` (5de13f8) | FAIT |
-| 1 | Retour d'action standardisé | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice) | FAIT |
-| 2 | Erreurs publiques stables | `8932ae9` | FAIT |
-| 3 | Session Board sans expiration | migration `049` + `fix(board)` (1249c3a) + validation PG | FAIT (VERIFIED sur PostgreSQL jetable) |
-| 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
-| 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136) | FAIT (C-06 VERIFIED sur PostgreSQL jetable) |
-| 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` (1bd197f) | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel) |
-| 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff) | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel) |
-| 8 | Cartes et panneau (clavier, focus, scroll) | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd) | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts) |
-| 9 | Terminologie et restitution | `fix(copy): align workshop terminology and hide technical codes` (5038582) | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué) |
-| 10 | Recette comportementale et axe | `test: cover rc3 multi-role UX end-to-end and at 200% zoom` (93e99d2) | FAIT (E2E 34/34 sur PostgreSQL jetable `_e2e` : axe multi-rôles, retrait annulation multi-rôles, zoom 200 %, mobile ; drift terminologique lot 9 rattrapé) |
-| 11 | Documentation et candidate | `docs: synchronize the jury evidence with rc3` | À FAIRE |
+| Lot | Objet                                      | Commit                                                                       | État                                                                                                                                                       |
+| --- | ------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | Matrice et contrats RC3                    | `docs: establish rc3 ux and traceability contracts` (5de13f8)                | FAIT                                                                                                                                                       |
+| 1   | Retour d'action standardisé                | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice)              | FAIT                                                                                                                                                       |
+| 2   | Erreurs publiques stables                  | `8932ae9`                                                                    | FAIT                                                                                                                                                       |
+| 3   | Session Board sans expiration              | migration `049` + `fix(board)` (1249c3a) + validation PG                     | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
+| 4   | Trace des corrections                      | `fix(audit)` + validation PG réelle                                          | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
+| 5   | Cycle d'annulation complet                 | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136)       | FAIT (C-06 VERIFIED sur PostgreSQL jetable)                                                                                                                |
+| 6   | Suivi explicite                            | `fix(workshop): require explicit incident follow consent` (1bd197f)          | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel)                                                                                               |
+| 7   | Mise en attente métier                     | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff) | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel)                                                                                                     |
+| 8   | Cartes et panneau (clavier, focus, scroll) | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd)     | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts)                                                                       |
+| 9   | Terminologie et restitution                | `fix(copy): align workshop terminology and hide technical codes` (5038582)   | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué)                                                              |
+| 10  | Recette comportementale et axe             | `test: cover rc3 multi-role UX end-to-end and at 200% zoom` (93e99d2)        | FAIT (E2E 34/34 sur PostgreSQL jetable `_e2e` : axe multi-rôles, retrait annulation multi-rôles, zoom 200 %, mobile ; drift terminologique lot 9 rattrapé) |
+| 11  | Documentation et candidate                 | `docs: synchronize the jury evidence with rc3`                               | PRÊT — montée 048→050 sur base figée validée sur PG réel ; faits mesurés synchronisés (50 migrations, 5 jobs CI, 1117 tests) ; en attente de commit        |
