@@ -97,7 +97,7 @@ export async function takeIncidentService(
 
 export async function setPendingIncidentService(
   incidentId: number,
-  diagnostic: string | undefined,
+  waitingReason: string | undefined,
   actorUserId: number,
   actorRole: string
 ): Promise<ServiceResult<unknown>> {
@@ -109,14 +109,16 @@ export async function setPendingIncidentService(
       return { kind: 'arbitration_required' as const };
     }
     if (!canPerform(actorRole, 'SET_PENDING', current)) return { kind: 'forbidden' as const };
-    if (!diagnostic?.trim() && !current.diagnostic)
-      return { kind: 'bad_request' as const, msg: 'Diagnostic obligatoire avant suspension.' };
+    // Le motif de mise en attente est obligatoire (concept métier propre, C-05).
+    const reason = waitingReason?.trim();
+    if (!reason && !current.waiting_reason)
+      return { kind: 'bad_request' as const, msg: 'Motif de mise en attente obligatoire.' };
 
     const id = await workshopRepository.updateIncidentData(
       {
         incidentId,
         current,
-        updates: { status: 'PENDING', diagnostic },
+        updates: { status: 'PENDING', waitingReason: reason ?? current.waiting_reason },
         role: actorRole,
         actorUserId,
         ...unchangedSelectionFields(current),
@@ -131,7 +133,7 @@ export async function setPendingIncidentService(
       {
         from: current.status,
         to: 'PENDING',
-        diagnostic: diagnostic ?? current.diagnostic,
+        waitingReason: reason ?? current.waiting_reason,
       },
       client
     );
@@ -169,7 +171,9 @@ export async function resumeIncidentService(
       {
         incidentId,
         current,
-        updates: { status: 'OPEN' },
+        // À la reprise, le motif courant est effacé (l'incident n'est plus en
+        // attente), mais il reste conservé dans l'événement INCIDENT_RESUMED.
+        updates: { status: 'OPEN', waitingReason: null },
         role: actorRole,
         actorUserId,
         ...unchangedSelectionFields(current),
@@ -184,6 +188,7 @@ export async function resumeIncidentService(
       {
         from: 'PENDING',
         to: 'OPEN',
+        waitingReason: current.waiting_reason,
       },
       client
     );

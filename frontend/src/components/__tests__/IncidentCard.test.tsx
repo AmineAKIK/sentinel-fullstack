@@ -21,6 +21,7 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
     is_priority: false,
     status: 'OPEN',
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: null,
     responsible_comment: null,
     edit_request: null,
@@ -110,6 +111,18 @@ describe('IncidentCard – rendu', () => {
   it('signale un produit non renseigné dans la ligne méta', () => {
     render(<IncidentCard incident={mockIncident({ current_product: '' })} {...defaultProps} />);
     expect(screen.getByText('Produit non renseigné')).toBeDefined();
+  });
+
+  it('affiche le motif de mise en attente d’un incident suspendu (C-05)', () => {
+    render(
+      <IncidentCard
+        incident={mockIncident({ status: 'PENDING', waiting_reason: 'Attente pièce détachée' })}
+        {...defaultProps}
+      />
+    );
+    // Le libellé métier est « Motif de mise en attente », jamais « Diagnostic ».
+    expect(screen.getByText(/Motif de mise en attente : Attente pièce détachée/)).toBeDefined();
+    expect(screen.queryByText(/Suspension justifiée/)).toBeNull();
   });
 
   it('affiche le bouton « Modification à arbitrer » si responsable et edit_request présent', () => {

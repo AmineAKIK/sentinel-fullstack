@@ -188,6 +188,7 @@ describe('CreateIncidentModal – mode requestOnly', () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       diagnostic: null,
+      waiting_reason: null,
       intervention_note: null,
       responsible_comment: null,
       edit_request: null,

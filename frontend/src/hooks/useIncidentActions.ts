@@ -263,7 +263,10 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     if (!selectedIncident) return;
     await runSimple(
       async () => {
-        await patchIncident(selectedIncident.id, { status: 'PENDING', diagnostic: reason.trim() });
+        await patchIncident(selectedIncident.id, {
+          status: 'PENDING',
+          waitingReason: reason.trim(),
+        });
       },
       {
         successMessage: SUCCESS.SET_PENDING,

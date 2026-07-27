@@ -86,12 +86,23 @@ describe('formatEventDetail', () => {
     expect(result).toBe('Fausse alarme');
   });
 
-  it('INCIDENT_SET_PENDING avec diagnostic tronqué à 60 chars', () => {
+  it('INCIDENT_SET_PENDING (nouveau) : waitingReason tronqué à 60 chars', () => {
+    const long = 'A'.repeat(80);
+    const result = formatEventDetail(
+      event({ event_type: 'INCIDENT_SET_PENDING', payload: { waitingReason: long } })
+    );
+    expect(result).toBe(`motif de mise en attente: ${'A'.repeat(60)}`);
+  });
+
+  it('INCIDENT_SET_PENDING (ancienne trace) : diagnostic relu comme motif de mise en attente', () => {
+    // Compatibilité de lecture : avant RC3 lot 7 le motif était stocké sous
+    // `diagnostic` ; il est réinterprété comme motif de mise en attente, jamais
+    // présenté comme un diagnostic.
     const long = 'A'.repeat(80);
     const result = formatEventDetail(
       event({ event_type: 'INCIDENT_SET_PENDING', payload: { diagnostic: long } })
     );
-    expect(result).toBe(`diagnostic: ${'A'.repeat(60)}`);
+    expect(result).toBe(`motif de mise en attente: ${'A'.repeat(60)}`);
   });
 
   it('INCIDENT_CLOSED avec interventionNote', () => {

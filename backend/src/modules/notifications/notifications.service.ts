@@ -287,7 +287,7 @@ export async function notifyFollowersIncidentTaken(
 export async function notifyFollowersIncidentSetPending(
   incidentId: number,
   actorUserId: number,
-  diagnostic: string,
+  waitingReason: string,
   alreadyDelivered: ReadonlySet<string> = new Set()
 ): Promise<DeliveryResult> {
   if (!(await getAdminNotifPref('notif_operateurs')))
@@ -307,7 +307,7 @@ export async function notifyFollowersIncidentSetPending(
       lineNumber: incident.line_number,
       machineId: incident.machine_id,
       eventLabel: 'Incident suspendu',
-      detail: `Diagnostic : ${diagnostic}`,
+      detail: `Motif de mise en attente : ${waitingReason}`,
       actorName,
       workshopUrl: `${clientOrigin()}/workshop/pilotage`,
     }),

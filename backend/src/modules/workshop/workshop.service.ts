@@ -245,8 +245,14 @@ export async function updateIncidentService(
   if (updates.isTaken !== undefined) return unexpectedFieldsError();
 
   if (updates.status === 'PENDING') {
-    if (!hasOnlyKeys(keys, ['status', 'diagnostic'])) return unexpectedFieldsError();
-    return setPendingIncidentService(id, updates.diagnostic, actorUserId, actorRole);
+    if (!hasOnlyKeys(keys, ['status', 'waitingReason'])) return unexpectedFieldsError();
+    // À la suspension, un motif nul est traité comme absent (motif obligatoire).
+    return setPendingIncidentService(
+      id,
+      updates.waitingReason ?? undefined,
+      actorUserId,
+      actorRole
+    );
   }
   if (updates.status === 'OPEN') {
     if (!hasOnlyKeys(keys, ['status'])) return unexpectedFieldsError();

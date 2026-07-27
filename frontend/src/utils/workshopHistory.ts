@@ -105,8 +105,15 @@ export function formatEventDetail(event: WorkshopIncidentEvent): string {
     if (payload.reason) return asString(payload.reason);
     return 'retiré des statistiques et de la connaissance';
   }
-  if (event.event_type === 'INCIDENT_SET_PENDING' && payload.diagnostic) {
-    return `diagnostic: ${asString(payload.diagnostic).slice(0, 60)}`;
+  if (event.event_type === 'INCIDENT_SET_PENDING') {
+    // Nouvelles traces : `waitingReason`. Anciennes traces (avant RC3 lot 7) :
+    // `diagnostic`, réinterprété comme un motif de mise en attente historique
+    // — jamais présenté comme un diagnostic.
+    const reason = payload.waitingReason ?? payload.diagnostic;
+    if (reason) return `motif de mise en attente: ${asString(reason).slice(0, 60)}`;
+  }
+  if (event.event_type === 'INCIDENT_RESUMED' && payload.waitingReason) {
+    return `motif levé: ${asString(payload.waitingReason).slice(0, 60)}`;
   }
   if (event.event_type === 'INCIDENT_CLOSED' && payload.interventionNote) {
     return `note: ${asString(payload.interventionNote).slice(0, 60)}`;

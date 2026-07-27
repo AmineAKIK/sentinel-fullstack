@@ -117,6 +117,8 @@ export type UpdateIncidentPayload = Partial<CreateIncidentPayload> & {
   isPriority?: boolean;
   status?: 'OPEN' | 'PENDING' | 'CLOSED' | 'CANCELED' | 'INVALIDATED';
   diagnostic?: string;
+  // Motif de mise en attente (RC3 lot 7) : concept distinct du diagnostic.
+  waitingReason?: string;
   interventionNote?: string;
   responsibleComment?: string;
   requestOnly?: boolean;

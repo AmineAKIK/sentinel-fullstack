@@ -179,7 +179,9 @@ export async function deliverNotificationOutboxItem(
         notifyFollowersIncidentSetPending(
           incidentId,
           actorUserId,
-          payloadString(item.payload, 'diagnostic'),
+          // Nouvelles traces : `waitingReason`. Anciennes traces (avant lot 7) :
+          // `diagnostic`, réinterprété comme motif de mise en attente.
+          payloadString(item.payload, 'waitingReason') || payloadString(item.payload, 'diagnostic'),
           alreadyDelivered
         )
       );

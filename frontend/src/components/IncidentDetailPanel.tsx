@@ -313,9 +313,13 @@ export default function IncidentDetailPanel({
   const takenByName = incident.taken_by_first_name
     ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
     : '';
+  // Le motif de mise en attente n'a de sens que tant que l'incident est
+  // suspendu (à la reprise il est effacé, mais reste dans l'historique).
+  const waitingReason = incident.status === 'PENDING' ? incident.waiting_reason : null;
   const hasNarrative =
     Boolean(incident.comment) ||
     Boolean(incident.diagnostic) ||
+    Boolean(waitingReason) ||
     Boolean(incident.intervention_note);
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
@@ -529,6 +533,7 @@ export default function IncidentDetailPanel({
           <DrawerSection title="Narratif atelier">
             <div className="incident-narrative-list">
               <NarrativeItem label="Signalement" value={incident.comment} primary />
+              <NarrativeItem label="Motif de mise en attente" value={waitingReason} />
               <NarrativeItem label="Diagnostic" value={incident.diagnostic} />
               <NarrativeItem label="Intervention" value={incident.intervention_note} />
             </div>

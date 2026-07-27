@@ -21,6 +21,7 @@ function mockIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncide
     is_priority: true,
     status: 'OPEN',
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: null,
     responsible_comment: 'Prioriser si la ligne bloque.',
     edit_request: { state: 'DEGRADEE' },

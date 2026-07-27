@@ -296,8 +296,42 @@ les révocations sont finalisés au lot 3.
   dans l'événement.
 - **Tests :** migration base vierge + upgrade ; nouvelle mise en attente écrit
   `waiting_reason` ; reprise ; alignement des surfaces.
-- **Preuve finale :** _(à compléter — lot 7)_
-- **État :** OPEN
+- **Décision métier (utilisateur, lot 7) :** `diagnostic` et « motif de mise en
+  attente » sont deux concepts distincts. La migration 050 ne recopie que la
+  valeur des incidents **actuellement** `PENDING` vers `waiting_reason` puis
+  efface leur `diagnostic` (cette valeur n'a jamais été un diagnostic). Les
+  sections « Diagnostic » sont **masquées** en l'absence de diagnostic réel,
+  jamais affichées vides ; RC3 n'ajoute aucune nouvelle saisie de diagnostic.
+  Les anciennes traces de mise en attente restent lisibles comme « motif de
+  mise en attente historique », jamais comme diagnostic. Toute nouvelle mise en
+  attente écrit uniquement `waiting_reason` ; la reprise efface la valeur
+  courante mais l'événement conserve le motif.
+- **Preuve finale (exécutée) :**
+  - _Migration 050 sur PostgreSQL réel_ —
+    `src/integration/__tests__/waitingReasonMigration.integration.test.ts` :
+    la colonne `waiting_reason` (type `text`) existe après migration d'une base
+    vierge ; le backfill recopie le motif des **seuls** incidents `PENDING`
+    puis efface leur `diagnostic` (un incident `OPEN` porteur d'un vrai
+    diagnostic n'est pas touché) ; une nouvelle mise en attente écrit
+    `waiting_reason` et jamais `diagnostic`.
+  - _Cycle service (unitaire)_ — `workshop.service.test.ts` :
+    PENDING sans motif refusé (`VALIDATION_ERROR`) ; PENDING avec motif écrit
+    `updates.waitingReason` et loggue l'événement `INCIDENT_SET_PENDING` avec
+    `waitingReason` ; à la reprise, `updates.waitingReason = null` (motif
+    effacé) mais l'événement `INCIDENT_RESUMED` conserve le motif.
+  - _Restitution frontend_ — `IncidentCard.test.tsx` (« Motif de mise en
+    attente : … », plus jamais « Suspension justifiée ») ;
+    `workshopHistory.test.ts` (nouvelle trace `waitingReason` et ancienne trace
+    `diagnostic` toutes deux rendues « motif de mise en attente », jamais
+    « diagnostic »). Panneau : le motif de mise en attente n'apparaît que tant
+    que l'incident est `PENDING` ; les sections « Diagnostic » restent masquées
+    quand `diagnostic` est vide. Modale de suspension : libellé « Motif de mise
+    en attente ». Notification followers : « Motif de mise en attente : … »,
+    avec repli de lecture sur l'ancienne clé `diagnostic`.
+- **Résultats globaux (exécutés) :** backend unit 493/493 ; intégration
+  PostgreSQL réelle 135/135 (19 suites) ; frontend 448/448 (52 fichiers) ;
+  ESLint + Prettier + typecheck propres.
+- **État :** VERIFIED
 
 ### C-06 — Arbitrages visibles de façon inégale ; retrait d'annulation absent
 
@@ -454,7 +488,7 @@ les révocations sont finalisés au lot 3.
 | 4 | Trace des corrections | `fix(audit)` + validation PG réelle | FAIT (VERIFIED sur PostgreSQL jetable) |
 | 5 | Cycle d'annulation complet | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136) | FAIT (C-06 VERIFIED sur PostgreSQL jetable) |
 | 6 | Suivi explicite | `fix(workshop): require explicit incident follow consent` (1bd197f) | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel) |
-| 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | À FAIRE |
+| 7 | Mise en attente métier | `fix(workshop): model waiting reasons separately from diagnostics` | PRÊT — C-05 VERIFIED (migration 050 + PG réel), en attente de commit |
 | 8 | Cartes et panneau | `fix(ux): make incident cards and dossier navigation predictable` | À FAIRE |
 | 9 | Terminologie et restitution | `fix(copy): align workshop labels with the incident lifecycle` | À FAIRE |
 | 10 | Recette comportementale et axe | `test: cover rc3 multi-role ux and audit contracts` | À FAIRE |

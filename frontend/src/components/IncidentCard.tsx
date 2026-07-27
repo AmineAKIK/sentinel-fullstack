@@ -192,9 +192,9 @@ export default function IncidentCard({
           <p>{incident.responsible_comment}</p>
         </div>
       )}
-      {incident.status === 'PENDING' && incident.diagnostic && (
+      {incident.status === 'PENDING' && incident.waiting_reason && (
         <div className="notice" style={{ marginTop: 12 }}>
-          Suspension justifiée : {incident.diagnostic}
+          Motif de mise en attente : {incident.waiting_reason}
         </div>
       )}
     </article>

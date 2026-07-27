@@ -165,6 +165,7 @@ function mockIncident(overrides: Record<string, unknown> = {}) {
     comment: null,
     current_product: null,
     diagnostic: null,
+    waiting_reason: null,
     intervention_note: null,
     is_priority: false,
     display_order: 0,
@@ -976,7 +977,7 @@ describe('updateIncidentService – RESPONSABLE', () => {
 });
 
 describe('updateIncidentService – MAINTENANCE', () => {
-  it('MAINTENANCE ne peut pas passer en PENDING sans diagnostic', async () => {
+  it('MAINTENANCE ne peut pas passer en PENDING sans motif de mise en attente', async () => {
     const incident = mockIncident({ is_taken: true });
     const line = mockLine();
     jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
@@ -987,9 +988,9 @@ describe('updateIncidentService – MAINTENANCE', () => {
     if (!result.ok) expect(result.code).toBe('VALIDATION_ERROR');
   });
 
-  it("MAINTENANCE peut passer en PENDING avec diagnostic et l'événement STATUS_CHANGED est loggué", async () => {
+  it("MAINTENANCE passe en PENDING avec un motif de mise en attente ; l'événement porte waitingReason (C-05)", async () => {
     const incident = mockIncident({ is_taken: true });
-    const updated = mockIncident({ status: 'PENDING', diagnostic: 'Capteur défaillant' });
+    const updated = mockIncident({ status: 'PENDING', waiting_reason: 'Capteur défaillant' });
     const line = mockLine();
     jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
     jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
@@ -999,16 +1000,59 @@ describe('updateIncidentService – MAINTENANCE', () => {
 
     const result = await updateIncidentService(
       1,
-      { status: 'PENDING', diagnostic: 'Capteur défaillant' },
+      { status: 'PENDING', waitingReason: 'Capteur défaillant' },
       1,
       'MAINTENANCE'
     );
     expect(result.ok).toBe(true);
+    // Le motif est écrit dans waiting_reason (jamais dans diagnostic)…
+    expect(repo.updateIncidentData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          status: 'PENDING',
+          waitingReason: 'Capteur défaillant',
+        }),
+      }),
+      null
+    );
+    // …et l'événement en garde la trace sous waitingReason.
     expect(events.logIncidentEvent).toHaveBeenCalledWith(
       1,
       1,
       'INCIDENT_SET_PENDING',
-      expect.objectContaining({ from: 'OPEN', to: 'PENDING' }),
+      expect.objectContaining({ from: 'OPEN', to: 'PENDING', waitingReason: 'Capteur défaillant' }),
+      null
+    );
+  });
+
+  it('à la reprise, waiting_reason est effacé mais conservé dans l’événement INCIDENT_RESUMED (C-05)', async () => {
+    const incident = mockIncident({
+      is_taken: true,
+      status: 'PENDING',
+      waiting_reason: 'Attente pièce',
+    });
+    const line = mockLine();
+    jest.mocked(repo.getIncidentById).mockResolvedValue(incident);
+    jest.mocked(repo.getActiveWorkshopLine).mockResolvedValue(line);
+    jest.mocked(repo.updateIncidentData).mockResolvedValue(1);
+    jest.mocked(repo.fetchIncidentWithUsers).mockResolvedValue(mockIncident({ status: 'OPEN' }));
+    jest.mocked(events.logIncidentEvent).mockResolvedValue(1);
+
+    const result = await updateIncidentService(1, { status: 'OPEN' }, 1, 'MAINTENANCE');
+    expect(result.ok).toBe(true);
+    // Le motif courant est effacé…
+    expect(repo.updateIncidentData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({ status: 'OPEN', waitingReason: null }),
+      }),
+      null
+    );
+    // …mais l'événement de reprise en garde la trace.
+    expect(events.logIncidentEvent).toHaveBeenCalledWith(
+      1,
+      1,
+      'INCIDENT_RESUMED',
+      expect.objectContaining({ from: 'PENDING', to: 'OPEN', waitingReason: 'Attente pièce' }),
       null
     );
   });

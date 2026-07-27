@@ -20,6 +20,7 @@ export interface WorkshopIncident {
   is_priority: boolean;
   status: IncidentStatus;
   diagnostic: string | null;
+  waiting_reason: string | null;
   intervention_note: string | null;
   responsible_comment: string | null;
   edit_request: Record<string, unknown> | null;

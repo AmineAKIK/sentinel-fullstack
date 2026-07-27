@@ -25,7 +25,7 @@ const pendingStatusSql = statusEqualsSql('status', 'PENDING');
 
 const INCIDENT_BASE_COLS = `wi.id, wi.user_id, wi.line_id, wi.line_number, wi.machine_id, wi.machine_brand,
             wi.robot_label, wi.head_number, wi.state, wi.comment, wi.current_product,
-            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.intervention_note,
+            wi.is_taken, wi.is_priority, wi.status, wi.diagnostic, wi.waiting_reason, wi.intervention_note,
             wi.responsible_comment, wi.edit_request, wi.cancel_request, wi.cancel_request_reason,
             wi.taken_by_user_id, wi.taken_at, wi.display_order, wi.created_at, wi.updated_at`;
 
@@ -137,6 +137,7 @@ export interface WorkshopIncidentRow extends CurrentIncident {
   current_product: string | null;
   is_priority: boolean;
   diagnostic: string | null;
+  waiting_reason: string | null;
   intervention_note: string | null;
   responsible_comment: string | null;
   edit_request: unknown | null;
@@ -912,6 +913,8 @@ export async function updateIncidentData(
   if (updates.status !== undefined) setIfChanged('status', updates.status, current.status);
   if (updates.diagnostic !== undefined)
     setIfChanged('diagnostic', updates.diagnostic, current.diagnostic);
+  if (updates.waitingReason !== undefined)
+    setIfChanged('waiting_reason', updates.waitingReason, current.waiting_reason);
   if (updates.interventionNote !== undefined)
     setIfChanged('intervention_note', updates.interventionNote, current.intervention_note);
   if (input.role === 'RESPONSABLE' && updates.responsibleComment !== undefined) {

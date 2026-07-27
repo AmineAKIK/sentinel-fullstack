@@ -21,11 +21,11 @@ export default function PendingConfirmModal({
           Vous allez suspendre l'incident {incident.line_number} · {incident.machine_id}.
         </>
       }
-      label="Justification *"
-      placeholder="Expliquez la raison de la suspension"
+      label="Motif de mise en attente *"
+      placeholder="Expliquez la raison de la mise en attente"
       confirmLabel="Suspendre"
       loadingLabel="Confirmation…"
-      requiredMessage="Merci de renseigner la justification."
+      requiredMessage="Merci de renseigner le motif de mise en attente."
       failureMessage="Impossible de suspendre l'incident."
       textareaId="pendingReason"
       maxLength={FIELD_LIMITS.NOTE}
