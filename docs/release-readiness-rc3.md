@@ -21,18 +21,18 @@ concept métier, session Board sans expiration, cartes et panneau accessibles).
 Chiffres dérivés automatiquement du dépôt et des rapports de test, à réactualiser
 au SHA candidat final avant la Porte D.
 
-| Fait                                  | Valeur | Dérivation                                                                      |
-| ------------------------------------- | ------ | ------------------------------------------------------------------------------- |
-| Migrations SQL                        | 50     | `ls backend/migrations/[0-9]*.sql \| wc -l` (001–048 inchangées + 049, 050)     |
-| Tables applicatives                   | 14     | `CREATE TABLE` distinctes dans les migrations                                   |
-| Tables totales                        | 15     | 14 + `schema_migrations` (créée par `migrate.ts`)                               |
-| Jobs CI                               | 5      | clés sous `jobs:` de `ci.yml` : backend, frontend, integration, containers, ops |
-| Fichiers suivis                       | 508    | `git ls-files \| wc -l`                                                         |
-| Backend unit                          | 507    | `jest --selectProjects unit`                                                    |
-| Backend intégration (PostgreSQL réel) | 137    | `jest --selectProjects integration` (20 suites)                                 |
-| Frontend                              | 454    | `vitest run`                                                                    |
-| E2E Playwright                        | 34     | `playwright test --list`                                                        |
-| Total tests                           | 1132   | somme (ensembles disjoints)                                                     |
+| Fait                                  | Valeur | Dérivation                                                                           |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| Migrations SQL                        | 50     | `ls backend/migrations/[0-9]*.sql \| wc -l` (001–048 inchangées + 049, 050)          |
+| Tables applicatives                   | 14     | `CREATE TABLE` distinctes dans les migrations                                        |
+| Tables totales                        | 15     | 14 + `schema_migrations` (créée par `migrate.ts`)                                    |
+| Jobs CI                               | 6      | clés sous `jobs:` de `ci.yml` : backend, frontend, integration, e2e, containers, ops |
+| Fichiers suivis                       | 510    | `git ls-files \| wc -l`                                                              |
+| Backend unit                          | 507    | `jest --selectProjects unit`                                                         |
+| Backend intégration (PostgreSQL réel) | 137    | `jest --selectProjects integration` (20 suites)                                      |
+| Frontend                              | 460    | `vitest run`                                                                         |
+| E2E Playwright                        | 34     | `playwright test --list`                                                             |
+| Total tests                           | 1138   | somme (ensembles disjoints)                                                          |
 
 ## 1. Règles de pilotage
 
@@ -626,9 +626,11 @@ autre opérateur`) ;
   **zéro violation axe sérieuse** après correction C-10, confirmée sur plusieurs
   démarrages froids. La seule réserve est la confirmation navigateur/HTTPS sur la
   RC3 réellement déployée (captures + recette externe), non réalisable localement.
-- **Porte D — Release : `BLOCKED_EXTERNAL`.** Tant que ne sont pas vérifiés : CI
-  distante verte sur le SHA candidat, VPS déployé, HTTPS/HSTS d'extrémité (cf.
-  C-08 `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION`), SMTP réel (cf. C-09), et
+- **Porte D — Release : `BLOCKED_EXTERNAL`.** La **CI distante (6 jobs :
+  backend, frontend, integration, e2e, containers, ops) est désormais verte sur
+  le SHA candidat** (cf. rapport de PR). Restent à vérifier avant GO : VPS
+  déployé, HTTPS/HSTS d'extrémité (cf. C-08
+  `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION`), SMTP réel (cf. C-09), et
   captures depuis la RC3 déployée. **Localement déjà prouvé** (équivalents CI,
   cf. §4.1) : builds backend+frontend, audits prod, ShellCheck, contrat des
   conteneurs de production (images non-root, labels révision, artefact runtime
@@ -659,7 +661,7 @@ VPS distant reste `BLOCKED_EXTERNAL` et n'est pas prétendu exécuté.
 | Préflight + matrice de rejet (containers)                                                       | `./scripts/test-preflight.sh`                                     | 19/19, 0 résidu                                                                                                             | 0      |
 | Images prod + non-root + labels + runtime minimal + Nginx non privilégié + favicon (containers) | `docker build … ; docker image inspect … ; docker run … nginx -t` | backend=`node`, frontend=`nginx`, révision=SHA, aucun artefact de test, `server.js` présent, `nginx -t` OK, favicon présent | 0      |
 | Backup/restore jetable (ops)                                                                    | `./scripts/test-backup-restore.sh`                                | 11/11, isolation prouvée                                                                                                    | 0      |
-| Intégration + migrations (integration)                                                          | `npm run test:integration`                                        | 136/136 (20 suites)                                                                                                         | 0      |
+| Intégration + migrations (integration)                                                          | `npm run test:integration`                                        | 137/137 (20 suites)                                                                                                         | 0      |
 | Montée 048→049→050 (fixture RC2 figée)                                                          | `jest … waitingReasonUpgrade048to050` sur PG jetable              | 2/2 (001..048 byte-identiques à `release/v1.0.0-rc2` + backfill vérifié)                                                    | 0      |
 | Résidu Docker                                                                                   | inspection après tous les contrôles                               | 0 conteneur/volume/image `:ci`/dangling résiduel                                                                            | —      |
 
@@ -668,22 +670,25 @@ candidat, déploiement, HTTPS/HSTS, SMTP, captures RC3 déployée.
 
 ### 4.2 Analyse des advisories React Router (avant push RC3)
 
-`npm audit --omit=dev --json` (frontend) : **2 vulnérabilités modérées, 0
-high/critical** (l'audit CI `--audit-level=high` passe donc, sortie 0).
+`npm audit --omit=dev --json` (frontend) : **2 vulnérabilités modérées** (au sens
+npm, par paquet), couvrant **3 advisories GHSA distinctes**, **0 high/critical**
+(l'audit CI `--audit-level=high` passe donc, sortie 0).
 
-| Advisory                                                                                                                                                   | Sévérité | Paquet             | Versions affectées  | Corrigé dans |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ | ------------------- | ------------ |
-| [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6) (CVE-2025-68470 bypass) — open redirect via backslash dans `<Link>`/`useNavigate` | modérée  | `react-router`     | `>=6.0.0 <7.18.0`   | `7.18.0`     |
-| [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg) — Arbitrary Constructor Injection via `deserializeErrors()` (hydratation SSR)     | modérée  | `react-router`     | `>=6.4.0 <7.18.0`   | `7.18.0`     |
-| [GHSA-jjmj-jmhj-qwj2](https://github.com/advisories/GHSA-jjmj-jmhj-qwj2) — open redirect menant à XSS                                                      | modérée  | `react-router-dom` | `>=6.30.2 <=6.30.4` | `7.18.0`     |
+| Advisory                                                                                                                                                   | Sévérité | Paquet             | Versions affectées  | Corrigé dans (major 7 uniquement) |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ | ------------------- | --------------------------------- |
+| [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6) (CVE-2025-68470 bypass) — open redirect via backslash dans `<Link>`/`useNavigate` | modérée  | `react-router`     | `>=6.0.0 <7.18.0`   | `7.18.0`                          |
+| [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg) — Arbitrary Constructor Injection via `deserializeErrors()` (hydratation SSR)     | modérée  | `react-router`     | `>=6.4.0 <7.18.0`   | `7.18.0`                          |
+| [GHSA-jjmj-jmhj-qwj2](https://github.com/advisories/GHSA-jjmj-jmhj-qwj2) — open redirect menant à XSS                                                      | modérée  | `react-router-dom` | `>=6.30.2 <=6.30.4` | `7.18.0`                          |
 
 - **Installé :** `react-router` et `react-router-dom` **6.30.4** (déclaré
   `react-router-dom: ^6.21.3`) — **transitif** pour `react-router`, direct pour
   `react-router-dom`. Chemins : `node_modules/react-router` (effets sur
   `react-router-dom`) et `node_modules/react-router-dom`.
-- **Correctif proposé par npm :** montée vers `7.18.0`. **Le plus haut 6.x publié
-  est `6.30.4` (déjà installé) : aucun correctif dans le même major.** La
-  correction impose donc **React Router 6 → 7 (changement MAJEUR)**.
+- **Aucune version corrigée n'existe dans le major 6.** Le plus haut `6.x`
+  publié est `6.30.4` (déjà installé) ; les trois advisories ne sont corrigées
+  qu'à partir de `7.18.0`. `react-router-dom 6.x` **n'est donc PAS corrigé
+  « en 7.18.0 » comme un simple patch** : la remédiation exige une **migration
+  majeure séparée vers React Router 7** (adaptation d'API, revalidation E2E).
 - **Impact sur les routes réellement utilisées :**
   - **Pas de SSR** dans l'application (Vite SPA pure : ni `renderToString`,
     `hydrateRoot`, `StaticRouter`, ni `deserializeErrors`) → **GHSA-337j non
@@ -696,28 +701,31 @@ high/critical** (l'audit CI `--audit-level=high` passe donc, sortie 0).
     cible de redirection. Aucun paramètre `redirect`/`returnTo`/`next` →
     **open-redirect non atteignable en pratique**.
 - **Décision (pas d'acceptation de risque unilatérale) :** la seule correction
-  disponible est une **montée majeure RR7**, qui sort du périmètre RC3 (gel
-  fonctionnel, diff limité). **Aucune mise à niveau appliquée** avant le push.
-  La montée RR6→RR7 est **différée** et laissée à décision explicite (hors RC3).
-  L'audit reste vert au seuil `high` de la CI.
+  disponible est une **migration majeure séparée vers React Router 7**, qui sort
+  du périmètre RC3 (gel fonctionnel, diff limité). **Aucune mise à niveau
+  appliquée.** L'audit reste vert au seuil `high` de la CI.
+- **Risque modéré différé et explicitement suivi :** issue de migration RR7
+  dédiée — [sentinel-fullstack#29](https://github.com/AmineAKIK/sentinel-fullstack/issues/29)
+  (les trois advisories, l'analyse d'atteignabilité et les critères de sortie).
+  À revérifier à chaque évolution de routage.
 
 ## 5. Journal des lots
 
-| Lot  | Objet                                                | Commit                                                                            | État                                                                                                                                                       |
-| ---- | ---------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0    | Matrice et contrats RC3                              | `docs: establish rc3 ux and traceability contracts` (5de13f8)                     | FAIT                                                                                                                                                       |
-| 1    | Retour d'action standardisé                          | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice)                   | FAIT                                                                                                                                                       |
-| 2    | Erreurs publiques stables                            | `8932ae9`                                                                         | FAIT                                                                                                                                                       |
-| 3    | Session Board sans expiration                        | migration `049` + `fix(board)` (1249c3a) + validation PG                          | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
-| 4    | Trace des corrections                                | `fix(audit)` + validation PG réelle                                               | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                     |
-| 5    | Cycle d'annulation complet                           | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136)            | FAIT (C-06 VERIFIED sur PostgreSQL jetable)                                                                                                                |
-| 6    | Suivi explicite                                      | `fix(workshop): require explicit incident follow consent` (1bd197f)               | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel)                                                                                               |
-| 7    | Mise en attente métier                               | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff)      | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel)                                                                                                     |
-| 8    | Cartes et panneau (clavier, focus, scroll)           | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd)          | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts)                                                                       |
-| 9    | Terminologie et restitution                          | `fix(copy): align workshop terminology and hide technical codes` (5038582)        | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué)                                                              |
-| 10   | Recette comportementale et axe                       | `test: cover rc3 multi-role UX end-to-end and at 200% zoom` (93e99d2)             | FAIT (E2E 34/34 sur PostgreSQL jetable `_e2e` : axe multi-rôles, retrait annulation multi-rôles, zoom 200 %, mobile ; drift terminologique lot 9 rattrapé) |
-| 11   | Documentation et candidate                           | `docs: synchronize the readiness matrix with measured facts` (046f021)            | FAIT (montée 048→050 sur base figée validée sur PG réel ; faits mesurés synchronisés : 50 migrations, 5 jobs CI, 1117 tests)                               |
-| C-08 | En-têtes de sécurité (autorité unique + anti-dérive) | `fix(security): make security headers single-authority and drift-proof` (8d54595) | FAIT (IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION : dérive CSP corrigée, source canonique unique, test anti-dérive)                                         |
-| C-09 | E-mail lisible sans images (alternative texte brut)  | `fix(notifications): keep emails readable without remote images` (ef5dfc4)        | FAIT (IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION : aucune image, partie texte brut ajoutée + tests)                                                        |
-| C-10 | Violation axe sur l'état de chargement               | `fix(a11y): give loading regions a role so aria-label is valid` (a7fd77a)         | FAIT (VERIFIED : `role="status"`, cause corrigée, signal déterministe, 3 démarrages froids verts)                                                          |
-| 11+  | Contrôles locaux (équivalents CI) + montée RC2 figée | (ce commit)                                                                       | FAIT (cf. §4.1 : builds, audits, ShellCheck, conteneurs, préflight, `.env`, backup/restore, migrations, 048→049→050 RC2 ; 0 résidu Docker)                 |
+| Lot  | Objet                                                | Commit                                                                            | État                                                                                                                                                                                                            |
+| ---- | ---------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Matrice et contrats RC3                              | `docs: establish rc3 ux and traceability contracts` (5de13f8)                     | FAIT                                                                                                                                                                                                            |
+| 1    | Retour d'action standardisé                          | `fd1ff70` + `3b4e736` + `01aced1` (création/consigne + matrice)                   | FAIT                                                                                                                                                                                                            |
+| 2    | Erreurs publiques stables                            | `8932ae9`                                                                         | FAIT                                                                                                                                                                                                            |
+| 3    | Session Board sans expiration                        | migration `049` + `fix(board)` (1249c3a) + validation PG                          | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                                                                          |
+| 4    | Trace des corrections                                | `fix(audit)` + validation PG réelle                                               | FAIT (VERIFIED sur PostgreSQL jetable)                                                                                                                                                                          |
+| 5    | Cycle d'annulation complet                           | `fix(workshop): complete cancellation arbitration lifecycle` (8c34136)            | FAIT (C-06 VERIFIED sur PostgreSQL jetable)                                                                                                                                                                     |
+| 6    | Suivi explicite                                      | `fix(workshop): require explicit incident follow consent` (1bd197f)               | FAIT (C-07 VERIFIED : unitaire rouge→vert + PostgreSQL réel)                                                                                                                                                    |
+| 7    | Mise en attente métier                               | `fix(workshop): model waiting reasons separately from diagnostics` (1e0f8ff)      | FAIT (C-05 VERIFIED : migration 050 + PostgreSQL réel)                                                                                                                                                          |
+| 8    | Cartes et panneau (clavier, focus, scroll)           | `fix(ux): make the incident dossier keyboard- and scroll-safe` (4eb74cd)          | FAIT (scroll drawer bureau borné + focus dossier à l'ouverture ; tests ciblés verts)                                                                                                                            |
+| 9    | Terminologie et restitution                          | `fix(copy): align workshop terminology and hide technical codes` (5038582)        | FAIT (« Suivi de l'incident » ; formatEventLabel : plus aucun code d'événement brut restitué)                                                                                                                   |
+| 10   | Recette comportementale et axe                       | `test: cover rc3 multi-role UX end-to-end and at 200% zoom` (93e99d2)             | FAIT (E2E 34/34 sur PostgreSQL jetable `_e2e` : axe multi-rôles, retrait annulation multi-rôles, zoom 200 %, mobile ; drift terminologique lot 9 rattrapé)                                                      |
+| 11   | Documentation et candidate                           | `docs: synchronize the readiness matrix with measured facts` (046f021)            | FAIT (montée 048→050 sur base figée validée sur PG réel). NB : le décompte « 5 jobs CI / 1117 tests » de ce commit était erroné — corrigé depuis en **6 jobs CI (dont e2e) / 1138 tests** (voir Faits mesurés). |
+| C-08 | En-têtes de sécurité (autorité unique + anti-dérive) | `fix(security): make security headers single-authority and drift-proof` (8d54595) | FAIT (IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION : dérive CSP corrigée, source canonique unique, test anti-dérive)                                                                                              |
+| C-09 | E-mail lisible sans images (alternative texte brut)  | `fix(notifications): keep emails readable without remote images` (ef5dfc4)        | FAIT (IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION : aucune image, partie texte brut ajoutée + tests)                                                                                                             |
+| C-10 | Violation axe sur l'état de chargement               | `fix(a11y): give loading regions a role so aria-label is valid` (a7fd77a)         | FAIT (VERIFIED : `role="status"`, cause corrigée, signal déterministe, 3 démarrages froids verts)                                                                                                               |
+| 11+  | Contrôles locaux (équivalents CI) + montée RC2 figée | (ce commit)                                                                       | FAIT (cf. §4.1 : builds, audits, ShellCheck, conteneurs, préflight, `.env`, backup/restore, migrations, 048→049→050 RC2 ; 0 résidu Docker)                                                                      |
