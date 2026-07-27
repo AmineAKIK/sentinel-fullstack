@@ -11,8 +11,18 @@ async function loginAsResponsable(page: Page): Promise<void> {
 }
 
 async function chooseSelectField(page: Page, ariaLabel: string, optionText: string) {
-  await page.getByRole('combobox', { name: ariaLabel }).click();
-  await page.getByRole('option', { name: optionText, exact: true }).click();
+  const combobox = page.getByRole('combobox', { name: ariaLabel });
+  await combobox.click();
+  // Signal DÉTERMINISTE d'ouverture : le combobox porte aria-expanded="true"
+  // quand le menu est réellement déployé. Sans cette attente, le clic sur
+  // l'option course avec l'ouverture du menu (flakiness observée en CI).
+  await expect(combobox).toHaveAttribute('aria-expanded', 'true');
+  const option = page.getByRole('option', { name: optionText, exact: true });
+  await expect(option).toBeVisible();
+  await option.click();
+  // Après sélection, le menu se referme : on confirme la fermeture pour que
+  // l'interaction suivante reparte d'un état stable.
+  await expect(combobox).toHaveAttribute('aria-expanded', 'false');
 }
 
 test.describe('Pilotage atelier', () => {

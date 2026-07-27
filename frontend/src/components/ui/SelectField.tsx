@@ -35,18 +35,43 @@ export default function SelectField({
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : null;
 
-  // Position the menu using fixed coords relative to the trigger
+  // Position the menu using fixed coords relative to the trigger. When there
+  // isn't enough room below (trigger low in the viewport), open UPWARD and clamp
+  // the height so the menu — and every option — stays fully inside the viewport
+  // and clickable (sinon un menu ouvert sous le pli devient inatteignable).
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    setMenuStyle({
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-      zIndex: 1200,
-    });
-  }, [open]);
+    const gap = 4;
+    const viewportH = window.innerHeight;
+    const spaceBelow = viewportH - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    // Hauteur souhaitée (bornée par le CSS max-height du menu, ici 280px).
+    const desired = Math.min(280, options.length * 40 + 8);
+    const openUp = spaceBelow < desired && spaceAbove > spaceBelow;
+    const available = Math.max(120, openUp ? spaceAbove : spaceBelow);
+    setMenuStyle(
+      openUp
+        ? {
+            position: 'fixed',
+            bottom: viewportH - rect.top + gap,
+            left: rect.left,
+            width: rect.width,
+            maxHeight: Math.min(desired, available),
+            overflowY: 'auto',
+            zIndex: 1200,
+          }
+        : {
+            position: 'fixed',
+            top: rect.bottom + gap,
+            left: rect.left,
+            width: rect.width,
+            maxHeight: Math.min(desired, available),
+            overflowY: 'auto',
+            zIndex: 1200,
+          }
+    );
+  }, [open, options.length]);
 
   useEffect(() => {
     if (!open) return undefined;
