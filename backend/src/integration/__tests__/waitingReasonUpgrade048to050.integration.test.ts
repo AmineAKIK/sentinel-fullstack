@@ -21,42 +21,40 @@ const DB_URL = process.env.DATABASE_URL!;
 const SCHEMA = `rc3_upgrade_${process.pid}`;
 const MIGRATIONS_DIR = path.join(__dirname, '../../../migrations');
 const REPO_ROOT = path.join(__dirname, '../../../..');
-// Réf. RC2 figée : la branche de stabilisation rc.2. La montée testée part donc
-// littéralement des migrations RC2 (001..048), pas d'une copie approximative.
-const RC2_REF = 'release/v1.0.0-rc2';
+// Référence IMMUABLE de la RC2 : le TAG publié `v1.0.0-rc.2` (pas la branche
+// mutable). La montée testée part donc littéralement des migrations RC2
+// (001..048). Le job CI d'intégration récupère ce tag (fetch-depth: 0), si bien
+// que la preuve de provenance est OBLIGATOIRE en CI — aucun skip conditionnel.
+const RC2_TAG = 'v1.0.0-rc.2';
+const RC2_COMMIT = `${RC2_TAG}^{commit}`;
 
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-// La réf. RC2 figée n'existe que sur un clone COMPLET (poste local) ; la CI
-// utilise un checkout superficiel (depth 1) où cette branche est absente. La
-// preuve de provenance « byte-identique à RC2 » est donc un contrôle local
-// opt-in : on ne l'exécute que si la réf. se résout, sans jamais échouer la CI
-// sur une réf. manquante. La preuve FONCTIONNELLE (montée 048→050 + backfill)
-// s'exécute toujours, elle.
-function rc2RefAvailable(): boolean {
+// Échoue explicitement si le tag RC2 n'est pas résolvable (sinon la preuve de
+// provenance serait silencieusement ignorée). En CI, `fetch-depth: 0` garantit
+// sa présence ; en local, un clone complet le fournit.
+function assertRc2TagResolvable(): void {
   try {
-    execFileSync('git', ['rev-parse', '--verify', '--quiet', `${RC2_REF}^{commit}`], {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', RC2_COMMIT], {
       cwd: REPO_ROOT,
       stdio: 'ignore',
     });
-    return true;
   } catch {
-    return false;
+    throw new Error(
+      `Tag RC2 « ${RC2_TAG} » introuvable : la preuve de provenance 001..048 ne peut ` +
+        `être vérifiée. En CI, utiliser fetch-depth: 0 (ou fetch explicite du tag).`
+    );
   }
 }
 
-// Contenu d'un fichier de migration tel qu'il existe dans la réf. RC2 figée.
-function rc2MigrationSql(file: string): string | null {
-  try {
-    return execFileSync('git', ['show', `${RC2_REF}:backend/migrations/${file}`], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
-  } catch {
-    return null;
-  }
+// Contenu d'un fichier de migration tel qu'il existe au tag RC2 immuable.
+function rc2MigrationSql(file: string): string {
+  return execFileSync('git', ['show', `${RC2_TAG}:backend/migrations/${file}`], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
 }
 
 let pool: Pool;
@@ -102,25 +100,19 @@ afterAll(async () => {
 });
 
 describe('montée 048 → 049 → 050 depuis la fixture RC2 figée (lot 11, C-05)', () => {
-  const rc2Available = rc2RefAvailable();
-  // Contrôle de provenance : ne s'exécute que si la réf. RC2 est présente
-  // (clone complet local). Absente en CI (checkout superficiel) → sauté
-  // explicitement, jamais en échec. La preuve fonctionnelle ci-dessous, elle,
-  // s'exécute toujours.
-  (rc2Available ? it : it.skip)(
-    'les migrations 001..048 appliquées SONT celles de la RC2 figée (byte-identiques)',
-    () => {
-      const upTo048 = migrationFiles().filter((f) => Number(f.slice(0, 3)) <= 48);
-      expect(upTo048.length).toBe(48);
-      for (const file of upTo048) {
-        const rc2 = rc2MigrationSql(file);
-        // Chaque migration 001..048 doit exister dans la réf. RC2…
-        expect(rc2).not.toBeNull();
-        // …et être identique au bit près à celle appliquée par le test.
-        expect(sha256(migrationSql(file))).toBe(sha256(rc2 as string));
-      }
+  // Preuve de provenance OBLIGATOIRE (aucun skip) : les migrations 001..048
+  // appliquées sont, au bit près, celles du tag immuable v1.0.0-rc.2. Échoue si
+  // le tag n'est pas résolvable (le job CI le rend disponible via fetch-depth: 0).
+  it('les migrations 001..048 appliquées SONT celles du tag v1.0.0-rc.2 (byte-identiques)', () => {
+    assertRc2TagResolvable();
+    const upTo048 = migrationFiles().filter((f) => Number(f.slice(0, 3)) <= 48);
+    expect(upTo048.length).toBe(48);
+    for (const file of upTo048) {
+      // Identique, au bit près, à la version du tag RC2 (rc2MigrationSql lève
+      // si le fichier est absent du tag).
+      expect(sha256(migrationSql(file))).toBe(sha256(rc2MigrationSql(file)));
     }
-  );
+  });
 
   it('applique 001..048, seed ancienne forme, puis 049 puis 050 et backfill le motif', async () => {
     const files = migrationFiles();
