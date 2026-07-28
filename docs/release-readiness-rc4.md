@@ -5,7 +5,7 @@
 > exécutée, sa sortie, son code de retour et l'interaction exacte qu'elle
 > vérifie.
 
-**Statut global : `NO-GO — PORTES_A_B_C_FRANCHIES / LOT_9_PENDING`**
+**Statut global : `NO-GO — PORTES_A_B_C_FRANCHIES / LOT_10_PENDING`**
 
 **Branche autorisée :** `release/v1.0.0-rc4`
 
@@ -91,14 +91,15 @@ disjointes avant de produire un total global.
 
 | Fait | Commande ou méthode de dérivation | Valeur RC4 | État |
 | --- | --- | --- | --- |
-| Fichiers suivis | `git ls-files \| wc -l` | `513` dans l'index du lot 0 (`511` sur la base RC3 + les deux documents) ; total candidat final à recalculer | `RECOUNTED_LOT0` |
-| Migrations SQL | Énumération ordonnée de `backend/migrations/[0-9][0-9][0-9]_*.sql` | `50` (`001` à `050`) | `VERIFIED_BASELINE` |
-| Jobs CI | Clés de premier niveau sous `jobs:` dans `.github/workflows/ci.yml` | `6` : `backend`, `frontend`, `integration`, `e2e`, `containers`, `ops` | `RECOUNTED_LOT0` |
-| Tests backend unitaires | `cd backend && npm test` | `507` tests dans `48` suites, tous verts | `RECOUNTED_LOT0` |
-| Tests backend PostgreSQL | `cd backend && scripts/with-disposable-postgres.sh npm run test:integration` | `137` tests dans `20` suites, tous verts ; aucun conteneur ni volume résiduel | `RECOUNTED_LOT0` |
-| Tests frontend | `cd frontend && npm test` | `468` tests dans `54` fichiers, tous verts | `RECOUNTED_LOT0` |
-| Tests E2E | `cd frontend && npx playwright test --list` | `34` tests dans `10` fichiers ; inventaire seulement, non exécutés au lot 0 | `RECOUNTED_NOT_RUN` |
-| Total disjoint | `507 + 137 + 468 + 34` | `1 146` tests recensés ; le sous-ensemble E2E reste à exécuter | `RECOUNTED_LOT0` |
+| Fichiers suivis | `git ls-files \| wc -l` | `534` après ajout au suivi des quatre documents jury synchronisés | `RECOUNTED_LOT9` |
+| Migrations SQL | Énumération ordonnée de `backend/migrations/[0-9][0-9][0-9]_*.sql` | `50` (`001` à `050`), byte-identiques à RC3 | `VERIFIED_LOT9` |
+| Tables | Analyse des `CREATE TABLE` et de `migrate.ts` par `collectDossierFacts.py` | `14` applicatives + `1` technique = `15` | `RECOUNTED_LOT9` |
+| Jobs CI | Clés de premier niveau sous `jobs:` dans `.github/workflows/ci.yml` | `6` : `backend`, `frontend`, `integration`, `e2e`, `containers`, `ops` | `RECOUNTED_LOT9` |
+| Tests backend unitaires | Rapport Jest JSON vert | `511` tests dans `48` suites | `VERIFIED_LOT9` |
+| Tests backend PostgreSQL | Rapport Jest JSON vert sur PostgreSQL jetable | `146` tests dans `21` suites ; nettoyage complet | `VERIFIED_LOT9` |
+| Tests frontend | Rapport Vitest JSON vert | `583` tests dans `58` fichiers | `VERIFIED_LOT9` |
+| Tests E2E | Suite Chromium réellement exécutée et inventaire JSON | `57` tests dans `18` fichiers ; PostgreSQL jetable nettoyé | `VERIFIED_LOT9` |
+| Total disjoint | `511 + 146 + 583 + 57` | `1 297` tests verts | `RECOUNTED_LOT9` |
 
 ## 4. Contrats figés à la Porte A
 
@@ -161,8 +162,8 @@ pas de `Cache-Control` dans le contrat actuel.
 | **R4-07** | **P1** | Plan RC4 §9.1–9.2, §12 lot 6 | Les pseudo-pluralisations, anciens libellés, rôles bruts, fallbacks d'enums et sections Diagnostic blanches ont été reproduits par des tests permanents avant correction. | Trois rouges permanents : terminologie `10/10 failed`, fallback enum `34` restitutions brutes, Diagnostic blanc `2/2 failed` ; commandes et sorties §6. | Accords `0/1/2`, cinq rôles, `33` pseudo-pluriels et `10` anciens libellés en échec ; puis `34` fallbacks bruts et deux sections Diagnostic blanches rendues. | Helpers français et libellés sûrs ; erreurs, filtres, confirmations, journaux, Board, administration et courriels ; tests existants alignés sur le glossaire sans changer les enums internes. | Tests permanents de source et DOM ; rôles/fallbacks sûrs ; Diagnostic absent si null/vide/blanc ; balayages obligatoires classifiés ; backend notifications/lignes. | Ciblés frontend `15/15`, `204/204` ; backend `2/2`, `26/26` ; builds, ESLint et Prettier des deux applications verts ; balayage pseudo-pluriels vide. | Les enums et clés restantes sont exclusivement types, logique, accès DTO/configuration et fixtures négatives ; aucun fallback brut de table de libellés ne subsiste. | `VERIFIED` |
 | **R4-08** | **P1** | Plan RC4 §10.1–10.3, §14.6 | La barrière, les scripts et la syntaxe 1.18 manquaient ; le modèle employait en outre `http2 on`, directive inconnue de Nginx 1.18.0. | Jest permanent `3 failed / 15 passed`, puis simulation réelle Nginx 1.18.0 rouge après les probes : modèle sans barrière ; détails §6. | Barrière absente, syntaxe HTTP/2 incompatible, deux scripts absents ; le vrai contrôle reproduit l'héritage sans barrière, le bloque avec, valide les valeurs publiques, puis sort `1` sur le modèle non corrigé. | Modèle hôte, vérificateur public, simulation locale, runbook et contrôle CI 1.18.0. | Barrière vide au serveur HTTPS ; syntaxe `listen ... ssl http2` ; autorités HSTS/statiques/API ; contrôle exact de six en-têtes, cache et non-exposition ; sauvegarde/application/rollback atomiques. | Jest `18/18`, vrai Nginx `1.18.0 (Ubuntu)` code `0`, `nginx -t` du modèle vert, ShellCheck et `bash -n` verts. | Les alertes initiales du binaire extrait vers son chemin de log compilé sont sans effet ; aucune requête VPS ni vérification publique externe n'a été effectuée. | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
 | **R4-09** | **P0** | Plan RC4 §5.2, §6.3, §7.3, §8.4, §14 | Les E2E RC3 omettaient des interactions réelles ; le lot 8 a aussi reproduit deux sorties Auth/Board perdant le focus, un succès d'arbitrage disant « Modification » au lieu de « Correction », deux assertions E2E périmées et un événement de retrait sans snapshot v2. | Baseline Chromium `46 passed / 2 failed`, rouges Auth `2/2 failed`, Board `1/1 failed`, correction `1/1 failed` et PostgreSQL correction `1 failed / 5 passed` ; commandes et causes ci-dessous | Les assertions périmées visaient `incident(s) actif(s)` et `Consigne responsable`; les sorties perdaient le focus après erreur ; l'application annonçait le mauvais résultat ; `EDIT_REQUEST_WITHDRAWN` omettait `schemaVersion`/`changes`. | E2E carte/panneau/attente/correction/annulation/mutations/axe/Auth/Board/Support/SelectField ; Auth partagé, Board, feedback correction ; service et intégration correction. | Restaurations de focus après fin du pending ; succès « Correction appliquée. » réservé à l'arbitrage ; retrait réutilisant le snapshot du dossier ; parcours réels et assertions visibles, sans migration ni changement de permission. | Trois exécutions neuves `29/29`, suite Chromium `57/57`, axe zéro critique/sérieuse ; frontend `583/583`, backend `511/511`, PostgreSQL correction `6/6`. | Mobile, zoom, haut/milieu/bas, molette, métadonnée, clavier, confirmations, erreurs/réessais, conservation, anti-double, Historique/Journal et ancienne session Board sont prouvés. | La répétition sur une même base a été explicitement rejetée comme non indépendante ; les trois preuves retenues recréent et reseedent chacune PostgreSQL. | `VERIFIED` |
-| **R4-10** | **P1** | Plan RC4 §12 lots 9–10, §16 portes D–E, §18 | Aucune capture image n'est suivie ; la liste reste « à réaliser ». Des faits documentaires sont périmés, dont `38` migrations et `579` tests. La readiness RC3 admet que captures, VPS et SMTP restent externes. | Au lot 9, lancer des recherches ciblées avec `rg -n` sur chaque valeur/version/SHA périmé dans les documents concernés avant leur synchronisation ; aucune capture ne peut être testée avant déploiement autorisé | Non exécuté au lot 0 conformément au §12. Les valeurs déjà localisées constituent le périmètre, mais chaque contrôle documentaire devra d'abord retourner un résultat non vide ; les captures et faits externes resteront explicitement en attente. | `docs/release-readiness-rc4.md` ; `docs/dossier-projet/liste-captures-a-realiser.md` ; `docs/dossier-projet/corrections-dossier-final.md` ; runbook, dossier jury et documents citant des totaux/version/SHA | Recalculer tous les faits au SHA candidat, synchroniser readiness/runbook/dossier, préparer la liste exacte des captures post-déploiement et distinguer preuves locales, CI et externes. | Recherches de valeurs périmées ; validation liens/SHA/totaux ; revue terminale documentaire ; captures uniquement après GO déploiement sur RC4 réellement servie. | `PENDING_EXECUTION[R4-10:GREEN_EVIDENCE]` | Faits recopiés, total non disjoint, capture RC3 attribuée à RC4, preuve externe inventée, document mis à jour avant le SHA final. | `OPEN_RED_PENDING` |
-| **R4-11** | **P0** | Plan RC4 §11, §14.3–14.6, §15 | Patrimoine RC3 présent à préserver : migrations 049/050, session Board sans expiration et révocable, correction v2 avec snapshots, arbitrages, suivi explicite, séparation motif/diagnostic, erreurs structurées, courriel multipart, redaction des secrets, SelectField et provenance OCI. Lacunes de preuve supplémentaires du diagnostic et les `16 GAP`/`11 EXCEPTION_TO_REVIEW` de l'inventaire sont détaillés en §7, notamment correction annoncée à tort appliquée, succès absents, modales fermées ou figées en erreur, faux succès reset et saisie Support perdue. | Aucun rouge générique valable pour un groupe d'invariants : baseline par `git diff --exit-code v1.0.0-rc.3 -- backend/migrations/` et recomptages §3 ; chaque défaut fonctionnel de §7 recevra sa commande rouge exacte avant correction | La baseline est verte (diff vide ; `1 146` tests recensés, suites locales exécutées vertes) et n'est pas présentée comme un rouge. Les lacunes de §7 restent ouvertes ; les regrouper sous une commande représentative violerait la règle d'interaction exacte. | `backend/migrations/049_*` et `050_*` ; tests Board auth/session ; tests correction/arbitrage PostgreSQL ; repository/service Atelier ; tests suivi et erreurs ; modèles courriel ; logs/redaction ; composant `SelectField` ; workflows/images OCI ; E2E attente/correction/annulation ; surfaces de l'inventaire | Ne modifier aucune migration ; compléter uniquement les preuves manquantes et corriger minimalement tout écart réellement reproduit, sans changer les permissions ou contrats métier. | Diff byte-identique migrations ; PostgreSQL réel et concurrence exactement un gagnant ; retraits de demandes par leur demandeur ; motifs obligatoires aux refus ; requête HTTP d'une ancienne session après révocation ; suivi explicite ; motif séparé sur Atelier/panneau/Board/historique ; erreurs sûres ; courriel HTML+texte avec lien correct ; logs sans cookie/JWT ; SelectField mesuré au viewport ; OCI et préflight registry-only ; cycles ciblés des lacunes d'inventaire ; SMTP externe après GO. | `PENDING_EXECUTION[R4-11:GREEN_EVIDENCE]` ; invariant migrations et socle de suites confirmés au lot 0 | Régression métier silencieuse, test unitaire confondu avec preuve HTTP/SQL/navigateur, concurrence non déterministe, SMTP réel faussement déclaré local, lacune de mutation oubliée, altération accidentelle d'une migration. | `OPEN_RED_PENDING` |
+| **R4-10** | **P1** | Plan RC4 §12 lots 9–10, §16 portes D–E, §18 | Le rouge documentaire a retrouvé les valeurs `38` migrations, `579` tests, `4` jobs, `2` E2E, l'ancien hook de position et la restauration encore dite non éprouvée. | Balayages `rg -n` ciblés, puis `collectDossierFacts.py` alimenté par quatre rapports JSON entièrement verts | Les documents et le générateur recopiaient des faits RC3/antérieurs et mélangeaient preuve locale, CI distante et instance publique. | Readiness, inventaire, runbook, checklist, quatre documents du dossier jury et générateur DOCX | Totaux dérivés, paramètres volatils du générateur, terminologie motif/diagnostic synchronisée, risques réels et liste exacte des captures externes. | Collecteur : `534` fichiers, `50` migrations, `15` tables, `6` jobs, `18` specs et `1 297` tests ; scans documentaires et syntaxe Python. | Tous les faits locaux sont synchronisés ; aucune capture RC4, CI distante ou preuve VPS/SMTP n'est inventée. | Le SHA du commit documentaire diffère du SHA code collecté sans changer les comptes ; la revue terminale doit le constater. | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
+| **R4-11** | **P0** | Plan RC4 §11, §14.3–14.6, §15 | Patrimoine RC3 préservé et lacunes fonctionnelles reproduites individuellement dans leurs lots ; aucune migration ni permission n'a été changée. | Rouges ciblés des lots 4–8 ; lot 9 : suites complètes, PostgreSQL réel, navigateur, courriel local, images, préflight, Nginx et restauration | Chaque écart a été localisé à son interaction ; les seules limites restantes sont les preuves nécessitant une candidate distante réellement publiée. | Migrations 001..050, Board, correction/annulation, suivi, motif, erreurs, courriels, logs, SelectField, OCI, Compose et scripts ops | Corrections minimales des lots 4–8 et consolidation des preuves locales au lot 9. | Backend `511`, PostgreSQL `146`, frontend `583`, Chromium `57`, courriel `25/25`, préflight `19/19`, env `14/14`, backup/restore `11/11`, Nginx 1.18 et images conformes. | Migrations byte-identiques ; ancienne session Board refusée ; concurrence exactement un gagnant ; snapshots v2 ; suivi explicite ; motif séparé ; erreurs sûres ; multipart local ; logs redigés ; géométrie et OCI prouvées. | SMTP reçu, unicité HTTPS publique, CI distante, digests de prerelease, health.version et captures attendent le lot 11 autorisé. | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
 
 ## 6. Registre exécutable des cycles rouge → vert
 
@@ -1057,14 +1058,96 @@ Porte C, sur une nouvelle base jetable :
 
 R4-09 passe à `VERIFIED` et la Porte C est franchie.
 
+### R4-10 et R4-11 — contrôles CI locaux et dossier candidat
+
+Le rouge documentaire a été exécuté avant correction avec des recherches
+ciblées. Il a retrouvé notamment `38 migrations`, `579 tests`, `4 jobs`,
+`2 scénarios`, `useIncidentDrawerPosition` et une restauration encore décrite
+comme non éprouvée. Ces résultats ont délimité les documents et le générateur à
+synchroniser.
+
+Contrôles applicatifs du lot 9 :
+
+- `npm ci` backend et frontend : codes `0` ;
+- backend format, lint, build, scripts TypeScript et `17` contrôles de
+  fiabilité : codes `0` ;
+- backend unitaire `48` suites, `511/511` ; couverture `84,23 %` statements,
+  `79,39 %` branches, `78,70 %` fonctions, `88,98 %` lignes ;
+- PostgreSQL jetable `21` suites, `146/146`, nettoyage complet ;
+- frontend format, lint et build : codes `0` ;
+- frontend `58` fichiers, `583/583` ; couverture `89,23 %` statements,
+  `83,16 %` branches, `91,69 %` fonctions, `91,29 %` lignes ;
+- Chromium complet `57/57` sur base `_e2e` jetable, nettoyage complet ;
+- audit production backend : `0` vulnérabilité ;
+- audit production frontend au seuil `high` : code `0`, deux advisories
+  React Router modérées acceptées et liées à l'issue `#29`, sans migration RR7
+  ni `audit fix --force`.
+
+Contrôles infrastructure :
+
+- ShellCheck `0.10.0` sur tous les scripts suivis : code `0` ;
+- trois `docker compose ... config --quiet` : codes `0` ;
+- topologie : huit invariants verts, digest-only et ports loopback ;
+- parsing env : `14/14` ;
+- builds production backend/frontend sur le SHA
+  `2c5207ef4ac13ddf7413863f49df1d59fe4e0f1b` ;
+- utilisateurs `node`/`nginx`, labels OCI `revision`, runtime minimal,
+  `nginx -t` read-only et favicon : verts ;
+- préflight registry-only `19/19`, dont digest réel, correspondance SHA,
+  refus d'image d'une autre release, non-fuite et nettoyage exact ;
+- sauvegarde/restauration `11/11`, RTO local `5 s`, checksum, exclusion
+  mutuelle, rejet d'un faux schéma et isolation ;
+- Nginx hôte 1.18.0 : héritage simulé, barrière, valeurs publiques et modèle
+  hôte conformes ;
+- Caddy `2.11.4-alpine` : configuration valide ;
+- courriel local : `3` suites, `25/25`, multipart HTML+texte, lien correct et
+  erreurs SMTP redigées.
+- zéro résidu final : aucun conteneur, volume, réseau ou tag du lot ; huit
+  anciens tags `127.0.0.1:*/sentinel-backend:run-*` laissés par des exercices
+  preflight antérieurs ont été identifiés par leur namespace de test puis
+  retirés explicitement, sans prune global.
+
+La première commande E2E directe a été refusée par le garde, car la configuration
+locale pointait vers `sentinel` et non une base suffixée `_e2e`. Elle n'a exécuté
+aucune fixture. La relance correcte via le helper jetable a donné `57/57`.
+La génération initiale du rapport JSON backend dans le sandbox a de même produit
+les seuls `listen EPERM` connus (`509/511`) ; le rapport retenu a été régénéré
+hors sandbox avec `511/511`.
+
+Les quatre rapports JSON verts, dont un vrai run Playwright `57/57` sans
+skipped, unexpected ni flaky, fournis à `collectDossierFacts.py` donnent :
+
+```text
+SHA code : 2c5207ef4ac13ddf7413863f49df1d59fe4e0f1b
+fichiers suivis : 534
+migrations : 50
+tables : 14 applicatives + 1 technique
+jobs CI : 6
+fichiers E2E : 18
+tests : 511 + 146 + 583 + 57 = 1 297
+```
+
+Le collecteur a été durci pour refuser un simple `playwright --list` : le
+rapport d'inventaire précédent échoue désormais avec
+`Rapport Playwright sans test passant`, tandis que le rapport d'exécution réel
+ci-dessus est accepté. Le total E2E ne peut donc plus provenir d'un inventaire
+non exécuté.
+
+Le lot 9 ajoute au suivi les quatre documents jury jusque-là locaux et ignorés,
+ce qui porte le total à `534`; les deux Plans restent les seules exceptions hors
+suivi. La readiness, l'inventaire, le runbook, la checklist, le dossier jury,
+les schémas et le générateur DOCX sont synchronisés. Les captures sont désormais
+listées par état exact et restent explicitement externes jusqu'à une autorisation
+du lot 11.
+
 ### Cycles restant à ouvrir
 
 | ID | Situation après le lot 0 | Preuve future |
 | --- | --- | --- |
 | R4-06 | Inventaire 61/61, 59 couvertes et 2 exceptions système prouvées | `VERIFIED` |
 | R4-09 | Parcours navigateur réels, responsive, accessibilité et invariants RC3 exécutés | `VERIFIED` |
-| R4-10 | Valeurs documentaires périmées confirmées ; captures externes non inventées | `PENDING_EXECUTION[R4-10:RED_GREEN_DOCUMENTATION]` |
-| R4-11 | Invariants fonctionnels du lot 8 prouvés ; courriel et infrastructure réservés au lot 9, SMTP externe toujours séparé | `PARTIAL_LOCAL_VERIFICATION` |
+| R4-10 | Faits et documents locaux synchronisés ; liste des captures exacte, aucune preuve externe inventée | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
+| R4-11 | Tous les invariants locaux prouvés ; SMTP, public HTTPS, CI distante, provenance publiée et VPS restent externes | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
 
 ## 7. Sous-matrice de non-régression R4-11
 
@@ -1073,7 +1156,7 @@ détectée au diagnostic soit perdu dans les lots transversaux.
 
 | Contrat ou lacune | Couche de preuve minimale | Situation au diagnostic RC3 | Preuve RC4 | État |
 | --- | --- | --- | --- | --- |
-| Migrations 049/050 append-only et 001..050 byte-identiques | Diff Git contre le tag, migration depuis base vierge et upgrade pertinent sur PostgreSQL jetable | Présent ; diff initial vide | `git diff --exit-code v1.0.0-rc.3 -- backend/migrations/` initial : code `0` ; preuve finale à répéter | `BASELINE_VERIFIED_FINAL_PENDING` |
+| Migrations 049/050 append-only et 001..050 byte-identiques | Diff Git contre le tag, migration depuis base vierge et upgrade pertinent sur PostgreSQL jetable | Présent ; diff initial vide | Diff initial et lot 9 vides ; PostgreSQL jetable `146/146`, dont upgrade et checksums | `VERIFIED_LOCAL_TERMINAL_DIFF_PENDING` |
 | Session Board sans expiration automatique et révocable | Unité JWT + intégration PostgreSQL + HTTP | Contrat et tests partiels présents | Suites Gate B ; navigateur : session émise utilisable avant révocation puis requête HTTP refusée après | `VERIFIED_LOCAL` |
 | Ancienne session Board refusée après révocation | Requête HTTP authentifiée avec jeton/session émis avant la révocation | Lacune supplémentaire : pas de preuve HTTP dédiée | `admin-board-session-revocation.spec.ts` : HTTP `200` avant, confirmation et vrai `PATCH`, puis HTTP `401 UNAUTHORIZED` avec l'ancienne session | `VERIFIED` |
 | Payload correction v2 et snapshot avant/après sous verrou | Unité sérialisation + intégration PostgreSQL réelle | Présent | PostgreSQL correction `6/6` et parcours navigateur comparant valeurs avant/demandées | `VERIFIED` |
@@ -1084,11 +1167,11 @@ détectée au diagnostic soit perdu dans les lots transversaux.
 | Suivi uniquement explicite | Repository/service + E2E de chaque mutation sensible | Présent | Suites Gate B et E2E correction/annulation : aucune mutation sensible ne crée de suivi implicite | `VERIFIED` |
 | Séparation `waiting_reason` / `diagnostic` | Migration, repository, Atelier, panneau, Board, Historique | Modèle présent ; panneau/Board et cycle reprise incomplets | PostgreSQL, DOM et navigateur : motif complet sur Atelier/panneau/Board, disparition après reprise et Historique conservé | `VERIFIED` |
 | Erreur publique structurée et traduction sûre | Contrôleurs + tests négatifs DOM | Présent | Suites backend/frontend et E2E Support/Auth/Board : sentinelles techniques absentes du DOM | `VERIFIED` |
-| Courriel multipart HTML + texte, lien correct et aucune image distante obligatoire | Unité de rendu/envoi, assertions du lien et réception SMTP réelle | Construction présente ; lien à revalider ; SMTP réel externe | `PENDING_EXECUTION[R4-11:MULTIPART_EMAIL_LOCAL]` ; SMTP : `PENDING_EXTERNAL_AUTHORIZATION` | `OPEN_EXTERNAL_PART` |
-| Aucun cookie/JWT dans les logs | Tests de redaction et balayage des sorties | Présent | Backend complet Gate B `511/511`, dont tests de redaction ; balayage terminal encore requis | `VERIFIED_LOCAL_TERMINAL_SCAN_PENDING` |
+| Courriel multipart HTML + texte, lien correct et aucune image distante obligatoire | Unité de rendu/envoi, assertions du lien et réception SMTP réelle | Construction présente ; lien à revalider ; SMTP réel externe | Tests notifications `25/25` : texte+HTML, lien correct, aucune image obligatoire ; SMTP réel `PENDING_EXTERNAL_AUTHORIZATION` | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
+| Aucun cookie/JWT dans les logs | Tests de redaction et balayage des sorties | Présent | Backend `511/511`, tests notifications `25/25`, préflight sans fuite ; balayage terminal requis | `VERIFIED_LOCAL_TERMINAL_SCAN_PENDING` |
 | SelectField borné au viewport | Test de composant + rectangles réels en navigateur à plusieurs positions/zooms | Tests simulés seulement | `select-field-geometry.spec.ts` : rectangles réels haut/bas, `640×720`, contraction `390×500`, resize et clavier | `VERIFIED` |
-| Provenance d'image OCI | Build images, labels et revision exacte | Présent | `PENDING_EXECUTION[R4-11:OCI_PROVENANCE]` | `OPEN` |
-| Préflight registry-only | Test shell/Compose versionné | Présent | `PENDING_EXECUTION[R4-11:REGISTRY_PREFLIGHT]` | `OPEN` |
+| Provenance d'image OCI | Build images, labels et revision exacte | Présent | Deux images production locales : utilisateurs non-root et labels `revision` égaux au SHA code ; publication distante non autorisée | `VERIFIED_LOCAL_EXTERNAL_PUBLICATION_PENDING` |
+| Préflight registry-only | Test shell/Compose versionné | Présent | `test-preflight.sh` `19/19`, registre/digests réels, rejet d'un mauvais SHA et zéro objet résiduel | `VERIFIED` |
 
 ### 7.1 Lacunes supplémentaires issues de l'inventaire des mutations
 

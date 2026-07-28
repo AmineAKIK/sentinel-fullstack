@@ -495,17 +495,32 @@ def rebuild(args: argparse.Namespace) -> None:
         raise ValueError("Corps du document introuvable")
 
     backend_total = args.backend_unit + args.backend_integration
-    total_tests = backend_total + args.frontend
+    total_tests = backend_total + args.frontend + args.e2e
 
     # Couverture et proprietes finales.
     cover_table = find_body_element(body, "562 tests")
     cover_cells = cover_table.findall(".//w:tc", NS)
-    set_cell_paragraphs(cover_cells[0], ["12", "tables physiques", "11 applicatives · 1 technique · 38 migrations"])
+    table_total = args.tables_application + args.tables_technical
+    set_cell_paragraphs(
+        cover_cells[0],
+        [
+            str(table_total),
+            "tables physiques",
+            f"{args.tables_application} applicatives · {args.tables_technical} technique · {args.migrations} migrations",
+        ],
+    )
     set_cell_paragraphs(
         cover_cells[1],
-        [str(total_tests), "tests automatisés", f"{backend_total} backend · {args.frontend} frontend"],
+        [
+            str(total_tests),
+            "tests automatisés",
+            f"{backend_total} backend · {args.frontend} frontend · {args.e2e} E2E",
+        ],
     )
-    set_cell_paragraphs(cover_cells[2], ["4", "jobs CI", "lint · build · tests · images Docker"])
+    set_cell_paragraphs(
+        cover_cells[2],
+        [str(args.ci_jobs), "jobs CI", "qualité · PostgreSQL · navigateur · conteneurs · restauration"],
+    )
     replace_paragraph(body, "DATE DE DÉPÔT", f"DATE DE DÉPÔT    {args.deposit_date}")
     replace_paragraph(
         body,
@@ -553,7 +568,11 @@ def rebuild(args: argparse.Namespace) -> None:
         ["CCP1 — Maquetter des interfaces web ou web mobile", "Design system, maquettes desktop/mobile et flux", "§5"],
         ["CCP1 — Réaliser des interfaces statiques", "Composants React, HTML sémantique et tokens CSS", "§8.1"],
         ["CCP1 — Développer la partie dynamique", "Hooks, appels API, permissions et concurrence réseau", "§8.2"],
-        ["CCP2 — Mettre en place une base relationnelle", "MCD, MPD, contraintes et 38 migrations", "§6"],
+        [
+            "CCP2 — Mettre en place une base relationnelle",
+            f"MCD, MPD, contraintes et {args.migrations} migrations",
+            "§6",
+        ],
         ["CCP2 — Développer l'accès aux données SQL et NoSQL", "Repositories, SQL paramétré et deux usages JSONB", "§9.3"],
         ["CCP2 — Développer des composants métier côté serveur", "Politique de permissions, services et transactions", "§9.1–9.2"],
         ["CCP2 — Documenter le déploiement", "Topologies, configuration, migrations et procédure VPS", "§14"],
@@ -661,7 +680,7 @@ def rebuild(args: argparse.Namespace) -> None:
         "—  Front-end  en production": "— Frontend : Vite réalise le build statique ; Nginx sert les fichiers compilés et redirige les routes de la SPA vers index.html.",
         "—  Environnement de production": "— Hébergement : sentinel.akiksystems.fr est une instance publique de démonstration sur VPS Linux. Elle prouve le déploiement technique mais ne constitue pas un déploiement dans une usine ni une validation par l'entreprise observée.",
         "—  Base de données": "— Base de données : PostgreSQL 15 utilise un volume persistant. Les migrations sont appliquées au démarrage. Le dépôt fournit des scripts pg_dump et de restauration ; l'activation d'une planification, la copie hors serveur et les essais périodiques de restauration doivent être vérifiés dans chaque environnement exploité.",
-        "—  CI/CD": "— Intégration continue : GitHub Actions exécute cinq jobs — qualité backend, qualité frontend, intégration PostgreSQL, parcours navigateur Playwright et contrat des conteneurs. Aucun déploiement automatique n'est configuré : la livraison sur le VPS reste manuelle et documentée.",
+        "—  CI/CD": f"— Intégration continue : GitHub Actions exécute {args.ci_jobs} jobs — qualité backend, qualité frontend, intégration PostgreSQL, parcours navigateur Playwright, contrat des conteneurs et exercice sauvegarde/restauration. Aucun déploiement automatique n'est configuré : la livraison sur le VPS reste manuelle et documentée.",
     }
     for needle, replacement in architecture_replacements.items():
         replace_paragraph(body, needle, replacement)
@@ -699,9 +718,13 @@ def rebuild(args: argparse.Namespace) -> None:
     replace_paragraph(
         body,
         "Dans les deux cas, JSONB reste un choix local",
-        "Dans les deux cas, JSONB reste un choix local et documenté au sein d'un schéma relationnel : clés étrangères, contraintes CHECK et index imposent les invariants structurants. Le MPD comporte 11 tables applicatives et la table technique schema_migrations.",
+        f"Dans tous les cas, JSONB reste un choix local et documenté au sein d'un schéma relationnel : clés étrangères, contraintes CHECK et index imposent les invariants structurants. Le MPD comporte {args.tables_application} tables applicatives et {args.tables_technical} table technique schema_migrations.",
     )
-    replace_paragraph(body, "Onze tables au total.", "Onze tables applicatives, auxquelles s'ajoute schema_migrations : douze tables physiques et 125 colonnes au total.")
+    replace_paragraph(
+        body,
+        "Onze tables au total.",
+        f"{args.tables_application} tables applicatives, auxquelles s'ajoute schema_migrations : {table_total} tables physiques.",
+    )
     replace_paragraph(
         body,
         "workshop _incident_events  (audit trail immuable)",
@@ -912,7 +935,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
             "Exemple concret : l'audit d'authentification a identifié des incohérences de révocation et de contrôle des actions sensibles. Les commits 99606b8 et dd17b81 ont ajouté la revalidation des sessions et l'exigence du mot de passe administrateur avant certaines révocations. L'audit final du dossier a ensuite conduit à incrémenter session_version lors d'une réinitialisation de mot de passe ou d'un changement d'activation, afin qu'un ancien JWT ne puisse pas redevenir valable.",
         ),
         make_paragraph(
-            "La démarche suivie est : alerte ou constat → reproduction → évaluation de l'impact → correctif minimal → test de non-régression → revue du texte public et du dossier. En juillet 2026, les audits npm backend et frontend ne signalaient aucune vulnérabilité connue au seuil high ; cette situation reste datée et doit être revérifiée avant chaque livraison.",
+            "La démarche suivie est : alerte ou constat → reproduction → évaluation de l'impact → correctif minimal → test de non-régression → revue du texte public et du dossier. En juillet 2026, les audits npm backend et frontend passent au seuil high ; deux advisories React Router modérées restent suivies dans l'issue #29 sans migration majeure dans la RC4. Cette situation reste datée et doit être revérifiée avant chaque livraison.",
         ),
     ]
     watch_index = list(body).index(security_watch)
@@ -996,7 +1019,12 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
         ["1. Connexion OPERATOR", "POST /api/workshop/auth/login", "200 + cookie HttpOnly", "Session OPERATOR validée"],
         ["2. Création", "POST /api/workshop/incidents", "201 + statut OPEN", "Incident créé et événement CREATED"],
         ["3. Prise en charge", "PATCH isTaken=true par MAINTENANCE", "Pris par le technicien", "taken_at et TAKEN enregistrés"],
-        ["4. Mise en attente", "PATCH status=PENDING + diagnostic", "PENDING", "Diagnostic et SET_PENDING enregistrés"],
+        [
+            "4. Mise en attente",
+            "PATCH status=PENDING + waitingReason",
+            "PENDING",
+            "Motif et SET_PENDING enregistrés",
+        ],
         ["5. Reprise", "PATCH status=OPEN", "OPEN, toujours pris", "RESUMED enregistré"],
         ["6. Clôture", "PATCH status=CLOSED + note", "CLOSED", "Note et CLOSED enregistrés"],
         ["7. Trace", "GET /incidents/:id/events", "Transitions ordonnées", "CREATED → TAKEN → SET_PENDING → RESUMED → CLOSED"],
@@ -1012,7 +1040,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     evidence_placeholder = find_body_element(body, "À COMPLÉTER Captures d'écran des résultats")
     evidence_nodes = [
         make_paragraph(
-            f"Vérification locale du {args.audit_date} sur la version corrigée : {args.backend_unit} tests unitaires backend et {args.frontend} tests frontend passants. La suite contient également {args.backend_integration} cas d'intégration PostgreSQL, exécutés par le dernier pipeline GitHub Actions vert capturé au commit {args.commit}. Les captures réelles des trois rôles au §8.2 montrent la traduction des permissions dans l'interface. Cette formulation distingue la vérification locale après correction de la preuve CI antérieure au dépôt final.",
+            f"Vérification locale du {args.audit_date} sur la version corrigée : {args.backend_unit} tests unitaires backend, {args.backend_integration} cas d'intégration PostgreSQL, {args.frontend} tests frontend et {args.e2e} parcours navigateur passants sur le candidat code {args.commit}. La preuve CI distante et les captures de la RC4 réellement déployée restent à joindre après autorisation. Cette formulation distingue la preuve locale de la preuve externe.",
         ),
         make_paragraph(
             "Le jeu d'essai détaillé et reproductible est versionné dans docs/jeu-essai.md. Les valeurs de limite, codes HTTP et préconditions ont été resynchronisés avec le code courant avant la production de ce dossier.",
@@ -1032,12 +1060,12 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     replace_paragraph(
         body,
         "—  Frontend ( Vitest",
-        f"— Frontend : {args.frontend} tests Vitest et Testing Library en jsdom, complétés par quatre parcours Playwright exécutés dans la CI.",
+        f"— Frontend : {args.frontend} tests Vitest et Testing Library en jsdom, complétés par {args.e2e} parcours Playwright exécutés localement et configurés dans la CI.",
     )
     replace_paragraph(
         body,
         "Les deux suites tournent automatiquement",
-        "GitHub Actions exécute lint, compilation, tests unitaires, tests frontend, audit de dépendances, construction des images Docker et intégration PostgreSQL. Le déploiement reste volontairement manuel.",
+        f"GitHub Actions définit {args.ci_jobs} jobs : qualités backend/frontend, intégration PostgreSQL, navigateur, contrat conteneurs et exercice sauvegarde/restauration. Le déploiement reste volontairement manuel.",
     )
     representative_test = find_body_element(body, "it ( ‘ refuse de suivre")
     test_code = """it('refuse de suivre un incident terminé', async () => {
@@ -1070,7 +1098,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     replace_paragraph(
         body,
         "GitHub Actions construit et teste à chaque push",
-        "GitHub Actions construit et teste à chaque push ou pull request ciblé. Les migrations sont appliquées de façon idempotente au démarrage du backend et PostgreSQL utilise un volume persistant. Les scripts de sauvegarde et restauration sont fournis ; leur planification, leur externalisation et les essais de restauration restent des responsabilités d'exploitation à démontrer séparément.",
+        "GitHub Actions construit et teste à chaque push ou pull request ciblé. Les migrations sont appliquées de façon idempotente au démarrage du backend et PostgreSQL utilise un volume persistant. Les scripts de sauvegarde et restauration sont fournis et exercés sur un projet PostgreSQL jetable ; leur planification, leur copie hors site et leur preuve sur l'infrastructure cible restent des responsabilités d'exploitation à démontrer séparément.",
     )
 
     # Bilan personnel : aucun texte de consigne ne subsiste.
@@ -1325,6 +1353,11 @@ def main() -> None:
     parser.add_argument("--backend-unit", type=int, required=True)
     parser.add_argument("--backend-integration", type=int, required=True)
     parser.add_argument("--frontend", type=int, required=True)
+    parser.add_argument("--e2e", type=int, required=True)
+    parser.add_argument("--tables-application", type=int, required=True)
+    parser.add_argument("--tables-technical", type=int, required=True)
+    parser.add_argument("--migrations", type=int, required=True)
+    parser.add_argument("--ci-jobs", type=int, required=True)
     parser.add_argument("--deposit-date", required=True)
     parser.add_argument("--audit-date", required=True)
     parser.add_argument("--commit", required=True)

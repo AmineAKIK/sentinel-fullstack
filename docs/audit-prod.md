@@ -18,7 +18,7 @@ Une ligne en échec non expliquée bloque le GO.
 
 ## 2. Contrats automatiques obligatoires
 
-Les cinq jobs de `.github/workflows/ci.yml` doivent réussir :
+Les six jobs de `.github/workflows/ci.yml` doivent réussir :
 
 | Contrat | Preuve |
 | --- | --- |
@@ -27,6 +27,7 @@ Les cinq jobs de `.github/workflows/ci.yml` doivent réussir :
 | PostgreSQL | migrations et suites d'intégration sur base réelle |
 | Navigateur | parcours Playwright et mobile arbitration |
 | Conteneurs | Compose, images non-root, Nginx, Caddy et ShellCheck |
+| Exploitation | exercice sauvegarde/restauration isolé, checksum, verrou, rejet et RTO |
 
 Vérifier également qu'aucun test n'est marqué `only`, qu'aucun artefact de test
 n'est suivi et que Dependabot n'a pas d'alerte high/critical non traitée.

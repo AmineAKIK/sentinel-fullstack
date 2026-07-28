@@ -222,5 +222,8 @@ Board ne sont plus des exceptions : ils utilisent le runner partagé.
 Le contrat est donc adopté par les 61 lignes. Les tests d'architecture prouvent
 ses consommateurs de production ; les tests communs prouvent anti-double, course
 entre succès et erreur, démontage, timer, traduction sûre, conservation, réessai
-et focus. Les parcours navigateur transversaux restent à compléter au lot 8 :
-R4-09 demeure ouvert jusque-là.
+et focus. Le lot 8 complète la preuve navigateur : Auth Admin/Atelier, sortie
+Board, révocation d'une session Board déjà émise, Support Admin/Atelier,
+correction, annulation, suivi explicite, confirmations destructives, erreurs,
+conservation et réessai. Les trois exécutions indépendantes donnent chacune
+`29/29`, puis Chromium complet donne `57/57`; R4-09 est `VERIFIED`.

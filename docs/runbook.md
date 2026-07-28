@@ -25,6 +25,27 @@ COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.
 
 Toutes les commandes opérationnelles ci-dessous utilisent `"${COMPOSE[@]}"`.
 
+### État de validation RC4 avant déploiement
+
+Le 28 juillet 2026, le candidat local a passé les contrôles suivants, sans accès
+au VPS ni publication d'image :
+
+- les trois compositions Docker et les huit invariants de topologie ;
+- builds production backend/frontend, utilisateurs `node`/`nginx`, labels OCI
+  `revision`, runtime backend minimal, `nginx -t` read-only et favicon ;
+- préflight registry-only : `19/19`, dont digest réel et rejet d'une image d'un
+  autre SHA, avec nettoyage intégral ;
+- parsing d'environnement : `14/14`, bcrypt runtime byte-identique ;
+- sauvegarde/restauration PostgreSQL jetable : `11/11`, RTO local mesuré à
+  `5 s`, checksum, verrou, rejet de schéma et isolation ;
+- Nginx 1.18.0 : héritage, barrière, valeurs publiques simulées et modèle hôte
+  conformes ;
+- ShellCheck de tous les scripts suivis.
+
+Ces résultats prouvent le contrat local, pas l'état de l'instance publique. Les
+contrôles VPS, `/api/health`, SMTP réel, en-têtes HTTPS publics et captures RC4
+restent conditionnés à une autorisation de déploiement séparée.
+
 ## 1. Contrôles rapides
 
 ```bash
