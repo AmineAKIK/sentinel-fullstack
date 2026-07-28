@@ -8,8 +8,8 @@ Le script ÉCHOUE (exit 1, exception explicite) dès qu'un fait ne peut pas êtr
 
 Les compteurs de tests proviennent de rapports JSON produits par les suites
 réellement exécutées (Jest --json, Vitest --reporter=json, Playwright
---list --reporter=json), passés en argument. Le script refuse un rapport dont
-`success` n'est pas vrai : on ne compte que des tests réellement passants.
+--reporter=json), passés en argument. Le script refuse tout rapport incomplet
+ou non vert : on ne compte que des tests réellement passants.
 
 Usage :
   # 1. produire les rapports (depuis backend/ et frontend/)
