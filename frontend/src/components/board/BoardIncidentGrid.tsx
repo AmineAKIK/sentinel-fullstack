@@ -1,4 +1,4 @@
-import { WorkshopBoardIncident } from '../../types';
+import type { IncidentStatus, WorkshopBoardIncident } from '../../types';
 import { STATE_LABELS } from '../../utils/labels';
 import { isOpenOverSevenDays, statusLabel } from '../../utils/boardUtils';
 import { formatElapsed } from '../../utils/date';
@@ -24,6 +24,20 @@ interface BoardIncidentGridProps {
   items: WorkshopBoardIncident[];
   activeView: 'alerts' | 'all' | 'lines';
   boardModeLabel: string;
+}
+
+interface BoardWaitingReasonProps {
+  status: IncidentStatus;
+  waitingReason: string | null;
+}
+
+function BoardWaitingReason({ status, waitingReason }: BoardWaitingReasonProps) {
+  if (status !== 'PENDING' || !waitingReason?.trim()) return null;
+  return (
+    <div className="board-incident-waiting-reason">
+      <p>{`Motif de mise en attente : ${waitingReason}`}</p>
+    </div>
+  );
 }
 
 export default function BoardIncidentGrid({
@@ -69,7 +83,7 @@ export default function BoardIncidentGrid({
                 )}
                 {/* Indicateur d'arbitrage : même libellé court que la carte
                     atelier et le panneau, en lecture seule. Le Board n'expose
-                    jamais de commande d'arbitrage ni aucune identité/motif. */}
+                    jamais de commande, identité ou motif d'arbitrage. */}
                 {incident.has_cancel_arbitration && (
                   <span
                     className="board-chip board-chip-arbitration"
@@ -109,6 +123,7 @@ export default function BoardIncidentGrid({
                 {responsibleInstruction || '—'}
               </p>
             </div>
+            <BoardWaitingReason status={incident.status} waitingReason={incident.waiting_reason} />
             <div className="board-incident-footer">
               <span>Depuis {formatElapsed(incident.created_at)}</span>
               <div className="board-incident-status">
@@ -133,4 +148,4 @@ export default function BoardIncidentGrid({
   );
 }
 
-export { BoardEmptyState };
+export { BoardEmptyState, BoardWaitingReason };

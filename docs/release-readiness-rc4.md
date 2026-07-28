@@ -155,7 +155,7 @@ pas de `Cache-Control` dans le contrat actuel.
 | **R4-01** | **P0** | Plan RC4 §5.1–5.2, §14.1 | `IncidentCard` ouvrait uniquement par le bouton contenant le titre. Le corps, les métadonnées, le pied, la consigne et le motif ne portaient pas l'activation principale ; le focus n'était pas restauré exactement sur le déclencheur après fermeture. | Tests permanents exécutés ensemble par `npm test -- src/components/__tests__/IncidentCard.test.tsx src/pages/__tests__/WorkshopDashboardPage.test.tsx`, puis rouge Chromium sur la métadonnée réelle ; sorties détaillées §6 | Code `1`, `10 failed / 25 passed` : métadonnée, consigne, motif et pied laissent chacun `onClick` à `0`, les ouvertures page depuis le corps échouent, le lien sémantique est absent et l'arbitrage ouvre indûment le dossier. E2E : dossier introuvable après clic souris au centre de la métadonnée. | `frontend/src/components/IncidentCard.tsx` ; `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/pages/__tests__/WorkshopDashboardPage.test.tsx` ; `frontend/src/styles/pages/workshop.css` ; E2E Atelier concernés | `article` conservé sans rôle artificiel ; lien réel avec `href` contenant tout le contenu non interactif et pseudo-élément étiré sur les blancs ; boutons indépendants frères au-dessus ; activation Espace directe sans clic synthétique ; déclencheur exact mémorisé puis refocalisé après croix ou Échap ; arbitrage direct sans sélectionner le dossier. | Composant/page : titre, métadonnée, consigne, motif, pied, `Entrée`, `Espace`, structure DOM, étoile/arbitrages sans ouverture, focus exact croix/Échap. Chromium : clic coordonné sur métadonnée, focus visible atteint par Tab et commandes indépendantes sans drawer. | Ciblés `35/35` ; frontend `476/476` ; Chromium carte `3/3` ; parcours E2E migrés `4/4` ; lint, format et build verts ; détails §6. | Risques d'imbrication, propagation, zone morte, doublon sémantique et mauvais retour de focus couverts par tests, E2E réel et revue du diff. | `VERIFIED` |
 | **R4-02** | **P0** | Plan RC4 §0, §5.2, §13 | L'ancien test nommé comme un clic sur la carte exécutait en réalité le bouton du titre ; son test clavier simulait aussi un clic, et les E2E historiques ciblaient seulement `.incident-card-open`. | Même exécution permanente rouge que R4-01 : quatre nœuds hors titre réellement cliqués, plus le scénario Chromium utilisant la géométrie de `.incident-card-meta` | Les quatre tests hors titre reçoivent `0` ouverture sur RC3 tandis que le test historique du titre reste passant ; le rouge navigateur ne trouve aucun dossier après le vrai hit-test de métadonnée. | `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/__tests__/WorkshopDashboardPage.test.tsx` ; `frontend/e2e/incident-card-activation.spec.ts` ; E2E cycle de vie, arbitrage mobile et retrait d'annulation | Ancien test renommé comme clic du titre ; tests séparés pour chaque zone réelle ; `user.keyboard` pour Entrée/Espace sans `fireEvent.click` ; E2E dédié sans `.incident-card-open`, utilisant `boundingBox()` puis `page.mouse.click()` au centre du produit ; anciens parcours migrés vers le rôle du lien. | Tests permanents distincts et assertions zéro dossier depuis les commandes indépendantes ; E2E réel métadonnée, focus, étoile et arbitrage. | Mêmes preuves vertes R4-01 : `35/35`, `476/476`, Chromium `3/3` et parcours migrés `4/4`. | Faux vert, sélecteur de substitution et clic forcé éliminés ; aucune tolérance ou `force: true`. | `VERIFIED` |
 | **R4-03** | **P0** | Plan RC4 §6.1–6.3, §14.1 | Chaîne dynamique encore active : `useIncidentDrawerPosition` → `detailOffsetTop` → `--incident-detail-offset-top` → `margin-top`, avec recentrage `window.scrollBy`. Sticky, hauteur bornée et scroll interne n'annulent pas ce couplage. | Vitest permanent : `npm test -- src/pages/__tests__/WorkshopDashboardPage.test.tsx src/pages/__tests__/incidentDrawerScroll.test.ts`. Chromium réel : test `incident-detail-scroll.spec.ts` sur haut/milieu/bas, molette, `640×720`, `390×844`, viewport réduit à `390×500` et resize ; voir §6. | Vitest code `1`, `7 failed / 9 passed` : recentrage reçu avec `top: 512`, offset inline reçu `0px`, containment et gouttière absents, contrat viewport absent, overrides contraints invalides et animation horizontale présente. Chromium `7/7 failed` : bas `scrollY 1019→975`, offset `998px`, drawer `bottom 1215` ; à `640px`, `right=644` et `document.scrollWidth=644` ; mobile sans scroll interne et resize réutilisant une position hors viewport. | `frontend/index.html` ; `frontend/src/hooks/useIncidentDrawerPosition.ts` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/components/IncidentDetailPanel.tsx` ; `frontend/src/styles/pages/workshop.css` ; tests page/panneau ; seed et E2E Atelier | Hook et chaîne de coordonnées supprimés ; desktop en colonne droite, `sticky` à `72px`, hauteur `vh`/`dvh` bornée ; en-tête hors scroll et corps flex `min-height: 0`, `overflow-y: auto`, containment et gouttière stable ; largeur contrainte bornée par CSS au viewport, sans animation horizontale ni recentrage ; sous `1180px`, panneau borné au layout viewport et contrat `interactive-widget=resizes-content`. | Unité/composant sur suppression du couplage, structure et viewport ; Chromium réel par clic coordonné sur métadonnée, trois positions, scroll page et interne, stabilité d'overscroll par égalités exactes, focus croix/Échap, `640×720`, `390×844`, `390×500` et resize. | Ciblés `44/44` ; nouveau Chromium `7/7` trois fois sans retry ; carte Lot 1 `3/3` ; E2E historiques `7/7` ; frontend `482/482` ; E2E complet `44/44` ; build, typage, lint et format verts ; détails et mesures §6. | Containing block, double scroll, coordonnées stale, dépassement transitoire, focus et flake couverts par assertions navigateur ; zéro calcul de géométrie en production. Le test `390×500` prouve une contraction représentative du layout viewport, pas l'ouverture d'un clavier système réel. | `VERIFIED` |
-| **R4-04** | **P1** | Plan RC4 §7.1–7.3, §14.2 | `waiting_reason` n'est ni projeté par la requête Board, ni présent dans le type public, ni rendu. Aucun test Board ne vérifie motif courant, disparition après reprise et conservation historique. | `npm test -- src/components/__tests__/BoardIncidentGrid.test.tsx -t 'RC4 RED — affiche le motif courant pour un incident en attente'` depuis `frontend/` ; sortie détaillée §6 | Code `1` : le DOM contient le statut `PENDING`/« En attente », mais aucun texte `Motif de mise en attente : Attente pièce détachée`. | `backend/src/modules/workshop/workshop.repository.ts` et types/projection Board ; tests repository/intégration ; `frontend/src/types/workshop.ts` ; `frontend/src/components/board/BoardIncidentGrid.tsx` ; `BoardIncidentGrid.test.tsx` ; `frontend/e2e/board.spec.ts` et cycle de vie | Ajouter uniquement `waiting_reason` à la projection et au type public Board ; rendre le libellé si `status === PENDING` et motif non vide, valeur complète accessible ; ne projeter aucune donnée privée supplémentaire. | Rouge frontend Board ; PostgreSQL réel sur projection minimale et valeur nulle/absente hors `PENDING` ; E2E attente → Atelier/panneau/Board visibles → reprise → disparition des trois surfaces → historique conservé. | `PENDING_EXECUTION[R4-04:GREEN_EVIDENCE]` | Fuite de diagnostic ou identité privée, motif périmé après reprise, troncature inaccessible, confusion état courant/historique. | `RED_PROVEN` |
+| **R4-04** | **P1** | Plan RC4 §7.1–7.3, §14.2 | `waiting_reason` n'était ni projeté par la requête Board, ni présent dans le type public, ni rendu. Aucun test Board ne vérifiait motif courant, disparition après reprise et conservation historique. | Trois rouges permanents exécutés avant correction : PostgreSQL réel `boardWaitingReasonProjection.integration.test.ts`, DOM `BoardIncidentGrid.test.tsx`, Chromium `board-waiting-reason.spec.ts` ; commandes et sorties exactes §6. | PostgreSQL : `6 failed / 1 passed`, propriété reçue `undefined` ; frontend : `3 failed / 11 passed`, phrase exacte introuvable ; Chromium : même carte ligne `999` / machine `E2E-MCH-1`, statut « En attente » visible mais motif absent. | Repository/service et tests Board backend ; type, composant, CSS et tests Board frontend ; nouveau parcours Chromium ; présente readiness. | DTO public backend explicite ; unique `CASE` de lecture conservant la valeur complète seulement pour `PENDING` non vide ; champ frontend `string \| null` ; bloc texte non interactif, complet dans le DOM et borné seulement visuellement ; aucune jointure, mutation ou migration. | PostgreSQL réel sur dix obligations ; composant sur statuts, vide, longueur et confidentialité ; Chromium attente → Atelier/panneau/Board → reprise → disparition après vrai `GET /api/board/data` → Historique conservé. | Ciblés repository `9/9`, PostgreSQL `7/7`, frontend Board/utilitaires `37/37`, Chromium `1/1` ; complets backend `508/508`, intégration `144/144`, frontend `490/490`, Chromium `45/45` ; builds, typages, lint, format et invariants verts ; détails §6. | Valeur périmée masquée deux fois (SQL et rendu), diagnostic sans repli, liste exacte des 18 clés, sentinelles privées absentes, Board sans commande, événement historique exact après reprise, polling réel documenté. | `VERIFIED` |
 | **R4-05** | **P0** | Plan RC4 §8.1–8.2, §12 lots 4–5, §14.5 | `useMutationRunner` n'a aucun import de production et n'est consommé que par son propre test. Les mutations utilisent en parallèle `runSimple`, `runPanelAction`, refs et états locaux ; l'existence d'une abstraction isolée ne prouve aucune adoption. | Contrat shell exact de recherche des consommateurs de production, depuis `frontend/` ; voir §6 | Code `1` et message exact `FAIL R4-05: useMutationRunner a 0 consommateur dans le code de production.` | `frontend/src/components/ui/MutationFeedback.tsx` ; hooks/actions Atelier ; modales incident ; pages Administration/Auth/Board/Support ; `docs/rc4-mutation-inventory.md` comme périmètre exhaustif | Choisir un unique contrat partagé léger, prouver ses imports en production, brancher d'abord toutes les mutations Atelier puis toutes les autres surfaces, documenter seulement les exceptions sûres login/logout et accusé silencieux. | Tests contractuels communs prêt/confirmation/pending/succès/échec/récupération ; une requête sur double clic ; focus ; erreurs réseau/métier ; tests de chaque ligne de l'inventaire et E2E représentatifs par famille. | `PENDING_EXECUTION[R4-05:GREEN_EVIDENCE]` | Migration partielle créant doubles messages, verrouillage incohérent, perte de focus, abstraction trop large, lignes oubliées hors inventaire. | `RED_PROVEN` |
 | **R4-06** | **P0** | Plan RC4 §8.1, §8.3–8.4, §14.3–14.5 | Les `61` lignes de l'inventaire sont classées : `16 GAP`, dont révocation fermant une modale avant la réponse, code Board sans confirmation adaptée, faux ou absents succès, archivage figé en erreur et saisie Support perdue ; `11` exceptions restent à formaliser. Les lacunes supplémentaires sont aussi figées sous R4-11 en §7. | Pas de commande globale admise : aux lots 4–5, chaque interaction nécessitant une correction (`GAP` ou `PARTIAL`) recevra son test ciblé et sa commande exacte avant correction ; une exception non corrigée devra être justifiée et prouvée sûre ; registre §6 | Non exécuté au lot 0 conformément à la liste obligatoire du §12. Un rouge « représentatif » commun serait invalide car il substituerait une interaction à une autre ; les causes statiques de chaque ligne sont déjà consignées dans l'inventaire. | Toutes les lignes de `docs/rc4-mutation-inventory.md`, notamment `AdminSettingsPage.tsx`, pages/composants Support, Auth et Board, modales de clôture/invalidation/annulation/archivage/comptes | Appliquer les cinq états, anti-double, message métier sûr, conservation saisie/modale/focus en échec ; confirmations accessibles pour clôture, invalidation, annulation définitive, suppression, désactivation, archivage, révocation et réglage déconnectant. | Par famille : erreur métier, erreur réseau, modale ouverte, saisie identique, bouton réutilisable, aucune clé brute, double clic = un appel, succès exact et focus restauré ; E2E des mutations transversales. | `PENDING_EXECUTION[R4-06:GREEN_EVIDENCE]` | Action irréversible sans confirmation, fermeture optimiste, champs perdus, secret/erreur technique visible, double envoi, confirmations empilées. | `OPEN_RED_PENDING` |
 | **R4-07** | **P1** | Plan RC4 §9.1–9.2, §12 lot 6 | Des pseudo-pluralisations visibles subsistent dans filtres, confirmations et erreurs. `formatEventActor` restitue directement `MAINTENANCE` et son test exige cette fuite ; certains journaux retombent sur les enums brutes. | `npm test -- src/api/__tests__/errorMessages.test.ts -t 'RC4 RED — pluralise naturellement le nombre d’incidents actifs'` depuis `frontend/` ; sortie détaillée §6 | Code `1` : attendu `2 incidents actifs`, reçu `Ce technicien a 2 incident(s) actif(s) en cours...`. | `frontend/src/components/ArchiveLineConfirmModal.tsx` ; `frontend/src/utils/workshopHistory.ts` et test ; composants/confirmations/filtres trouvés par balayage ; traducteurs d'erreurs ; modèles de courriel backend | Centraliser les accords français utiles, appliquer le glossaire, traduire tous les rôles, masquer Diagnostic sans valeur réelle et éliminer toute restitution brute sans modifier les enums internes. | Tests `0/1/2`, tous rôles et fallback sûr ; tests négatifs DOM/courriels contre pseudo-pluriels, clés `snake_case`, SQL et enums ; E2E/captures des surfaces visibles. | `PENDING_EXECUTION[R4-07:GREEN_EVIDENCE]` | Remplacement aveugle des chaînes internes, accords incomplets, fallback réintroduisant une enum, divergence courriel/DOM. | `RED_PROVEN` |
@@ -462,21 +462,261 @@ R4-03 passe à `VERIFIED`. R4-04 et tous les lots ultérieurs restent inchangés
 
 ### R4-04 — motif courant sur le Board
 
-Répertoire d'exécution : `frontend/`.
+Trois preuves rouges permanentes ont été ajoutées et exécutées avant toute
+correction de production.
+
+#### Rouges permanents du lot 3
+
+PostgreSQL réel, depuis la racine :
 
 ```bash
-npm test -- src/components/__tests__/BoardIncidentGrid.test.tsx -t 'RC4 RED — affiche le motif courant pour un incident en attente'
+backend/scripts/with-disposable-postgres.sh npm --prefix backend run test:integration -- --runTestsByPath src/integration/__tests__/boardWaitingReasonProjection.integration.test.ts
 ```
 
 - code de sortie : `1` ;
-- sortie utile : `1 failed`, `9 skipped` ;
-- assertion : texte attendu
-  `Motif de mise en attente : Attente pièce détachée`, introuvable ;
-- cause : le DOM rend bien `PENDING`/« En attente », mais ne reçoit ni
-  n'affiche `waiting_reason`.
+- sortie : `1` suite en échec, `6 failed / 1 passed` sur `7` tests ;
+- cause exacte : la vraie projection renvoie `undefined` pour
+  `waiting_reason`, au lieu du motif distinctif complet ou de `null` ;
+- les cas rouge couvrent aussi `PENDING` nul/espaces, `OPEN` adversarial,
+  vrai service de mise en attente et ensemble exact des clés ;
+- la preuve de lecture seule par snapshot PostgreSQL est déjà verte ;
+- nettoyage final : aucun conteneur ni volume résiduel.
 
-Vert : `PENDING_EXECUTION[R4-04:GREEN_AFTER_LOT3]`, avec projection PostgreSQL
-minimale et parcours reprise/historique encore obligatoires.
+DOM frontend, depuis la racine :
+
+```bash
+npm --prefix frontend test -- src/components/__tests__/BoardIncidentGrid.test.tsx
+```
+
+- code de sortie : `1` ;
+- sortie : `1` fichier, `3 failed / 11 passed` sur `14` tests ;
+- interaction exacte : rendu d'une vraie carte Board `PENDING` portant
+  `waiting_reason: "Attente pièce détachée RC4"` ;
+- cause exacte : le statut « En attente » est présent, mais le DOM ne contient
+  pas `Motif de mise en attente : Attente pièce détachée RC4` ; le bloc du
+  motif long et la preuve de confidentialité échouent pour la même omission.
+
+Chromium réel sur PostgreSQL E2E jetable, depuis la racine :
+
+```bash
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- --project=chromium e2e/board-waiting-reason.spec.ts
+```
+
+- code de sortie : `1`, `1 failed` en `9.6 s` ;
+- le navigateur crée l'incident déterministe, le rend urgent par la vraie UI,
+  le technicien le prend en charge et le suspend avec
+  `RC4 — attente pièce détachée — conservation historique` ;
+- la carte et le panneau Atelier montrent le statut et le motif ;
+- le vrai code Board ouvre le vrai Board, puis ses réglages isolent la carte
+  `Ligne 999`, machine `E2E-MCH-1`, produit `E2E-RC4-WAITING-REASON` ;
+- cause exacte : cette carte unique contient « En attente » mais pas
+  `Motif de mise en attente : RC4 — attente pièce détachée — conservation historique` ;
+- aucun mock réseau, injection DOM, accès DB depuis le test, screenshot comme
+  assertion, `reload`, `waitForTimeout`, `force: true` ou retry ;
+- nettoyage final : aucun conteneur ni volume résiduel.
+
+#### Contrat et correction minimale
+
+Le contrat incident Board passe de `17` à `18` champs. Liste publique exacte :
+
+```text
+id
+line_id
+line_number
+machine_id
+robot_label
+head_number
+state
+current_product
+is_taken
+is_priority
+responsible_comment
+waiting_reason
+status
+display_order
+created_at
+updated_at
+has_edit_arbitration
+has_cancel_arbitration
+```
+
+Exemple anonymisé avant :
+
+```json
+{
+  "id": 42,
+  "line_number": "L01",
+  "machine_id": "M-01",
+  "status": "PENDING",
+  "responsible_comment": "Sécuriser la zone.",
+  "has_edit_arbitration": false,
+  "has_cancel_arbitration": false
+}
+```
+
+Après :
+
+```json
+{
+  "id": 42,
+  "line_number": "L01",
+  "machine_id": "M-01",
+  "status": "PENDING",
+  "responsible_comment": "Sécuriser la zone.",
+  "waiting_reason": "Attente pièce détachée",
+  "has_edit_arbitration": false,
+  "has_cancel_arbitration": false
+}
+```
+
+La seule donnée nouvelle est `waiting_reason: string | null`. La requête
+incidents reste un unique `SELECT`, sans jointure ni verrou ni mutation :
+
+```sql
+CASE
+  WHEN status = 'PENDING'
+   AND NULLIF(btrim(waiting_reason), '') IS NOT NULL
+  THEN waiting_reason
+  ELSE NULL
+END AS waiting_reason
+```
+
+Cette forme utilise `btrim` seulement pour décider si la valeur est vide, puis
+retourne la valeur source complète. Pour `OPEN`, pour toute valeur périmée, et
+pour un motif nul/vide/espaces, le JSON contient explicitement `null`.
+
+Le frontend étend son modèle partagé sans `any`, cast opportuniste ni modèle
+parallèle. `BoardWaitingReason` ne rend rien hors `PENDING` ou pour un motif
+normalisé vide. Le texte complet reste un vrai nœud DOM accessible, sans
+`title` ni `aria-hidden`; un line-clamp CSS de deux lignes est uniquement
+visuel. La carte reste un `article` de consultation sans bouton, lien,
+formulaire ou commande privée.
+
+Les données interdites restent absentes : `user_id`, identités et badges,
+`taken_by_*`, `role`, `comment`, `diagnostic`, `intervention_note`,
+`edit_request`, `cancel_request`, `cancel_request_reason`, `arbitration`,
+`decision_reason`, historique, permissions et commandes.
+`responsible_comment` et les deux booléens d'arbitrage étaient déjà publics.
+
+#### Verts ciblés
+
+```bash
+npm --prefix backend test -- --runTestsByPath src/modules/workshop/__tests__/workshop.repository.test.ts
+npm --prefix frontend test -- src/components/__tests__/BoardIncidentGrid.test.tsx src/utils/__tests__/boardUtils.test.ts
+backend/scripts/with-disposable-postgres.sh npm --prefix backend run test:integration -- --runTestsByPath src/integration/__tests__/boardWaitingReasonProjection.integration.test.ts
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- --project=chromium e2e/board-waiting-reason.spec.ts
+```
+
+- repository : `1` suite, `9/9` ;
+- frontend Board et utilitaires : `2` fichiers, `37/37` ;
+- PostgreSQL réel : `1` suite, `7/7`, puis nettoyage complet ;
+- Chromium : `1/1` en `35.7 s` lors de la validation finale, puis nettoyage
+  complet.
+
+Les sept tests PostgreSQL couvrent les dix obligations contractuelles :
+
+1. `PENDING` avec motif de `1 000` caractères, égalité et longueur exactes ;
+2. `PENDING` + `null` ;
+3. `PENDING` + espaces seuls ;
+4. `OPEN` + valeur périmée injectée directement ;
+5. vrai `setPendingIncidentService` puis projection exacte ;
+6. vrai `resumeIncidentService`, projection et stockage courant à `null` ;
+7. événements `INCIDENT_SET_PENDING` et `INCIDENT_RESUMED` conservant le motif ;
+8. diagnostic distinct sans repli et absent du JSON ;
+9. snapshots `xmin`, données, dates et comptes d'événements identiques avant
+   et après la lecture ;
+10. enveloppe, ligne, métriques et `18` clés incidents exactes, sentinelles
+    privées absentes.
+
+Le test frontend couvre `PENDING` avec motif, nul et espaces, `OPEN` avec motif
+périmé, ainsi que `CLOSED`, `CANCELED` et `INVALIDATED`. Il vérifie aussi un
+motif de `1 000` caractères intégralement accessible, la borne CSS réelle,
+l'absence de Diagnostic, de données d'identité et de tout contrôle interactif.
+
+#### Parcours Chromium vert et actualisation réelle
+
+Le parcours vert vérifie successivement :
+
+1. création opérateur sur ligne `999`, machine `E2E-MCH-1`, tête `13`,
+   distincte des fixtures existantes ;
+2. priorité activée par un responsable, puis vraie connexion technicien ;
+3. prise en charge et suspension avec le motif exact ;
+4. motif et « En attente » visibles sur carte et panneau Atelier ;
+5. session Board ouverte par le vrai code et carte identifiée par ligne,
+   machine et produit ;
+6. motif et statut visibles, mais commentaire privé, identités, badges,
+   Diagnostic et commandes absents ;
+7. reprise technicien, puis motif absent de la carte et du panneau Atelier ;
+8. même carte Board toujours visible comme « Pris en charge », motif absent
+   après une vraie réponse `GET /api/board/data` ;
+9. événements « Suspendu » et « Reprise en cours » conservant respectivement
+   `motif de mise en attente: …` et `motif levé: …`, jamais Diagnostic ;
+10. clôture par le vrai workflow pour nettoyer fonctionnellement la donnée.
+
+Le Board n'est pas présenté comme temps réel : il charge initialement, écoute
+`focus`/`visibilitychange` et interroge toutes les `30 s` quand il est visible.
+Les pages Atelier et Board du test utilisent des contextes distincts ; le test
+ne prétend donc pas qu'un focus synthétique a eu lieu. Il remet le Board au
+premier plan et attend la prochaine réponse réseau réelle, qui peut provenir
+du polling visible. Le budget `90 s` permet ce contrat sans attente fixe ni
+retry ; les exécutions vertes de `34.7 s`, `36.8 s` et `35.3 s` sont cohérentes
+avec ce polling. La validation finale après isolation de la tête dédiée passe
+également en `35.7 s`.
+
+#### Non-régressions complètes
+
+```bash
+npm --prefix backend test
+backend/scripts/with-disposable-postgres.sh npm --prefix backend run test:integration
+npm --prefix frontend test
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- --project=chromium e2e/board.spec.ts e2e/board-waiting-reason.spec.ts e2e/incident-lifecycle.spec.ts
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- --project=chromium
+npm --prefix backend run build
+npm --prefix frontend run build
+npm --prefix backend run typecheck:scripts
+npm --prefix frontend exec -- tsc --noEmit --project frontend/tsconfig.json
+npm --prefix backend run lint
+npm --prefix frontend run lint
+npm --prefix backend run format:check
+npm --prefix frontend run format:check
+git diff --exit-code v1.0.0-rc.3 -- backend/migrations
+git diff --check
+```
+
+- backend unitaire : `48` suites, `508/508` ;
+- intégration PostgreSQL : `21` suites, `144/144` ;
+- frontend : `54` fichiers, `490/490` ;
+- groupe Board + nouveau parcours + cycle de vie : `4/4` en `48.6 s` ;
+- Chromium complet : `45/45` en `1.6 min`, sans retry ;
+- builds, typechecks, ESLint et Prettier : codes `0` ;
+- migrations : exactement `001..050`, diff RC3 code `0` ;
+- `git diff --check` : code `0` ;
+- chaque wrapper PostgreSQL vert termine par
+  `nettoyage complet : aucun conteneur ni volume résiduel` ; contrôle Docker
+  final vide.
+
+Incidents de validation consignés sans les masquer :
+
+- premier build frontend après ajout du test : code `2`, déclarations
+  `node:fs`/`node:path` absentes ; échappatoires locales documentées comme le
+  test CSS existant, puis build vert ;
+- première suite backend en sandbox : `506/508`, deux `listen EPERM` dus à
+  l'interdiction du port local ; relance hors sandbox : `508/508` ;
+- première intégration complète : `143/143` exécutés mais ancienne suite
+  d'arbitrage non compilée à cause d'un cast devenu inutile avec le DTO ;
+  suppression du cast, puis `144/144` ;
+- première tentative verte du nouveau Chromium : plafond global `30 s`
+  atteint à l'attente de rafraîchissement ; budget porté à `90 s`, sans retry
+  ni délai fixe, puis parcours vert ;
+- première tentative Chromium complète : Docker code `125` avant tout test,
+  port aléatoire indisponible ; contrôle immédiat zéro résidu puis vraie suite
+  `45/45` ;
+- la revue finale a isolé la fixture du nouveau parcours de la tête `5` vers
+  la tête dédiée `13`, sans changer l'interaction testée ; le ciblé (`1/1` en
+  `35.7 s`), le groupe Board/cycle de vie (`4/4` en `48.6 s`) et Chromium
+  complet (`45/45` en `1.6 min`) ont tous été rejoués sur cet état.
+
+R4-04 passe à `VERIFIED`. R4-09 reste ouvert pour ses futurs scénarios.
 
 ### R4-05 — adoption de l'infrastructure de mutation
 

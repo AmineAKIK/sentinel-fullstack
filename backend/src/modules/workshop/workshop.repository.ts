@@ -8,6 +8,8 @@ import {
   INCIDENT_LIST_MAX_LIMIT,
   isIncidentState,
   isIncidentStatus,
+  ActiveIncidentStatus,
+  IncidentState,
   IncidentStatus,
 } from '../../domain/constants';
 import { CurrentIncident } from './workshop.policy';
@@ -96,6 +98,52 @@ export interface ActiveWorkshopLine {
   id: number;
   line_number: string;
   machines: StoredMachine[];
+}
+
+export interface WorkshopBoardLine {
+  id: number;
+  line_number: string;
+}
+
+export interface WorkshopBoardIncident {
+  id: number;
+  line_id: number;
+  line_number: string;
+  machine_id: string;
+  robot_label: string;
+  head_number: number;
+  state: IncidentState;
+  current_product: string | null;
+  is_taken: boolean;
+  is_priority: boolean;
+  responsible_comment: string | null;
+  waiting_reason: string | null;
+  status: ActiveIncidentStatus;
+  display_order: number;
+  created_at: Date;
+  updated_at: Date;
+  has_edit_arbitration: boolean;
+  has_cancel_arbitration: boolean;
+}
+
+export interface WorkshopBoardMetrics {
+  total: number;
+  open: number;
+  pending: number;
+  open_over_7d: number;
+}
+
+export interface WorkshopBoardData {
+  lines: WorkshopBoardLine[];
+  incidents: WorkshopBoardIncident[];
+  metrics: WorkshopBoardMetrics;
+}
+
+interface WorkshopBoardMetricRow {
+  total: number;
+  open_count: number;
+  pending_count: number;
+  open_over_7d: number;
 }
 
 export interface IncidentLineLockContext {
@@ -382,27 +430,34 @@ function buildHistoryEventFilters(query: QueryParams): {
   };
 }
 
-export async function getBoardData() {
+export async function getBoardData(): Promise<WorkshopBoardData> {
   const [lineResult, incidentResult, metricResult] = await Promise.all([
-    pool.query(
+    pool.query<WorkshopBoardLine>(
       `SELECT id, line_number
        FROM production_lines
        WHERE is_deleted = FALSE AND is_active = TRUE
        ORDER BY line_number ASC`
     ),
-    pool.query(
+    pool.query<WorkshopBoardIncident>(
       // Le Board reçoit UNIQUEMENT l'existence d'un arbitrage (type de demande),
-      // jamais les identités ni les motifs (RC3 §6, projection Board minimale).
+      // jamais les identités ni les motifs d'arbitrage (projection minimale).
       `SELECT id, line_id, line_number, machine_id, robot_label,
               head_number, state, current_product, is_taken, is_priority,
-              responsible_comment, status, display_order, created_at, updated_at,
+              responsible_comment,
+              CASE
+                WHEN status = 'PENDING'
+                 AND NULLIF(btrim(waiting_reason), '') IS NOT NULL
+                THEN waiting_reason
+                ELSE NULL
+              END AS waiting_reason,
+              status, display_order, created_at, updated_at,
               (edit_request IS NOT NULL) AS has_edit_arbitration,
               (cancel_request = TRUE) AS has_cancel_arbitration
        FROM workshop_incidents
        WHERE ${activeIncidentStatusSql}
        ORDER BY is_priority DESC, display_order DESC, is_taken ASC, created_at DESC`
     ),
-    pool.query(
+    pool.query<WorkshopBoardMetricRow>(
       `SELECT
          COUNT(*) FILTER (WHERE ${activeIncidentStatusSql})::int AS total,
          COUNT(*) FILTER (WHERE ${openStatusSql})::int AS open_count,

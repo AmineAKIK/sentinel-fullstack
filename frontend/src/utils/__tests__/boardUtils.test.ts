@@ -24,6 +24,7 @@ function incident(overrides: Partial<WorkshopBoardIncident> = {}): WorkshopBoard
     is_taken: false,
     is_priority: false,
     responsible_comment: null,
+    waiting_reason: null,
     display_order: 0,
     current_product: null,
     created_at: new Date(Date.now() - 1000 * 3600).toISOString(),

@@ -115,12 +115,13 @@ export interface WorkshopBoardIncident {
   is_taken: boolean;
   is_priority: boolean;
   responsible_comment: string | null;
+  waiting_reason: string | null;
   status: 'OPEN' | 'PENDING';
   display_order: number;
   created_at: string;
   updated_at: string;
   // Le Board ne reçoit QUE l'existence d'un arbitrage (type de demande), jamais
-  // les identités ni les motifs (projection Board minimale, RC3 lot 5).
+  // les identités ni les motifs d'arbitrage (projection Board minimale).
   has_edit_arbitration?: boolean;
   has_cancel_arbitration?: boolean;
 }
