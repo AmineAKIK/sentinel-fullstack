@@ -162,6 +162,7 @@ export default function WorkshopBoardPage() {
   // On détecte localement un utilisateur atelier connecté (échec silencieux
   // pour un écran kiosque sans session) pour afficher le retour dashboard.
   const [isWorkshopUser, setIsWorkshopUser] = useState(false);
+  const exitButtonRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void getUnifiedMe(controller.signal)
@@ -389,11 +390,18 @@ export default function WorkshopBoardPage() {
   }
 
   async function closeBoardAccess() {
-    await mutation.execute(logoutBoardSession, {
+    const result = await mutation.execute(logoutBoardSession, {
       key: 'auth:board:logout',
       toErrorMessage: () => 'Impossible de quitter le Board. Réessayez.',
       onSuccess: () => void navigate('/login', { replace: true }),
     });
+    if (result.status === 'error') {
+      requestAnimationFrame(() => {
+        if (exitButtonRef.current?.isConnected) {
+          exitButtonRef.current.focus({ preventScroll: true });
+        }
+      });
+    }
   }
 
   function handleLineToggle(lineId: string) {
@@ -495,6 +503,7 @@ export default function WorkshopBoardPage() {
             </button>
           ) : (
             <button
+              ref={exitButtonRef}
               className="board-exit"
               onClick={() => void closeBoardAccess()}
               aria-label="Quitter"

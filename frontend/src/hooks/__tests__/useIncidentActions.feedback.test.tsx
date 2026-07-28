@@ -241,7 +241,7 @@ describe('useIncidentActions — retour d’action global (lot 1 RC3)', () => {
     await run('Basculer suivi', 'Suivi activé.');
     expect(followWorkshopIncident).toHaveBeenCalledWith(42);
 
-    await run('Appliquer correction', 'Modification appliquée.');
+    await run('Appliquer correction', 'Correction appliquée.');
     expect(updateWorkshopIncident).toHaveBeenCalledWith(42, { applyEditRequest: true });
 
     await run('Refuser correction', 'Demande de modification refusée.');

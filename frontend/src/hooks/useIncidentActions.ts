@@ -22,7 +22,7 @@ const SUCCESS = {
   INVALIDATE: 'Incident invalidé et conservé dans l’historique.',
   REQUEST_DELETE: 'Demande d’annulation envoyée.',
   WITHDRAW_CANCEL: 'Demande d’annulation retirée.',
-  APPLY_EDIT: 'Modification appliquée.',
+  APPLY_EDIT: 'Correction appliquée.',
   REJECT_EDIT: 'Demande de modification refusée.',
   APPROVE_DELETE: 'Incident annulé et conservé dans l’historique.',
   REJECT_DELETE: 'Demande d’annulation refusée.',

@@ -551,7 +551,7 @@ describe('ReviewIncidentRequestModal', () => {
     await user.click(retryButton);
 
     await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('Modification appliquée.')
+      expect(screen.getByRole('status')).toHaveTextContent('Correction appliquée.')
     );
     expect(updateWorkshopIncident).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('dialog', { name: 'Arbitrage correction' })).toBeNull();
@@ -652,7 +652,7 @@ describe('ReviewIncidentRequestModal', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('Modification appliquée.')
+      expect(screen.getByRole('status')).toHaveTextContent('Correction appliquée.')
     );
     expect(pendingSnapshot).toEqual({
       ariaBusy: 'true',

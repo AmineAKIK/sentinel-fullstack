@@ -5,7 +5,7 @@
 > exécutée, sa sortie, son code de retour et l'interaction exacte qu'elle
 > vérifie.
 
-**Statut global : `NO-GO — PORTE_A_FRANCHIE / PORTE_B_FERMÉE`**
+**Statut global : `NO-GO — PORTES_A_B_C_FRANCHIES / LOT_9_PENDING`**
 
 **Branche autorisée :** `release/v1.0.0-rc4`
 
@@ -160,7 +160,7 @@ pas de `Cache-Control` dans le contrat actuel.
 | **R4-06** | **P0** | Plan RC4 §8.1, §8.3–8.4, §14.3–14.5 | Les `61` lignes sont traitées après les lots 4–5 : `59 COVERED`, `2 EXCEPTION_PROVEN`, `0 PARTIAL`, `0 GAP`. | Rouge ciblé par famille, registre courant détaillé dans `docs/rc4-mutation-inventory.md` | Lot 4 : matrice Atelier rouge puis `102/102`; lot 5 : architecture/support rouge `35 failed`, puis `76/76`; suite frontend verte | Toutes les lignes de l'inventaire ; confirmations de désactivation, suppression, archivage, révocation et code Board | Aucun correctif de mutation restant ; conserver la matrice au lot 8. | Erreurs sûres, conservation, réessai, anti-double, succès exact, focus ; E2E transversaux complétés au lot 8. | Inventaire `61/61`, zéro ligne sans état ni preuve | Régression E2E possible, couverte par R4-09 au lot 8. | `VERIFIED` |
 | **R4-07** | **P1** | Plan RC4 §9.1–9.2, §12 lot 6 | Les pseudo-pluralisations, anciens libellés, rôles bruts, fallbacks d'enums et sections Diagnostic blanches ont été reproduits par des tests permanents avant correction. | Trois rouges permanents : terminologie `10/10 failed`, fallback enum `34` restitutions brutes, Diagnostic blanc `2/2 failed` ; commandes et sorties §6. | Accords `0/1/2`, cinq rôles, `33` pseudo-pluriels et `10` anciens libellés en échec ; puis `34` fallbacks bruts et deux sections Diagnostic blanches rendues. | Helpers français et libellés sûrs ; erreurs, filtres, confirmations, journaux, Board, administration et courriels ; tests existants alignés sur le glossaire sans changer les enums internes. | Tests permanents de source et DOM ; rôles/fallbacks sûrs ; Diagnostic absent si null/vide/blanc ; balayages obligatoires classifiés ; backend notifications/lignes. | Ciblés frontend `15/15`, `204/204` ; backend `2/2`, `26/26` ; builds, ESLint et Prettier des deux applications verts ; balayage pseudo-pluriels vide. | Les enums et clés restantes sont exclusivement types, logique, accès DTO/configuration et fixtures négatives ; aucun fallback brut de table de libellés ne subsiste. | `VERIFIED` |
 | **R4-08** | **P1** | Plan RC4 §10.1–10.3, §14.6 | La barrière, les scripts et la syntaxe 1.18 manquaient ; le modèle employait en outre `http2 on`, directive inconnue de Nginx 1.18.0. | Jest permanent `3 failed / 15 passed`, puis simulation réelle Nginx 1.18.0 rouge après les probes : modèle sans barrière ; détails §6. | Barrière absente, syntaxe HTTP/2 incompatible, deux scripts absents ; le vrai contrôle reproduit l'héritage sans barrière, le bloque avec, valide les valeurs publiques, puis sort `1` sur le modèle non corrigé. | Modèle hôte, vérificateur public, simulation locale, runbook et contrôle CI 1.18.0. | Barrière vide au serveur HTTPS ; syntaxe `listen ... ssl http2` ; autorités HSTS/statiques/API ; contrôle exact de six en-têtes, cache et non-exposition ; sauvegarde/application/rollback atomiques. | Jest `18/18`, vrai Nginx `1.18.0 (Ubuntu)` code `0`, `nginx -t` du modèle vert, ShellCheck et `bash -n` verts. | Les alertes initiales du binaire extrait vers son chemin de log compilé sont sans effet ; aucune requête VPS ni vérification publique externe n'a été effectuée. | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
-| **R4-09** | **P0** | Plan RC4 §5.2, §6.3, §7.3, §8.4, §14 | Les E2E ne cliquent pas le corps de carte ; ne prouvent ni géométrie haut/milieu/bas ni molette interne ; Board ne couvre que l'accès/session ; le cycle de vie ne vérifie pas motif sur les trois surfaces et dans l'historique. Échecs réseau/métier, doubles clics et récupérations sont incomplets. | Pas de scénario global au lot 0 : au lot 8, chaque parcours de §14 sera ajouté puis exécuté isolément avec `npx playwright test <fichier> -g '<interaction exacte>'` avant correction de ce parcours | Non exécuté au lot 0 conformément au §12. Chaque scénario devra échouer sur le comportement réellement absent, sans `force`, retry ni timeout arbitraire ; un scénario global ne localiserait pas l'interaction. | `frontend/e2e/incident-lifecycle.spec.ts` ; `board.spec.ts` ; `accessibility.spec.ts` ; `workshop-arbitration-mobile.spec.ts` ; `workshop-cancel-withdrawal.spec.ts` ; `workshop-zoom.spec.ts` ; fixtures E2E | Ajouter les parcours déterministes manquants sur vraie surface, avec attentes d'états observables et géométrie réelle ; compléter axe, responsive, clavier, focus et matrice de mutations. | Section 14 intégrale : carte/panneau, attente, correction, annulation, mutations transversales, sécurité/courriel ; desktop, mobile, zoom 200 %, axe zéro critique/sérieuse. | `PENDING_EXECUTION[R4-09:GREEN_EVIDENCE]` | Flakes, fixtures non représentatives, sélecteurs de substitution, interceptions qui ne prouvent pas la vraie API, tests trop globaux pour diagnostiquer. | `OPEN_RED_PENDING` |
+| **R4-09** | **P0** | Plan RC4 §5.2, §6.3, §7.3, §8.4, §14 | Les E2E RC3 omettaient des interactions réelles ; le lot 8 a aussi reproduit deux sorties Auth/Board perdant le focus, un succès d'arbitrage disant « Modification » au lieu de « Correction », deux assertions E2E périmées et un événement de retrait sans snapshot v2. | Baseline Chromium `46 passed / 2 failed`, rouges Auth `2/2 failed`, Board `1/1 failed`, correction `1/1 failed` et PostgreSQL correction `1 failed / 5 passed` ; commandes et causes ci-dessous | Les assertions périmées visaient `incident(s) actif(s)` et `Consigne responsable`; les sorties perdaient le focus après erreur ; l'application annonçait le mauvais résultat ; `EDIT_REQUEST_WITHDRAWN` omettait `schemaVersion`/`changes`. | E2E carte/panneau/attente/correction/annulation/mutations/axe/Auth/Board/Support/SelectField ; Auth partagé, Board, feedback correction ; service et intégration correction. | Restaurations de focus après fin du pending ; succès « Correction appliquée. » réservé à l'arbitrage ; retrait réutilisant le snapshot du dossier ; parcours réels et assertions visibles, sans migration ni changement de permission. | Trois exécutions neuves `29/29`, suite Chromium `57/57`, axe zéro critique/sérieuse ; frontend `583/583`, backend `511/511`, PostgreSQL correction `6/6`. | Mobile, zoom, haut/milieu/bas, molette, métadonnée, clavier, confirmations, erreurs/réessais, conservation, anti-double, Historique/Journal et ancienne session Board sont prouvés. | La répétition sur une même base a été explicitement rejetée comme non indépendante ; les trois preuves retenues recréent et reseedent chacune PostgreSQL. | `VERIFIED` |
 | **R4-10** | **P1** | Plan RC4 §12 lots 9–10, §16 portes D–E, §18 | Aucune capture image n'est suivie ; la liste reste « à réaliser ». Des faits documentaires sont périmés, dont `38` migrations et `579` tests. La readiness RC3 admet que captures, VPS et SMTP restent externes. | Au lot 9, lancer des recherches ciblées avec `rg -n` sur chaque valeur/version/SHA périmé dans les documents concernés avant leur synchronisation ; aucune capture ne peut être testée avant déploiement autorisé | Non exécuté au lot 0 conformément au §12. Les valeurs déjà localisées constituent le périmètre, mais chaque contrôle documentaire devra d'abord retourner un résultat non vide ; les captures et faits externes resteront explicitement en attente. | `docs/release-readiness-rc4.md` ; `docs/dossier-projet/liste-captures-a-realiser.md` ; `docs/dossier-projet/corrections-dossier-final.md` ; runbook, dossier jury et documents citant des totaux/version/SHA | Recalculer tous les faits au SHA candidat, synchroniser readiness/runbook/dossier, préparer la liste exacte des captures post-déploiement et distinguer preuves locales, CI et externes. | Recherches de valeurs périmées ; validation liens/SHA/totaux ; revue terminale documentaire ; captures uniquement après GO déploiement sur RC4 réellement servie. | `PENDING_EXECUTION[R4-10:GREEN_EVIDENCE]` | Faits recopiés, total non disjoint, capture RC3 attribuée à RC4, preuve externe inventée, document mis à jour avant le SHA final. | `OPEN_RED_PENDING` |
 | **R4-11** | **P0** | Plan RC4 §11, §14.3–14.6, §15 | Patrimoine RC3 présent à préserver : migrations 049/050, session Board sans expiration et révocable, correction v2 avec snapshots, arbitrages, suivi explicite, séparation motif/diagnostic, erreurs structurées, courriel multipart, redaction des secrets, SelectField et provenance OCI. Lacunes de preuve supplémentaires du diagnostic et les `16 GAP`/`11 EXCEPTION_TO_REVIEW` de l'inventaire sont détaillés en §7, notamment correction annoncée à tort appliquée, succès absents, modales fermées ou figées en erreur, faux succès reset et saisie Support perdue. | Aucun rouge générique valable pour un groupe d'invariants : baseline par `git diff --exit-code v1.0.0-rc.3 -- backend/migrations/` et recomptages §3 ; chaque défaut fonctionnel de §7 recevra sa commande rouge exacte avant correction | La baseline est verte (diff vide ; `1 146` tests recensés, suites locales exécutées vertes) et n'est pas présentée comme un rouge. Les lacunes de §7 restent ouvertes ; les regrouper sous une commande représentative violerait la règle d'interaction exacte. | `backend/migrations/049_*` et `050_*` ; tests Board auth/session ; tests correction/arbitrage PostgreSQL ; repository/service Atelier ; tests suivi et erreurs ; modèles courriel ; logs/redaction ; composant `SelectField` ; workflows/images OCI ; E2E attente/correction/annulation ; surfaces de l'inventaire | Ne modifier aucune migration ; compléter uniquement les preuves manquantes et corriger minimalement tout écart réellement reproduit, sans changer les permissions ou contrats métier. | Diff byte-identique migrations ; PostgreSQL réel et concurrence exactement un gagnant ; retraits de demandes par leur demandeur ; motifs obligatoires aux refus ; requête HTTP d'une ancienne session après révocation ; suivi explicite ; motif séparé sur Atelier/panneau/Board/historique ; erreurs sûres ; courriel HTML+texte avec lien correct ; logs sans cookie/JWT ; SelectField mesuré au viewport ; OCI et préflight registry-only ; cycles ciblés des lacunes d'inventaire ; SMTP externe après GO. | `PENDING_EXECUTION[R4-11:GREEN_EVIDENCE]` ; invariant migrations et socle de suites confirmés au lot 0 | Régression métier silencieuse, test unitaire confondu avec preuve HTTP/SQL/navigateur, concurrence non déterministe, SMTP réel faussement déclaré local, lacune de mutation oubliée, altération accidentelle d'une migration. | `OPEN_RED_PENDING` |
 
@@ -963,14 +963,108 @@ autorisation séparée.
 
 R4-08 passe à `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION`.
 
+### R4-09 — parcours navigateur, accessibilité et responsive
+
+Baseline Chromium du lot 8 sur une base PostgreSQL jetable :
+
+```bash
+npx playwright test --project=chromium
+```
+
+- code `1`, `46 passed / 2 failed` ;
+- l'ancien libellé pseudo-pluriel `incident(s) actif(s)` était encore attendu
+  par `edit-machine.spec.ts` ;
+- l'ancien libellé `Consigne responsable` était encore attendu par
+  `workshop-mutation-feedback.spec.ts`.
+
+Ces deux rouges ont servi à corriger les assertions devenues mensongères, sans
+changer le produit. Les rouges produit permanents, chacun exécuté isolément,
+ont ensuite prouvé :
+
+- Auth Admin et Atelier : `2/2 failed`, le déclencheur de déconnexion perdait
+  le focus après une erreur réseau ;
+- sortie Board : `1/1 failed`, le bouton « Quitter » perdait le focus après une
+  erreur réseau ;
+- arbitrage de correction : `1/1 failed`, le succès visible disait
+  « Modification appliquée. » au lieu de « Correction appliquée. » ;
+- intégration PostgreSQL correction : `1 failed / 5 passed`, le retrait était
+  autorisé et atomique mais l'événement `EDIT_REQUEST_WITHDRAWN` ne contenait
+  ni `schemaVersion` ni snapshot `changes`.
+
+La correction minimale :
+
+- expose le pending de déconnexion partagé et ne navigue qu'après succès ;
+- restaure exactement le déclencheur Auth ou Board après la fin du pending en
+  erreur ;
+- réserve « Correction appliquée. » à l'arbitrage, sans modifier le retour
+  d'une édition directe ;
+- réutilise le payload d'arbitrage versionné pour le retrait d'une demande,
+  sans migration, recalcul ni changement de permission.
+
+Les parcours permanents ajoutés ou étendus couvrent réellement :
+
+- Auth Admin/Atelier et sortie Board : erreur réseau, maintien sur la page,
+  pending, focus exact et réessai ;
+- révocation Board : session réellement utilisable avant la confirmation,
+  mot de passe invalide conservé et refocalisé, un seul `PATCH`, puis vraie
+  requête HTTP de l'ancienne session refusée en `401 UNAUTHORIZED` ;
+- Support Admin/Atelier : `503` contenant une sentinelle technique,
+  erreur publique sûre, saisie byte-identique, focus, réessai, succès et une
+  seule live region ;
+- `SelectField` : rectangles réels en haut et en bas à `640×720`, puis
+  contraction `390×500` représentative du zoom 200 %, resize et clavier réel ;
+- correction : demande, retrait, nouvelle demande, refus en erreur puis
+  réessai, demande multi-champs, snapshots avant/demandé, application, carte
+  finale et Journal ;
+- annulation : demande, retrait, nouvelle demande, refus motivé, nouvelle
+  demande, confirmation, absence du tableau actif, présence dans Historique,
+  événements du Journal et zéro suivi implicite ;
+- pages et états principaux, panneau d'arbitrage et modales destructives avec
+  axe-core, sans violation critique ou sérieuse.
+
+Preuves ciblées vertes :
+
+- Auth `2/2`, sortie Board `1/1`, Support/révocation/SelectField/correction/
+  annulation verts ;
+- frontend ciblé `23/23` ;
+- PostgreSQL correction `6/6`, dont retrait demandeur et arbitrage réellement
+  concurrent avec exactement un gagnant.
+
+Les nouveaux parcours ont été exécutés trois fois indépendamment. Chaque
+exécution a créé, migré et seedé une nouvelle base jetable, puis l'a supprimée :
+
+```text
+exécution 1 : 29 passed
+exécution 2 : 29 passed
+exécution 3 : 29 passed
+```
+
+Un essai `--repeat-each=3` sur une seule base a produit `74/78` à cause de
+collisions attendues entre fixtures d'une répétition et la suivante. Il n'est
+pas retenu comme preuve, aucun retry ou timeout n'a été ajouté, et il a été
+remplacé par les trois exécutions réellement indépendantes ci-dessus.
+
+Porte C, sur une nouvelle base jetable :
+
+- Chromium complet : `57/57`, code `0` ;
+- axe-core : zéro violation critique ou sérieuse ;
+- frontend complet : `58` fichiers, `583/583` ;
+- backend complet : `48` suites, `511/511` hors sandbox ; la tentative en
+  sandbox donnait uniquement les deux échecs `listen EPERM` du test HTTP ;
+- PostgreSQL correction : `6/6` ;
+- builds, typages, ESLint et Prettier des deux applications : codes `0` ;
+- aucune occurrence nouvelle de `force: true`, `waitForTimeout` ou retry.
+
+R4-09 passe à `VERIFIED` et la Porte C est franchie.
+
 ### Cycles restant à ouvrir
 
 | ID | Situation après le lot 0 | Preuve future |
 | --- | --- | --- |
 | R4-06 | Inventaire 61/61, 59 couvertes et 2 exceptions système prouvées | `VERIFIED` |
-| R4-09 | Lacunes E2E confirmées statiquement ; aucun scénario de substitution accepté | `PENDING_EXECUTION[R4-09:RED_GREEN_E2E]` |
+| R4-09 | Parcours navigateur réels, responsive, accessibilité et invariants RC3 exécutés | `VERIFIED` |
 | R4-10 | Valeurs documentaires périmées confirmées ; captures externes non inventées | `PENDING_EXECUTION[R4-10:RED_GREEN_DOCUMENTATION]` |
-| R4-11 | Baseline migrations et suites exécutée ; lacunes de §7 toujours ouvertes | `PENDING_EXECUTION[R4-11:TARGETED_RED_GREEN_AND_EXTERNAL]` |
+| R4-11 | Invariants fonctionnels du lot 8 prouvés ; courriel et infrastructure réservés au lot 9, SMTP externe toujours séparé | `PARTIAL_LOCAL_VERIFICATION` |
 
 ## 7. Sous-matrice de non-régression R4-11
 
@@ -980,19 +1074,19 @@ détectée au diagnostic soit perdu dans les lots transversaux.
 | Contrat ou lacune | Couche de preuve minimale | Situation au diagnostic RC3 | Preuve RC4 | État |
 | --- | --- | --- | --- | --- |
 | Migrations 049/050 append-only et 001..050 byte-identiques | Diff Git contre le tag, migration depuis base vierge et upgrade pertinent sur PostgreSQL jetable | Présent ; diff initial vide | `git diff --exit-code v1.0.0-rc.3 -- backend/migrations/` initial : code `0` ; preuve finale à répéter | `BASELINE_VERIFIED_FINAL_PENDING` |
-| Session Board sans expiration automatique et révocable | Unité JWT + intégration PostgreSQL + HTTP | Contrat et tests partiels présents | `PENDING_EXECUTION[R4-11:BOARD_SESSION]` | `OPEN` |
-| Ancienne session Board refusée après révocation | Requête HTTP authentifiée avec jeton/session émis avant la révocation | Lacune supplémentaire : pas de preuve HTTP dédiée | `PENDING_EXECUTION[R4-11:BOARD_OLD_SESSION_HTTP]` | `OPEN_TEST_GAP` |
-| Payload correction v2 et snapshot avant/après sous verrou | Unité sérialisation + intégration PostgreSQL réelle | Présent | `PENDING_EXECUTION[R4-11:CORRECTION_V2]` | `OPEN` |
-| Retrait de demande de correction par son demandeur | Service/permissions + PostgreSQL + parcours utilisateur | Lacune supplémentaire : pas de preuve dédiée | `PENDING_EXECUTION[R4-11:CORRECTION_WITHDRAWAL]` | `OPEN_TEST_GAP` |
-| Motif obligatoire au refus de correction | Validation + PostgreSQL + modale conservée en erreur | Présent | `PENDING_EXECUTION[R4-11:CORRECTION_REJECTION_REASON]` | `OPEN` |
-| Concurrence correction : exactement un gagnant | Deux transactions réellement concurrentes sur PostgreSQL | Lacune supplémentaire : preuve absente | `PENDING_EXECUTION[R4-11:CORRECTION_CONCURRENCY]` | `OPEN_TEST_GAP` |
-| Demande et retrait d'annulation par le demandeur ; refus avec motif obligatoire ; arbitrage concurrent avec exactement un gagnant | Permissions + PostgreSQL réellement concurrent + E2E multi-rôle | Présents, à revalider séparément | `PENDING_EXECUTION[R4-11:CANCELLATION]` | `OPEN` |
-| Suivi uniquement explicite | Repository/service + E2E de chaque mutation sensible | Présent | `PENDING_EXECUTION[R4-11:FOLLOW_EXPLICIT]` | `OPEN` |
-| Séparation `waiting_reason` / `diagnostic` | Migration, repository, Atelier, panneau, Board, Historique | Modèle présent ; panneau/Board et cycle reprise incomplets | `PENDING_EXECUTION[R4-11:WAITING_REASON_SEPARATION]` | `OPEN_TEST_AND_UI_GAP` |
-| Erreur publique structurée et traduction sûre | Contrôleurs + tests négatifs DOM | Présent | `PENDING_EXECUTION[R4-11:PUBLIC_ERRORS]` | `OPEN` |
+| Session Board sans expiration automatique et révocable | Unité JWT + intégration PostgreSQL + HTTP | Contrat et tests partiels présents | Suites Gate B ; navigateur : session émise utilisable avant révocation puis requête HTTP refusée après | `VERIFIED_LOCAL` |
+| Ancienne session Board refusée après révocation | Requête HTTP authentifiée avec jeton/session émis avant la révocation | Lacune supplémentaire : pas de preuve HTTP dédiée | `admin-board-session-revocation.spec.ts` : HTTP `200` avant, confirmation et vrai `PATCH`, puis HTTP `401 UNAUTHORIZED` avec l'ancienne session | `VERIFIED` |
+| Payload correction v2 et snapshot avant/après sous verrou | Unité sérialisation + intégration PostgreSQL réelle | Présent | PostgreSQL correction `6/6` et parcours navigateur comparant valeurs avant/demandées | `VERIFIED` |
+| Retrait de demande de correction par son demandeur | Service/permissions + PostgreSQL + parcours utilisateur | Lacune supplémentaire : pas de preuve dédiée | PostgreSQL réel et E2E correction : retrait par le demandeur, snapshot v2 et nouvelle demande possible | `VERIFIED` |
+| Motif obligatoire au refus de correction | Validation + PostgreSQL + modale conservée en erreur | Présent | PostgreSQL réel plus E2E : refus en erreur conservé puis réessai motivé | `VERIFIED` |
+| Concurrence correction : exactement un gagnant | Deux transactions réellement concurrentes sur PostgreSQL | Lacune supplémentaire : preuve absente | `correctionArbitration.integration.test.ts`, `6/6` : approbation/refus concurrents, exactement un gagnant | `VERIFIED` |
+| Demande et retrait d'annulation par le demandeur ; refus avec motif obligatoire ; arbitrage concurrent avec exactement un gagnant | Permissions + PostgreSQL réellement concurrent + E2E multi-rôle | Présents, à revalider séparément | Suites PostgreSQL complètes Gate B et E2E annulation complet jusqu'à Historique/Journal | `VERIFIED` |
+| Suivi uniquement explicite | Repository/service + E2E de chaque mutation sensible | Présent | Suites Gate B et E2E correction/annulation : aucune mutation sensible ne crée de suivi implicite | `VERIFIED` |
+| Séparation `waiting_reason` / `diagnostic` | Migration, repository, Atelier, panneau, Board, Historique | Modèle présent ; panneau/Board et cycle reprise incomplets | PostgreSQL, DOM et navigateur : motif complet sur Atelier/panneau/Board, disparition après reprise et Historique conservé | `VERIFIED` |
+| Erreur publique structurée et traduction sûre | Contrôleurs + tests négatifs DOM | Présent | Suites backend/frontend et E2E Support/Auth/Board : sentinelles techniques absentes du DOM | `VERIFIED` |
 | Courriel multipart HTML + texte, lien correct et aucune image distante obligatoire | Unité de rendu/envoi, assertions du lien et réception SMTP réelle | Construction présente ; lien à revalider ; SMTP réel externe | `PENDING_EXECUTION[R4-11:MULTIPART_EMAIL_LOCAL]` ; SMTP : `PENDING_EXTERNAL_AUTHORIZATION` | `OPEN_EXTERNAL_PART` |
-| Aucun cookie/JWT dans les logs | Tests de redaction et balayage des sorties | Présent | `PENDING_EXECUTION[R4-11:LOG_REDACTION]` | `OPEN` |
-| SelectField borné au viewport | Test de composant + rectangles réels en navigateur à plusieurs positions/zooms | Tests simulés seulement | `PENDING_EXECUTION[R4-11:SELECTFIELD_GEOMETRY]` | `OPEN_BROWSER_GAP` |
+| Aucun cookie/JWT dans les logs | Tests de redaction et balayage des sorties | Présent | Backend complet Gate B `511/511`, dont tests de redaction ; balayage terminal encore requis | `VERIFIED_LOCAL_TERMINAL_SCAN_PENDING` |
+| SelectField borné au viewport | Test de composant + rectangles réels en navigateur à plusieurs positions/zooms | Tests simulés seulement | `select-field-geometry.spec.ts` : rectangles réels haut/bas, `640×720`, contraction `390×500`, resize et clavier | `VERIFIED` |
 | Provenance d'image OCI | Build images, labels et revision exacte | Présent | `PENDING_EXECUTION[R4-11:OCI_PROVENANCE]` | `OPEN` |
 | Préflight registry-only | Test shell/Compose versionné | Présent | `PENDING_EXECUTION[R4-11:REGISTRY_PREFLIGHT]` | `OPEN` |
 
@@ -1000,27 +1094,27 @@ détectée au diagnostic soit perdu dans les lots transversaux.
 
 Ces lignes font partie de R4-11 afin qu'aucun écart découvert par le balayage
 exhaustif du lot 0 ne disparaisse derrière les six défauts rouges prioritaires.
-Elles recoupent R4-06, mais ne sont pas déclarées corrigées : chaque interaction
-devra recevoir son propre rouge exact avant modification.
+Elles recoupent R4-06 ; les lots 4–5 ont fourni les rouges ciblés et les preuves
+unitaires, puis le lot 8 a complété les parcours navigateur transversaux.
 
 | Lacune supplémentaire | Interactions comptées | Situation RC3 observée | Preuve future minimale | État |
 | --- | ---: | --- | --- | --- |
-| Proposition de correction annoncée comme déjà appliquée | 1 | Le mode `requestOnly` affiche `Modification appliquée.` au lieu de décrire une demande créée | Test de la soumission `requestOnly`, succès exact et absence du faux message | `OPEN_TEST_GAP` |
-| Succès silencieux Atelier | 2 | Retrait d'une demande de correction et retrait d'une consigne sans message métier | Tests de succès `role="status"` et de récupération en erreur pour les deux déclencheurs | `OPEN_TEST_GAP` |
-| Compte désactivé ou supprimé | 2 | Désactivation sans avertissement dédié et risque d'état partiel ; suppression sans succès visible | Confirmation adaptée, atomicité/rafraîchissement sûr, succès exact et erreurs conservant la modale | `OPEN_TEST_GAP` |
-| Archivage simple ou forcé d'une ligne | 2 | L'erreur absorbée sous `AdminPasswordConfirmModal` laisse les deux parcours figés en pending | Deux rouges d'erreur, modale maintenue, bouton réutilisable, un seul appel et succès exact | `OPEN_TEST_GAP` |
-| Succès silencieux dans les réglages et tâches Admin | 4 | Préférences de notification, activation Board, désactivation Board et traitement d'une demande de reset n'annoncent pas le résultat | Tests par interaction sur message précis, pending, erreur persistante et focus | `OPEN_TEST_GAP` |
-| Changement de code Board révoquant des sessions | 1 | Avertissement inline mais aucune confirmation dédiée avant la mutation déconnectante | Rouge sur soumission directe, puis confirmation accessible et anti-double | `OPEN_TEST_GAP` |
-| Révocation de sessions | 1 | L'appelant ferme la modale avant l'appel API et perd le mot de passe en cas d'échec | Rouge réseau/métier prouvant fermeture et perte, puis modale/saisie conservées | `OPEN_TEST_GAP` |
-| Demande de réinitialisation Atelier | 1 | Le `finally` ferme la modale et affiche le succès même lorsque l'API échoue | Rouge d'échec exact, absence de faux succès, saisie et réessai conservés | `OPEN_TEST_GAP` |
-| Envoi Support Admin et Atelier | 2 | Le compositeur efface le message avant l'appel et ne le restaure pas en échec | Rouge partagé sur les deux services, texte identique après erreur, focus et réessai | `OPEN_TEST_GAP` |
-| Exceptions encore non formalisées | 11 | Accusé de consultation ; login/setup/logout ; accès/quitter Board ; réactions système aux `401` ; stockage local Board | Justification de sûreté ligne par ligne et tests ciblés des invariants retenus | `OPEN_EXCEPTION_REVIEW` |
+| Proposition de correction annoncée comme déjà appliquée | 1 | Le mode `requestOnly` affichait `Modification appliquée.` au lieu de décrire une demande créée | Tests du succès exact au lot 4 ; arbitrage réellement appliqué distingué au lot 8 | `VERIFIED` |
+| Succès silencieux Atelier | 2 | Retrait d'une demande de correction et retrait d'une consigne sans message métier | Statut métier, erreur, conservation et réessai prouvés au lot 4 ; retrait correction parcouru au lot 8 | `VERIFIED` |
+| Compte désactivé ou supprimé | 2 | Désactivation sans avertissement dédié et risque d'état partiel ; suppression sans succès visible | Confirmation adaptée, atomicité/rafraîchissement sûr, succès exact et erreurs conservant la modale au lot 5 | `VERIFIED` |
+| Archivage simple ou forcé d'une ligne | 2 | L'erreur absorbée sous `AdminPasswordConfirmModal` laissait les deux parcours figés en pending | Deux rouges d'erreur, modale maintenue, bouton réutilisable, un seul appel et succès exact au lot 5 | `VERIFIED` |
+| Succès silencieux dans les réglages et tâches Admin | 4 | Préférences de notification, activation Board, désactivation Board et traitement d'une demande de reset n'annonçaient pas le résultat | Tests par interaction sur message précis, pending, erreur persistante et focus au lot 5 | `VERIFIED` |
+| Changement de code Board révoquant des sessions | 1 | Avertissement inline mais aucune confirmation dédiée avant la mutation déconnectante | Confirmation accessible, conséquence annoncée et anti-double au lot 5 | `VERIFIED` |
+| Révocation de sessions | 1 | L'appelant fermait la modale avant l'appel API et perdait le mot de passe en cas d'échec | Modale/saisie conservées au lot 5 ; refus HTTP de l'ancienne session prouvé au lot 8 | `VERIFIED` |
+| Demande de réinitialisation Atelier | 1 | Le `finally` fermait la modale et affichait le succès même lorsque l'API échouait | Absence de faux succès, saisie et réessai conservés au lot 5 | `VERIFIED` |
+| Envoi Support Admin et Atelier | 2 | Le compositeur effaçait le message avant l'appel et ne le restaurait pas en échec | Contrat partagé au lot 5 ; texte byte-identique, focus et réessai navigateur au lot 8 | `VERIFIED` |
+| Exceptions encore non formalisées | 11 | Accusé de consultation ; login/setup/logout ; accès/quitter Board ; réactions système aux `401` ; stockage local Board | Neuf mutations adoptent le runner partagé ; seules deux réactions automatiques `401` restent des exceptions prouvées | `VERIFIED` |
 
 Le décompte des neuf premières lignes est exactement celui des `16 GAP` de
 `docs/rc4-mutation-inventory.md`; la dernière couvre ses
 `11 EXCEPTION_TO_REVIEW`.
 
-## 8. Suivi de la Porte A
+## 8. Suivi des Portes A à C
 
 La Porte A ne peut être déclarée franchie que lorsque chaque ligne ci-dessous
 est soutenue par un fait local consigné.
@@ -1042,10 +1136,18 @@ est soutenue par un fait local consigné.
 | Autorité Nginx figée | Section 4.2 | `VERIFIED_CONTRACT` |
 | Plans externes préservés | Seules exceptions hors suivi autorisées, non ignorées ; SHA-256 RC3 `861dc523…c822`, RC4 `31f40aa3…f4d2b` inchangés | `VERIFIED_BASELINE` |
 
-**Décision Porte A : `FRANCHIE AU LOT 0`.** Cette décision valide uniquement le
-contrat, l'inventaire et les défauts rouges exigés. Tous les
-`PENDING_EXECUTION` des lots futurs restent non prouvés ; la Porte B et le GO
-release demeurent fermés.
+**Décision Porte A : `FRANCHIE AU LOT 0`.**
+
+**Décision Porte B : `FRANCHIE APRÈS LE LOT 7`.** Backend `511/511`,
+PostgreSQL réel `144/144`, frontend `583/583`, couvertures backend
+`84,23 %` statements / `79,39 %` branches et frontend `89,23 %` /
+`83,16 %`, builds, typages, lint, format et audits au seuil contractuel verts ;
+migrations inchangées et zéro résidu Docker.
+
+**Décision Porte C : `FRANCHIE APRÈS LE LOT 8`.** Trois exécutions
+indépendantes `29/29`, Chromium complet `57/57`, axe zéro violation critique ou
+sérieuse, responsive et zoom prouvés. Le GO release et toute action du lot 11
+restent fermés.
 
 ## 9. Contrôles de fin de lot 0
 

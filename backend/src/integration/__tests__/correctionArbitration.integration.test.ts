@@ -20,6 +20,7 @@ import {
   requestEditIncidentService,
   approveEditIncidentService,
   rejectEditIncidentService,
+  withdrawEditRequestService,
 } from '../../modules/workshop/workshop.service.edit';
 import type { ServiceResult } from '../../utils/serviceResult';
 
@@ -254,5 +255,83 @@ describe('arbitrage de correction — contrat de traçabilité (lot 4, PostgreSQ
     // Même diff que la demande (avant → après identiques), pas recalculé.
     expect(applied?.changes).toEqual(requested?.changes);
     expect(typeof applied?.requestEventId).toBe('number');
+  });
+
+  it('le demandeur retire sa correction, jamais un autre utilisateur', async () => {
+    const incidentId = await createIncident();
+    assertOk(
+      await requestEditIncidentService(
+        incidentId,
+        { state: 'INDISPONIBLE', currentProduct: 'REF-B' },
+        operatorId,
+        'OPERATOR'
+      )
+    );
+
+    const forbidden = await withdrawEditRequestService(incidentId, responsableId, 'RESPONSABLE');
+    expect(forbidden.ok).toBe(false);
+    expect(await eventPayload(incidentId, 'EDIT_REQUEST_WITHDRAWN')).toBeNull();
+
+    assertOk(await withdrawEditRequestService(incidentId, operatorId, 'OPERATOR'));
+    const withdrawn = await eventPayload(incidentId, 'EDIT_REQUEST_WITHDRAWN');
+    expect(withdrawn?.schemaVersion).toBe(2);
+    expect(withdrawn?.changes).toEqual({
+      state: { before: 'DEGRADEE', after: 'INDISPONIBLE' },
+      currentProduct: { before: 'REF-A', after: 'REF-B' },
+    });
+
+    const { rows } = await pool.query<{
+      edit_request: Record<string, unknown> | null;
+      status: string;
+    }>(
+      `SELECT i.edit_request, c.status
+       FROM workshop_incidents i
+       JOIN workshop_arbitration_cases c ON c.incident_id = i.id
+       WHERE i.id = $1 AND c.request_type = 'EDIT'
+       ORDER BY c.id DESC LIMIT 1`,
+      [incidentId]
+    );
+    expect(rows[0]).toEqual({ edit_request: null, status: 'WITHDRAWN' });
+  });
+
+  it('deux arbitrages concurrents produisent exactement un gagnant et une décision', async () => {
+    const incidentId = await createIncident();
+    assertOk(
+      await requestEditIncidentService(
+        incidentId,
+        { state: 'INDISPONIBLE', currentProduct: 'REF-B' },
+        operatorId,
+        'OPERATOR'
+      )
+    );
+
+    const results = await Promise.all([
+      approveEditIncidentService(incidentId, responsableId, 'RESPONSABLE'),
+      rejectEditIncidentService(
+        incidentId,
+        responsableId,
+        'RESPONSABLE',
+        'Refus concurrent documenté.'
+      ),
+    ]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+
+    const { rows: decisionEvents } = await pool.query<{ event_type: string }>(
+      `SELECT event_type
+       FROM workshop_incident_events
+       WHERE incident_id = $1 AND event_type IN ('EDIT_APPLIED', 'EDIT_REJECTED')`,
+      [incidentId]
+    );
+    expect(decisionEvents).toHaveLength(1);
+    expect(['EDIT_APPLIED', 'EDIT_REJECTED']).toContain(decisionEvents[0].event_type);
+
+    const { rows: cases } = await pool.query<{ status: string }>(
+      `SELECT status
+       FROM workshop_arbitration_cases
+       WHERE incident_id = $1 AND request_type = 'EDIT'`,
+      [incidentId]
+    );
+    expect(cases).toHaveLength(1);
+    expect(['APPROVED', 'REJECTED']).toContain(cases[0].status);
   });
 });

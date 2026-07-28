@@ -17,7 +17,7 @@ const JOURNAL_NAV_ITEM: NavItem = {
 };
 
 export default function WorkshopNavBar() {
-  const { session, logout } = useAppAuth();
+  const { session, logout, logoutPending } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const navigate = useNavigate();
 
@@ -27,8 +27,7 @@ export default function WorkshopNavBar() {
       : BASE_NAV_ITEMS;
 
   async function handleLogout() {
-    await logout();
-    navigate('/login', { replace: true });
+    if (await logout()) navigate('/login', { replace: true });
   }
 
   return (
@@ -44,8 +43,12 @@ export default function WorkshopNavBar() {
               <span className="nav-user workshop-nav-user">
                 {user.first_name} {user.last_name}
               </span>
-              <button className="nav-logout workshop-nav-logout" onClick={handleLogout}>
-                Déconnexion
+              <button
+                className="nav-logout workshop-nav-logout"
+                onClick={handleLogout}
+                disabled={logoutPending}
+              >
+                {logoutPending ? 'Déconnexion…' : 'Déconnexion'}
               </button>
             </div>
           )}

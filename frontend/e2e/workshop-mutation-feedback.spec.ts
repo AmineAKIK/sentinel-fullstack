@@ -46,10 +46,13 @@ test('correction : demande, retrait, refus en erreur sûre puis vrai réessai', 
   await operatorCard.getByRole('link', { name: /Ouvrir incident/i }).click();
   const operatorPanel = page.locator('aside.incident-detail-drawer');
 
-  async function requestCorrection(comment: string): Promise<void> {
+  async function requestCorrection(comment: string, currentProduct?: string): Promise<void> {
     await operatorPanel.getByRole('button', { name: 'Demander une correction' }).click();
     const editDialog = page.getByRole('dialog', { name: "Modifier l'incident" });
     await editDialog.getByLabel('Commentaire').fill(comment);
+    if (currentProduct) {
+      await editDialog.getByLabel('Produit en cours *').fill(currentProduct);
+    }
     await editDialog.getByRole('button', { name: 'Aperçu' }).click();
     await page.getByRole('button', { name: 'Valider la modification' }).click();
     await expect(page.getByRole('status')).toContainText('Demande de correction envoyée.');
@@ -128,6 +131,37 @@ test('correction : demande, retrait, refus en erreur sûre puis vrai réessai', 
     'Demande de modification refusée.'
   );
   await responsableContext.close();
+
+  const finalProduct = `${product}-APPLIQUE`;
+  const finalComment = 'Correction finale multi-champs E2E RC4.';
+  await page.reload();
+  await page
+    .locator('article', { hasText: product })
+    .getByRole('link', {
+      name: /Ouvrir incident/i,
+    })
+    .click();
+  await requestCorrection(finalComment, finalProduct);
+
+  const applyContext = await browser.newContext();
+  const applyPage = await applyContext.newPage();
+  await loginAsWorkshop(applyPage, E2E_RESPONSABLE_BADGE);
+  const applyCard = applyPage.locator('article', { hasText: product });
+  await expect(applyCard).toBeVisible();
+  await applyCard.getByRole('link', { name: /Ouvrir incident/i }).click();
+  const applyDialog = applyPage.getByRole('dialog', { name: 'Arbitrage correction' });
+  await expect(applyDialog.getByText(product, { exact: true }).first()).toBeVisible();
+  await expect(applyDialog.getByText(finalProduct, { exact: true }).first()).toBeVisible();
+  await expect(applyDialog.getByText(finalComment, { exact: true }).first()).toBeVisible();
+  await applyDialog.getByRole('button', { name: 'Appliquer la correction' }).click();
+  await expect(applyDialog).toBeHidden();
+  await expect(applyPage.getByRole('status')).toContainText('Correction appliquée.');
+  await expect(applyPage.locator('article', { hasText: finalProduct })).toBeVisible();
+
+  await applyPage.goto('/workshop/journal');
+  await applyPage.getByPlaceholder('Incident, machine, acteur, commentaire…').fill(finalProduct);
+  await expect(applyPage.getByRole('cell', { name: /Correction appliquée/ }).first()).toBeVisible();
+  await applyContext.close();
 });
 
 test('annulation : demande, retrait, nouvelle demande puis confirmation définitive', async ({
@@ -136,6 +170,12 @@ test('annulation : demande, retrait, nouvelle demande puis confirmation définit
 }) => {
   const product = `E2E-RC4-ANNULATION-${Date.now()}`;
   await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
+  let implicitFollowRequests = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/follow')) {
+      implicitFollowRequests += 1;
+    }
+  });
   const operatorCard = await createIncident(page, product, 14);
   await operatorCard.getByRole('link', { name: /Ouvrir incident/i }).click();
   const operatorPanel = page.locator('aside.incident-detail-drawer');
@@ -161,16 +201,62 @@ test('annulation : demande, retrait, nouvelle demande puis confirmation définit
   const responsableCard = responsablePage.locator('article', { hasText: product });
   await expect(responsableCard).toBeVisible();
   await responsableCard.getByRole('link', { name: /Ouvrir incident/i }).click();
-  const reviewDialog = responsablePage.getByRole('dialog', {
+  let reviewDialog = responsablePage.getByRole('dialog', {
+    name: 'Arbitrage annulation',
+  });
+  await reviewDialog.getByRole('button', { name: 'Refuser la demande' }).click();
+  const rejectionReason = 'Doublon non confirmé par la production.';
+  await reviewDialog.getByLabel('Motif du refus').fill(rejectionReason);
+  await reviewDialog.getByRole('button', { name: 'Confirmer le refus' }).click();
+  await expect(reviewDialog).toBeHidden();
+  await expect(responsablePage.getByRole('status')).toContainText('Demande d’annulation refusée.');
+  await responsableContext.close();
+
+  await page.reload();
+  await page
+    .locator('article', { hasText: product })
+    .getByRole('link', {
+      name: /Ouvrir incident/i,
+    })
+    .click();
+  await requestCancellation('Demande finale confirmée après nouvelle vérification.');
+
+  const approvalContext = await browser.newContext();
+  const approvalPage = await approvalContext.newPage();
+  await loginAsWorkshop(approvalPage, E2E_RESPONSABLE_BADGE);
+  await approvalPage
+    .locator('article', { hasText: product })
+    .getByRole('link', { name: /Ouvrir incident/i })
+    .click();
+  reviewDialog = approvalPage.getByRole('dialog', {
     name: 'Arbitrage annulation',
   });
   await expect(reviewDialog).toContainText(/annulation définitive/i);
   await reviewDialog.getByRole('button', { name: "Confirmer l'annulation" }).click();
   await expect(reviewDialog).toBeHidden();
-  await expect(responsablePage.getByRole('status')).toContainText(
+  await expect(approvalPage.getByRole('status')).toContainText(
     'Incident annulé et conservé dans l’historique.'
   );
-  await responsableContext.close();
+
+  await approvalPage.goto('/workshop/journal');
+  await approvalPage.getByPlaceholder('Incident, machine, acteur, commentaire…').fill(product);
+  await expect(
+    approvalPage.getByRole('cell', { name: 'Annulation refusée', exact: true }).first()
+  ).toBeVisible();
+  await expect(
+    approvalPage.getByRole('cell', { name: 'Incident annulé', exact: true }).first()
+  ).toBeVisible();
+  await approvalContext.close();
+
+  await page.reload();
+  await expect(page.locator('article', { hasText: product })).toHaveCount(0);
+  await page.goto('/workshop/history');
+  await page.getByPlaceholder('Incident, machine, acteur, commentaire…').fill(product);
+  const historyItem = page.locator('.history-incident-item').first();
+  await expect(historyItem).toBeVisible();
+  await historyItem.click();
+  await expect(page.getByText(product, { exact: true })).toBeVisible();
+  expect(implicitFollowRequests).toBe(0);
 });
 
 test('suivi, urgence et consigne : une mutation réelle et un feedback précis', async ({ page }) => {
@@ -212,7 +298,7 @@ test('suivi, urgence et consigne : une mutation réelle et un feedback précis',
   expect(mutationRequests.filter((request) => request.startsWith('POST'))).toHaveLength(1);
   await expect(panel.getByRole('button', { name: 'Retirer du suivi' })).toBeVisible();
 
-  const instruction = panel.getByLabel('Consigne responsable');
+  const instruction = panel.getByLabel('Consigne du responsable');
   await instruction.fill('  Prioriser après contrôle qualité β.  ');
   await panel.getByRole('button', { name: 'Ajouter' }).click();
   await expect(page.getByRole('status')).toContainText('Consigne enregistrée.');

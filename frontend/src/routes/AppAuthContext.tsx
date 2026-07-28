@@ -23,7 +23,8 @@ interface AppAuthContextValue {
   session: AuthSession;
   loading: boolean;
   setSession: (session: AuthSession) => void;
-  logout: () => Promise<void>;
+  logout: () => Promise<boolean>;
+  logoutPending: boolean;
 }
 
 const AppAuthContext = createContext<AppAuthContextValue | null>(null);
@@ -127,16 +128,29 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   }, [location.pathname, markExpired]);
 
   const logout = useCallback(async () => {
-    await mutation.execute(unifiedLogout, {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const result = await mutation.execute(unifiedLogout, {
       key: 'auth:logout',
       toErrorMessage: (err) => apiErrorMessage(err, 'Impossible de se déconnecter. Réessayez.'),
       onSuccess: () => setSession(null),
+      onError: () => {
+        requestAnimationFrame(() => {
+          if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+        });
+      },
     });
+    return result.status === 'success';
   }, [mutation]);
 
   const contextValue = useMemo(
-    () => ({ session, loading, setSession, logout }),
-    [session, loading, logout]
+    () => ({
+      session,
+      loading,
+      setSession,
+      logout,
+      logoutPending: mutation.isPending('auth:logout'),
+    }),
+    [session, loading, logout, mutation]
   );
 
   return <AppAuthContext.Provider value={contextValue}>{children}</AppAuthContext.Provider>;
