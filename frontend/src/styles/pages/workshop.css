@@ -238,7 +238,7 @@ button.workshop-metric:hover,
   min-width: 0;
   width: 100%;
   margin-left: 0;
-  transform: translateX(0);
+  overflow-anchor: none;
   transition:
     gap 280ms var(--ease),
     grid-template-columns 280ms var(--ease);
@@ -247,6 +247,10 @@ button.workshop-metric:hover,
 .workshop-results-workbench.is-detail-open {
   grid-template-columns: minmax(0, 1fr) minmax(380px, 440px);
   gap: var(--space-4);
+}
+
+.workshop-results-workbench.is-detail-open .workshop-results-list-pane {
+  padding-bottom: 64px;
 }
 
 .workshop-results-list-pane {
@@ -318,12 +322,13 @@ button.workshop-metric:hover,
 .incident-detail-drawer {
   position: sticky;
   top: 72px;
+  bottom: 16px;
   align-self: start;
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
-  margin-top: var(--incident-detail-offset-top, 0px);
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -331,25 +336,10 @@ button.workshop-metric:hover,
     0 18px 42px rgba(11, 18, 32, 0.12),
     0 4px 14px rgba(11, 18, 32, 0.06);
   overflow: hidden;
-  /* Le drawer collant (top: 72px) est borné à la fenêtre : sans cela, un
-     dossier plus haut que l'écran voit ses actions de bas de panneau coupées
-     par overflow: hidden et inatteignables au bureau (lot 8). La marge de 16px
-     laisse respirer le bord bas. Le corps du panneau défile à l'intérieur. */
-  max-height: calc(100vh - 72px - 16px);
-  scroll-margin-top: 88px;
-  animation: incident-detail-pane-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  transition: margin-top 260ms var(--ease);
-}
-
-@keyframes incident-detail-pane-in {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  /* Fallback vh puis unité dynamique : le panneau reste entre la navigation
+     sticky et une marge basse de 16px, y compris après resize/zoom. */
+  max-height: calc(100vh - 88px);
+  max-height: calc(100dvh - 88px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -357,10 +347,6 @@ button.workshop-metric:hover,
   .workshop-results-list-pane,
   .incident-list {
     transition: none;
-  }
-
-  .incident-detail-drawer {
-    animation: none;
   }
 }
 
@@ -370,28 +356,23 @@ button.workshop-metric:hover,
     gap: var(--space-4);
   }
 
-  .incident-detail-drawer {
-    position: relative;
-    top: auto;
-    margin-top: 0;
-    /* Sous 1180px le drawer n'est plus collant : il s'étend naturellement et
-       c'est la page qui défile (pas de région défilante imbriquée). */
-    max-height: none;
-    overflow: visible;
+  .workshop-results-workbench.is-detail-open .workshop-results-list-pane {
+    visibility: hidden;
+    padding-bottom: 0;
   }
 
-  .incident-detail-content {
-    overflow-y: visible;
+  .incident-detail-drawer {
+    position: fixed;
+    inset: 72px 16px 16px;
+    z-index: 90;
+    width: auto;
+    max-width: none;
   }
 }
 
 @media (max-width: 700px) {
   .workshop-results-workbench.is-detail-open {
     gap: 0;
-  }
-
-  .workshop-results-workbench.is-detail-open .workshop-results-list-pane {
-    display: none;
   }
 }
 
@@ -502,7 +483,10 @@ button.workshop-metric:hover,
      (.incident-detail-topbar) reste visible pendant le défilement. */
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 16px 20px 24px;
   background-color: var(--color-surface);
 }

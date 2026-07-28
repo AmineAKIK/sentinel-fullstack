@@ -154,7 +154,7 @@ pas de `Cache-Control` dans le contrat actuel.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **R4-01** | **P0** | Plan RC4 §5.1–5.2, §14.1 | `IncidentCard` ouvrait uniquement par le bouton contenant le titre. Le corps, les métadonnées, le pied, la consigne et le motif ne portaient pas l'activation principale ; le focus n'était pas restauré exactement sur le déclencheur après fermeture. | Tests permanents exécutés ensemble par `npm test -- src/components/__tests__/IncidentCard.test.tsx src/pages/__tests__/WorkshopDashboardPage.test.tsx`, puis rouge Chromium sur la métadonnée réelle ; sorties détaillées §6 | Code `1`, `10 failed / 25 passed` : métadonnée, consigne, motif et pied laissent chacun `onClick` à `0`, les ouvertures page depuis le corps échouent, le lien sémantique est absent et l'arbitrage ouvre indûment le dossier. E2E : dossier introuvable après clic souris au centre de la métadonnée. | `frontend/src/components/IncidentCard.tsx` ; `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/pages/__tests__/WorkshopDashboardPage.test.tsx` ; `frontend/src/styles/pages/workshop.css` ; E2E Atelier concernés | `article` conservé sans rôle artificiel ; lien réel avec `href` contenant tout le contenu non interactif et pseudo-élément étiré sur les blancs ; boutons indépendants frères au-dessus ; activation Espace directe sans clic synthétique ; déclencheur exact mémorisé puis refocalisé après croix ou Échap ; arbitrage direct sans sélectionner le dossier. | Composant/page : titre, métadonnée, consigne, motif, pied, `Entrée`, `Espace`, structure DOM, étoile/arbitrages sans ouverture, focus exact croix/Échap. Chromium : clic coordonné sur métadonnée, focus visible atteint par Tab et commandes indépendantes sans drawer. | Ciblés `35/35` ; frontend `476/476` ; Chromium carte `3/3` ; parcours E2E migrés `4/4` ; lint, format et build verts ; détails §6. | Risques d'imbrication, propagation, zone morte, doublon sémantique et mauvais retour de focus couverts par tests, E2E réel et revue du diff. | `VERIFIED` |
 | **R4-02** | **P0** | Plan RC4 §0, §5.2, §13 | L'ancien test nommé comme un clic sur la carte exécutait en réalité le bouton du titre ; son test clavier simulait aussi un clic, et les E2E historiques ciblaient seulement `.incident-card-open`. | Même exécution permanente rouge que R4-01 : quatre nœuds hors titre réellement cliqués, plus le scénario Chromium utilisant la géométrie de `.incident-card-meta` | Les quatre tests hors titre reçoivent `0` ouverture sur RC3 tandis que le test historique du titre reste passant ; le rouge navigateur ne trouve aucun dossier après le vrai hit-test de métadonnée. | `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/__tests__/WorkshopDashboardPage.test.tsx` ; `frontend/e2e/incident-card-activation.spec.ts` ; E2E cycle de vie, arbitrage mobile et retrait d'annulation | Ancien test renommé comme clic du titre ; tests séparés pour chaque zone réelle ; `user.keyboard` pour Entrée/Espace sans `fireEvent.click` ; E2E dédié sans `.incident-card-open`, utilisant `boundingBox()` puis `page.mouse.click()` au centre du produit ; anciens parcours migrés vers le rôle du lien. | Tests permanents distincts et assertions zéro dossier depuis les commandes indépendantes ; E2E réel métadonnée, focus, étoile et arbitrage. | Mêmes preuves vertes R4-01 : `35/35`, `476/476`, Chromium `3/3` et parcours migrés `4/4`. | Faux vert, sélecteur de substitution et clic forcé éliminés ; aucune tolérance ou `force: true`. | `VERIFIED` |
-| **R4-03** | **P0** | Plan RC4 §6.1–6.3, §14.1 | Chaîne dynamique encore active : `useIncidentDrawerPosition` → `detailOffsetTop` → `--incident-detail-offset-top` → `margin-top`, avec recentrage `window.scrollBy`. Sticky, hauteur bornée et scroll interne n'annulent pas ce couplage. | Deux commandes Vitest exactes sur `WorkshopDashboardPage.test.tsx`, l'une sur le recentrage et l'autre sur la variable inline ; voir §6 | Codes `1` : l'ouverture de la carte basse appelle `scrollBy({ behavior: 'smooth', top: 432 })` et pose `--incident-detail-offset-top: 740px` au lieu de supprimer ces deux couplages. | `frontend/src/hooks/useIncidentDrawerPosition.ts` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/components/IncidentDetailPanel.tsx` ; `frontend/src/styles/pages/workshop.css` ; tests page/panneau ; E2E Atelier | Supprimer hook, import, état/prop `detailOffsetTop`, variable CSS et marge dynamique ; sticky à `top` stable, hauteur viewport, en-tête visible, corps scrollable, `overscroll-behavior: contain`, `scrollbar-gutter: stable`, aucun recentrage artificiel. | Unité/composant sur suppression du couplage ; navigateur `1440×900` carte haut/milieu/bas, longue liste, panneau haut, molette bas/haut, scroll page ; mobile `390×844`, zoom 200 %, clavier et focus retour ; rectangles dans viewport. | `PENDING_EXECUTION[R4-03:GREEN_EVIDENCE]` | Containing block cassant `sticky`, double scroll mobile, clavier virtuel, panneau inaccessible en bas de liste, test de géométrie simulé ou flake. | `RED_PROVEN` |
+| **R4-03** | **P0** | Plan RC4 §6.1–6.3, §14.1 | Chaîne dynamique encore active : `useIncidentDrawerPosition` → `detailOffsetTop` → `--incident-detail-offset-top` → `margin-top`, avec recentrage `window.scrollBy`. Sticky, hauteur bornée et scroll interne n'annulent pas ce couplage. | Vitest permanent : `npm test -- src/pages/__tests__/WorkshopDashboardPage.test.tsx src/pages/__tests__/incidentDrawerScroll.test.ts`. Chromium réel : test `incident-detail-scroll.spec.ts` sur haut/milieu/bas, molette, `640×720`, `390×844`, viewport réduit à `390×500` et resize ; voir §6. | Vitest code `1`, `7 failed / 9 passed` : recentrage reçu avec `top: 512`, offset inline reçu `0px`, containment et gouttière absents, contrat viewport absent, overrides contraints invalides et animation horizontale présente. Chromium `7/7 failed` : bas `scrollY 1019→975`, offset `998px`, drawer `bottom 1215` ; à `640px`, `right=644` et `document.scrollWidth=644` ; mobile sans scroll interne et resize réutilisant une position hors viewport. | `frontend/index.html` ; `frontend/src/hooks/useIncidentDrawerPosition.ts` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/components/IncidentDetailPanel.tsx` ; `frontend/src/styles/pages/workshop.css` ; tests page/panneau ; seed et E2E Atelier | Hook et chaîne de coordonnées supprimés ; desktop en colonne droite, `sticky` à `72px`, hauteur `vh`/`dvh` bornée ; en-tête hors scroll et corps flex `min-height: 0`, `overflow-y: auto`, containment et gouttière stable ; largeur contrainte bornée par CSS au viewport, sans animation horizontale ni recentrage ; sous `1180px`, panneau borné au layout viewport et contrat `interactive-widget=resizes-content`. | Unité/composant sur suppression du couplage, structure et viewport ; Chromium réel par clic coordonné sur métadonnée, trois positions, scroll page et interne, stabilité d'overscroll par égalités exactes, focus croix/Échap, `640×720`, `390×844`, `390×500` et resize. | Ciblés `44/44` ; nouveau Chromium `7/7` trois fois sans retry ; carte Lot 1 `3/3` ; E2E historiques `7/7` ; frontend `482/482` ; E2E complet `44/44` ; build, typage, lint et format verts ; détails et mesures §6. | Containing block, double scroll, coordonnées stale, dépassement transitoire, focus et flake couverts par assertions navigateur ; zéro calcul de géométrie en production. Le test `390×500` prouve une contraction représentative du layout viewport, pas l'ouverture d'un clavier système réel. | `VERIFIED` |
 | **R4-04** | **P1** | Plan RC4 §7.1–7.3, §14.2 | `waiting_reason` n'est ni projeté par la requête Board, ni présent dans le type public, ni rendu. Aucun test Board ne vérifie motif courant, disparition après reprise et conservation historique. | `npm test -- src/components/__tests__/BoardIncidentGrid.test.tsx -t 'RC4 RED — affiche le motif courant pour un incident en attente'` depuis `frontend/` ; sortie détaillée §6 | Code `1` : le DOM contient le statut `PENDING`/« En attente », mais aucun texte `Motif de mise en attente : Attente pièce détachée`. | `backend/src/modules/workshop/workshop.repository.ts` et types/projection Board ; tests repository/intégration ; `frontend/src/types/workshop.ts` ; `frontend/src/components/board/BoardIncidentGrid.tsx` ; `BoardIncidentGrid.test.tsx` ; `frontend/e2e/board.spec.ts` et cycle de vie | Ajouter uniquement `waiting_reason` à la projection et au type public Board ; rendre le libellé si `status === PENDING` et motif non vide, valeur complète accessible ; ne projeter aucune donnée privée supplémentaire. | Rouge frontend Board ; PostgreSQL réel sur projection minimale et valeur nulle/absente hors `PENDING` ; E2E attente → Atelier/panneau/Board visibles → reprise → disparition des trois surfaces → historique conservé. | `PENDING_EXECUTION[R4-04:GREEN_EVIDENCE]` | Fuite de diagnostic ou identité privée, motif périmé après reprise, troncature inaccessible, confusion état courant/historique. | `RED_PROVEN` |
 | **R4-05** | **P0** | Plan RC4 §8.1–8.2, §12 lots 4–5, §14.5 | `useMutationRunner` n'a aucun import de production et n'est consommé que par son propre test. Les mutations utilisent en parallèle `runSimple`, `runPanelAction`, refs et états locaux ; l'existence d'une abstraction isolée ne prouve aucune adoption. | Contrat shell exact de recherche des consommateurs de production, depuis `frontend/` ; voir §6 | Code `1` et message exact `FAIL R4-05: useMutationRunner a 0 consommateur dans le code de production.` | `frontend/src/components/ui/MutationFeedback.tsx` ; hooks/actions Atelier ; modales incident ; pages Administration/Auth/Board/Support ; `docs/rc4-mutation-inventory.md` comme périmètre exhaustif | Choisir un unique contrat partagé léger, prouver ses imports en production, brancher d'abord toutes les mutations Atelier puis toutes les autres surfaces, documenter seulement les exceptions sûres login/logout et accusé silencieux. | Tests contractuels communs prêt/confirmation/pending/succès/échec/récupération ; une requête sur double clic ; focus ; erreurs réseau/métier ; tests de chaque ligne de l'inventaire et E2E représentatifs par famille. | `PENDING_EXECUTION[R4-05:GREEN_EVIDENCE]` | Migration partielle créant doubles messages, verrouillage incohérent, perte de focus, abstraction trop large, lignes oubliées hors inventaire. | `RED_PROVEN` |
 | **R4-06** | **P0** | Plan RC4 §8.1, §8.3–8.4, §14.3–14.5 | Les `61` lignes de l'inventaire sont classées : `16 GAP`, dont révocation fermant une modale avant la réponse, code Board sans confirmation adaptée, faux ou absents succès, archivage figé en erreur et saisie Support perdue ; `11` exceptions restent à formaliser. Les lacunes supplémentaires sont aussi figées sous R4-11 en §7. | Pas de commande globale admise : aux lots 4–5, chaque interaction nécessitant une correction (`GAP` ou `PARTIAL`) recevra son test ciblé et sa commande exacte avant correction ; une exception non corrigée devra être justifiée et prouvée sûre ; registre §6 | Non exécuté au lot 0 conformément à la liste obligatoire du §12. Un rouge « représentatif » commun serait invalide car il substituerait une interaction à une autre ; les causes statiques de chaque ligne sont déjà consignées dans l'inventaire. | Toutes les lignes de `docs/rc4-mutation-inventory.md`, notamment `AdminSettingsPage.tsx`, pages/composants Support, Auth et Board, modales de clôture/invalidation/annulation/archivage/comptes | Appliquer les cinq états, anti-double, message métier sûr, conservation saisie/modale/focus en échec ; confirmations accessibles pour clôture, invalidation, annulation définitive, suppression, désactivation, archivage, révocation et réglage déconnectant. | Par famille : erreur métier, erreur réseau, modale ouverte, saisie identique, bouton réutilisable, aucune clé brute, double clic = un appel, succès exact et focus restauré ; E2E des mutations transversales. | `PENDING_EXECUTION[R4-06:GREEN_EVIDENCE]` | Action irréversible sans confirmation, fermeture optimiste, champs perdus, secret/erreur technique visible, double envoi, confirmations empilées. | `OPEN_RED_PENDING` |
@@ -166,13 +166,14 @@ pas de `Cache-Control` dans le contrat actuel.
 
 ## 6. Registre exécutable des cycles rouge → vert
 
-Toutes les preuves ci-dessous ont été exécutées sur le SHA
-`e5019eef374d580eca8d4f62af61bbd3135ceecb`, avant toute correction produit.
-Les sondes de test temporaires ont été ajoutées par patch, exécutées une à une,
-puis entièrement retirées par patch. Elles ne figurent donc pas dans le commit
-documentaire cassé. Après retrait, les quatre fichiers frontend concernés ont
-repassé `50/50` tests et le fichier backend ciblé `15/15`. Ces contrôles prouvent
-le retour à la base, pas le vert des corrections futures.
+Les preuves de diagnostic initiales du lot 0 introduites ci-dessous ont été
+exécutées sur le SHA `e5019eef374d580eca8d4f62af61bbd3135ceecb`, avant toute
+correction produit. Les sondes de test temporaires ont été ajoutées par patch,
+exécutées une à une, puis entièrement retirées par patch. Elles ne figurent
+donc pas dans le commit documentaire cassé. Après retrait, les quatre fichiers
+frontend concernés ont repassé `50/50` tests et le fichier backend ciblé
+`15/15`. Ces contrôles prouvent le retour à la base, pas le vert des
+corrections futures.
 
 Commandes exactes de retour à la base, respectivement depuis `frontend/` et
 `backend/` :
@@ -295,31 +296,169 @@ Les trois commandes ont retourné le code `0`. R4-01 et R4-02 passent à
 
 ### R4-03 — recentrage et décalage dynamique
 
+Les deux sondes unitaires exécutées au lot 0 avaient déjà prouvé séparément
+le recentrage (`scrollBy({ behavior: "smooth", top: 432 })`) et l'offset inline
+(`740px`). Au démarrage du lot 2, elles ont été remplacées par des tests
+permanents couvrant tout le contrat.
+
+#### Rouge permanent du lot 2
+
 Répertoire d'exécution : `frontend/`.
 
 ```bash
-npm test -- src/pages/__tests__/WorkshopDashboardPage.test.tsx -t 'RC4 RED — ouvre une carte basse sans décalage dynamique ni recentrage de page'
+npm test -- src/pages/__tests__/WorkshopDashboardPage.test.tsx src/pages/__tests__/incidentDrawerScroll.test.ts
 ```
 
 - code de sortie : `1` ;
-- sortie utile : `1 failed`, `5 skipped` ;
-- assertion : `window.scrollBy` attendu sans appel, reçu une fois avec
-  `{ behavior: "smooth", top: 432 }` ;
-- cause : l'ouverture d'une carte basse déclenche encore le recentrage RC3.
+- sortie utile : `2` fichiers en échec, `7 failed / 9 passed` ;
+- ouverture réelle depuis la métadonnée d'une carte basse : `scrollBy` attendu
+  sans appel, reçu une fois avec `{ behavior: "smooth", top: 512 }` ;
+- propriété inline attendue absente, reçue `0px` ;
+- feuille de style sans `overscroll-behavior: contain` ni
+  `scrollbar-gutter: stable` sur le corps ;
+- source encore couplée au hook et à l'offset ; surcharge sous `1180px`
+  contenant `max-height: none`, `overflow: visible` et
+  `overflow-y: visible` ; contrat viewport
+  `interactive-widget=resizes-content` absent ; keyframe contenant
+  `translateX`.
+
+Rouge Chromium réel, depuis la racine du dépôt, sans retry :
 
 ```bash
-npm test -- src/pages/__tests__/WorkshopDashboardPage.test.tsx -t 'RC4 RED — supprime tout offset inline calculé depuis la carte ouverte'
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- e2e/incident-detail-scroll.spec.ts --reporter=line
 ```
 
 - code de sortie : `1` ;
-- sortie utile : `1 failed`, `5 skipped` ;
-- assertion future-compatible : valeur de
-  `--incident-detail-offset-top` attendue vide, reçue `740px` ;
-- cause : la page calcule et injecte encore l'offset inline. Le vert exigera
-  l'absence de la propriété, pas une valeur artificielle `0px`.
+- sortie utile : `7/7` scénarios en échec sous Chromium, puis nettoyage
+  PostgreSQL/Docker complet ;
+- carte haute, viewport `1440×900` : ouverture `scrollY 315→6`, drawer
+  `top=374`, `bottom=1186`, corps `clientHeight=707`,
+  `scrollHeight=1144`, propriété d'offset `0px` ;
+- carte milieu : ouverture `scrollY 647→599`, drawer `top=76`, `bottom=888`,
+  corps `707/1144`, offset `295px` ;
+- carte basse : ouverture `scrollY 1019→975`, drawer `top=403`,
+  `bottom=1215`, corps `707/1019`, offset `998px` ;
+- scroll page : `480→720→560`; molette interne `scrollTop 0→240` avec page à
+  `560`, puis, à la borne atteinte par la molette `scrollTop=436`, une molette
+  supplémentaire conserve le corps à `436` mais déplace la page `560→880`
+  parce que l'overscroll reste `auto` ;
+- insertion à `640×720` : `innerWidth=640`,
+  `document.scrollWidth=644`, drawer `x=36`, `right=644`, `width=608`,
+  `top=310`, `bottom=1425.78125` ; le dépassement transitoire vient du
+  `translateX(20px)` ;
+- mobile `390×844` : `scrollY=982`, drawer `top=88.375`,
+  `bottom=1707.96875`, corps `clientHeight=scrollHeight=1493`; la molette
+  conserve `scrollTop=0`, déplace la page `982→1222` et pousse l'en-tête à
+  `top=-151.625` ;
+- resize desktop → mobile → desktop : mobile `top=590.375`,
+  `bottom=2209.96875`, puis desktop `scrollY=190`, offset `174px`,
+  `top=364`, `bottom=1176`, preuve d'une coordonnée devenue invalide.
 
-Vert : `PENDING_EXECUTION[R4-03:GREEN_AFTER_LOT2]`, avec preuve navigateur
-réelle encore obligatoire.
+Chaque ouverture Chromium calcule la boîte de `.incident-card-meta` et effectue
+un vrai `page.mouse.click()` en son centre. Aucun test n'ouvre par le titre,
+`.incident-card-open`, un callback, `force: true`, retry ou temporisation
+arbitraire.
+
+#### Architecture verte
+
+- `useIncidentDrawerPosition.ts` est supprimé avec ses imports, refs, état,
+  style inline, variable CSS, marge dynamique et tout recentrage d'ouverture ;
+- le seul `requestAnimationFrame` conservé dans `WorkshopDashboardPage`
+  séquence l'arbitrage automatique après rendu, sans lecture de géométrie ni
+  scroll ;
+- desktop : grille liste + colonne droite, drawer `position: sticky`,
+  `top: 72px`, marge basse `16px`, `max-height` bornée en `vh` puis `dvh` ;
+- l'en-tête est un enfant flex non scrollable ; le corps est l'autre enfant,
+  avec `flex`, `min-height: 0`, `min-width: 0`, `overflow-y: auto`,
+  `overscroll-behavior: contain` et `scrollbar-gutter: stable` ;
+- sous `1180px`, le drawer devient un panneau viewport avec
+  `inset: 72px 16px 16px`; la liste reste dans le flux mais devient invisible.
+  Le document déclare `interactive-widget=resizes-content` et la réduction
+  réelle du layout viewport Chromium de `390×844` à `390×500` vérifie que le
+  panneau reste intégralement borné et scrollable. Cette preuve reproduit la
+  contraction utile, sans prétendre qu'un clavier système réel a été ouvert ;
+  aucune coordonnée JavaScript ne survit à un resize ;
+- l'animation horizontale est supprimée ; l'ouverture du titre reçoit
+  `focus({ preventScroll: true })` et la fermeture attend la synchronisation
+  état/URL avant de refocaliser le lien exact de la carte ;
+- le seed E2E fournit huit dossiers longs avec commentaire valide de
+  `500` caractères et `display_order` explicite, afin de rendre les positions
+  physiques haut/milieu/bas déterministes.
+
+#### Vert ciblé et mesures navigateur
+
+```bash
+npm test -- src/components/__tests__/IncidentCard.test.tsx src/pages/__tests__/WorkshopDashboardPage.test.tsx src/pages/__tests__/incidentDrawerScroll.test.ts
+```
+
+- code `0`, `3` fichiers et `44/44` tests passés ;
+- suppression du couplage, absence de recentrage, structure en-tête/corps,
+  focus exact croix/Échap et invariants Lot 1 couverts.
+
+Le test Chromium dédié ci-dessus a ensuite été exécuté trois fois
+indépendamment, sans retry :
+
+- exécution 1 : `7/7` passés en `12.1 s` ;
+- exécution 2 : `7/7` passés en `11.6 s` ;
+- exécution 3 : `7/7` passés en `11.7 s` ;
+- les trois exécutions terminent par
+  `nettoyage complet : aucun conteneur ni volume résiduel`.
+
+Mesures vertes consignées :
+
+- desktop haut/milieu/bas, `1440×900` : `scrollY` respectivement
+  `315`, `647`, `1019`, inchangé par l'ouverture ; drawer identique
+  `left=884`, `top=72`, `right=1324`, `bottom=884`, `width=440`,
+  `height=812`, `document.scrollWidth=1440` ; corps `707/1184` en
+  haut/milieu et `707/1037` en bas (`clientHeight/scrollHeight`) ;
+- scroll page réel `524→764→604` : drawer toujours à `top=72` ; molette dans
+  le corps `scrollTop 0→240` puis `476` sans modifier `scrollY=604`; à la borne
+  atteinte par la molette, une seconde molette conserve exactement
+  `scrollTop=476` et `scrollY=604`; retour interne exact à `0` sans déplacement
+  de page ;
+  en-tête, navigation, compteur et fermeture gardent exactement leurs boîtes ;
+- zoom 200 %, `640×720` : dès l'insertion puis après stabilisation,
+  `left=16`, `top=72`, `right=624`, `bottom=704`, `width=608`,
+  `height=632`, `document.scrollWidth=640`; corps `553/1058` ;
+- mobile `390×844` : `left=16`, `top=72`, `right=374`, `bottom=828`,
+  `width=358`, `height=756`, `document.scrollWidth=390`; corps `629/1493`,
+  molette `scrollTop 0→240` avec `scrollY=1528` inchangé ;
+- viewport réduit à `390×500` : `left=16`, `top=72`, `right=374`,
+  `bottom=484`, `width=358`, `height=412`; corps `285/1493`, molette
+  `scrollTop 240→360` avec `scrollY=1528` inchangé ; topbar, navigation,
+  compteur et fermeture restent tous dans le viewport ; le jeton
+  `interactive-widget=resizes-content` est vérifié dans le navigateur ;
+- resize `1440×900→390×844→1440×900` : géométries ci-dessus puis retour exact
+  à `left=884`, `top=72`, `right=1324`, `bottom=884`, avec
+  `scrollY=524` inchangé ;
+- fermetures par croix (haut/bas) et Échap (milieu) : focus final sur les
+  liens `A.incident-card-open` des cartes exactes `11`, `6` et `1`.
+
+#### Non-régressions et balayages
+
+- Lot 1 ciblé : `37/37` ; E2E carte : `3/3` ;
+- E2E historiques panneau : `7/7` ;
+- panneau ciblé : `13/13` ;
+- suite frontend : `54` fichiers, `482/482` ;
+- suite E2E Chromium complète : `44/44` en `44.8 s`, sans retry ;
+- builds frontend/backend, typage des scripts backend, ESLint frontend/backend
+  et Prettier frontend/backend : codes `0`.
+
+Balayages exigés :
+
+- `rg -n 'useIncidentDrawerPosition|detailOffsetTop|incident-detail-offset-top' frontend`
+  retourne zéro occurrence ;
+- `rg -n 'scrollBy|scrollIntoView' frontend/src/pages frontend/src/components frontend/src/hooks`
+  ne retourne que quatre scrolls indépendants : élément actif et détail du
+  journal dans `useHistoryData.ts`, détail de connaissance dans
+  `WorkshopKnowledgePage.tsx`, bas de conversation dans `SupportChat.tsx` ;
+- les occurrences de `incident-detail-drawer` sont classées ainsi :
+  production dans `workshop.css` et `WorkshopDashboardPage.tsx`, contrats
+  unitaires dans les deux tests de page/CSS, et observations navigateur dans
+  les E2E carte, scroll, cycle de vie, retrait et zoom. Aucune n'est une
+  coordonnée ou un second mécanisme de positionnement.
+
+R4-03 passe à `VERIFIED`. R4-04 et tous les lots ultérieurs restent inchangés.
 
 ### R4-04 — motif courant sur le Board
 

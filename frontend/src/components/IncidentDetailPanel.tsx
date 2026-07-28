@@ -264,7 +264,7 @@ export default function IncidentDetailPanel({
   // carte de la liste. Le titre est focusable programmatiquement (tabIndex=-1)
   // sans entrer dans l'ordre de tabulation (lot 8, accessibilité).
   useEffect(() => {
-    titleRef.current?.focus();
+    titleRef.current?.focus({ preventScroll: true });
   }, [incident.id]);
 
   // Runner des actions du panneau : verrou anti-double (pendingActionRef), état

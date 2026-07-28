@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CreateIncidentModal from '../components/CreateIncidentModal';
 import IncidentMetricsBar from '../components/IncidentMetricsBar';
@@ -27,7 +27,6 @@ import { useIncidentsData } from '../hooks/useIncidentsData';
 import { useFollowedResolvedIncidents } from '../hooks/useFollowedResolvedIncidents';
 import { useModalState, ReviewType } from '../hooks/useModalState';
 import { useIncidentActions } from '../hooks/useIncidentActions';
-import { useIncidentDrawerPosition } from '../hooks/useIncidentDrawerPosition';
 
 function isWithinLastDays(iso: string, days: number): boolean {
   const createdAt = new Date(iso).getTime();
@@ -66,9 +65,11 @@ export default function WorkshopDashboardPage() {
   const { session } = useAppAuth();
   const user = session?.accountType === 'workshop' ? session.user : null;
   const [searchParams, setSearchParams] = useSearchParams();
-  const workbenchRef = useRef<HTMLDivElement | null>(null);
-  const detailDrawerRef = useRef<HTMLElement | null>(null);
   const incidentOpenTriggerRef = useRef<HTMLAnchorElement | null>(null);
+  const pendingFocusRestoreRef = useRef<{
+    incidentId: number | undefined;
+    trigger: HTMLAnchorElement | null;
+  } | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
   const [focusedIncidentId, setFocusedIncidentId] = useState<number | null>(null);
   const [reportedArbitrationKey, setReportedArbitrationKey] = useState<string | null>(null);
@@ -146,11 +147,32 @@ export default function WorkshopDashboardPage() {
   );
 
   const closeSelectedIncidentAndRestoreFocus = useCallback(() => {
-    const trigger = incidentOpenTriggerRef.current;
+    pendingFocusRestoreRef.current = {
+      incidentId: selectedIncident?.id,
+      trigger: incidentOpenTriggerRef.current,
+    };
     clearSelectedIncident();
-    if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     incidentOpenTriggerRef.current = null;
-  }, [clearSelectedIncident]);
+  }, [clearSelectedIncident, selectedIncident?.id]);
+
+  useEffect(() => {
+    if (
+      selectedIncident !== null ||
+      selectedIncidentParam !== null ||
+      pendingFocusRestoreRef.current === null
+    )
+      return;
+    const { incidentId, trigger } = pendingFocusRestoreRef.current;
+    pendingFocusRestoreRef.current = null;
+    const currentTrigger =
+      incidentId === undefined
+        ? null
+        : document.querySelector<HTMLAnchorElement>(
+            `[data-incident-card-id="${incidentId}"] .incident-card-open`
+          );
+    const focusTarget = currentTrigger ?? (trigger?.isConnected ? trigger : null);
+    focusTarget?.focus({ preventScroll: true });
+  }, [selectedIncident, selectedIncidentParam]);
 
   useEffect(() => {
     if (!selectedIncidentParam) {
@@ -267,8 +289,6 @@ export default function WorkshopDashboardPage() {
           const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           return sortOrder === 'date_desc' ? diff : -diff;
         });
-  const sortedIncidentPositionKey = sortedIncidents.map((incident) => incident.id).join('|');
-
   // Regroupement sémantique par ligne : les groupes sont ordonnés 1-9/A-Z de
   // façon fixe (indépendante du tri/filtre actif), le tri/filtre choisis par
   // l'utilisateur ne s'appliquent qu'à l'intérieur de chaque groupe (l'ordre
@@ -300,16 +320,17 @@ export default function WorkshopDashboardPage() {
   const selectedIncidentId = selectedIncident?.id ?? null;
   const selectedIncidentUpdatedAt = selectedIncident?.updated_at ?? null;
 
-  const { detailOffsetTop } = useIncidentDrawerPosition({
-    workbenchRef,
-    detailDrawerRef,
-    selectedIncidentId,
-    selectedIncidentUpdatedAt,
-    sortedIncidentPositionKey,
-    loading,
-    sortOrder,
-    setFocusedIncidentId,
-  });
+  // L'ouverture automatique d'un arbitrage attend que le dossier sélectionné
+  // soit rendu. Ce séquencement ne dépend d'aucune géométrie et ne déplace
+  // jamais la page.
+  useEffect(() => {
+    setFocusedIncidentId(null);
+    if (selectedIncidentId === null || loading) return;
+    const frameId = window.requestAnimationFrame(() => {
+      setFocusedIncidentId(selectedIncidentId);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [selectedIncidentId, selectedIncidentUpdatedAt, loading]);
 
   function navigateToIncident(offset: number) {
     if (selectedIndex === -1) return;
@@ -392,10 +413,6 @@ export default function WorkshopDashboardPage() {
   ]
     .filter(Boolean)
     .join(' ');
-  const detailDrawerStyle = {
-    '--incident-detail-offset-top': `${detailOffsetTop}px`,
-  } as CSSProperties;
-
   return (
     <>
       <WorkshopNavBar />
@@ -472,7 +489,7 @@ export default function WorkshopDashboardPage() {
           onClear={clearAllFilters}
         />
 
-        <div ref={workbenchRef} className={workbenchClassName}>
+        <div className={workbenchClassName}>
           <section className="workshop-results-list-pane" aria-label="Liste des incidents atelier">
             {loading ? (
               <div className="workshop-results-loading">
@@ -564,9 +581,7 @@ export default function WorkshopDashboardPage() {
 
           {selectedIncident && (
             <aside
-              ref={detailDrawerRef}
               className="incident-detail-drawer"
-              style={detailDrawerStyle}
               aria-label={`Détail de l'incident ligne ${selectedIncident.line_number}, machine ${selectedIncident.machine_id}`}
             >
               <IncidentDetailPanel

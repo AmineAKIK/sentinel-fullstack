@@ -18,6 +18,7 @@ test('ouvre le dossier depuis la métadonnée produit de la carte', async ({ pag
     .locator('.incident-card-meta')
     .getByText('E2E-CORRECTION', { exact: true });
   await expect(productMetadata).toBeVisible();
+  await card.scrollIntoViewIfNeeded();
 
   const metadataBox = await productMetadata.boundingBox();
   expect(metadataBox).not.toBeNull();
