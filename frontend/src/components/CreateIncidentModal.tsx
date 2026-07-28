@@ -4,11 +4,12 @@ import SelectField from './ui/SelectField';
 import CharCounter from './ui/CharCounter';
 import { createWorkshopIncident, updateWorkshopIncident } from '../api/workshop';
 import { translateApiError } from '../api/errorMessages';
-import { useMutationFeedback } from './ui/MutationFeedback';
+import { useMutationRunner } from './ui/MutationFeedback';
 import { IncidentState, ProductionLine, WorkshopIncident } from '../types';
 import { getRobotOptions } from '../utils/lineMachines';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { STATE_LABELS } from '../utils/labels';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface CreateIncidentModalProps {
   lines: ProductionLine[];
@@ -32,7 +33,7 @@ export default function CreateIncidentModal({
   onClose,
   onSuccess,
 }: CreateIncidentModalProps) {
-  const { notifySuccess } = useMutationFeedback();
+  const mutation = useMutationRunner();
   const hasLineReferences = lines.length > 0;
   const [lineId, setLineId] = useState(incident ? String(incident.line_id) : '');
   const [machineId, setMachineId] = useState(incident?.machine_id || '');
@@ -42,8 +43,20 @@ export default function CreateIncidentModal({
   const [comment, setComment] = useState(incident?.comment || '');
   const [currentProduct, setCurrentProduct] = useState(incident?.current_product || '');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const isEditing = Boolean(incident);
+  const mutationKey = requestOnly
+    ? WORKSHOP_MUTATION_KEYS.REQUEST_EDIT
+    : isEditing
+      ? WORKSHOP_MUTATION_KEYS.EDIT
+      : WORKSHOP_MUTATION_KEYS.CREATE;
+  const isPending = mutation.isPending(mutationKey);
+  const successMessage = requestOnly
+    ? 'Demande de correction envoyée.'
+    : isEditing
+      ? 'Modification appliquée.'
+      : 'Incident signalé.';
+  const pendingLabel = requestOnly ? 'Envoi de la demande…' : 'Enregistrement…';
 
   const selectedLine = useMemo(
     () => lines.find((line) => String(line.id) === lineId),
@@ -73,42 +86,40 @@ export default function CreateIncidentModal({
 
   async function handleSubmit() {
     if (!validate()) return;
-    // Verrou anti-double-soumission : le bouton est déjà désactivé via `loading`,
-    // mais on garde aussi cette garde pour couvrir la touche Entrée.
-    if (loading) return;
 
     const selectedState = state as IncidentState;
-
-    setLoading(true);
     setError('');
-    try {
-      const payload = {
-        lineId: Number(lineId),
-        machineId,
-        robotLabel,
-        headNumber: Number(headNumber),
-        state: selectedState,
-        comment: comment.trim(),
-        currentProduct: currentProduct.trim(),
-        requestOnly,
-      };
-      const saved = incident
-        ? await updateWorkshopIncident(incident.id, payload)
-        : await createWorkshopIncident(payload);
-      // Succès métier annoncé globalement (contrat RC3). La modale se ferme via
-      // onSuccess (restauration du focus gérée par l'appelant).
-      notifySuccess(incident ? 'Modification appliquée.' : 'Incident signalé.');
-      onSuccess(saved);
-    } catch (err) {
-      // Erreur traduite (jamais le message brut) et conservée près du formulaire ;
-      // les saisies restent en place (aucun reset de champ ici).
-      setError(translateApiError(err));
-    } finally {
-      setLoading(false);
+
+    const payload = {
+      lineId: Number(lineId),
+      machineId,
+      robotLabel,
+      headNumber: Number(headNumber),
+      state: selectedState,
+      comment: comment.trim(),
+      currentProduct: currentProduct.trim(),
+      requestOnly,
+    };
+    const result = await mutation.execute(
+      () =>
+        incident ? updateWorkshopIncident(incident.id, payload) : createWorkshopIncident(payload),
+      {
+        key: mutationKey,
+        successMessage,
+        toErrorMessage: translateApiError,
+        errorPresentation: 'local',
+        onError: (_requestError, safeMessage) => {
+          // L'erreur reste près du formulaire ; aucune saisie n'est réinitialisée.
+          setError(safeMessage);
+        },
+      }
+    );
+
+    if (result.status === 'success') {
+      onSuccess(result.value);
     }
   }
 
-  const isEditing = Boolean(incident);
   const isDirty =
     !showPreview &&
     (lineId !== (incident ? String(incident.line_id) : '') ||
@@ -128,10 +139,10 @@ export default function CreateIncidentModal({
             ? "Modifier l'incident"
             : 'Créer un incident'
       }
-      onClose={loading ? undefined : onClose}
+      onClose={isPending ? undefined : onClose}
       closeOnOverlay={false}
       isDirty={isDirty}
-      isLoading={loading}
+      isLoading={isPending}
       size="lg"
       footer={
         showPreview ? (
@@ -139,14 +150,14 @@ export default function CreateIncidentModal({
             <button
               className="btn btn-secondary"
               onClick={() => setShowPreview(false)}
-              disabled={loading}
+              disabled={isPending}
             >
               Retour
             </button>
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-              {loading ? (
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={isPending}>
+              {isPending ? (
                 <>
-                  <span className="spinner" aria-hidden="true" /> Enregistrement…
+                  <span className="spinner" aria-hidden="true" /> {pendingLabel}
                 </>
               ) : isEditing ? (
                 'Valider la modification'
@@ -157,10 +168,10 @@ export default function CreateIncidentModal({
           </>
         ) : (
           <>
-            <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
+            <button className="btn btn-secondary" onClick={onClose} disabled={isPending}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={handlePreview} disabled={loading}>
+            <button className="btn btn-primary" onClick={handlePreview} disabled={isPending}>
               Aperçu
             </button>
           </>
@@ -233,7 +244,7 @@ export default function CreateIncidentModal({
                 setRobotLabel('');
                 setHeadNumber('');
               }}
-              disabled={loading || !hasLineReferences}
+              disabled={isPending || !hasLineReferences}
               ariaLabel="Ligne"
               options={[
                 {
@@ -257,7 +268,7 @@ export default function CreateIncidentModal({
                 setRobotLabel('');
                 setHeadNumber('');
               }}
-              disabled={loading || !selectedLine}
+              disabled={isPending || !selectedLine}
               ariaLabel="Machine"
               options={[
                 {
@@ -283,7 +294,7 @@ export default function CreateIncidentModal({
                 setRobotLabel(value);
                 setHeadNumber('');
               }}
-              disabled={loading || !selectedMachine}
+              disabled={isPending || !selectedMachine}
               ariaLabel="Robot"
               options={[
                 {
@@ -303,7 +314,7 @@ export default function CreateIncidentModal({
               id="incidentHead"
               value={headNumber}
               onChange={setHeadNumber}
-              disabled={loading || !selectedRobot}
+              disabled={isPending || !selectedRobot}
               ariaLabel="Tête"
               options={[
                 {
@@ -323,7 +334,7 @@ export default function CreateIncidentModal({
               id="incidentState"
               value={state}
               onChange={(value) => setState(value as IncidentState)}
-              disabled={loading}
+              disabled={isPending}
               ariaLabel="État"
               options={[
                 { value: '', label: 'Sélectionner un état' },
@@ -341,7 +352,7 @@ export default function CreateIncidentModal({
               className="form-input"
               value={comment}
               onChange={(e) => setComment(e.target.value.slice(0, FIELD_LIMITS.COMMENT))}
-              disabled={loading}
+              disabled={isPending}
               rows={3}
               maxLength={FIELD_LIMITS.COMMENT}
               placeholder="Ajouter un commentaire"
@@ -360,7 +371,7 @@ export default function CreateIncidentModal({
               className="form-input"
               value={currentProduct}
               onChange={(e) => setCurrentProduct(e.target.value)}
-              disabled={loading}
+              disabled={isPending}
               maxLength={FIELD_LIMITS.PRODUCT}
               placeholder="Référence produit"
               aria-invalid={Boolean(error) || undefined}

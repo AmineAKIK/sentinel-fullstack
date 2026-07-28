@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 import IncidentDetailPanel from '../IncidentDetailPanel';
@@ -56,7 +56,6 @@ function mockModal(): ModalStateApi {
       reviewIncident: null,
       reviewType: null,
       reviewError: '',
-      reviewLoading: false,
       unfollowConfirmIncident: null,
       deleteResponsibleCommentIncident: null,
     },
@@ -65,7 +64,6 @@ function mockModal(): ModalStateApi {
     openReview: vi.fn(),
     closeReview: vi.fn(),
     setReviewError: vi.fn(),
-    setReviewLoading: vi.fn(),
     setUnfollowConfirm: vi.fn(),
     setDeleteCommentConfirm: vi.fn(),
   };
@@ -334,5 +332,102 @@ describe('IncidentDetailPanel – retrait de la demande d’annulation (lot 5)',
     expect(screen.queryByRole('button', { name: 'Arbitrer' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reprendre' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Décision requise' })).toBeNull();
+  });
+});
+
+describe('IncidentDetailPanel – mutations panneau via le runner partagé RC4', () => {
+  it('retire positivement une demande de correction et annonce le succès exact', async () => {
+    const incident = mockIncident({
+      role: 'OPERATOR',
+      user_id: 7,
+      is_followed: false,
+      edit_request: { comment: 'Correction proposée' },
+    });
+    const updated = mockIncident({
+      role: 'OPERATOR',
+      user_id: 7,
+      is_followed: false,
+      edit_request: null,
+    });
+    const patchIncident = vi.fn(() => Promise.resolve(updated));
+    renderPanel({
+      incident,
+      userRole: 'OPERATOR',
+      userId: 7,
+      isResponsable: false,
+      patchIncident,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer ma demande' }));
+
+    await screen.findByText('Demande de correction retirée.');
+    expect(patchIncident).toHaveBeenCalledTimes(1);
+    expect(patchIncident).toHaveBeenCalledWith(1, { withdrawEditRequest: true });
+  });
+
+  it('conserve une consigne byte-for-byte après erreur, refocalise puis réussit au vrai réessai', async () => {
+    const rawTechnicalError =
+      'board_session_ttl_hours waiting_reason decision_reason internal_failure SELECT * FROM workshop_incidents HTTP 500 Internal Server Error internal_field_rc4 internal_reason_rc4';
+    const incident = mockIncident({
+      responsible_comment: null,
+      role: 'RESPONSABLE',
+    });
+    const patchIncident = vi
+      .fn<(id: number, payload: unknown) => Promise<WorkshopIncident>>()
+      .mockRejectedValueOnce(new Error(rawTechnicalError))
+      .mockResolvedValueOnce({
+        ...incident,
+        responsible_comment: 'Prioriser après contrôle qualité β.',
+      });
+    renderPanel({ incident, patchIncident });
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Consigne responsable');
+    const exactDraft = '  Prioriser après contrôle qualité β.\nPoste\t2  ';
+    fireEvent.change(textarea, { target: { value: exactDraft } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
+
+    expect(await screen.findByText("Impossible d'enregistrer la consigne.")).toHaveAttribute(
+      'role',
+      'alert'
+    );
+    expect(textarea.value).toBe(exactDraft);
+    await waitFor(() => expect(textarea).toHaveFocus());
+    expect(screen.getByRole('button', { name: 'Ajouter' })).toBeEnabled();
+    expect(document.body.textContent).not.toContain(rawTechnicalError);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
+
+    await screen.findByText('Consigne enregistrée.');
+    expect(patchIncident).toHaveBeenCalledTimes(2);
+    expect(patchIncident).toHaveBeenLastCalledWith(1, {
+      responsibleComment: exactDraft.trim(),
+    });
+  });
+
+  it('rend le pending du panneau observable et bloque deux activations à un appel', async () => {
+    let resolvePatch!: (value: WorkshopIncident) => void;
+    const incident = mockIncident({ responsible_comment: null, role: 'RESPONSABLE' });
+    const patchIncident = vi.fn(
+      () =>
+        new Promise<WorkshopIncident>((resolve) => {
+          resolvePatch = resolve;
+        })
+    );
+    renderPanel({ incident, patchIncident });
+    fireEvent.change(screen.getByLabelText('Consigne responsable'), {
+      target: { value: 'Prioriser ce contrôle' },
+    });
+    const submit = screen.getByRole('button', { name: 'Ajouter' });
+
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(patchIncident).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.incident-detail-content')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: 'Enregistrement…' })).toBeDisabled();
+    expect(screen.getByLabelText('Consigne responsable')).toBeDisabled();
+
+    resolvePatch({ ...incident, responsible_comment: 'Prioriser ce contrôle' });
+    await screen.findByText('Consigne enregistrée.');
   });
 });

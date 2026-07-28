@@ -48,7 +48,7 @@ test.beforeEach(async ({ page }) => {
   await loginAsResponsable(page);
 });
 
-test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut', async ({ page }) => {
+test('annuler conserve l’arbitrage actif et ouvre le dossier mobile en haut', async ({ page }) => {
   const card = page.locator('.incident-card').filter({ hasText: 'E2E-ANNULATION' });
   await expect(card).toBeVisible();
   // RC4 : l'activateur natif couvre toute la zone non interactive de la carte.
@@ -57,7 +57,7 @@ test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut',
 
   const dialog = page.getByRole('dialog', { name: 'Arbitrage annulation' });
   await expectCompactModal(page, dialog);
-  await dialog.getByRole('button', { name: 'Reporter' }).click();
+  await dialog.getByRole('button', { name: 'Annuler' }).click();
   await expect(dialog).toBeHidden();
 
   const dossier = page.getByLabel(/Détail de l'incident ligne 999, machine E2E-MCH-1/);
@@ -72,7 +72,11 @@ test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut',
 
   await dossier.getByRole('button', { name: 'Fermer le détail' }).click();
   await cardActivationArea.click();
-  await expect(page.getByRole('dialog', { name: 'Arbitrage annulation' })).toBeVisible();
+  const resumedDialog = page.getByRole('dialog', { name: 'Arbitrage annulation' });
+  await expect(resumedDialog).toBeVisible();
+  await resumedDialog.getByRole('button', { name: 'Consulter le dossier' }).click();
+  await expect(resumedDialog).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Dossier d’arbitrage consulté.');
 });
 
 test('la correction se décide directement depuis le modal mobile', async ({ page }) => {

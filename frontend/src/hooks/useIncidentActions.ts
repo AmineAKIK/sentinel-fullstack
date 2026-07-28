@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import {
   cancelWorkshopIncident,
   followWorkshopIncident,
@@ -6,9 +5,10 @@ import {
   updateWorkshopIncident,
 } from '../api/workshop';
 import { apiErrorMessage, translateApiError } from '../api/errorMessages';
-import { useMutationFeedback } from '../components/ui/MutationFeedback';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
 import { WorkshopIncident } from '../types';
 import { sortIncidents } from '../utils/incidentSort';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 import { ModalStateApi } from './useModalState';
 
 // Messages de succès (résultat métier) du catalogue RC3. Le canal global ne
@@ -26,6 +26,8 @@ const SUCCESS = {
   REJECT_EDIT: 'Demande de modification refusée.',
   APPROVE_DELETE: 'Incident annulé et conservé dans l’historique.',
   REJECT_DELETE: 'Demande d’annulation refusée.',
+  REQUEST_EDIT: 'Demande de correction envoyée.',
+  WITHDRAW_EDIT: 'Demande de correction retirée.',
   URGENT_ON: 'Incident déclaré urgent.',
   URGENT_OFF: 'Urgence retirée.',
   FOLLOW_ON: 'Suivi activé.',
@@ -53,42 +55,11 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     modal,
     isMaintenance,
   } = opts;
-  const reviewActionRef = useRef(false);
-  // Verrou anti-double-soumission pour les mutations « simples » (hors review,
-  // qui a déjà reviewActionRef). Aucune de ces mutations ne peut partir deux fois.
-  const simpleActionRef = useRef(false);
-  const feedback = useMutationFeedback();
-
-  // Exécute une mutation « simple » de bout en bout : verrou anti-double,
-  // fermeture de la modale et succès métier annoncés seulement en cas de succès ;
-  // en cas d'échec, la modale reste ouverte et une erreur globale persistante est
-  // affichée (récupération possible). Le message d'erreur passe par le fallback
-  // métier — le lot 2 introduira la traduction fine code+details.
-  async function runSimple(
-    op: () => Promise<void>,
-    opts2: { successMessage: string; errorFallback: string; closeOnSuccess?: boolean }
-  ): Promise<void> {
-    if (simpleActionRef.current) return;
-    simpleActionRef.current = true;
-    try {
-      await op();
-      if (opts2.closeOnSuccess !== false) modal.closeModal();
-      feedback.notifySuccess(opts2.successMessage);
-    } catch (error) {
-      // C-03 : jamais de message brut. apiErrorMessage traduit une erreur API
-      // (code+details) et n'utilise le repli français métier que pour une erreur
-      // NON API (exception JS / réseau bas niveau sans code).
-      feedback.notifyError(apiErrorMessage(error, opts2.errorFallback));
-    } finally {
-      simpleActionRef.current = false;
-    }
-  }
+  const mutation = useMutationRunner();
 
   async function patchIncident(id: number, payload: Parameters<typeof updateWorkshopIncident>[1]) {
     const updated = await updateWorkshopIncident(id, payload);
-    setIncidents((prev) =>
-      sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-    );
+    upsertIncident(updated);
     void refreshMetrics();
     return updated;
   }
@@ -116,217 +87,202 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
 
   async function handleConfirmTakeCharge() {
     if (!selectedIncident) return;
-    await runSimple(
-      async () => {
-        await patchIncident(selectedIncident.id, { isTaken: true });
-      },
-      {
-        successMessage: SUCCESS.TAKE_CHARGE,
-        errorFallback: 'Impossible d’enregistrer la prise en charge.',
-      }
-    );
+    await mutation.execute(() => patchIncident(selectedIncident.id, { isTaken: true }), {
+      key: WORKSHOP_MUTATION_KEYS.TAKE_CHARGE,
+      successMessage: SUCCESS.TAKE_CHARGE,
+      toErrorMessage: (error) =>
+        apiErrorMessage(error, 'Impossible d’enregistrer la prise en charge.'),
+      onSuccess: () => modal.closeModal(),
+    });
   }
 
   async function handleRequestDelete(reason: string) {
     if (!selectedIncident) return;
-    await runSimple(
-      async () => {
-        const updated = await updateWorkshopIncident(selectedIncident.id, {
+    await mutation.execute(
+      () =>
+        updateWorkshopIncident(selectedIncident.id, {
           cancelRequest: true,
           cancelRequestReason: reason,
-        });
-        upsertIncident(updated);
-      },
+        }),
       {
+        key: WORKSHOP_MUTATION_KEYS.REQUEST_CANCEL,
         successMessage: SUCCESS.REQUEST_DELETE,
-        errorFallback: 'Impossible d’envoyer la demande d’annulation.',
+        toErrorMessage: (error) =>
+          apiErrorMessage(error, 'Impossible d’envoyer la demande d’annulation.'),
+        onSuccess: (updated) => {
+          upsertIncident(updated);
+          modal.closeModal();
+        },
       }
     );
   }
 
   async function handleApplyEditRequest() {
-    if (!modal.state.reviewIncident || reviewActionRef.current) return;
+    if (!modal.state.reviewIncident) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
       modal.setReviewError('Modification interdite apres prise en charge.');
       return;
     }
-    reviewActionRef.current = true;
-    modal.setReviewLoading(true);
     modal.setReviewError('');
-    try {
-      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
-        applyEditRequest: true,
-      });
-      upsertIncident(updated);
-      void refreshMetrics();
-      modal.closeReview();
-      feedback.notifySuccess(SUCCESS.APPLY_EDIT);
-    } catch (requestError) {
-      // C-03 : erreur API traduite (jamais de message brut) ; repli français
-      // métier réservé aux erreurs non API.
-      modal.setReviewError(
-        apiErrorMessage(requestError, "Impossible d'appliquer la modification.")
-      );
-    } finally {
-      reviewActionRef.current = false;
-      modal.setReviewLoading(false);
-    }
+    await mutation.execute(
+      () =>
+        updateWorkshopIncident(modal.state.reviewIncident!.id, {
+          applyEditRequest: true,
+        }),
+      {
+        key: WORKSHOP_MUTATION_KEYS.APPLY_EDIT,
+        successMessage: SUCCESS.APPLY_EDIT,
+        errorPresentation: 'local',
+        toErrorMessage: (error) =>
+          apiErrorMessage(error, "Impossible d'appliquer la modification."),
+        onSuccess: (updated) => {
+          upsertIncident(updated);
+          void refreshMetrics();
+          modal.closeReview();
+        },
+        onError: (_error, safeMessage) => modal.setReviewError(safeMessage),
+      }
+    );
   }
 
   async function handleRejectEditRequest(decisionReason: string) {
-    if (!modal.state.reviewIncident || reviewActionRef.current) return;
+    if (!modal.state.reviewIncident) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
       modal.setReviewError('Modification interdite apres prise en charge.');
       return;
     }
-    reviewActionRef.current = true;
-    modal.setReviewLoading(true);
     modal.setReviewError('');
-    try {
-      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
-        rejectEditRequest: true,
-        decisionReason,
-      });
-      upsertIncident(updated);
-      void refreshMetrics();
-      modal.closeReview();
-      feedback.notifySuccess(SUCCESS.REJECT_EDIT);
-    } catch (requestError) {
-      // Erreur TRADUITE (jamais le message brut ; le motif invalide renvoie un
-      // details.field=decisionReason). La modale reste ouverte : la saisie du
-      // motif est conservée.
-      modal.setReviewError(translateApiError(requestError));
-    } finally {
-      reviewActionRef.current = false;
-      modal.setReviewLoading(false);
-    }
+    await mutation.execute(
+      () =>
+        updateWorkshopIncident(modal.state.reviewIncident!.id, {
+          rejectEditRequest: true,
+          decisionReason,
+        }),
+      {
+        key: WORKSHOP_MUTATION_KEYS.REJECT_EDIT,
+        successMessage: SUCCESS.REJECT_EDIT,
+        errorPresentation: 'local',
+        toErrorMessage: translateApiError,
+        onSuccess: (updated) => {
+          upsertIncident(updated);
+          void refreshMetrics();
+          modal.closeReview();
+        },
+        onError: (_error, safeMessage) => modal.setReviewError(safeMessage),
+      }
+    );
   }
 
   async function handleApproveDeleteRequest() {
-    if (!modal.state.reviewIncident || reviewActionRef.current) return;
-    reviewActionRef.current = true;
-    modal.setReviewLoading(true);
+    if (!modal.state.reviewIncident) return;
     modal.setReviewError('');
-    try {
-      // Approbation d'une demande précise : expectArbitration=true.
-      await applyCancelation(modal.state.reviewIncident.id, true);
-      modal.closeReview();
-      feedback.notifySuccess(SUCCESS.APPROVE_DELETE);
-    } catch (_err) {
-      modal.setReviewError(translateApiError(_err));
-    } finally {
-      reviewActionRef.current = false;
-      modal.setReviewLoading(false);
-    }
+    await mutation.execute(() => applyCancelation(modal.state.reviewIncident!.id, true), {
+      key: WORKSHOP_MUTATION_KEYS.APPROVE_CANCEL,
+      successMessage: SUCCESS.APPROVE_DELETE,
+      errorPresentation: 'local',
+      toErrorMessage: translateApiError,
+      onSuccess: () => modal.closeReview(),
+      onError: (_error, safeMessage) => modal.setReviewError(safeMessage),
+    });
   }
 
   async function handleRejectDeleteRequest(decisionReason: string) {
-    if (!modal.state.reviewIncident || reviewActionRef.current) return;
-    reviewActionRef.current = true;
-    modal.setReviewLoading(true);
+    if (!modal.state.reviewIncident) return;
     modal.setReviewError('');
-    try {
-      const updated = await updateWorkshopIncident(modal.state.reviewIncident.id, {
-        rejectDeleteRequest: true,
-        decisionReason,
-      });
-      upsertIncident(updated);
-      void refreshMetrics();
-      modal.closeReview();
-      feedback.notifySuccess(SUCCESS.REJECT_DELETE);
-    } catch (requestError) {
-      // Erreur traduite (details.field=decisionReason) ; modale ouverte, saisie
-      // du motif conservée.
-      modal.setReviewError(translateApiError(requestError));
-    } finally {
-      reviewActionRef.current = false;
-      modal.setReviewLoading(false);
-    }
-  }
-
-  // Retrait de sa propre demande d'annulation par le demandeur (tant qu'elle est
-  // en attente). Mutation simple : succès/erreur globaux + verrou anti-double.
-  async function handleWithdrawCancelRequest(incident: WorkshopIncident) {
-    await runSimple(
-      async () => {
-        const updated = await updateWorkshopIncident(incident.id, {
-          withdrawCancelRequest: true,
-        });
-        upsertIncident(updated);
-        void refreshMetrics();
-      },
+    await mutation.execute(
+      () =>
+        updateWorkshopIncident(modal.state.reviewIncident!.id, {
+          rejectDeleteRequest: true,
+          decisionReason,
+        }),
       {
-        successMessage: SUCCESS.WITHDRAW_CANCEL,
-        errorFallback: "Impossible de retirer la demande d'annulation.",
-        closeOnSuccess: false,
+        key: WORKSHOP_MUTATION_KEYS.REJECT_CANCEL,
+        successMessage: SUCCESS.REJECT_DELETE,
+        errorPresentation: 'local',
+        toErrorMessage: translateApiError,
+        onSuccess: (updated) => {
+          upsertIncident(updated);
+          void refreshMetrics();
+          modal.closeReview();
+        },
+        onError: (_error, safeMessage) => modal.setReviewError(safeMessage),
       }
     );
   }
 
   async function handleSetPending(reason: string) {
     if (!selectedIncident) return;
-    await runSimple(
-      async () => {
-        await patchIncident(selectedIncident.id, {
+    await mutation.execute(
+      () =>
+        patchIncident(selectedIncident.id, {
           status: 'PENDING',
           waitingReason: reason.trim(),
-        });
-      },
+        }),
       {
+        key: WORKSHOP_MUTATION_KEYS.SET_PENDING,
         successMessage: SUCCESS.SET_PENDING,
-        errorFallback: 'Impossible de mettre l’incident en attente.',
+        toErrorMessage: (error) =>
+          apiErrorMessage(error, 'Impossible de mettre l’incident en attente.'),
+        onSuccess: () => modal.closeModal(),
       }
     );
   }
 
   async function handleResumeIncident() {
     if (!selectedIncident) return;
-    await runSimple(
-      async () => {
-        await patchIncident(selectedIncident.id, { status: 'OPEN' });
-      },
-      { successMessage: SUCCESS.RESUME, errorFallback: 'Impossible de reprendre le traitement.' }
-    );
+    await mutation.execute(() => patchIncident(selectedIncident.id, { status: 'OPEN' }), {
+      key: WORKSHOP_MUTATION_KEYS.RESUME,
+      successMessage: SUCCESS.RESUME,
+      toErrorMessage: (error) => apiErrorMessage(error, 'Impossible de reprendre le traitement.'),
+      onSuccess: () => modal.closeModal(),
+    });
   }
 
   async function handleCloseIncident(note: string) {
     if (!selectedIncident) return;
-    await runSimple(
-      async () => {
-        await patchIncident(selectedIncident.id, {
+    await mutation.execute(
+      () =>
+        patchIncident(selectedIncident.id, {
           status: 'CLOSED',
           interventionNote: note.trim(),
-        });
-      },
-      { successMessage: SUCCESS.CLOSE, errorFallback: 'Impossible de clôturer l’incident.' }
+        }),
+      {
+        key: WORKSHOP_MUTATION_KEYS.CLOSE,
+        successMessage: SUCCESS.CLOSE,
+        toErrorMessage: (error) => apiErrorMessage(error, 'Impossible de clôturer l’incident.'),
+        onSuccess: () => modal.closeModal(),
+      }
     );
   }
 
   async function handleInvalidateIncident(reason: string) {
     if (!selectedIncident) return;
-    await runSimple(
-      async () => {
-        await patchIncident(selectedIncident.id, {
+    await mutation.execute(
+      () =>
+        patchIncident(selectedIncident.id, {
           status: 'INVALIDATED',
           invalidationReason: reason.trim(),
-        });
-      },
-      { successMessage: SUCCESS.INVALIDATE, errorFallback: 'Impossible d’invalider l’incident.' }
+        }),
+      {
+        key: WORKSHOP_MUTATION_KEYS.INVALIDATE,
+        successMessage: SUCCESS.INVALIDATE,
+        toErrorMessage: (error) => apiErrorMessage(error, 'Impossible d’invalider l’incident.'),
+        onSuccess: () => modal.closeModal(),
+      }
     );
   }
 
   async function handleToggleUrgent(incident: WorkshopIncident) {
-    await runSimple(
-      async () => {
-        const updated = await updateWorkshopIncident(incident.id, {
+    await mutation.execute(
+      () =>
+        updateWorkshopIncident(incident.id, {
           isPriority: !incident.is_priority,
-        });
-        upsertIncident(updated);
-      },
+        }),
       {
+        key: WORKSHOP_MUTATION_KEYS.PRIORITY,
         successMessage: incident.is_priority ? SUCCESS.URGENT_OFF : SUCCESS.URGENT_ON,
-        errorFallback: 'Impossible de modifier l’urgence.',
-        closeOnSuccess: false,
+        toErrorMessage: (error) => apiErrorMessage(error, 'Impossible de modifier l’urgence.'),
+        onSuccess: upsertIncident,
       }
     );
   }
@@ -343,47 +299,32 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
       modal.setUnfollowConfirm(incident);
       return;
     }
-    await runSimple(
-      async () => {
-        const updated = incident.is_followed
-          ? await unfollowWorkshopIncident(incident.id)
-          : await followWorkshopIncident(incident.id);
-        upsertIncident(updated);
-        modal.setUnfollowConfirm(null);
-        void refreshMetrics();
-      },
+    await mutation.execute(
+      () =>
+        incident.is_followed
+          ? unfollowWorkshopIncident(incident.id)
+          : followWorkshopIncident(incident.id),
       {
+        key: WORKSHOP_MUTATION_KEYS.FOLLOW,
         successMessage: incident.is_followed ? SUCCESS.FOLLOW_OFF : SUCCESS.FOLLOW_ON,
-        errorFallback: 'Impossible de modifier le suivi.',
-        closeOnSuccess: false,
+        toErrorMessage: (error) => apiErrorMessage(error, 'Impossible de modifier le suivi.'),
+        onSuccess: (updated) => {
+          upsertIncident(updated);
+          modal.setUnfollowConfirm(null);
+          void refreshMetrics();
+        },
       }
     );
   }
 
-  async function handleMaintenanceDeleteConfirm(mode: 'direct' | 'approve') {
-    if (reviewActionRef.current) return;
-    reviewActionRef.current = true;
-    modal.setReviewLoading(true);
-    modal.setReviewError('');
-    try {
-      if (mode === 'approve' && modal.state.reviewIncident) {
-        // Approbation d'une demande précise.
-        await applyCancelation(modal.state.reviewIncident.id, true);
-        modal.closeReview();
-        feedback.notifySuccess(SUCCESS.APPROVE_DELETE);
-        return;
-      }
-      if (mode === 'direct' && selectedIncident) {
-        await applyCancelation(selectedIncident.id, false);
-        modal.closeModal();
-        feedback.notifySuccess(SUCCESS.APPROVE_DELETE);
-      }
-    } catch (err) {
-      modal.setReviewError(translateApiError(err));
-    } finally {
-      reviewActionRef.current = false;
-      modal.setReviewLoading(false);
-    }
+  async function handleMaintenanceDeleteConfirm() {
+    if (!selectedIncident) return;
+    await mutation.execute(() => applyCancelation(selectedIncident.id, false), {
+      key: WORKSHOP_MUTATION_KEYS.DIRECT_CANCEL,
+      successMessage: SUCCESS.APPROVE_DELETE,
+      toErrorMessage: translateApiError,
+      onSuccess: () => modal.closeModal(),
+    });
   }
 
   return {
@@ -394,7 +335,6 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
     handleRejectEditRequest,
     handleApproveDeleteRequest,
     handleRejectDeleteRequest,
-    handleWithdrawCancelRequest,
     handleSetPending,
     handleResumeIncident,
     handleCloseIncident,

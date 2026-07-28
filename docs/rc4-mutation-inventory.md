@@ -1,12 +1,12 @@
-# RC4 — Inventaire initial des mutations frontend
+# RC4 — Inventaire des mutations frontend
 
 ## Portée et méthode
 
-Cet inventaire est le constat initial du lot 0. Il a été produit par balayage des
+Cet inventaire a été créé au lot 0 puis actualisé au lot 4. Il a été produit par balayage des
 imports de `frontend/src/api/*`, de tous leurs appels dans le code frontend de
 production, des soumissions de formulaires, des écritures de stockage navigateur
-et des tests existants. La colonne **Tests** constate la présence statique d'une
-preuve ; elle ne signifie pas que le test a été exécuté pendant ce balayage.
+et des tests existants. Pour les lignes Atelier passées à `COVERED`, la colonne
+**Tests** désigne des preuves effectivement exécutées au lot 4.
 
 Ne sont pas des mutations métier et ne reçoivent donc pas de ligne :
 
@@ -21,8 +21,10 @@ Ne sont pas des mutations métier et ne reçoivent donc pas de ligne :
   `sessionStorage` un identifiant d'écran Board au chargement et n'est ni une
   action explicite de l'utilisateur ni une mutation métier.
 
-Les états initiaux employés sont :
+Les états employés sont :
 
+- `COVERED` : le contrat cinq états, l'anti-double, le feedback accessible et la
+  récupération attendue sont branchés sur l'infrastructure partagée et prouvés ;
 - `PARTIAL` : une partie substantielle du contrat cinq états existe, mais une
   preuve ciblée ou un élément du contrat manque ;
 - `GAP` : une exigence observable est absente ou contredite par le comportement
@@ -37,6 +39,9 @@ Abréviations des preuves existantes :
 - `UT-IDP` : `frontend/src/components/__tests__/IncidentDetailPanel.test.tsx` ;
 - `UT-RIR` : `frontend/src/components/__tests__/ReviewIncidentRequestModal.test.tsx` ;
 - `UT-CM` : `frontend/src/components/__tests__/ConfirmModal.test.tsx` ;
+- `UT-MF` : `frontend/src/components/ui/__tests__/MutationFeedback.test.tsx` ;
+- `UT-ARCH` : `frontend/src/components/__tests__/WorkshopMutationArchitecture.test.ts` ;
+- `UT-TEXT` : `frontend/src/components/__tests__/WorkshopTextMutationContract.test.tsx` ;
 - `UT-CU` : `frontend/src/components/__tests__/CreateUserModal.test.tsx` ;
 - `UT-DU` : `frontend/src/components/__tests__/DeleteConfirmModal.test.tsx` ;
 - `UT-EM` : `frontend/src/components/__tests__/EditMachineModal.test.tsx` ;
@@ -44,6 +49,7 @@ Abréviations des preuves existantes :
 - `E2E-LIFE` : `frontend/e2e/incident-lifecycle.spec.ts` ;
 - `E2E-CANCEL` : `frontend/e2e/workshop-cancel-withdrawal.spec.ts` ;
 - `E2E-ARB` : `frontend/e2e/workshop-arbitration-mobile.spec.ts` ;
+- `E2E-MUT` : `frontend/e2e/workshop-mutation-feedback.spec.ts` ;
 - `E2E-USERS` : `frontend/e2e/admin-users.spec.ts` ;
 - `E2E-MACHINE` : `frontend/e2e/edit-machine.spec.ts` ;
 - `E2E-BOARD` : `frontend/e2e/board.spec.ts` ;
@@ -53,30 +59,30 @@ Abréviations des preuves existantes :
 
 | Surface | Déclencheur | API/service | Destructive ? | Confirmation | Pending | Succès | Échec | Focus/récupération | Tests | État |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Atelier | Créer un incident — `CreateIncidentModal`, « Valider la création » | `createWorkshopIncident` — `POST /api/workshop/incidents` | Non | Aperçu puis bouton final explicite | `loading`, commandes désactivées, spinner et modale `aria-busy` ; pas de verrou `ref` | `Incident signalé.` dans le feedback global, puis fermeture sur `onSuccess` | Erreur traduite locale, modale et saisies conservées | `Modal` restaure le déclencheur à la fermeture ; restauration non testée sur ce flux | `UT-CI` succès/erreur ; `E2E-LIFE` succès | `PARTIAL` |
-| Atelier | Modifier directement un incident — `IncidentDetailPanel` → `CreateIncidentModal`, « Valider la modification » | `updateWorkshopIncident` — `PATCH /api/workshop/incidents/:id` | Non | Aperçu avant envoi | Même gestion que la création | `Modification appliquée.` puis fermeture après succès | Erreur traduite, valeurs conservées | Retour au déclencheur fourni par `Modal`, sans preuve ciblée | `UT-CI` ne couvre que le rendu du mode édition ; aucun test de mutation ciblé | `PARTIAL` |
-| Atelier | Proposer une correction — même modale avec `requestOnly=true` | `updateWorkshopIncident` — `PATCH /api/workshop/incidents/:id` | Non | Aperçu avant envoi | Même gestion que la création | **Libellé erroné** : annonce `Modification appliquée.` alors que seule une demande est créée | Erreur traduite, modale et valeurs conservées | Retour au déclencheur via `Modal`, non testé | Aucun test `requestOnly` ciblé | `GAP` |
-| Atelier | Retirer une demande de correction — `IncidentDetailPanel`, « Retirer ma demande » | `updateWorkshopIncident({ withdrawEditRequest: true })` | Non | Aucune, retrait réversible avant décision | `runPanelAction`, verrou `pendingActionRef`, bouton désactivé ; pas d'`aria-busy` | Aucun message de succès | Erreur traduite dans le panneau, bouton réactivé | Le bouton reste dans le panneau ; aucun recentrage explicite | Aucun test ciblé | `GAP` |
-| Atelier | Prendre en charge — `TakeChargeConfirmModal` | `updateWorkshopIncident({ isTaken: true })` | Non | Modale « Confirmer la prise en charge » | `ConfirmModal` et `runSimple` bloquent le double envoi ; modale `aria-busy` | `Prise en charge enregistrée.`, fermeture seulement après succès | Alerte globale persistante et modale maintenue | La modale conserve le contexte ; retour au déclencheur à la fermeture | `UT-IA` succès, erreur sûre et modale maintenue ; `UT-CM` socle anti-double ; `E2E-LIFE` succès | `PARTIAL` |
-| Atelier | Mettre en attente — `PendingConfirmModal`, « Suspendre » | `updateWorkshopIncident({ status: "PENDING", waitingReason })` | Non | Modale avec motif obligatoire | `TextConfirmModal` + verrou `submittingRef`, commandes désactivées et `aria-busy` | `Incident mis en attente.`, fermeture après succès | Alerte globale persistante ; motif et modale conservés | Retour au déclencheur via `Modal`, non testé | `E2E-LIFE` succès uniquement | `PARTIAL` |
-| Atelier | Reprendre — `ResumeIncidentConfirmModal` | `updateWorkshopIncident({ status: "OPEN" })` | Non | Modale « Confirmer la reprise » | `ConfirmModal`, commandes désactivées et `aria-busy` | `Traitement repris.`, fermeture après succès | Alerte globale persistante, modale maintenue | Retour au déclencheur via `Modal`, non testé | `E2E-LIFE` succès uniquement ; `UT-CM` socle | `PARTIAL` |
-| Atelier | Clôturer — `CloseIncidentModal` | `updateWorkshopIncident({ status: "CLOSED", interventionNote })` | Oui, état final | Modale dédiée, compte rendu obligatoire, bouton « Clôturer » | `TextConfirmModal`, verrou, désactivation et `aria-busy` | `Incident clôturé et conservé dans l’historique.`, fermeture après succès | Alerte globale persistante ; compte rendu conservé | Retour au déclencheur via `Modal`, non testé | `E2E-LIFE` succès uniquement | `PARTIAL` |
-| Atelier | Invalider — `InvalidateIncidentModal` | `updateWorkshopIncident({ status: "INVALIDATED", invalidationReason })` | Oui | Modale danger et bouton « Confirmer l’invalidation » | `TextConfirmModal`, verrou, désactivation et `aria-busy` | `Incident invalidé et conservé dans l’historique.`, fermeture après succès | Alerte globale persistante ; motif conservé | Retour au déclencheur via `Modal`, non testé | Aucun test ciblé | `PARTIAL` |
-| Atelier | Déclarer l'urgence — `IncidentDetailPanel`, « Déclarer urgent » | `updateWorkshopIncident({ isPriority: true })` | Non | Aucune requise | `runPanelAction` + `runSimple`, verrous `ref`, commandes du panneau désactivées ; pas d'`aria-busy` | `Incident déclaré urgent.` dans le feedback global | Alerte globale persistante, bouton réactivé | Focus reste sur l'action tant que le DOM la conserve | Aucun test ciblé | `PARTIAL` |
-| Atelier | Retirer l'urgence — `IncidentDetailPanel`, « Retirer l'urgence » | `updateWorkshopIncident({ isPriority: false })` | Non | Aucune requise | Même gestion que la déclaration | `Urgence retirée.` | Alerte globale persistante, bouton réactivé | Focus reste sur l'action tant que le DOM la conserve | Aucun test ciblé | `PARTIAL` |
-| Atelier | Suivre un incident — carte ou panneau | `followWorkshopIncident` — `POST /api/workshop/incidents/:id/follow` | Non | Aucune requise | Verrous `runPanelAction`/`runSimple` depuis le panneau ; le chemin carte dépend seulement du verrou `runSimple` | `Suivi activé.` | Alerte globale persistante | Focus conservé si le déclencheur reste monté | `IncidentCard.test.tsx` ne teste que le callback du déclencheur, pas la mutation | `PARTIAL` |
-| Atelier | Ne plus suivre un incident actif — carte ou panneau | `unfollowWorkshopIncident` — `DELETE /api/workshop/incidents/:id/follow` | Non | Aucune pour un incident actif | Verrou `runSimple`, et `runPanelAction` dans le panneau | `Suivi désactivé.` | Alerte globale persistante, action réutilisable | Focus conservé si le déclencheur reste monté | Aucun test de mutation ciblé | `PARTIAL` |
-| Atelier | Ne plus suivre un incident résolu — `UnfollowIncidentConfirmModal` | Même `DELETE /follow` | Non, mais perte d'un repère personnel | Confirmation dédiée | `ConfirmModal` + verrou `runSimple`, modale `aria-busy` | `Suivi désactivé.`, confirmation fermée seulement après succès | Alerte persistante, confirmation maintenue | Retour au déclencheur par `Modal` | `UT-CM` socle uniquement | `PARTIAL` |
-| Atelier | Ajouter ou modifier une consigne — éditeur de `IncidentDetailPanel` | `updateWorkshopIncident({ responsibleComment })` | Non | Aucune requise | `runPanelAction`, verrou `pendingActionRef`, commandes désactivées | `Consigne enregistrée.` | Erreur traduite dans le panneau, texte conservé, réessai possible | Le champ reste dans le panneau ; aucun focus d'erreur explicite | Aucun test ciblé | `PARTIAL` |
-| Atelier | Retirer une consigne — `DeleteResponsibleCommentConfirmModal` | `updateWorkshopIncident({ responsibleComment: "" })` | Oui, retrait de contenu | Confirmation danger dédiée | `ConfirmModal`, verrou interne et `aria-busy` | Aucun message de succès ; seule la disparition du contenu matérialise le résultat | Erreur sûre du `ConfirmModal`, modale maintenue | Retour au déclencheur à la fermeture | Aucun test ciblé | `GAP` |
-| Atelier | Demander une annulation — `DeleteRequestModal` | `updateWorkshopIncident({ cancelRequest: true, cancelRequestReason })` | Non, demande soumise à arbitrage | Modale danger avec motif obligatoire | `TextConfirmModal` + verrou `runSimple`, désactivation et `aria-busy` | `Demande d’annulation envoyée.`, fermeture après succès | Alerte globale persistante ; motif conservé | Retour au déclencheur via `Modal`, non testé | Aucun test ciblé de demande | `PARTIAL` |
-| Atelier | Retirer une demande d'annulation — `IncidentDetailPanel`, « Retirer ma demande » | `updateWorkshopIncident({ withdrawCancelRequest: true })` | Non | Aucune requise | `runPanelAction`, verrou, bouton désactivé, un seul appel | `Demande d’annulation retirée.` | Erreur traduite, bouton réactivé | Action reste utilisable dans le dossier | `UT-IDP` succès, anti-double, conflit et récupération ; `E2E-CANCEL` succès multi-rôles | `PARTIAL` |
-| Atelier | Accuser la consultation d'un arbitrage — `ReviewIncidentRequestModal`, « Consulter… » | `consultWorkshopArbitration` — `POST /api/workshop/incidents/:id/arbitration-consultation` | Non | Aucune | État `reviewLoading`, commandes désactivées et modale `aria-busy` | Aucun message ; fermeture après mise à jour du compteur et de l'incident | Erreur locale, modale maintenue | Réessai possible ; saisie sans objet | `UT-RIR` vérifie l'offre de consultation, pas l'appel ; aucun E2E de l'accusé | `EXCEPTION_TO_REVIEW` |
-| Atelier | Appliquer une correction — arbitrage responsable | `updateWorkshopIncident({ applyEditRequest: true })` | Oui, décision définitive sur la demande | La modale d'arbitrage et « Appliquer la correction » constituent la décision | `reviewActionRef`, état `reviewLoading`, commandes désactivées, `aria-busy` | `Modification appliquée.`, fermeture après succès | Erreur sûre locale, modale maintenue | Réessai possible ; retour au dossier à la fermeture | `UT-IA` erreur sûre et maintien ; `E2E-ARB` succès | `PARTIAL` |
-| Atelier | Refuser une correction — formulaire de motif d'arbitrage | `updateWorkshopIncident({ rejectEditRequest: true, decisionReason })` | Oui, décision définitive | Choix « Refuser », motif obligatoire, puis « Confirmer le refus » | `reviewActionRef`, `reviewLoading`, commandes désactivées | `Demande de modification refusée.`, fermeture après succès | Erreur traduite, modale et motif conservés | Focus placé dans le motif à son apparition ; réessai possible | `UT-RIR` validation, normalisation et conservation du motif ; pas de test API ciblé | `PARTIAL` |
-| Atelier | Confirmer une demande d'annulation — arbitrage responsable | `cancelWorkshopIncident({ expectArbitration: true })` — `POST /cancel` | Oui | Bouton final « Confirmer l'annulation » dans la modale d'arbitrage | `reviewActionRef`, `reviewLoading`, commandes désactivées | `Incident annulé et conservé dans l’historique.`, fermeture après succès | Erreur traduite, modale maintenue | Réessai possible ; retour au dossier à la fermeture | `UT-RIR` libellé final seulement ; aucun test API/échec ciblé | `PARTIAL` |
-| Atelier | Refuser une demande d'annulation — formulaire de motif | `updateWorkshopIncident({ rejectDeleteRequest: true, decisionReason })` | Oui, décision définitive | Motif obligatoire puis « Confirmer le refus » | `reviewActionRef`, `reviewLoading`, commandes désactivées | `Demande d’annulation refusée.`, fermeture après succès | Erreur traduite, motif et modale conservés | Focus initial sur le motif, réessai possible | `UT-RIR` validation du motif ; pas de test API ciblé | `PARTIAL` |
-| Atelier | Annuler directement côté maintenance/responsable — `MaintenanceDeleteConfirmModal` | `cancelWorkshopIncident({ expectArbitration: false })` — `POST /cancel` | Oui ; remplace l'ancienne suppression physique si elle existait | Modale danger, conséquence expliquée, bouton « Confirmer l’annulation » | `reviewActionRef` + `ConfirmModal`, commandes désactivées et `aria-busy` | `Incident annulé et conservé dans l’historique.`, fermeture après succès | Erreur traduite, modale maintenue | Réessai possible ; retour au déclencheur | `UT-IA` anti-double ciblé ; pas de test erreur ou E2E ciblé | `PARTIAL` |
+| Atelier | Créer un incident — `CreateIncidentModal`, « Valider la création » | `createWorkshopIncident` — `POST /api/workshop/incidents` | Non | Aperçu puis bouton final explicite | Clé partagée, commandes désactivées et `aria-busy` ; double activation = un appel | `Incident signalé.` | Erreur publique sûre ; modale et saisies byte-identiques | Réessai possible ; focus d'erreur puis restauration du déclencheur à la fermeture | `UT-CI`, `UT-MF`, `E2E-LIFE`, `E2E-MUT` | `COVERED` |
+| Atelier | Modifier directement un incident — `IncidentDetailPanel` → `CreateIncidentModal` | `updateWorkshopIncident` — `PATCH /api/workshop/incidents/:id` | Non | Aperçu avant envoi | Même runner partagé et verrou global | `Modification appliquée.` | Modale et valeurs conservées | Réessai et retour au déclencheur | `UT-CI`, `UT-ARCH` | `COVERED` |
+| Atelier | Proposer une correction — même modale avec `requestOnly=true` | Même `PATCH` | Non | Aperçu avant envoi | Même runner partagé et verrou global | `Demande de correction envoyée.` | Modale et valeurs conservées | Réessai et focus d'erreur | `UT-CI`, `E2E-MUT` | `COVERED` |
+| Atelier | Retirer une demande de correction — panneau | `updateWorkshopIncident({ withdrawEditRequest: true })` | Non | Aucune, retrait réversible | Clé partagée, action désactivée, un appel | `Demande de correction retirée.` | Erreur sûre, panneau maintenu | Action refocalisée et réutilisable | `UT-IDP`, `E2E-MUT` | `COVERED` |
+| Atelier | Prendre en charge — `TakeChargeConfirmModal` | `updateWorkshopIncident({ isTaken: true })` | Non | Confirmation explicite | Runner partagé, `aria-busy`, un appel | `Prise en charge enregistrée.` | Confirmation maintenue | Réessai ; restauration du déclencheur | `UT-IA`, `UT-CM`, `E2E-LIFE` | `COVERED` |
+| Atelier | Mettre en attente — `PendingConfirmModal` | `updateWorkshopIncident({ status: "PENDING", waitingReason })` | Non | Motif obligatoire | Runner partagé, commandes désactivées, `aria-busy` | `Incident mis en attente.` | Erreur sûre, motif byte-identique | Focus restauré au motif, réessai réel | `UT-TEXT`, `UT-IA`, `E2E-LIFE` | `COVERED` |
+| Atelier | Reprendre — `ResumeIncidentConfirmModal` | `updateWorkshopIncident({ status: "OPEN" })` | Non | Confirmation explicite | Runner partagé, `aria-busy`, un appel | `Traitement repris.` | Confirmation maintenue | Réessai ; restauration du déclencheur | `UT-IA`, `UT-CM`, `E2E-LIFE` | `COVERED` |
+| Atelier | Clôturer — `CloseIncidentModal` | `updateWorkshopIncident({ status: "CLOSED", interventionNote })` | Oui, état final | Conséquence définitive et historique explicités, compte rendu obligatoire | Runner partagé, `aria-busy`, un appel | `Incident clôturé et conservé dans l’historique.` | Compte rendu byte-identique, modale maintenue | Focus au champ ; annulation et succès restaurent le déclencheur | `UT-TEXT`, `UT-CM`, `E2E-LIFE` | `COVERED` |
+| Atelier | Invalider — `InvalidateIncidentModal` | `updateWorkshopIncident({ status: "INVALIDATED", invalidationReason })` | Oui | Conséquence définitive et historique explicités | Runner partagé, `aria-busy`, un appel | `Incident invalidé et conservé dans l’historique.` | Motif byte-identique, modale maintenue | Focus au champ ; restauration du déclencheur | `UT-TEXT`, `UT-CM` | `COVERED` |
+| Atelier | Déclarer l'urgence | `updateWorkshopIncident({ isPriority: true })` | Non | Aucune requise | Clé partagée, action désactivée, un appel | `Incident déclaré urgent.` | Erreur sûre, action réutilisable | Focus conservé/restauré | `UT-IA`, `UT-IDP`, `E2E-MUT` | `COVERED` |
+| Atelier | Retirer l'urgence | `updateWorkshopIncident({ isPriority: false })` | Non | Aucune requise | Même contrat partagé | `Urgence retirée.` | Erreur sûre, action réutilisable | Focus conservé/restauré | `UT-IA`, `UT-IDP` | `COVERED` |
+| Atelier | Suivre un incident — carte ou panneau | `followWorkshopIncident` — `POST /follow` | Non | Aucune requise | Clé partagée entre carte et panneau, un appel | `Suivi activé.` | Erreur sûre, aucun état optimiste mensonger | Focus conservé/restauré | `UT-IA`, `UT-IDP`, `E2E-MUT` | `COVERED` |
+| Atelier | Ne plus suivre un incident actif — carte ou panneau | `unfollowWorkshopIncident` — `DELETE /follow` | Non | Aucune requise | Même contrat partagé | `Suivi désactivé.` | Erreur sûre, action réutilisable | Focus conservé/restauré | `UT-IA`, `UT-IDP` | `COVERED` |
+| Atelier | Ne plus suivre un incident résolu — `UnfollowIncidentConfirmModal` | Même `DELETE /follow` | Non | Confirmation dédiée | Runner partagé, `aria-busy`, un appel | `Suivi désactivé.` | Confirmation maintenue | Réessai et restauration du déclencheur | `UT-IA`, `UT-CM` | `COVERED` |
+| Atelier | Ajouter ou modifier une consigne — panneau | `updateWorkshopIncident({ responsibleComment })` | Non | Aucune requise | Runner partagé, commandes désactivées | `Consigne enregistrée.` | Texte byte-identique, panneau maintenu | Focus au champ et réessai | `UT-IDP`, `E2E-MUT` | `COVERED` |
+| Atelier | Retirer une consigne — confirmation dédiée | `updateWorkshopIncident({ responsibleComment: "" })` | Oui, retrait de contenu | Conséquence explicite | Runner partagé, `aria-busy`, un appel | `Consigne retirée.` | Confirmation maintenue | Réessai ; restauration du déclencheur | `UT-IA`, `UT-CM`, `E2E-MUT` | `COVERED` |
+| Atelier | Demander une annulation — `DeleteRequestModal` | `updateWorkshopIncident({ cancelRequest: true, cancelRequestReason })` | Non | Motif obligatoire | Runner partagé, `aria-busy`, un appel | `Demande d’annulation envoyée.` | Motif byte-identique, modale maintenue | Focus au motif et réessai | `UT-TEXT`, `UT-IA`, `E2E-MUT` | `COVERED` |
+| Atelier | Retirer une demande d'annulation — panneau | `updateWorkshopIncident({ withdrawCancelRequest: true })` | Non | Aucune, retrait réversible | Clé partagée, action désactivée, un appel | `Demande d’annulation retirée.` | Erreur sûre, dossier maintenu | Action réutilisable et refocalisée | `UT-IDP`, `E2E-CANCEL`, `E2E-MUT` | `COVERED` |
+| Atelier | Accuser la consultation d'un arbitrage | `consultWorkshopArbitration` — `POST /arbitration-consultation` | Non | Aucune requise | Runner partagé, modale `aria-busy`, un appel | `Dossier d’arbitrage consulté.` | Erreur locale sûre, modale maintenue | Réessai possible | `UT-RIR`, `UT-ARCH`, `E2E-ARB` | `COVERED` |
+| Atelier | Appliquer une correction — arbitrage responsable | `updateWorkshopIncident({ applyEditRequest: true })` | Oui, décision définitive | Décision explicite dans la modale | Runner partagé, commandes désactivées, `aria-busy` | `Modification appliquée.` | Erreur sûre, modale maintenue | Réessai ; restauration au dossier | `UT-IA`, `UT-RIR`, `E2E-ARB` | `COVERED` |
+| Atelier | Refuser une correction — formulaire de motif | `updateWorkshopIncident({ rejectEditRequest: true, decisionReason })` | Oui, décision définitive | Motif obligatoire et libellé final | Runner partagé, commandes désactivées, un appel | `Demande de modification refusée.` | Huit détails techniques filtrés ; motif byte-identique | Focus au motif et réessai réel | `UT-IA`, `UT-RIR`, `E2E-MUT` | `COVERED` |
+| Atelier | Confirmer une demande d'annulation | `cancelWorkshopIncident({ expectArbitration: true })` — `POST /cancel` | Oui | Conséquence définitive et historique explicités | Runner partagé, commandes désactivées, un appel | `Incident annulé et conservé dans l’historique.` | Erreur sûre, modale maintenue | Réessai ; restauration au dossier | `UT-IA`, `UT-RIR`, `E2E-MUT` | `COVERED` |
+| Atelier | Refuser une demande d'annulation — formulaire de motif | `updateWorkshopIncident({ rejectDeleteRequest: true, decisionReason })` | Oui, décision définitive | Motif obligatoire et libellé final | Runner partagé, commandes désactivées, un appel | `Demande d’annulation refusée.` | Motif byte-identique, erreur sûre | Focus au motif et réessai | `UT-IA`, `UT-RIR` | `COVERED` |
+| Atelier | Annuler directement côté maintenance/responsable | `cancelWorkshopIncident({ expectArbitration: false })` — `POST /cancel` | Oui | Conséquence définitive et historique explicités | Runner partagé, `aria-busy`, un appel | `Incident annulé et conservé dans l’historique.` | Erreur sûre, confirmation maintenue | Réessai et restauration du déclencheur | `UT-IA`, `UT-CM` | `COVERED` |
 
 ## Administration
 
@@ -130,7 +136,7 @@ Abréviations des preuves existantes :
 | Support Admin | Envoyer un message — `AdminSupportPage` → `SupportChat` | `sendAdminSupportMessage` — `POST /api/admin/support/chat` | Non | Aucune requise | `loading`, compositeur désactivé, indicateur de réponse et garde anti-double ; pas d'`aria-busy` | Réponse ajoutée au journal `aria-live="polite"` | Erreur sûre persistante, mais **la saisie a déjà été vidée et n'est pas restaurée** | Textarea refocalisée, mais l'utilisateur doit ressaisir son message | `UT-SC` succès, anti-double, erreur sûre et abort ; aucun test spécifique à l'endpoint Admin | `GAP` |
 | Support Atelier | Envoyer un message — `WorkshopSupportPage` → `SupportChat` | `sendWorkshopSupportMessage` — `POST /api/workshop/support/chat` | Non | Aucune requise | Même gestion partagée | Même réponse dans le journal vivant | Même perte de saisie sur erreur | Même refocus sans restauration du texte | `UT-SC` sur le composant partagé ; aucun test spécifique à l'endpoint Atelier | `GAP` |
 
-## Synthèse initiale
+## Synthèse
 
 L'inventaire contient **61 mutations ou réactions mutantes** :
 
@@ -139,27 +145,40 @@ L'inventaire contient **61 mutations ou réactions mutantes** :
 - 11 lignes Authentification/Board ;
 - 2 lignes Support.
 
-Répartition initiale :
+Répartition initiale au lot 0 :
 
 - 34 `PARTIAL` ;
 - 16 `GAP` ;
 - 11 `EXCEPTION_TO_REVIEW`.
 
-Les lacunes transversales les plus structurantes sont :
+Après le lot 4, sans reclasser les surfaces réservées au lot 5 :
 
-1. `useMutationRunner` n'est importé par aucune surface de production ; les
-   mutations emploient encore plusieurs runners et verrous distincts ;
-2. aucun groupe de surface ne possède le test négatif commun complet de la
-   section 8.4 (métier, réseau, conservation, réessai, double clic, message
-   exact et restauration du focus) ;
-3. la proposition de correction annonce à tort qu'elle a été appliquée ;
-4. le retrait d'une correction, le retrait d'une consigne, les préférences de
-   notification, les bascules Board et le traitement d'une demande de reset
-   n'annoncent pas leur succès ;
-5. l'archivage de ligne reste bloqué en chargement sur erreur ;
-6. la révocation de sessions ferme sa modale avant le résultat ;
-7. la demande de réinitialisation Atelier affiche un faux succès même en cas
+- 24 `COVERED` — toutes les lignes Atelier ;
+- 14 `PARTIAL` ;
+- 13 `GAP` ;
+- 10 `EXCEPTION_TO_REVIEW`.
+
+Le contrat partagé est désormais consommé en production par les quatre points
+d'orchestration Atelier (`CreateIncidentModal`, `useIncidentActions`,
+`IncidentDetailPanel`, `WorkshopDashboardPage`) et observé par les confirmations
+communes. Il centralise le verrou anti-double synchrone, le pending par clé, les
+succès accessibles, les erreurs publiques sûres, le refocus et la protection des
+callbacks après démontage. Les états locaux `runSimple`, `runPanelAction`,
+`reviewActionRef`, `pendingActionRef` et `reviewLoading` ont disparu du périmètre
+Atelier. Le `submittingRef` restant dans la branche de compatibilité de
+`ConfirmModal` ne sert qu'aux consommateurs non-Atelier, réservés au lot 5.
+
+Les lacunes transversales restant à traiter sont :
+
+1. les mutations Administration, Authentification/Board et Support restent au
+   lot 5 et conservent leurs classements `PARTIAL`, `GAP` ou exception ;
+2. les préférences de notification, les bascules Board et le traitement d'une
+   demande de reset n'annoncent pas leur succès ;
+3. l'archivage de ligne reste bloqué en chargement sur erreur ;
+4. la révocation de sessions ferme sa modale avant le résultat ;
+5. la demande de réinitialisation Atelier affiche un faux succès même en cas
    d'échec ;
-8. le support efface la saisie avant l'appel et ne la restaure pas après échec ;
-9. les exceptions de navigation login/logout, d'accusé de consultation et de
-   stockage local Board restent à formaliser et à tester.
+6. le support efface la saisie avant l'appel et ne la restaure pas après échec ;
+7. les exceptions de navigation login/logout et de stockage local Board restent
+   à formaliser et à tester ;
+8. R4-09 reste ouvert pour les parcours navigateur hors matrice Atelier du lot 4.

@@ -1,6 +1,7 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface PendingConfirmModalProps {
   incident: WorkshopIncident;
@@ -25,6 +26,7 @@ export default function PendingConfirmModal({
       placeholder="Expliquez la raison de la mise en attente"
       confirmLabel="Suspendre"
       loadingLabel="Confirmation…"
+      mutationKey={WORKSHOP_MUTATION_KEYS.SET_PENDING}
       requiredMessage="Merci de renseigner le motif de mise en attente."
       failureMessage="Impossible de suspendre l'incident."
       textareaId="pendingReason"

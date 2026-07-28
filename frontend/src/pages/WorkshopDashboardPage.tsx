@@ -13,7 +13,8 @@ import ErrorBanner from '../components/ui/ErrorBanner';
 import SelectField from '../components/ui/SelectField';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import { isIncidentResolved } from '../components/IncidentBadges';
-import { consultWorkshopArbitration, updateWorkshopIncident } from '../api/workshop';
+import { consultWorkshopArbitration } from '../api/workshop';
+import { apiErrorMessage } from '../api/errorMessages';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { WorkshopIncident } from '../types';
 import { canPerform } from '../utils/workshopPermissions';
@@ -27,6 +28,8 @@ import { useIncidentsData } from '../hooks/useIncidentsData';
 import { useFollowedResolvedIncidents } from '../hooks/useFollowedResolvedIncidents';
 import { useModalState, ReviewType } from '../hooks/useModalState';
 import { useIncidentActions } from '../hooks/useIncidentActions';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 function isWithinLastDays(iso: string, days: number): boolean {
   const createdAt = new Date(iso).getTime();
@@ -112,6 +115,7 @@ export default function WorkshopDashboardPage() {
     loadMoreFollowedResolved,
   } = useFollowedResolvedIncidents(filters.scope === 'followed');
   const modal = useModalState();
+  const mutation = useMutationRunner();
   const { closeReview, openReview } = modal;
   const { activeModal, reviewIncident } = modal.state;
   const { filterChips, activeFilterCount, clearAllFilters } = useDashboardFilters({
@@ -307,9 +311,12 @@ export default function WorkshopDashboardPage() {
   });
 
   async function handleDeleteCommentConfirm(incident: WorkshopIncident) {
-    const updated = await updateWorkshopIncident(incident.id, { responsibleComment: '' });
-    upsertIncident(updated);
-    modal.setDeleteCommentConfirm(null);
+    await mutation.execute(() => actions.patchIncident(incident.id, { responsibleComment: '' }), {
+      key: WORKSHOP_MUTATION_KEYS.DELETE_RESPONSIBLE_COMMENT,
+      successMessage: 'Consigne retirée.',
+      toErrorMessage: (error) => apiErrorMessage(error, 'Impossible de retirer la consigne.'),
+      onSuccess: () => modal.setDeleteCommentConfirm(null),
+    });
   }
 
   // Position de l'incident ouvert dans la liste affichée (triée + filtrée) :
@@ -389,20 +396,28 @@ export default function WorkshopDashboardPage() {
 
   async function handleConsultArbitration(incident: WorkshopIncident | null) {
     if (!incident || !modal.state.reviewType) return;
-    modal.setReviewLoading(true);
     modal.setReviewError('');
-    try {
-      const requestType = modal.state.reviewType === 'edit' ? 'EDIT' : 'CANCEL';
-      const result = await consultWorkshopArbitration(incident.id, requestType);
-      upsertIncident(result.incident);
-      if (selectedIncident?.id === incident.id) setSelectedIncident(result.incident);
-      await refreshMetrics();
-      modal.closeReview();
-    } catch {
-      modal.setReviewError("Impossible de passer le dossier d'arbitrage en consultation.");
-    } finally {
-      modal.setReviewLoading(false);
-    }
+    const requestType = modal.state.reviewType === 'edit' ? 'EDIT' : 'CANCEL';
+    await mutation.execute(
+      async () => {
+        const result = await consultWorkshopArbitration(incident.id, requestType);
+        await refreshMetrics();
+        return result;
+      },
+      {
+        key: WORKSHOP_MUTATION_KEYS.CONSULT_ARBITRATION,
+        successMessage: 'Dossier d’arbitrage consulté.',
+        errorPresentation: 'local',
+        toErrorMessage: (error) =>
+          apiErrorMessage(error, "Impossible de passer le dossier d'arbitrage en consultation."),
+        onSuccess: (result) => {
+          upsertIncident(result.incident);
+          if (selectedIncident?.id === incident.id) setSelectedIncident(result.incident);
+          modal.closeReview();
+        },
+        onError: (_error, safeMessage) => modal.setReviewError(safeMessage),
+      }
+    );
   }
 
   const workbenchClassName = [
@@ -532,6 +547,7 @@ export default function WorkshopDashboardPage() {
                           isSelected={selectedIncident?.id === incident.id}
                           isResponsable={isResponsable}
                           isMaintenance={isMaintenance}
+                          mutationPending={mutation.pending}
                           onToggleFollow={actions.handleToggleFollow}
                           onOpenTrigger={(trigger) => {
                             incidentOpenTriggerRef.current = trigger;
@@ -617,15 +633,7 @@ export default function WorkshopDashboardPage() {
                   void refreshMetrics();
                 }}
                 onDeleteCommentConfirm={handleDeleteCommentConfirm}
-                patchIncident={async (id, payload) => {
-                  const updated = await updateWorkshopIncident(id, payload);
-                  setIncidents((prev) =>
-                    sortIncidents(prev.map((item) => (item.id === updated.id ? updated : item)))
-                  );
-                  setSelectedIncident(updated);
-                  void refreshMetrics();
-                  return updated;
-                }}
+                patchIncident={actions.patchIncident}
               />
             </aside>
           )}
@@ -659,7 +667,7 @@ export default function WorkshopDashboardPage() {
             incident={modal.state.reviewIncident}
             lines={lines}
             type={modal.state.reviewType}
-            loading={modal.state.reviewLoading}
+            loading={mutation.pending}
             error={modal.state.reviewError}
             onClose={modal.closeReview}
             onConsult={() => void handleConsultArbitration(modal.state.reviewIncident)}
@@ -679,7 +687,7 @@ export default function WorkshopDashboardPage() {
             }
             deleteWarning={
               canPerform(user?.role, 'approveCancel', modal.state.reviewIncident)
-                ? "L'annulation conserve l'incident dans l'historique avec sa trace de décision."
+                ? "L'annulation définitive conserve l'incident dans l'historique avec sa trace de décision."
                 : undefined
             }
             allowEditApply={canPerform(user?.role, 'approveEdit', modal.state.reviewIncident)}

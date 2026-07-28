@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Modal from './Modal';
 import CharCounter from './ui/CharCounter';
 import { ProductionLine, WorkshopIncident } from '../types';
@@ -146,6 +146,11 @@ export default function ReviewIncidentRequestModal({
   const [rejectReason, setRejectReason] = useState('');
   const rejectInputRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    if (!error || !rejectMode) return;
+    rejectInputRef.current?.focus();
+  }, [error, rejectMode]);
+
   function enterRejectMode() {
     setRejectMode(true);
     // Focus au champ dès son apparition.
@@ -221,7 +226,7 @@ export default function ReviewIncidentRequestModal({
       <div className="arbitration-footer">
         <div className="arbitration-footer-group">
           <button className="btn btn-secondary" onClick={report} disabled={loading}>
-            Reporter
+            Annuler
           </button>
           {onConsult && hasConsultableArbitration && (
             <button className="btn btn-outline" onClick={onConsult} disabled={loading}>
@@ -267,7 +272,7 @@ export default function ReviewIncidentRequestModal({
       <div className="arbitration-footer">
         <div className="arbitration-footer-group">
           <button className="btn btn-secondary" onClick={report} disabled={loading}>
-            Reporter
+            Annuler
           </button>
           {onConsult && hasConsultableArbitration && (
             <button className="btn btn-outline" onClick={onConsult} disabled={loading}>
@@ -371,6 +376,10 @@ export default function ReviewIncidentRequestModal({
                 <div className="arbitration-reason-card">
                   <span className="detail-field-label">Motif opérateur</span>
                   <p>{incident.cancel_request_reason || 'Non renseigné'}</p>
+                </div>
+                <div className="arbitration-system-note arbitration-system-note--danger">
+                  Cette annulation est définitive. L’incident sera conservé dans l’historique avec
+                  la trace de la décision.
                 </div>
                 {deleteWarning && <div className="arbitration-system-note">{deleteWarning}</div>}
                 {deleteApprovalDisabled && (
@@ -480,7 +489,11 @@ export default function ReviewIncidentRequestModal({
           </div>
         )}
 
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <div className="error-message" role="alert">
+            {error}
+          </div>
+        )}
       </div>
     </Modal>
   );

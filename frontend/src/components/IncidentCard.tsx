@@ -18,6 +18,7 @@ interface IncidentCardProps {
   isSelected?: boolean;
   isResponsable: boolean;
   isMaintenance: boolean;
+  mutationPending?: boolean;
   onClick: (incident: WorkshopIncident) => void;
   onOpenTrigger?: (trigger: HTMLAnchorElement) => void;
   onToggleFollow?: (incident: WorkshopIncident) => void;
@@ -30,6 +31,7 @@ export default function IncidentCard({
   isSelected = false,
   isResponsable,
   isMaintenance,
+  mutationPending = false,
   onClick,
   onOpenTrigger,
   onToggleFollow,
@@ -69,6 +71,7 @@ export default function IncidentCard({
       data-incident-card-id={incident.id}
       className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isResponsable && !isResolvedFollowed ? ' incident-card--has-follow-toggle' : ''}${isSelected ? ' is-selected' : ''}`}
       aria-current={isSelected || undefined}
+      aria-busy={mutationPending || undefined}
     >
       <a
         ref={openTriggerRef}
@@ -188,9 +191,16 @@ export default function IncidentCard({
         <button
           type="button"
           className={`incident-follow-toggle${incident.is_followed ? ' is-active' : ''}`}
-          aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
+          aria-label={
+            mutationPending
+              ? 'Modification du suivi…'
+              : incident.is_followed
+                ? 'Retirer du suivi'
+                : 'Suivre cet incident'
+          }
           title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
           onClick={() => onToggleFollow?.(incident)}
+          disabled={mutationPending}
         >
           <StarIcon filled={Boolean(incident.is_followed)} />
         </button>
@@ -201,8 +211,9 @@ export default function IncidentCard({
           type="button"
           className="btn btn-secondary btn-sm incident-followed-resolved-remove"
           onClick={() => onToggleFollow?.(incident)}
+          disabled={mutationPending}
         >
-          Retirer du suivi
+          {mutationPending ? 'Retrait…' : 'Retirer du suivi'}
         </button>
       )}
 
@@ -213,6 +224,7 @@ export default function IncidentCard({
               type="button"
               className="incident-request-action incident-request-action--edit"
               onClick={(event) => onReviewEdit(event, incident)}
+              disabled={mutationPending}
             >
               {editArbitrationWaiting ? 'Correction en attente' : 'Modification à arbitrer'}
             </button>
@@ -222,6 +234,7 @@ export default function IncidentCard({
               type="button"
               className="incident-request-action incident-request-action--delete"
               onClick={(event) => onReviewDelete(event, incident)}
+              disabled={mutationPending}
             >
               {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation à arbitrer'}
             </button>

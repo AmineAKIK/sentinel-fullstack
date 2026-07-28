@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MutationFeedbackProvider } from '../../components/ui/MutationFeedback';
 import { useIncidentActions } from '../useIncidentActions';
@@ -13,7 +13,12 @@ vi.mock('../../api/workshop', () => ({
   unfollowWorkshopIncident: vi.fn(),
 }));
 
-import { updateWorkshopIncident, cancelWorkshopIncident } from '../../api/workshop';
+import {
+  updateWorkshopIncident,
+  cancelWorkshopIncident,
+  followWorkshopIncident,
+  unfollowWorkshopIncident,
+} from '../../api/workshop';
 import { ApiResponseError } from '../../api/client';
 
 // Erreur API dont le message BRUT contient un nom technique + du snake_case :
@@ -46,7 +51,6 @@ function makeModal(): ModalStateApi {
     },
     closeModal: vi.fn(),
     closeReview: vi.fn(),
-    setReviewLoading: vi.fn(),
     setReviewError: vi.fn(),
     setUnfollowConfirm: vi.fn(),
   } as unknown as ModalStateApi;
@@ -69,6 +73,74 @@ function Harness({ modal }: { modal: ModalStateApi }) {
     <button type="button" onClick={() => void actions.handleConfirmTakeCharge()}>
       Prendre en charge
     </button>
+  );
+}
+
+function MutationMatrixHarness({
+  modal,
+  selectedIncident = baseIncident,
+}: {
+  modal: ModalStateApi;
+  selectedIncident?: WorkshopIncident;
+}) {
+  const actions = useIncidentActions({
+    selectedIncident,
+    clearSelectedIncident: vi.fn(),
+    upsertIncident: vi.fn(),
+    setIncidents: vi.fn(),
+    refreshMetrics: () => Promise.resolve(),
+    modal,
+    isMaintenance: false,
+    userRole: 'RESPONSABLE',
+  });
+  return (
+    <>
+      <button type="button" onClick={() => void actions.handleSetPending('Attente composant')}>
+        Mettre en attente
+      </button>
+      <button type="button" onClick={() => void actions.handleResumeIncident()}>
+        Reprendre
+      </button>
+      <button
+        type="button"
+        onClick={() => void actions.handleCloseIncident('Intervention terminée')}
+      >
+        Clôturer
+      </button>
+      <button
+        type="button"
+        onClick={() => void actions.handleInvalidateIncident('Doublon confirmé')}
+      >
+        Invalider
+      </button>
+      <button type="button" onClick={() => void actions.handleRequestDelete('Erreur de saisie')}>
+        Demander annulation
+      </button>
+      <button type="button" onClick={() => void actions.handleToggleUrgent(selectedIncident)}>
+        Basculer urgence
+      </button>
+      <button type="button" onClick={() => void actions.handleToggleFollow(selectedIncident)}>
+        Basculer suivi
+      </button>
+      <button type="button" onClick={() => void actions.handleApplyEditRequest()}>
+        Appliquer correction
+      </button>
+      <button
+        type="button"
+        onClick={() => void actions.handleRejectEditRequest('Mesures incohérentes')}
+      >
+        Refuser correction
+      </button>
+      <button type="button" onClick={() => void actions.handleApproveDeleteRequest()}>
+        Approuver annulation
+      </button>
+      <button
+        type="button"
+        onClick={() => void actions.handleRejectDeleteRequest('Incident confirmé')}
+      >
+        Refuser annulation
+      </button>
+    </>
   );
 }
 
@@ -115,6 +187,135 @@ describe('useIncidentActions — retour d’action global (lot 1 RC3)', () => {
     expect(modal.closeModal).not.toHaveBeenCalled();
   });
 
+  it('branche positivement les mutations de cycle, demandes et arbitrages sur le runner commun', async () => {
+    const updated = { ...baseIncident, updated_at: '2026-07-28T12:00:00.000Z' };
+    vi.mocked(updateWorkshopIncident).mockResolvedValue(updated);
+    vi.mocked(followWorkshopIncident).mockResolvedValue({
+      ...updated,
+      is_followed: true,
+    });
+    vi.mocked(cancelWorkshopIncident).mockResolvedValue(undefined);
+    const modal = makeModal();
+    (modal.state as { reviewIncident: WorkshopIncident | null }).reviewIncident = baseIncident;
+    render(
+      <MutationFeedbackProvider>
+        <MutationMatrixHarness modal={modal} />
+      </MutationFeedbackProvider>
+    );
+
+    async function run(label: string, success: string): Promise<void> {
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(success));
+    }
+
+    await run('Mettre en attente', 'Incident mis en attente.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, {
+      status: 'PENDING',
+      waitingReason: 'Attente composant',
+    });
+
+    await run('Reprendre', 'Traitement repris.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, { status: 'OPEN' });
+
+    await run('Clôturer', 'Incident clôturé et conservé dans l’historique.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, {
+      status: 'CLOSED',
+      interventionNote: 'Intervention terminée',
+    });
+
+    await run('Invalider', 'Incident invalidé et conservé dans l’historique.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, {
+      status: 'INVALIDATED',
+      invalidationReason: 'Doublon confirmé',
+    });
+
+    await run('Demander annulation', 'Demande d’annulation envoyée.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, {
+      cancelRequest: true,
+      cancelRequestReason: 'Erreur de saisie',
+    });
+
+    await run('Basculer urgence', 'Incident déclaré urgent.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, { isPriority: true });
+
+    await run('Basculer suivi', 'Suivi activé.');
+    expect(followWorkshopIncident).toHaveBeenCalledWith(42);
+
+    await run('Appliquer correction', 'Modification appliquée.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, { applyEditRequest: true });
+
+    await run('Refuser correction', 'Demande de modification refusée.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, {
+      rejectEditRequest: true,
+      decisionReason: 'Mesures incohérentes',
+    });
+
+    await run('Approuver annulation', 'Incident annulé et conservé dans l’historique.');
+    expect(cancelWorkshopIncident).toHaveBeenCalledWith(42, { expectArbitration: true });
+
+    await run('Refuser annulation', 'Demande d’annulation refusée.');
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, {
+      rejectDeleteRequest: true,
+      decisionReason: 'Incident confirmé',
+    });
+  });
+
+  it('branche les retraits urgence/suivi actif et le retrait confirmé d’un suivi résolu', async () => {
+    const activeFollowed = {
+      ...baseIncident,
+      is_priority: true,
+      is_followed: true,
+    };
+    vi.mocked(updateWorkshopIncident).mockResolvedValue({
+      ...activeFollowed,
+      is_priority: false,
+    });
+    vi.mocked(unfollowWorkshopIncident).mockResolvedValue({
+      ...activeFollowed,
+      is_followed: false,
+    });
+    const activeModal = makeModal();
+    render(
+      <MutationFeedbackProvider>
+        <MutationMatrixHarness modal={activeModal} selectedIncident={activeFollowed} />
+      </MutationFeedbackProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Basculer urgence' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Urgence retirée.'));
+    expect(updateWorkshopIncident).toHaveBeenCalledWith(42, { isPriority: false });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Basculer suivi' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Suivi désactivé.'));
+    expect(unfollowWorkshopIncident).toHaveBeenCalledWith(42);
+
+    cleanup();
+    vi.clearAllMocks();
+    const resolvedFollowed = {
+      ...baseIncident,
+      status: 'CLOSED',
+      is_followed: true,
+    } as WorkshopIncident;
+    const resolvedModal = makeModal();
+    (
+      resolvedModal.state as { unfollowConfirmIncident: WorkshopIncident | null }
+    ).unfollowConfirmIncident = resolvedFollowed;
+    vi.mocked(unfollowWorkshopIncident).mockResolvedValue({
+      ...resolvedFollowed,
+      is_followed: false,
+    });
+    render(
+      <MutationFeedbackProvider>
+        <MutationMatrixHarness modal={resolvedModal} selectedIncident={resolvedFollowed} />
+      </MutationFeedbackProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Basculer suivi' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Suivi désactivé.'));
+    expect(unfollowWorkshopIncident).toHaveBeenCalledTimes(1);
+    expect(resolvedModal.setUnfollowConfirm).toHaveBeenCalledWith(null);
+  });
+
   it('n’envoie pas deux annulations si on clique deux fois vite', async () => {
     let resolve!: (v: unknown) => void;
     const pending = new Promise((r) => {
@@ -136,7 +337,7 @@ describe('useIncidentActions — retour d’action global (lot 1 RC3)', () => {
         userRole: 'MAINTENANCE',
       });
       return (
-        <button type="button" onClick={() => void actions.handleMaintenanceDeleteConfirm('direct')}>
+        <button type="button" onClick={() => void actions.handleMaintenanceDeleteConfirm()}>
           Confirmer l’annulation
         </button>
       );
@@ -154,9 +355,15 @@ describe('useIncidentActions — retour d’action global (lot 1 RC3)', () => {
       resolve({});
       await Promise.resolve();
     });
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Incident annulé et conservé dans l’historique.'
+      )
+    );
+    expect(modal.closeModal).toHaveBeenCalledTimes(1);
   });
 
-  it('NÉGATIF runSimple() : l’alerte n’affiche jamais le message technique brut ni le snake_case', async () => {
+  it('NÉGATIF runner partagé : l’alerte n’affiche jamais le message technique brut ni le snake_case', async () => {
     (updateWorkshopIncident as ReturnType<typeof vi.fn>).mockRejectedValue(technicalApiError());
     const modal = makeModal();
     render(

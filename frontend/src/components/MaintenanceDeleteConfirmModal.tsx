@@ -1,5 +1,6 @@
 import ConfirmModal from './ConfirmModal';
 import { WorkshopIncident } from '../types';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface MaintenanceDeleteConfirmModalProps {
   incident: WorkshopIncident;
@@ -23,6 +24,7 @@ export default function MaintenanceDeleteConfirmModal({
   return (
     <ConfirmModal
       title={title}
+      mutationKey={WORKSHOP_MUTATION_KEYS.DIRECT_CANCEL}
       onClose={onClose}
       onConfirm={onConfirm}
       confirmLabel="Confirmer l’annulation"
@@ -33,6 +35,7 @@ export default function MaintenanceDeleteConfirmModal({
       failureMessage="Impossible d’annuler l’incident."
     >
       <div className="notice">
+        <strong>Cette annulation est définitive.</strong>{' '}
         {message ||
           'Cette action annule l’incident et le conserve dans l’historique. Confirmez uniquement s’il s’agit d’une erreur ou d’un doublon.'}
       </div>

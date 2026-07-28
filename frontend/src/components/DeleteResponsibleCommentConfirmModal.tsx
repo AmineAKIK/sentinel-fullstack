@@ -1,5 +1,6 @@
 import ConfirmModal from './ConfirmModal';
 import { WorkshopIncident } from '../types';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface DeleteResponsibleCommentConfirmModalProps {
   incident: WorkshopIncident;
@@ -15,6 +16,7 @@ export default function DeleteResponsibleCommentConfirmModal({
   return (
     <ConfirmModal
       title="Retirer la consigne"
+      mutationKey={WORKSHOP_MUTATION_KEYS.DELETE_RESPONSIBLE_COMMENT}
       onClose={onClose}
       onConfirm={onConfirm}
       confirmLabel="Retirer"
