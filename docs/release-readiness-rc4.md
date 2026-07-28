@@ -152,8 +152,8 @@ pas de `Cache-Control` dans le contrat actuel.
 
 | ID | Sévérité | Contrat source | Défaut prouvé sur RC3 | Commande du test rouge | Raison exacte de l'échec | Fichiers concernés | Correction minimale | Tests ciblés | Preuve verte | Risques | État |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **R4-01** | **P0** | Plan RC4 §5.1–5.2, §14.1 | `IncidentCard` ouvre uniquement par le bouton contenant le titre. Le corps, les métadonnées, le pied, la consigne et le motif ne portent pas l'activation principale ; le focus n'est pas restauré exactement sur le déclencheur après fermeture. | `npm test -- src/components/__tests__/IncidentCard.test.tsx -t 'RC4 RED — ouvre le dossier quand la métadonnée produit est cliquée'` depuis `frontend/` ; sortie détaillée §6 | Code `1` : le clic réel sur la métadonnée produit laisse `onClick` à `0` appel au lieu de transmettre l'incident. | `frontend/src/components/IncidentCard.tsx` ; `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; styles de carte ; E2E Atelier concernés | Conserver l'`article`, ajouter un vrai lien/bouton sémantique étiré couvrant toute zone non interactive, placer les commandes indépendantes au-dessus, éviter toute imbrication interactive, rendre le focus visible et restaurer le déclencheur exact. | Composant : titre, métadonnée, consigne, motif, pied, zone blanche, `Entrée`, `Espace`, focus retour, absence d'imbrication ; étoile et Arbitrer n'ouvrent pas. E2E : vrai clic corps et clavier. | `PENDING_EXECUTION[R4-01:GREEN_EVIDENCE]` | Imbrication interactive, propagation étoile/arbitrage, doublon lecteur d'écran, ordre d'empilement, restauration sur la mauvaise carte. | `RED_PROVEN` |
-| **R4-02** | **P0** | Plan RC4 §0, §5.2, §13 | Le test nommé comme un clic sur la carte exécute `getByRole('button', { name: /ouvrir incident/i })` ; le test clavier simule également un clic. Les E2E ciblent `.incident-card-open`. Ces tests donnent une preuve positive d'une autre interaction. | Même commande rouge que R4-01 sur la métadonnée réelle ; après retrait de la sonde, la suite historique `IncidentCard` est restée verte dans le contrôle ciblé `50/50` | La nouvelle interaction réelle échoue avec `0` ouverture alors que les tests historiques de substitution restent verts : leurs assertions portent donc sur un autre déclencheur. | `frontend/src/components/__tests__/IncidentCard.test.tsx` ; E2E Atelier et cycle de vie qui ciblent `.incident-card-open` | Remplacer les interactions de substitution par des sélecteurs sémantiques et des clics/événements clavier sur la vraie zone annoncée, sans affaiblir les assertions. | Test négatif démontrant l'écart ancien ; tests corps/titre distincts ; E2E sur métadonnée ou coordonnée blanche ; assertions zéro ouverture depuis les commandes indépendantes. | `PENDING_EXECUTION[R4-02:GREEN_EVIDENCE]` | Faux vert conservé par un nom trompeur, sélecteur CSS trop permissif, clic E2E intercepté ou forcé. | `RED_PROVEN` |
+| **R4-01** | **P0** | Plan RC4 §5.1–5.2, §14.1 | `IncidentCard` ouvrait uniquement par le bouton contenant le titre. Le corps, les métadonnées, le pied, la consigne et le motif ne portaient pas l'activation principale ; le focus n'était pas restauré exactement sur le déclencheur après fermeture. | Tests permanents exécutés ensemble par `npm test -- src/components/__tests__/IncidentCard.test.tsx src/pages/__tests__/WorkshopDashboardPage.test.tsx`, puis rouge Chromium sur la métadonnée réelle ; sorties détaillées §6 | Code `1`, `10 failed / 25 passed` : métadonnée, consigne, motif et pied laissent chacun `onClick` à `0`, les ouvertures page depuis le corps échouent, le lien sémantique est absent et l'arbitrage ouvre indûment le dossier. E2E : dossier introuvable après clic souris au centre de la métadonnée. | `frontend/src/components/IncidentCard.tsx` ; `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/pages/__tests__/WorkshopDashboardPage.test.tsx` ; `frontend/src/styles/pages/workshop.css` ; E2E Atelier concernés | `article` conservé sans rôle artificiel ; lien réel avec `href` contenant tout le contenu non interactif et pseudo-élément étiré sur les blancs ; boutons indépendants frères au-dessus ; activation Espace directe sans clic synthétique ; déclencheur exact mémorisé puis refocalisé après croix ou Échap ; arbitrage direct sans sélectionner le dossier. | Composant/page : titre, métadonnée, consigne, motif, pied, `Entrée`, `Espace`, structure DOM, étoile/arbitrages sans ouverture, focus exact croix/Échap. Chromium : clic coordonné sur métadonnée, focus visible atteint par Tab et commandes indépendantes sans drawer. | Ciblés `35/35` ; frontend `476/476` ; Chromium carte `3/3` ; parcours E2E migrés `4/4` ; lint, format et build verts ; détails §6. | Risques d'imbrication, propagation, zone morte, doublon sémantique et mauvais retour de focus couverts par tests, E2E réel et revue du diff. | `VERIFIED` |
+| **R4-02** | **P0** | Plan RC4 §0, §5.2, §13 | L'ancien test nommé comme un clic sur la carte exécutait en réalité le bouton du titre ; son test clavier simulait aussi un clic, et les E2E historiques ciblaient seulement `.incident-card-open`. | Même exécution permanente rouge que R4-01 : quatre nœuds hors titre réellement cliqués, plus le scénario Chromium utilisant la géométrie de `.incident-card-meta` | Les quatre tests hors titre reçoivent `0` ouverture sur RC3 tandis que le test historique du titre reste passant ; le rouge navigateur ne trouve aucun dossier après le vrai hit-test de métadonnée. | `frontend/src/components/__tests__/IncidentCard.test.tsx` ; `frontend/src/pages/__tests__/WorkshopDashboardPage.test.tsx` ; `frontend/e2e/incident-card-activation.spec.ts` ; E2E cycle de vie, arbitrage mobile et retrait d'annulation | Ancien test renommé comme clic du titre ; tests séparés pour chaque zone réelle ; `user.keyboard` pour Entrée/Espace sans `fireEvent.click` ; E2E dédié sans `.incident-card-open`, utilisant `boundingBox()` puis `page.mouse.click()` au centre du produit ; anciens parcours migrés vers le rôle du lien. | Tests permanents distincts et assertions zéro dossier depuis les commandes indépendantes ; E2E réel métadonnée, focus, étoile et arbitrage. | Mêmes preuves vertes R4-01 : `35/35`, `476/476`, Chromium `3/3` et parcours migrés `4/4`. | Faux vert, sélecteur de substitution et clic forcé éliminés ; aucune tolérance ou `force: true`. | `VERIFIED` |
 | **R4-03** | **P0** | Plan RC4 §6.1–6.3, §14.1 | Chaîne dynamique encore active : `useIncidentDrawerPosition` → `detailOffsetTop` → `--incident-detail-offset-top` → `margin-top`, avec recentrage `window.scrollBy`. Sticky, hauteur bornée et scroll interne n'annulent pas ce couplage. | Deux commandes Vitest exactes sur `WorkshopDashboardPage.test.tsx`, l'une sur le recentrage et l'autre sur la variable inline ; voir §6 | Codes `1` : l'ouverture de la carte basse appelle `scrollBy({ behavior: 'smooth', top: 432 })` et pose `--incident-detail-offset-top: 740px` au lieu de supprimer ces deux couplages. | `frontend/src/hooks/useIncidentDrawerPosition.ts` ; `frontend/src/pages/WorkshopDashboardPage.tsx` ; `frontend/src/components/IncidentDetailPanel.tsx` ; `frontend/src/styles/pages/workshop.css` ; tests page/panneau ; E2E Atelier | Supprimer hook, import, état/prop `detailOffsetTop`, variable CSS et marge dynamique ; sticky à `top` stable, hauteur viewport, en-tête visible, corps scrollable, `overscroll-behavior: contain`, `scrollbar-gutter: stable`, aucun recentrage artificiel. | Unité/composant sur suppression du couplage ; navigateur `1440×900` carte haut/milieu/bas, longue liste, panneau haut, molette bas/haut, scroll page ; mobile `390×844`, zoom 200 %, clavier et focus retour ; rectangles dans viewport. | `PENDING_EXECUTION[R4-03:GREEN_EVIDENCE]` | Containing block cassant `sticky`, double scroll mobile, clavier virtuel, panneau inaccessible en bas de liste, test de géométrie simulé ou flake. | `RED_PROVEN` |
 | **R4-04** | **P1** | Plan RC4 §7.1–7.3, §14.2 | `waiting_reason` n'est ni projeté par la requête Board, ni présent dans le type public, ni rendu. Aucun test Board ne vérifie motif courant, disparition après reprise et conservation historique. | `npm test -- src/components/__tests__/BoardIncidentGrid.test.tsx -t 'RC4 RED — affiche le motif courant pour un incident en attente'` depuis `frontend/` ; sortie détaillée §6 | Code `1` : le DOM contient le statut `PENDING`/« En attente », mais aucun texte `Motif de mise en attente : Attente pièce détachée`. | `backend/src/modules/workshop/workshop.repository.ts` et types/projection Board ; tests repository/intégration ; `frontend/src/types/workshop.ts` ; `frontend/src/components/board/BoardIncidentGrid.tsx` ; `BoardIncidentGrid.test.tsx` ; `frontend/e2e/board.spec.ts` et cycle de vie | Ajouter uniquement `waiting_reason` à la projection et au type public Board ; rendre le libellé si `status === PENDING` et motif non vide, valeur complète accessible ; ne projeter aucune donnée privée supplémentaire. | Rouge frontend Board ; PostgreSQL réel sur projection minimale et valeur nulle/absente hors `PENDING` ; E2E attente → Atelier/panneau/Board visibles → reprise → disparition des trois surfaces → historique conservé. | `PENDING_EXECUTION[R4-04:GREEN_EVIDENCE]` | Fuite de diagnostic ou identité privée, motif périmé après reprise, troncature inaccessible, confusion état courant/historique. | `RED_PROVEN` |
 | **R4-05** | **P0** | Plan RC4 §8.1–8.2, §12 lots 4–5, §14.5 | `useMutationRunner` n'a aucun import de production et n'est consommé que par son propre test. Les mutations utilisent en parallèle `runSimple`, `runPanelAction`, refs et états locaux ; l'existence d'une abstraction isolée ne prouve aucune adoption. | Contrat shell exact de recherche des consommateurs de production, depuis `frontend/` ; voir §6 | Code `1` et message exact `FAIL R4-05: useMutationRunner a 0 consommateur dans le code de production.` | `frontend/src/components/ui/MutationFeedback.tsx` ; hooks/actions Atelier ; modales incident ; pages Administration/Auth/Board/Support ; `docs/rc4-mutation-inventory.md` comme périmètre exhaustif | Choisir un unique contrat partagé léger, prouver ses imports en production, brancher d'abord toutes les mutations Atelier puis toutes les autres surfaces, documenter seulement les exceptions sûres login/logout et accusé silencieux. | Tests contractuels communs prêt/confirmation/pending/succès/échec/récupération ; une requête sur double clic ; focus ; erreurs réseau/métier ; tests de chaque ligne de l'inventaire et E2E représentatifs par famille. | `PENDING_EXECUTION[R4-05:GREEN_EVIDENCE]` | Migration partielle créant doubles messages, verrouillage incohérent, perte de focus, abstraction trop large, lignes oubliées hors inventaire. | `RED_PROVEN` |
@@ -190,19 +190,108 @@ frontend passés ; `1` suite et `15` tests backend passés.
 Répertoire d'exécution : `frontend/`.
 
 ```bash
-npm test -- src/components/__tests__/IncidentCard.test.tsx -t 'RC4 RED — ouvre le dossier quand la métadonnée produit est cliquée'
+npm test -- src/components/__tests__/IncidentCard.test.tsx src/pages/__tests__/WorkshopDashboardPage.test.tsx
 ```
 
 - code de sortie : `1` ;
-- sortie utile : `1 failed`, `22 skipped` ;
-- assertion : `onClick` attendu avec l'incident, nombre d'appels reçu `0` ;
-- cause : le clic a visé la métadonnée produit, tandis que l'activation RC3 est
-  attachée uniquement au bouton du titre ;
-- portée R4-02 : une fois la sonde retirée, la suite historique est restée
-  verte dans le contrôle ciblé `50/50`, ce qui confirme qu'elle prouve une
-  interaction de substitution et non ce clic réel.
+- sortie utile : `2 failed` fichiers, `10 failed / 25 passed` tests ;
+- interactions rouges permanentes et causes exactes :
+  - clic sur `PRODUIT X45` dans la métadonnée : `onClick` reçu `0` fois ;
+  - clic sur `Sécuriser la zone avant intervention.` dans la consigne :
+    `onClick` reçu `0` fois ;
+  - clic sur `Motif de mise en attente : Attente pièce détachée` :
+    `onClick` reçu `0` fois ;
+  - clic sur `Créé par Jean Dupont · Opérateur` dans le pied :
+    `onClick` reçu `0` fois ;
+  - absence du rôle `link` attendu pour l'activateur ;
+  - les deux ouvertures page depuis les métadonnées ne créent aucun drawer ;
+  - les deux scénarios de fermeture ne peuvent donc pas restaurer le focus ;
+  - le bouton `Modification à arbitrer` ouvre la modale mais sélectionne aussi
+    le dossier, contrairement à son indépendance contractuelle.
 
-Vert : `PENDING_EXECUTION[R4-01:R4-02_GREEN_AFTER_LOT1]`.
+Le test historique trompeur a été renommé
+`ouvre le dossier quand le titre visible est cliqué`. Les deux tests clavier
+permanents utilisent `user.tab()` puis `user.keyboard('{Enter}')` ou
+`user.keyboard('[Space]')` ; aucun clic synthétique ne remplace la touche.
+
+Rouge navigateur réel, depuis la racine du dépôt avec Node `24.18.0` dans le
+`PATH` :
+
+```bash
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- e2e/incident-card-activation.spec.ts --grep 'ouvre le dossier depuis la métadonnée produit de la carte'
+```
+
+- code de sortie : `1` ;
+- sortie utile : `1 failed` sous Chromium ;
+- interaction : calcul de la `boundingBox()` du texte `E2E-CORRECTION` situé
+  dans `.incident-card-meta`, puis `page.mouse.click()` en son centre ;
+- assertion : le drawer
+  `Détail de l'incident ligne 999, machine E2E-MCH-1` reste introuvable après
+  `5 000 ms` ;
+- nettoyage : aucun conteneur ni volume PostgreSQL résiduel.
+
+#### Vert ciblé du lot 1
+
+```bash
+npm test -- src/components/__tests__/IncidentCard.test.tsx src/pages/__tests__/WorkshopDashboardPage.test.tsx
+```
+
+- code `0` ;
+- `2` fichiers passés, `35/35` tests passés ;
+- les mêmes nœuds hors titre ouvrent maintenant ; le titre reste couvert ;
+- Entrée et Espace activent le lien réel ;
+- l'`article` reste sans `role`/`tabIndex`, l'unique lien possède un vrai
+  `href`, et aucun `a`/`button` n'en contient un autre ;
+- étoile, modification et annulation appellent uniquement leur commande ;
+- l'arbitrage ouvre sa modale avec zéro drawer ;
+- fermeture par croix et par Échap : le même `HTMLAnchorElement` déclencheur
+  retrouve exactement le focus.
+
+Suite frontend complète :
+
+```bash
+npm test
+```
+
+- code `0` ;
+- `54` fichiers passés, `476/476` tests passés.
+
+Preuve Chromium dédiée :
+
+```bash
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- e2e/incident-card-activation.spec.ts
+```
+
+- code `0`, `3/3` tests passés ;
+- clic souris réel au centre de la métadonnée : drawer, produit et paramètre
+  `incident` visibles ;
+- navigation Tab réelle jusqu'au lien : `toBeFocused()` puis
+  `outlineStyle != none` et `outlineWidth > 0` ;
+- clics réels sur l'étoile puis sur `Modification à arbitrer` : zéro drawer,
+  aucun paramètre `incident`, modale d'arbitrage visible ;
+- aucun `force: true`, aucune activation par `.incident-card-open` dans ce
+  scénario, aucun conteneur ou volume résiduel.
+
+Parcours E2E historiques dont l'activateur a été migré vers le rôle `link` :
+
+```bash
+DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- e2e/incident-lifecycle.spec.ts e2e/workshop-arbitration-mobile.spec.ts e2e/workshop-cancel-withdrawal.spec.ts
+```
+
+- code `0`, `4/4` tests passés ;
+- cycle de vie, arbitrage mobile et retrait d'annulation restent verts ;
+- aucun conteneur ni volume résiduel.
+
+Contrôles statiques :
+
+```bash
+npm run lint
+npm run format:check
+npm run build
+```
+
+Les trois commandes ont retourné le code `0`. R4-01 et R4-02 passent à
+`VERIFIED`. R4-09 reste ouvert pour ses autres scénarios du lot 8.
 
 ### R4-03 — recentrage et décalage dynamique
 

@@ -572,19 +572,47 @@ button.workshop-metric:hover,
 
 .incident-card-open {
   display: block;
-  background: none;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  background: transparent;
   border: none;
   padding: 0;
   margin: 0;
   text-align: left;
   cursor: pointer;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: inherit;
+}
+
+.incident-card-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
 }
 
 .incident-card-open:hover h2,
 .incident-card-open:focus-visible h2 {
   text-decoration: underline;
   color: var(--color-primary);
+}
+
+.incident-follow-toggle,
+.incident-request-action {
+  position: relative;
+  z-index: 2;
+}
+
+.incident-card > .incident-follow-toggle {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+}
+
+.incident-card--has-follow-toggle .incident-card-main {
+  padding-right: 38px;
 }
 
 /* Liseré gauche = niveau d'attention (doctrine §5.1, P1). L'urgent émerge par
@@ -620,11 +648,11 @@ button.workshop-metric:hover,
 
 .incident-followed-resolved-banner {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 10px;
   margin: -4px 0 16px;
-  padding: 10px 12px;
+  padding: 10px 150px 10px 12px;
   border: 1px solid var(--color-nav-muted);
   border-radius: var(--radius);
   background-color: var(--color-surface-alt);
@@ -639,6 +667,13 @@ button.workshop-metric:hover,
 
 .incident-followed-resolved-banner span {
   color: var(--color-text-secondary);
+}
+
+.incident-followed-resolved-remove {
+  position: absolute;
+  top: 20px;
+  right: 28px;
+  z-index: 2;
 }
 
 .incident-card-main {
@@ -1520,6 +1555,11 @@ button.workshop-metric:hover,
   margin-bottom: var(--space-3);
 }
 
+.incident-card-actions--interactive {
+  margin-top: var(--space-3);
+  margin-bottom: 0;
+}
+
 .incident-request-action {
   display: inline-flex;
   align-items: center;
@@ -1613,6 +1653,18 @@ button.workshop-metric:hover,
 
   .incident-card-main {
     flex-direction: column;
+  }
+
+  .incident-followed-resolved-banner {
+    grid-template-columns: 1fr;
+    padding-right: 12px;
+  }
+
+  .incident-followed-resolved-remove {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin-top: var(--space-3);
   }
 
   .incident-card-controls {

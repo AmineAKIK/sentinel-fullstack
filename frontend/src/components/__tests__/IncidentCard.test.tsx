@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import IncidentCard from '../IncidentCard';
 import { WorkshopIncident } from '../../types';
 
@@ -227,28 +228,98 @@ describe('IncidentCard – rendu', () => {
 });
 
 describe('IncidentCard – interactions', () => {
-  it('appelle onClick quand on clique sur la carte', () => {
+  it('ouvre le dossier quand le titre visible est cliqué', async () => {
+    const user = userEvent.setup();
     const onClick = vi.fn();
     const incident = mockIncident();
     render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
-    fireEvent.click(screen.getByRole('button', { name: /ouvrir incident/i }));
+
+    await user.click(screen.getByRole('heading', { name: 'Ligne L01 · M01' }));
+
     expect(onClick).toHaveBeenCalledWith(incident);
   });
 
-  it('est un vrai bouton natif, activable au clavier sans gestionnaire keyDown manuel (A11Y-01)', () => {
+  it('ouvre le dossier quand la métadonnée produit est cliquée hors du titre', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const incident = mockIncident({ current_product: 'PRODUIT X45' });
+    render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
+
+    await user.click(screen.getByText('PRODUIT X45'));
+
+    expect(onClick).toHaveBeenCalledWith(incident);
+  });
+
+  it('ouvre le dossier quand la consigne est cliquée hors du titre', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const incident = mockIncident({
+      responsible_comment: 'Sécuriser la zone avant intervention.',
+    });
+    render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
+
+    await user.click(screen.getByText('Sécuriser la zone avant intervention.'));
+
+    expect(onClick).toHaveBeenCalledWith(incident);
+  });
+
+  it('ouvre le dossier quand le motif de mise en attente est cliqué hors du titre', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const incident = mockIncident({
+      status: 'PENDING',
+      waiting_reason: 'Attente pièce détachée',
+    });
+    render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
+
+    await user.click(
+      screen.getByText('Motif de mise en attente : Attente pièce détachée', { exact: true })
+    );
+
+    expect(onClick).toHaveBeenCalledWith(incident);
+  });
+
+  it('ouvre le dossier quand le pied de carte est cliqué hors du titre', async () => {
+    const user = userEvent.setup();
     const onClick = vi.fn();
     const incident = mockIncident();
     render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
-    const openButton = screen.getByRole('button', { name: /ouvrir incident/i });
-    // Un <button> HTML natif active onClick sur Entrée/Espace via le
-    // navigateur lui-même — testé ici en simulant directement l'activation
-    // native (jsdom ne traduit pas keyDown en click pour un vrai <button>).
-    expect(openButton.tagName).toBe('BUTTON');
-    fireEvent.click(openButton);
+
+    await user.click(screen.getByText('Créé par Jean Dupont · Opérateur', { exact: true }));
+
     expect(onClick).toHaveBeenCalledWith(incident);
   });
 
-  it('appelle onReviewEdit sans propager le click au parent', () => {
+  it('active réellement l’ouverture avec la touche Entrée', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const incident = mockIncident();
+    render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
+
+    const openActivator = screen.getByLabelText(/ouvrir incident ligne L01, machine M01/i);
+    await user.tab();
+    expect(openActivator).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(onClick).toHaveBeenCalledWith(incident);
+  });
+
+  it('active réellement l’ouverture avec la touche Espace', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const incident = mockIncident();
+    render(<IncidentCard incident={incident} {...defaultProps} onClick={onClick} />);
+
+    const openActivator = screen.getByLabelText(/ouvrir incident ligne L01, machine M01/i);
+    await user.tab();
+    expect(openActivator).toHaveFocus();
+    await user.keyboard('[Space]');
+
+    expect(onClick).toHaveBeenCalledWith(incident);
+  });
+
+  it('appelle onReviewEdit sans ouvrir le dossier', async () => {
+    const user = userEvent.setup();
     const onReviewEdit = vi.fn();
     const onClick = vi.fn();
     const incident = mockIncident({ edit_request: { state: 'ARRET' } });
@@ -261,12 +332,36 @@ describe('IncidentCard – interactions', () => {
         isResponsable
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Modification à arbitrer' }));
+
+    await user.click(screen.getByRole('button', { name: 'Modification à arbitrer' }));
+
     expect(onReviewEdit).toHaveBeenCalledTimes(1);
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it('appelle onToggleFollow sans propager le click au parent', () => {
+  it('appelle onReviewDelete sans ouvrir le dossier', async () => {
+    const user = userEvent.setup();
+    const onReviewDelete = vi.fn();
+    const onClick = vi.fn();
+    const incident = mockIncident({ cancel_request: true });
+    render(
+      <IncidentCard
+        incident={incident}
+        {...defaultProps}
+        onClick={onClick}
+        onReviewDelete={onReviewDelete}
+        isResponsable
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Annulation à arbitrer' }));
+
+    expect(onReviewDelete).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('appelle onToggleFollow sans ouvrir le dossier', async () => {
+    const user = userEvent.setup();
     const onToggleFollow = vi.fn();
     const onClick = vi.fn();
     const incident = mockIncident();
@@ -280,25 +375,43 @@ describe('IncidentCard – interactions', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suivre cet incident' }));
+    await user.click(screen.getByRole('button', { name: 'Suivre cet incident' }));
 
     expect(onToggleFollow).toHaveBeenCalledWith(incident);
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it("n'imbrique jamais un bouton dans un autre bouton (A11Y-01)", () => {
+  it("conserve l'article et un lien d'ouverture unique sans interaction imbriquée", () => {
     const incident = mockIncident({
       is_followed: true,
-      status: 'CLOSED',
       edit_request: { state: 'ARRET' },
       cancel_request: true,
     });
-    render(<IncidentCard incident={incident} {...defaultProps} isResponsable />);
+    const { container } = render(
+      <IncidentCard incident={incident} {...defaultProps} isResponsable />
+    );
 
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBeGreaterThan(1);
-    for (const button of buttons) {
-      expect(button.querySelector('button')).toBeNull();
+    const article = container.querySelector('article[data-incident-card-id="1"]');
+    expect(article).not.toBeNull();
+    expect(article?.getAttribute('role')).toBeNull();
+    expect(article?.getAttribute('tabindex')).toBeNull();
+
+    const openLink = screen.getByRole('link', {
+      name: /ouvrir incident ligne L01, machine M01/i,
+    });
+    expect(openLink.tagName).toBe('A');
+    expect(openLink).toHaveAttribute('href', '/workshop/dashboard?incident=1');
+    expect(article?.querySelectorAll('a.incident-card-open')).toHaveLength(1);
+    expect(
+      article?.querySelector('a[href] a[href], a[href] button, button a[href], button button')
+    ).toBeNull();
+
+    for (const independentAction of [
+      screen.getByRole('button', { name: 'Retirer du suivi' }),
+      screen.getByRole('button', { name: 'Modification à arbitrer' }),
+      screen.getByRole('button', { name: 'Annulation à arbitrer' }),
+    ]) {
+      expect(openLink.contains(independentAction)).toBe(false);
     }
   });
 });

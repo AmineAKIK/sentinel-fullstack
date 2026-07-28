@@ -45,7 +45,7 @@ test('retrait d’une demande d’annulation : indicateur commun, action réserv
   await expect(operatorCard).toBeVisible();
   await expect(operatorCard.getByText('Annulation à arbitrer')).toBeVisible();
 
-  await operatorCard.locator('.incident-card-open').click();
+  await operatorCard.getByRole('link', { name: /Ouvrir incident/i }).click();
   const dossier = operatorPage.locator('.incident-detail-drawer');
   const withdrawButton = dossier.getByRole('button', { name: 'Retirer ma demande' });
   await expect(withdrawButton).toBeVisible();

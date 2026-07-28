@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { WorkshopIncident } from '../types';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { incidentAttentionLevel } from '../utils/attention';
@@ -18,6 +19,7 @@ interface IncidentCardProps {
   isResponsable: boolean;
   isMaintenance: boolean;
   onClick: (incident: WorkshopIncident) => void;
+  onOpenTrigger?: (trigger: HTMLAnchorElement) => void;
   onToggleFollow?: (incident: WorkshopIncident) => void;
   onReviewEdit: (event: React.MouseEvent, incident: WorkshopIncident) => void;
   onReviewDelete: (event: React.MouseEvent, incident: WorkshopIncident) => void;
@@ -29,10 +31,12 @@ export default function IncidentCard({
   isResponsable,
   isMaintenance,
   onClick,
+  onOpenTrigger,
   onToggleFollow,
   onReviewEdit,
   onReviewDelete,
 }: IncidentCardProps) {
+  const openTriggerRef = useRef<HTMLAnchorElement | null>(null);
   const isResolved = isIncidentResolved(incident);
   const isResolvedFollowed = incident.is_followed && isResolved;
   const isActiveUrgent = incident.is_priority && !isResolved;
@@ -43,158 +47,185 @@ export default function IncidentCard({
   // sorte que l'urgent émerge par contraste avec les autres, sans agression (P1).
   const attentionLevel = isResolvedFollowed ? 'calm' : incidentAttentionLevel(incident);
 
+  function openIncident() {
+    if (openTriggerRef.current) onOpenTrigger?.(openTriggerRef.current);
+    onClick(incident);
+  }
+
+  function handleOpenClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    openIncident();
+  }
+
+  function handleOpenKeyDown(event: React.KeyboardEvent<HTMLAnchorElement>) {
+    if (event.key === ' ') {
+      event.preventDefault();
+      openIncident();
+    }
+  }
+
   return (
     <article
       data-incident-card-id={incident.id}
-      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isSelected ? ' is-selected' : ''}`}
+      className={`incident-card incident-card--attention-${attentionLevel}${isResolvedFollowed ? ' incident-card--resolved-followed' : ''}${isResponsable && !isResolvedFollowed ? ' incident-card--has-follow-toggle' : ''}${isSelected ? ' is-selected' : ''}`}
       aria-current={isSelected || undefined}
     >
-      {isResolvedFollowed && (
-        <div className="incident-followed-resolved-banner">
-          <strong>{incident.status === 'CLOSED' ? 'Incident clôturé' : 'Incident annulé'}</strong>
-          <span>Conservé dans vos suivis</span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => onToggleFollow?.(incident)}
-          >
-            Retirer du suivi
-          </button>
-        </div>
-      )}
-      <div className="incident-card-main">
-        <button
-          type="button"
-          className="incident-card-open"
-          onClick={() => onClick(incident)}
-          aria-label={`Ouvrir incident${isActiveUrgent ? ' urgent' : ''} ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
-        >
+      <a
+        ref={openTriggerRef}
+        href={`/workshop/dashboard?incident=${incident.id}`}
+        className="incident-card-open"
+        onClick={handleOpenClick}
+        onKeyDown={handleOpenKeyDown}
+        aria-label={`Ouvrir incident${isActiveUrgent ? ' urgent' : ''} ligne ${incident.line_number}, machine ${incident.machine_id}, statut ${incident.status}`}
+      >
+        {isResolvedFollowed && (
+          <div className="incident-followed-resolved-banner">
+            <strong>{incident.status === 'CLOSED' ? 'Incident clôturé' : 'Incident annulé'}</strong>
+            <span>Conservé dans vos suivis</span>
+          </div>
+        )}
+        <div className="incident-card-main">
           <h2>
             Ligne {incident.line_number} · {incident.machine_id}
           </h2>
-        </button>
-        <div className="incident-card-controls">
-          <div className="incident-card-status" aria-label="Statuts de l'incident">
-            <IncidentStateChip incident={incident} />
-            <IncidentPriorityChip incident={incident} />
-            <IncidentStatusChip incident={incident} />
-            {incident.is_followed && <IncidentFollowedChip />}
-            {/* Le statut de prise en charge n'est badgé que pour l'opérateur :
-                technicien et responsable le lisent dans la ligne méta (un signal,
-                un canal — pas de redondance). */}
-            {!isMaintenance && !isResponsable && <IncidentTakenChip incident={incident} />}
+          <div className="incident-card-controls">
+            <div className="incident-card-status" aria-label="Statuts de l'incident">
+              <IncidentStateChip incident={incident} />
+              <IncidentPriorityChip incident={incident} />
+              <IncidentStatusChip incident={incident} />
+              {incident.is_followed && <IncidentFollowedChip />}
+              {/* Le statut de prise en charge n'est badgé que pour l'opérateur :
+                  technicien et responsable le lisent dans la ligne méta (un signal,
+                  un canal — pas de redondance). */}
+              {!isMaintenance && !isResponsable && <IncidentTakenChip incident={incident} />}
+            </div>
           </div>
-          {isResponsable && !isResolvedFollowed && (
-            <button
-              type="button"
-              className={`incident-follow-toggle${incident.is_followed ? ' is-active' : ''}`}
-              aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
-              title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
-              onClick={() => onToggleFollow?.(incident)}
-            >
-              <StarIcon filled={Boolean(incident.is_followed)} />
-            </button>
-          )}
         </div>
-      </div>
-      {/* L'existence d'un arbitrage est un FAIT OPÉRATIONNEL COMMUN : l'indicateur
-          « à arbitrer » est visible par TOUS les rôles. Seule la COMMANDE (bouton
-          cliquable qui ouvre l'arbitrage) est réservée au responsable ; les autres
-          rôles voient un badge non interactif. */}
-      {(Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
-        <div className="incident-card-actions">
-          {incident.edit_request &&
-            (isResponsable ? (
-              <button
-                type="button"
-                className="incident-request-action incident-request-action--edit"
-                onClick={(event) => onReviewEdit(event, incident)}
-              >
-                {editArbitrationWaiting ? 'Correction en attente' : 'Modification à arbitrer'}
-              </button>
-            ) : (
+        {/* L'existence d'un arbitrage est un FAIT OPÉRATIONNEL COMMUN : les rôles
+            non responsables voient ici un indicateur non interactif. Les commandes
+            du responsable restent des boutons frères du lien, plus bas. */}
+        {!isResponsable && (Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
+          <div className="incident-card-actions">
+            {incident.edit_request && (
               <span
                 className="incident-request-action incident-request-action--edit incident-request-action--readonly"
                 aria-label="Modification à arbitrer"
               >
                 Modification à arbitrer
               </span>
-            ))}
-          {incident.cancel_request &&
-            (isResponsable ? (
-              <button
-                type="button"
-                className="incident-request-action incident-request-action--delete"
-                onClick={(event) => onReviewDelete(event, incident)}
-              >
-                {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation à arbitrer'}
-              </button>
-            ) : (
+            )}
+            {incident.cancel_request && (
               <span
                 className="incident-request-action incident-request-action--delete incident-request-action--readonly"
                 aria-label="Annulation à arbitrer"
               >
                 Annulation à arbitrer
               </span>
-            ))}
-        </div>
-      )}
-
-      <div className="incident-card-meta">
-        {currentProduct ? (
-          <span className="incident-meta-item">
-            Produit <strong>{currentProduct}</strong>
-          </span>
-        ) : (
-          <span className="incident-meta-item incident-meta-missing">Produit non renseigné</span>
-        )}
-        <span className="incident-meta-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="incident-meta-item">
-          {incident.robot_label} · Tête {incident.head_number}
-        </span>
-        <span className="incident-meta-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="incident-meta-item" title={formatDateTime(incident.created_at)}>
-          Depuis {formatElapsed(incident.created_at)}
-        </span>
-        {(isMaintenance || isResponsable) && (
-          <>
-            <span className="incident-meta-sep" aria-hidden="true">
-              ·
-            </span>
-            {incident.taken_by_first_name ? (
-              <span className="incident-meta-item">
-                Pris par{' '}
-                <strong>
-                  {`${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()}
-                </strong>
-                {incident.taken_by_role
-                  ? ` (${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role})`
-                  : ''}
-              </span>
-            ) : (
-              <span className="incident-meta-item">Non pris</span>
             )}
-          </>
+          </div>
         )}
-      </div>
-      <div className="incident-card-footer">
-        Créé par {`${incident.first_name} ${incident.last_name}`.trim()} ·{' '}
-        {ROLE_LABELS[incident.role] || incident.role}
-      </div>
 
-      {incident.responsible_comment && (
-        <div className="incident-responsible-instruction">
-          <strong>Consigne responsable</strong>
-          <p>{incident.responsible_comment}</p>
+        <div className="incident-card-meta">
+          {currentProduct ? (
+            <span className="incident-meta-item">
+              Produit <strong>{currentProduct}</strong>
+            </span>
+          ) : (
+            <span className="incident-meta-item incident-meta-missing">Produit non renseigné</span>
+          )}
+          <span className="incident-meta-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="incident-meta-item">
+            {incident.robot_label} · Tête {incident.head_number}
+          </span>
+          <span className="incident-meta-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="incident-meta-item" title={formatDateTime(incident.created_at)}>
+            Depuis {formatElapsed(incident.created_at)}
+          </span>
+          {(isMaintenance || isResponsable) && (
+            <>
+              <span className="incident-meta-sep" aria-hidden="true">
+                ·
+              </span>
+              {incident.taken_by_first_name ? (
+                <span className="incident-meta-item">
+                  Pris par{' '}
+                  <strong>
+                    {`${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()}
+                  </strong>
+                  {incident.taken_by_role
+                    ? ` (${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role})`
+                    : ''}
+                </span>
+              ) : (
+                <span className="incident-meta-item">Non pris</span>
+              )}
+            </>
+          )}
         </div>
+        <div className="incident-card-footer">
+          Créé par {`${incident.first_name} ${incident.last_name}`.trim()} ·{' '}
+          {ROLE_LABELS[incident.role] || incident.role}
+        </div>
+
+        {incident.responsible_comment && (
+          <div className="incident-responsible-instruction">
+            <strong>Consigne responsable</strong>
+            <p>{incident.responsible_comment}</p>
+          </div>
+        )}
+        {incident.status === 'PENDING' && incident.waiting_reason && (
+          <div className="notice" style={{ marginTop: 12 }}>
+            Motif de mise en attente : {incident.waiting_reason}
+          </div>
+        )}
+      </a>
+
+      {isResponsable && !isResolvedFollowed && (
+        <button
+          type="button"
+          className={`incident-follow-toggle${incident.is_followed ? ' is-active' : ''}`}
+          aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
+          title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
+          onClick={() => onToggleFollow?.(incident)}
+        >
+          <StarIcon filled={Boolean(incident.is_followed)} />
+        </button>
       )}
-      {incident.status === 'PENDING' && incident.waiting_reason && (
-        <div className="notice" style={{ marginTop: 12 }}>
-          Motif de mise en attente : {incident.waiting_reason}
+
+      {isResolvedFollowed && (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm incident-followed-resolved-remove"
+          onClick={() => onToggleFollow?.(incident)}
+        >
+          Retirer du suivi
+        </button>
+      )}
+
+      {isResponsable && (Boolean(incident.edit_request) || Boolean(incident.cancel_request)) && (
+        <div className="incident-card-actions incident-card-actions--interactive">
+          {incident.edit_request && (
+            <button
+              type="button"
+              className="incident-request-action incident-request-action--edit"
+              onClick={(event) => onReviewEdit(event, incident)}
+            >
+              {editArbitrationWaiting ? 'Correction en attente' : 'Modification à arbitrer'}
+            </button>
+          )}
+          {incident.cancel_request && (
+            <button
+              type="button"
+              className="incident-request-action incident-request-action--delete"
+              onClick={(event) => onReviewDelete(event, incident)}
+            >
+              {cancelArbitrationWaiting ? 'Annulation en attente' : 'Annulation à arbitrer'}
+            </button>
+          )}
         </div>
       )}
     </article>

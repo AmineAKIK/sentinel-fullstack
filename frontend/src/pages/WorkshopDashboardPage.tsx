@@ -35,11 +35,6 @@ function isWithinLastDays(iso: string, days: number): boolean {
   return createdAt >= limit;
 }
 
-type PendingReviewRequest = {
-  incidentId: number;
-  type: ReviewType;
-};
-
 function isArbitrationRequestActive(incident: WorkshopIncident, type: ReviewType): boolean {
   if (type === 'edit') {
     if (!incident.edit_request) return false;
@@ -73,11 +68,9 @@ export default function WorkshopDashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const workbenchRef = useRef<HTMLDivElement | null>(null);
   const detailDrawerRef = useRef<HTMLElement | null>(null);
+  const incidentOpenTriggerRef = useRef<HTMLAnchorElement | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<WorkshopIncident | null>(null);
   const [focusedIncidentId, setFocusedIncidentId] = useState<number | null>(null);
-  const [pendingReviewRequest, setPendingReviewRequest] = useState<PendingReviewRequest | null>(
-    null
-  );
   const [reportedArbitrationKey, setReportedArbitrationKey] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'default' | 'date_desc' | 'date_asc'>('default');
   const [filters, setFilters] = useState<DashboardFiltersState>({
@@ -147,18 +140,23 @@ export default function WorkshopDashboardPage() {
     (replace = true) => {
       setSelectedIncident(null);
       setFocusedIncidentId(null);
-      setPendingReviewRequest(null);
       setIncidentUrlParam(null, replace);
     },
-    [setIncidentUrlParam, setSelectedIncident, setFocusedIncidentId, setPendingReviewRequest]
+    [setIncidentUrlParam, setSelectedIncident, setFocusedIncidentId]
   );
+
+  const closeSelectedIncidentAndRestoreFocus = useCallback(() => {
+    const trigger = incidentOpenTriggerRef.current;
+    clearSelectedIncident();
+    if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    incidentOpenTriggerRef.current = null;
+  }, [clearSelectedIncident]);
 
   useEffect(() => {
     if (!selectedIncidentParam) {
       setSelectedIncident(null);
       setFocusedIncidentId(null);
-      setPendingReviewRequest(null);
-      if (reviewIncident) closeReview();
+      if (reviewIncident && selectedIncident) closeReview();
       return;
     }
     const found = incidents.find((inc) => String(inc.id) === selectedIncidentParam);
@@ -169,7 +167,15 @@ export default function WorkshopDashboardPage() {
     if (!loading && incidents.length > 0) {
       setIncidentUrlParam(null, true);
     }
-  }, [selectedIncidentParam, incidents, loading, reviewIncident, closeReview, setIncidentUrlParam]);
+  }, [
+    selectedIncidentParam,
+    selectedIncident,
+    incidents,
+    loading,
+    reviewIncident,
+    closeReview,
+    setIncidentUrlParam,
+  ]);
 
   useEffect(() => {
     setReportedArbitrationKey(null);
@@ -311,7 +317,6 @@ export default function WorkshopDashboardPage() {
     if (!next) return;
     setSelectedIncident(next);
     setFocusedIncidentId(null);
-    setPendingReviewRequest(null);
     // replace : feuilleter les incidents ne doit pas empiler l'historique.
     setIncidentUrlParam(next.id, true);
   }
@@ -326,17 +331,17 @@ export default function WorkshopDashboardPage() {
   useEffect(() => {
     if (!selectedIncident || anyModalOpen) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') clearSelectedIncident();
+      if (event.key === 'Escape') closeSelectedIncidentAndRestoreFocus();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [selectedIncident, anyModalOpen, clearSelectedIncident]);
+  }, [selectedIncident, anyModalOpen, closeSelectedIncidentAndRestoreFocus]);
 
   useEffect(() => {
     if (!isResponsable || !selectedIncident || reviewIncident || activeModal) {
       return;
     }
-    if (focusedIncidentId !== selectedIncident.id || pendingReviewRequest) return;
+    if (focusedIncidentId !== selectedIncident.id) return;
     const reviewType = getAutoReviewType(selectedIncident);
     const arbitrationKey = getActiveArbitrationKey(selectedIncident);
     if (!reviewType || !arbitrationKey || arbitrationKey === reportedArbitrationKey) return;
@@ -348,44 +353,16 @@ export default function WorkshopDashboardPage() {
     activeModal,
     reportedArbitrationKey,
     focusedIncidentId,
-    pendingReviewRequest,
-    openReview,
-  ]);
-
-  useEffect(() => {
-    if (
-      !selectedIncident ||
-      !pendingReviewRequest ||
-      pendingReviewRequest.incidentId !== selectedIncident.id ||
-      focusedIncidentId !== selectedIncident.id ||
-      reviewIncident ||
-      activeModal
-    ) {
-      return;
-    }
-
-    openReview(selectedIncident, pendingReviewRequest.type);
-    setPendingReviewRequest(null);
-  }, [
-    selectedIncident,
-    pendingReviewRequest,
-    focusedIncidentId,
-    reviewIncident,
-    activeModal,
     openReview,
   ]);
 
   function openReviewFromIncident(incident: WorkshopIncident, reviewType: ReviewType) {
-    setSelectedIncident(incident);
-    setFocusedIncidentId(null);
-    setPendingReviewRequest({ incidentId: incident.id, type: reviewType });
-    setIncidentUrlParam(incident.id);
     setReportedArbitrationKey(null);
+    openReview(incident, reviewType);
   }
 
   function handleReportArbitration(incident: WorkshopIncident | null) {
     if (incident) setReportedArbitrationKey(getActiveArbitrationKey(incident));
-    setPendingReviewRequest(null);
     modal.closeReview();
   }
 
@@ -539,10 +516,12 @@ export default function WorkshopDashboardPage() {
                           isResponsable={isResponsable}
                           isMaintenance={isMaintenance}
                           onToggleFollow={actions.handleToggleFollow}
+                          onOpenTrigger={(trigger) => {
+                            incidentOpenTriggerRef.current = trigger;
+                          }}
                           onClick={(inc) => {
                             setSelectedIncident(inc);
                             setFocusedIncidentId(null);
-                            setPendingReviewRequest(null);
                             setIncidentUrlParam(inc.id);
                           }}
                           onReviewEdit={(_e, inc) => openReviewFromIncident(inc, 'edit')}
@@ -607,7 +586,7 @@ export default function WorkshopDashboardPage() {
                       }
                     : undefined
                 }
-                onBack={() => clearSelectedIncident()}
+                onBack={closeSelectedIncidentAndRestoreFocus}
                 onToggleFollow={actions.handleToggleFollow}
                 onToggleUrgent={actions.handleToggleUrgent}
                 onConfirmTakeCharge={actions.handleConfirmTakeCharge}

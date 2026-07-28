@@ -37,9 +37,10 @@ test('cycle de vie complet d’un incident : création → prise en charge → s
   await expect(page.getByText("Aperçu de l'incident")).toBeVisible();
   await page.getByRole('button', { name: 'Valider la création' }).click();
 
-  const card = page.locator('article', { hasText: productRef }).locator('.incident-card-open');
-  await expect(card).toBeVisible();
-  await card.click();
+  const card = page.locator('article', { hasText: productRef });
+  const cardActivationArea = card.getByRole('link', { name: /Ouvrir incident/i });
+  await expect(cardActivationArea).toBeVisible();
+  await cardActivationArea.click();
 
   const panel = page.locator('aside.incident-detail-drawer');
   await expect(panel.getByText(productRef)).toBeVisible();
@@ -50,11 +51,12 @@ test('cycle de vie complet d’un incident : création → prise en charge → s
   const maintenancePage = await maintenanceContext.newPage();
   await loginAsWorkshop(maintenancePage, E2E_MAINTENANCE_BADGE);
 
-  const maintenanceCard = maintenancePage
-    .locator('article', { hasText: productRef })
-    .locator('.incident-card-open');
-  await expect(maintenanceCard).toBeVisible();
-  await maintenanceCard.click();
+  const maintenanceCard = maintenancePage.locator('article', { hasText: productRef });
+  const maintenanceCardActivationArea = maintenanceCard.getByRole('link', {
+    name: /Ouvrir incident/i,
+  });
+  await expect(maintenanceCardActivationArea).toBeVisible();
+  await maintenanceCardActivationArea.click();
 
   await maintenancePage.getByRole('button', { name: 'Prendre en charge' }).click();
   await maintenancePage.getByRole('button', { name: 'Confirmer' }).click();
