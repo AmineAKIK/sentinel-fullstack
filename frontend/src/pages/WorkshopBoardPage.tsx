@@ -21,6 +21,7 @@ import {
 } from '../utils/boardUtils';
 import { usePageTitle } from '../hooks/usePageTitle';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import { inflect } from '../utils/french';
 
 type BoardView = 'alerts' | 'all' | 'lines';
 const VIEWS: BoardView[] = ['alerts', 'all', 'lines'];
@@ -816,7 +817,11 @@ export default function WorkshopBoardPage() {
                       ? 'Toutes les lignes'
                       : draftSettings.lineIds.includes(NO_LINES_SELECTED)
                         ? 'Aucune ligne'
-                        : `${draftSettings.lineIds.length} ligne(s) sélectionnée(s)`}
+                        : `${draftSettings.lineIds.length} ${inflect(
+                            draftSettings.lineIds.length,
+                            'ligne sélectionnée',
+                            'lignes sélectionnées'
+                          )}`}
                   </small>
                 </span>
               </summary>
@@ -869,7 +874,9 @@ export default function WorkshopBoardPage() {
                 {draftSettings.lineIds.length > 0 &&
                   !draftSettings.lineIds.includes(NO_LINES_SELECTED) && (
                     <div className="board-lines-selected-summary">
-                      {draftSettings.lineIds.length} ligne(s) affichée(s) :{' '}
+                      {draftSettings.lineIds.length}{' '}
+                      {inflect(draftSettings.lineIds.length, 'ligne affichée', 'lignes affichées')}{' '}
+                      :{' '}
                       {safeLines
                         .filter((line) => draftSettings.lineIds.includes(String(line.id)))
                         .map((line) => `Ligne ${line.line_number}`)

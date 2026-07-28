@@ -1,5 +1,5 @@
 import { WorkshopIncidentEvent } from '../types';
-import { STATE_LABELS as STATE_LABELS_MAP, WORKSHOP_EVENT_LABELS } from './labels';
+import { ROLE_LABELS, STATE_LABELS as STATE_LABELS_MAP, WORKSHOP_EVENT_LABELS } from './labels';
 export { formatDateTime, formatSeconds } from './date';
 export { STATE_LABELS, STATUS_LABELS } from './labels';
 export { WORKSHOP_EVENT_LABELS as EVENT_LABELS } from './labels';
@@ -60,7 +60,7 @@ export function formatVersionedCorrection(payload: Record<string, unknown>): str
     if (!change || typeof change !== 'object' || !('before' in change) || !('after' in change)) {
       continue;
     }
-    const label = CORRECTION_FIELD_LABELS[field] ?? field;
+    const label = CORRECTION_FIELD_LABELS[field] ?? 'Champ modifié';
     parts.push(
       `${label} : ${displayCorrectionValue(field, change.before)} → ${displayCorrectionValue(field, change.after)}`
     );
@@ -74,9 +74,10 @@ export function formatVersionedCorrection(payload: Record<string, unknown>): str
 }
 
 export function formatEventActor(event: WorkshopIncidentEvent): string {
-  if (!event.first_name) return 'Systeme';
+  const roleLabel = event.role ? (ROLE_LABELS[event.role] ?? 'Utilisateur') : null;
+  if (!event.first_name) return roleLabel ?? 'Système';
   const fullName = `${event.first_name} ${event.last_name ?? ''}`.trim();
-  return event.role ? `${fullName} · ${event.role}` : fullName;
+  return roleLabel ? `${fullName} · ${roleLabel}` : fullName;
 }
 
 export function formatEventDetail(event: WorkshopIncidentEvent): string {

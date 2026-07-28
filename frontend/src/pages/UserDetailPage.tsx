@@ -10,7 +10,7 @@ import FullPageLoader from '../components/ui/FullPageLoader';
 import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
 import { formatDateTime } from '../utils/date';
-import { ROLE_LABELS } from '../utils/labels';
+import { formatRoleLabel } from '../utils/labels';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function UserDetailPage() {
@@ -124,7 +124,7 @@ export default function UserDetailPage() {
               <DetailField label="Prénom">{user.first_name}</DetailField>
               <DetailField label="Numéro de badge">{user.badge_number}</DetailField>
               <DetailField label="Rôle">
-                <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
+                <span className="badge-role">{formatRoleLabel(user.role)}</span>
               </DetailField>
               <DetailField label="Email">{user.email || '—'}</DetailField>
               <DetailField label="Mot de passe workshop">{passwordStatusLabel(user)}</DetailField>

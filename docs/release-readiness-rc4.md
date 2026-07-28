@@ -158,7 +158,7 @@ pas de `Cache-Control` dans le contrat actuel.
 | **R4-04** | **P1** | Plan RC4 §7.1–7.3, §14.2 | `waiting_reason` n'était ni projeté par la requête Board, ni présent dans le type public, ni rendu. Aucun test Board ne vérifiait motif courant, disparition après reprise et conservation historique. | Trois rouges permanents exécutés avant correction : PostgreSQL réel `boardWaitingReasonProjection.integration.test.ts`, DOM `BoardIncidentGrid.test.tsx`, Chromium `board-waiting-reason.spec.ts` ; commandes et sorties exactes §6. | PostgreSQL : `6 failed / 1 passed`, propriété reçue `undefined` ; frontend : `3 failed / 11 passed`, phrase exacte introuvable ; Chromium : même carte ligne `999` / machine `E2E-MCH-1`, statut « En attente » visible mais motif absent. | Repository/service et tests Board backend ; type, composant, CSS et tests Board frontend ; nouveau parcours Chromium ; présente readiness. | DTO public backend explicite ; unique `CASE` de lecture conservant la valeur complète seulement pour `PENDING` non vide ; champ frontend `string \| null` ; bloc texte non interactif, complet dans le DOM et borné seulement visuellement ; aucune jointure, mutation ou migration. | PostgreSQL réel sur dix obligations ; composant sur statuts, vide, longueur et confidentialité ; Chromium attente → Atelier/panneau/Board → reprise → disparition après vrai `GET /api/board/data` → Historique conservé. | Ciblés repository `9/9`, PostgreSQL `7/7`, frontend Board/utilitaires `37/37`, Chromium `1/1` ; complets backend `508/508`, intégration `144/144`, frontend `490/490`, Chromium `45/45` ; builds, typages, lint, format et invariants verts ; détails §6. | Valeur périmée masquée deux fois (SQL et rendu), diagnostic sans repli, liste exacte des 18 clés, sentinelles privées absentes, Board sans commande, événement historique exact après reprise, polling réel documenté. | `VERIFIED` |
 | **R4-05** | **P0** | Plan RC4 §8.1–8.2, §12 lots 4–5, §14.5 | Rouge initial : zéro consommateur. Lots 4–5 : toutes les mutations explicites des 61 lignes passent par le runner partagé ; les deux seules exceptions sont des réactions système à `401`. | Contrat shell exact et tests d'architecture Atelier/hors Atelier ; voir §6 | Lot 5 rouge : `35 failed`; vert ciblé : `76/76`; branche `LegacyConfirmModal`, `submittingRef` et machines locales transitoires supprimées | `MutationFeedback.tsx`, confirmations, pages Administration/Auth/Board/Support, inventaire complet | Aucun travail d'adoption restant ; préserver le contrat dans les lots suivants. | Contrat commun, course, démontage, timers, anti-double, focus, erreurs réseau/métier et tests positifs par surface. | 59 lignes `COVERED`, 2 réactions système `EXCEPTION_PROVEN`, zéro trou | Régression future ou nouveau consommateur contournant le runner. | `VERIFIED` |
 | **R4-06** | **P0** | Plan RC4 §8.1, §8.3–8.4, §14.3–14.5 | Les `61` lignes sont traitées après les lots 4–5 : `59 COVERED`, `2 EXCEPTION_PROVEN`, `0 PARTIAL`, `0 GAP`. | Rouge ciblé par famille, registre courant détaillé dans `docs/rc4-mutation-inventory.md` | Lot 4 : matrice Atelier rouge puis `102/102`; lot 5 : architecture/support rouge `35 failed`, puis `76/76`; suite frontend verte | Toutes les lignes de l'inventaire ; confirmations de désactivation, suppression, archivage, révocation et code Board | Aucun correctif de mutation restant ; conserver la matrice au lot 8. | Erreurs sûres, conservation, réessai, anti-double, succès exact, focus ; E2E transversaux complétés au lot 8. | Inventaire `61/61`, zéro ligne sans état ni preuve | Régression E2E possible, couverte par R4-09 au lot 8. | `VERIFIED` |
-| **R4-07** | **P1** | Plan RC4 §9.1–9.2, §12 lot 6 | Des pseudo-pluralisations visibles subsistent dans filtres, confirmations et erreurs. `formatEventActor` restitue directement `MAINTENANCE` et son test exige cette fuite ; certains journaux retombent sur les enums brutes. | `npm test -- src/api/__tests__/errorMessages.test.ts -t 'RC4 RED — pluralise naturellement le nombre d’incidents actifs'` depuis `frontend/` ; sortie détaillée §6 | Code `1` : attendu `2 incidents actifs`, reçu `Ce technicien a 2 incident(s) actif(s) en cours...`. | `frontend/src/components/ArchiveLineConfirmModal.tsx` ; `frontend/src/utils/workshopHistory.ts` et test ; composants/confirmations/filtres trouvés par balayage ; traducteurs d'erreurs ; modèles de courriel backend | Centraliser les accords français utiles, appliquer le glossaire, traduire tous les rôles, masquer Diagnostic sans valeur réelle et éliminer toute restitution brute sans modifier les enums internes. | Tests `0/1/2`, tous rôles et fallback sûr ; tests négatifs DOM/courriels contre pseudo-pluriels, clés `snake_case`, SQL et enums ; E2E/captures des surfaces visibles. | `PENDING_EXECUTION[R4-07:GREEN_EVIDENCE]` | Remplacement aveugle des chaînes internes, accords incomplets, fallback réintroduisant une enum, divergence courriel/DOM. | `RED_PROVEN` |
+| **R4-07** | **P1** | Plan RC4 §9.1–9.2, §12 lot 6 | Les pseudo-pluralisations, anciens libellés, rôles bruts, fallbacks d'enums et sections Diagnostic blanches ont été reproduits par des tests permanents avant correction. | Trois rouges permanents : terminologie `10/10 failed`, fallback enum `34` restitutions brutes, Diagnostic blanc `2/2 failed` ; commandes et sorties §6. | Accords `0/1/2`, cinq rôles, `33` pseudo-pluriels et `10` anciens libellés en échec ; puis `34` fallbacks bruts et deux sections Diagnostic blanches rendues. | Helpers français et libellés sûrs ; erreurs, filtres, confirmations, journaux, Board, administration et courriels ; tests existants alignés sur le glossaire sans changer les enums internes. | Tests permanents de source et DOM ; rôles/fallbacks sûrs ; Diagnostic absent si null/vide/blanc ; balayages obligatoires classifiés ; backend notifications/lignes. | Ciblés frontend `15/15`, `204/204` ; backend `2/2`, `26/26` ; builds, ESLint et Prettier des deux applications verts ; balayage pseudo-pluriels vide. | Les enums et clés restantes sont exclusivement types, logique, accès DTO/configuration et fixtures négatives ; aucun fallback brut de table de libellés ne subsiste. | `VERIFIED` |
 | **R4-08** | **P1** | Plan RC4 §10.1–10.3, §14.6 | Le modèle Nginx hôte versionné ne contient aucune directive effective `X-Sentinel-Inheritance-Barrier`, aucun contrôle public `verify-public-headers.sh` n'existe et aucun test ne couvre l'héritage global ou l'unicité. Le modèle hôte ne contient que HSTS et masquage upstream. | `npm test -- src/middlewares/__tests__/securityHeaders.test.ts -t 'RC4 RED — versionne la barrière qui bloque les add_header globaux'` depuis `backend/` ; sortie détaillée §6 | Code `1` : `deploy/nginx/sentinel.conf.example` ne contient pas la directive exacte `add_header X-Sentinel-Inheritance-Barrier "";`. | `deploy/nginx/sentinel.conf.example` ; nouveau contrôle versionné sous `scripts/` ; test local Nginx ; `docs/runbook.md` ; contrôles CI/ops si nécessaire | Versionner la barrière au niveau HTTPS approprié, expliquer les autorités, vérifier `/login` et `/api/health`, occurrences et valeurs exactes, refuser l'en-tête interne ; documenter sauvegarde/application atomique/`nginx -t`/reload/validation/rollback, sans VPS. | Test local avec héritage global et upstream simulés ; `nginx -t` compatible 1.18 ; script public en environnement local ; tests négatifs doublon, mauvaise valeur et barrière exposée ; vérification externe différée. | `PENDING_EXECUTION[R4-08:GREEN_EVIDENCE]` | Sémantique subtile d'héritage `add_header`, incompatibilité Nginx 1.18, HSTS en double, barrière publique, script divulguant un secret, confusion preuve locale/VPS. | `RED_PROVEN` |
 | **R4-09** | **P0** | Plan RC4 §5.2, §6.3, §7.3, §8.4, §14 | Les E2E ne cliquent pas le corps de carte ; ne prouvent ni géométrie haut/milieu/bas ni molette interne ; Board ne couvre que l'accès/session ; le cycle de vie ne vérifie pas motif sur les trois surfaces et dans l'historique. Échecs réseau/métier, doubles clics et récupérations sont incomplets. | Pas de scénario global au lot 0 : au lot 8, chaque parcours de §14 sera ajouté puis exécuté isolément avec `npx playwright test <fichier> -g '<interaction exacte>'` avant correction de ce parcours | Non exécuté au lot 0 conformément au §12. Chaque scénario devra échouer sur le comportement réellement absent, sans `force`, retry ni timeout arbitraire ; un scénario global ne localiserait pas l'interaction. | `frontend/e2e/incident-lifecycle.spec.ts` ; `board.spec.ts` ; `accessibility.spec.ts` ; `workshop-arbitration-mobile.spec.ts` ; `workshop-cancel-withdrawal.spec.ts` ; `workshop-zoom.spec.ts` ; fixtures E2E | Ajouter les parcours déterministes manquants sur vraie surface, avec attentes d'états observables et géométrie réelle ; compléter axe, responsive, clavier, focus et matrice de mutations. | Section 14 intégrale : carte/panneau, attente, correction, annulation, mutations transversales, sécurité/courriel ; desktop, mobile, zoom 200 %, axe zéro critique/sérieuse. | `PENDING_EXECUTION[R4-09:GREEN_EVIDENCE]` | Flakes, fixtures non représentatives, sélecteurs de substitution, interceptions qui ne prouvent pas la vraie API, tests trop globaux pour diagnostiquer. | `OPEN_RED_PENDING` |
 | **R4-10** | **P1** | Plan RC4 §12 lots 9–10, §16 portes D–E, §18 | Aucune capture image n'est suivie ; la liste reste « à réaliser ». Des faits documentaires sont périmés, dont `38` migrations et `579` tests. La readiness RC3 admet que captures, VPS et SMTP restent externes. | Au lot 9, lancer des recherches ciblées avec `rg -n` sur chaque valeur/version/SHA périmé dans les documents concernés avant leur synchronisation ; aucune capture ne peut être testée avant déploiement autorisé | Non exécuté au lot 0 conformément au §12. Les valeurs déjà localisées constituent le périmètre, mais chaque contrôle documentaire devra d'abord retourner un résultat non vide ; les captures et faits externes resteront explicitement en attente. | `docs/release-readiness-rc4.md` ; `docs/dossier-projet/liste-captures-a-realiser.md` ; `docs/dossier-projet/corrections-dossier-final.md` ; runbook, dossier jury et documents citant des totaux/version/SHA | Recalculer tous les faits au SHA candidat, synchroniser readiness/runbook/dossier, préparer la liste exacte des captures post-déploiement et distinguer preuves locales, CI et externes. | Recherches de valeurs périmées ; validation liens/SHA/totaux ; revue terminale documentaire ; captures uniquement après GO déploiement sur RC4 réellement servie. | `PENDING_EXECUTION[R4-10:GREEN_EVIDENCE]` | Faits recopiés, total non disjoint, capture RC3 attribuée à RC4, preuve externe inventée, document mis à jour avant le SHA final. | `OPEN_RED_PENDING` |
@@ -796,7 +796,85 @@ npm test -- src/api/__tests__/errorMessages.test.ts -t 'RC4 RED — pluralise na
   `Ce technicien a 2 incident(s) actif(s) en cours...` ;
 - cause : le traducteur expose encore la pseudo-pluralisation interdite.
 
-Vert : `PENDING_EXECUTION[R4-07:GREEN_AFTER_LOT6]`.
+Le test temporaire du lot 0 ayant été retiré comme annoncé, sa relance au lot
+6 sélectionne `0` test (`14 skipped`, code `0`) et n'est pas utilisée comme
+preuve verte. Les tests permanents suivants ont d'abord été ajoutés et
+réellement exécutés en rouge :
+
+```bash
+npm test -- src/utils/__tests__/userFacingTerminology.test.ts
+```
+
+- code `1`, `10/10 failed` ;
+- accords `0`, `1`, `2` encore faux ;
+- les cinq rôles sont bruts ou mal libellés ;
+- `33` pseudo-pluralisations et `10` anciens libellés recensés dans les sources
+  de production frontend/backend.
+
+Après ce premier inventaire, le balayage obligatoire des rôles a localisé des
+fallbacks visibles non sûrs. La garde permanente correspondante a elle aussi
+été exécutée avant correction :
+
+```bash
+npm test -- src/utils/__tests__/userFacingTerminology.test.ts -t 'bannit les fallbacks qui restituent une enum d’événement brute'
+```
+
+- code `1` ;
+- d'abord `6` lignes représentatives, puis garde généralisée : `34` fallbacks
+  `ROLE/STATE/STATUS/EVENT_LABELS[...] ?? valeur_interne` ;
+- les deux restitutions d'événements d'administration et les surfaces
+  Atelier/Board/Historique/Connaissance étaient concernées.
+
+Enfin, la règle « aucune section Diagnostic vide » est couverte par un vrai
+rendu DOM :
+
+```bash
+npm test -- src/components/__tests__/IncidentDetailPanel.test.tsx src/components/__tests__/ReviewIncidentRequestModal.test.tsx -t 'ne rend aucune section Diagnostic pour une valeur vide ou blanche'
+```
+
+- code `1`, `2/2 failed` ;
+- une valeur composée uniquement d'espaces rendait encore le libellé
+  `Diagnostic` dans le panneau et dans l'arbitrage.
+
+Vert ciblé du lot 6 :
+
+```bash
+npm test -- src/utils/__tests__/userFacingTerminology.test.ts src/api/__tests__/errorMessages.test.ts src/utils/__tests__/workshopHistory.test.ts src/utils/__tests__/incidentDiff.test.ts src/utils/__tests__/userSort.test.ts src/utils/__tests__/workshopFilters.test.ts src/components/__tests__/IncidentCard.test.tsx src/components/__tests__/IncidentDetailPanel.test.tsx src/components/__tests__/ReviewIncidentRequestModal.test.tsx src/components/__tests__/BoardIncidentGrid.test.tsx src/components/__tests__/IncidentMetricsBar.test.tsx src/pages/__tests__/WorkshopHistoryPage.test.tsx src/pages/__tests__/WorkshopJournalPage.test.tsx src/pages/__tests__/WorkshopKnowledgePage.test.tsx src/pages/__tests__/UserListPage.a11y.test.tsx
+```
+
+- code `0`, `15/15` fichiers et `204/204` tests ;
+- la garde permanente seule est verte à `11/11` ;
+- accords naturels pour `0`, `1` et plusieurs éléments ;
+- glossaire complet, cinq rôles traduits et fallback générique sûr ;
+- aucune table de libellés ne restitue sa valeur interne en fallback ;
+- Diagnostic est conservé uniquement lorsqu'une vraie valeur non blanche
+  existe.
+
+Contrôles backend ciblés :
+
+```bash
+npm test -- --runInBand src/modules/lines/__tests__/lines.service.test.ts src/modules/notifications/__tests__/notifications.service.test.ts
+```
+
+- code `0`, `2/2` suites et `26/26` tests.
+
+Les builds, ESLint et Prettier frontend/backend ont tous retourné le code `0`.
+La suite frontend complète est réservée à la Porte B après le lot 7.
+
+Classification des quatre balayages obligatoires :
+
+- `.message` / `ApiResponseError` : transport API, narrowing vers le
+  traducteur sûr, contexte du runner, ErrorBoundary masquée en production et
+  fixtures négatives ; aucun rendu direct d'une erreur API ;
+- clés internes : types/DTO, accès aux réglages, comparaisons et fixtures
+  négatives ; `waiting_reason` est rendu seulement par sa valeur sous le
+  libellé « Motif de mise en attente » ;
+- pseudo-pluralisations : aucune occurrence, `rg` code `1` (ensemble vide) ;
+- rôles : constantes de domaine, policies, requêtes, types, comparaisons et
+  fixtures ; les sorties utilisateur passent par les helpers français et la
+  garde anti-fallback.
+
+R4-07 passe à `VERIFIED`.
 
 ### R4-08 — barrière Nginx versionnée
 

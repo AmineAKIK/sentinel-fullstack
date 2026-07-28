@@ -1,12 +1,16 @@
+import { inflect } from '../utils/french';
+
 export type FilterChip = {
   key: string;
   label: string;
   onRemove: () => void;
 };
 
+export type CountLabel = string | { singular: string; plural: string };
+
 type FilterSummaryProps = {
   count: number;
-  countLabel: string;
+  countLabel: CountLabel;
   chips: FilterChip[];
   onClear?: () => void;
   emptyText?: string;
@@ -22,12 +26,16 @@ export default function FilterSummary({
   className = '',
 }: FilterSummaryProps) {
   const hasFilters = chips.length > 0;
+  const resolvedCountLabel =
+    typeof countLabel === 'string'
+      ? countLabel
+      : inflect(count, countLabel.singular, countLabel.plural);
 
   return (
     <div className={`filter-summary ${className}`.trim()}>
       <div className="filter-summary-main">
         <span className="filter-result-count">
-          {count} {countLabel}
+          {count} {resolvedCountLabel}
         </span>
         {hasFilters ? (
           <div className="filter-chip-list">

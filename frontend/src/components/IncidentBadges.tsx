@@ -1,5 +1,5 @@
 import { WorkshopIncident } from '../types';
-import { STATE_LABELS, STATUS_LABELS } from '../utils/labels';
+import { formatStateLabel, formatStatusLabel } from '../utils/labels';
 
 export function isIncidentResolved(incident: WorkshopIncident): boolean {
   return (
@@ -11,9 +11,7 @@ export function isIncidentResolved(incident: WorkshopIncident): boolean {
 
 export function IncidentStateChip({ incident }: { incident: WorkshopIncident }) {
   return (
-    <span className="incident-chip incident-chip--state">
-      {STATE_LABELS[incident.state] || incident.state}
-    </span>
+    <span className="incident-chip incident-chip--state">{formatStateLabel(incident.state)}</span>
   );
 }
 
@@ -43,7 +41,7 @@ export function IncidentStatusChip({
 
   return (
     <span className={`incident-chip incident-chip--${tone}`}>
-      {STATUS_LABELS[incident.status] ?? incident.status}
+      {formatStatusLabel(incident.status)}
     </span>
   );
 }

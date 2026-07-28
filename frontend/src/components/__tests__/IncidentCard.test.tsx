@@ -98,7 +98,7 @@ describe('IncidentCard – rendu', () => {
         {...defaultProps}
       />
     );
-    expect(screen.getByText('Consigne responsable')).toBeDefined();
+    expect(screen.getByText('Consigne du responsable')).toBeDefined();
     expect(screen.getByText('Sécuriser la zone avant intervention.')).toBeDefined();
   });
 

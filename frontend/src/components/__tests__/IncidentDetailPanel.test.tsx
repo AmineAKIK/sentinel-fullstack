@@ -116,6 +116,19 @@ function renderPanel({
 }
 
 describe('IncidentDetailPanel', () => {
+  it('ne rend aucune section Diagnostic pour une valeur vide ou blanche', () => {
+    renderPanel({
+      incident: mockIncident({
+        comment: null,
+        diagnostic: '   ',
+        waiting_reason: null,
+        intervention_note: null,
+      }),
+    });
+
+    expect(screen.queryByText('Diagnostic')).not.toBeInTheDocument();
+  });
+
   it('affiche la synthèse, le dossier et les décisions du drawer', () => {
     renderPanel({
       incident: mockIncident({
@@ -202,9 +215,9 @@ describe('IncidentDetailPanel', () => {
       isResponsable: false,
     });
 
-    expect(screen.getByRole('heading', { name: 'Consigne responsable' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Consigne du responsable' })).toBeDefined();
     expect(screen.getByText('Prioriser après contrôle qualité.')).toBeDefined();
-    expect(screen.queryByRole('textbox', { name: 'Consigne responsable' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Consigne du responsable' })).toBeNull();
   });
 });
 
@@ -380,7 +393,7 @@ describe('IncidentDetailPanel – mutations panneau via le runner partagé RC4',
         responsible_comment: 'Prioriser après contrôle qualité β.',
       });
     renderPanel({ incident, patchIncident });
-    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Consigne responsable');
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Consigne du responsable');
     const exactDraft = '  Prioriser après contrôle qualité β.\nPoste\t2  ';
     fireEvent.change(textarea, { target: { value: exactDraft } });
 
@@ -414,7 +427,7 @@ describe('IncidentDetailPanel – mutations panneau via le runner partagé RC4',
         })
     );
     renderPanel({ incident, patchIncident });
-    fireEvent.change(screen.getByLabelText('Consigne responsable'), {
+    fireEvent.change(screen.getByLabelText('Consigne du responsable'), {
       target: { value: 'Prioriser ce contrôle' },
     });
     const submit = screen.getByRole('button', { name: 'Ajouter' });
@@ -425,7 +438,7 @@ describe('IncidentDetailPanel – mutations panneau via le runner partagé RC4',
     expect(patchIncident).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.incident-detail-content')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('button', { name: 'Enregistrement…' })).toBeDisabled();
-    expect(screen.getByLabelText('Consigne responsable')).toBeDisabled();
+    expect(screen.getByLabelText('Consigne du responsable')).toBeDisabled();
 
     resolvePatch({ ...incident, responsible_comment: 'Prioriser ce contrôle' });
     await screen.findByText('Consigne enregistrée.');

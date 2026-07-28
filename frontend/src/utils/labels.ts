@@ -2,7 +2,13 @@ export const ROLE_LABELS: Record<string, string> = {
   OPERATOR: 'Opérateur',
   MAINTENANCE: 'Technicien',
   RESPONSABLE: 'Responsable',
+  ADMIN: 'Administrateur',
+  SYSTEM: 'Système',
 };
+
+export function formatRoleLabel(role: string | null | undefined): string {
+  return role ? (ROLE_LABELS[role] ?? 'Utilisateur') : 'Utilisateur';
+}
 
 export const STATUS_LABELS: Record<string, string> = {
   OPEN: 'Ouvert',
@@ -12,12 +18,20 @@ export const STATUS_LABELS: Record<string, string> = {
   INVALIDATED: 'Invalidé',
 };
 
+export function formatStatusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? 'Statut inconnu';
+}
+
 export const STATE_LABELS: Record<string, string> = {
   SKIPEE_PAR_MACHINE: 'Skip machine',
   SKIPEE_PAR_CONDUCTEUR: 'Skip opérateur',
   DEGRADEE: 'Dégradée',
   INDISPONIBLE: 'Indisponible',
 };
+
+export function formatStateLabel(state: string): string {
+  return STATE_LABELS[state] ?? 'État inconnu';
+}
 
 export const ADMIN_EVENT_LABELS: Record<string, string> = {
   USER_CREATED: 'Utilisateur créé',
@@ -41,6 +55,10 @@ export const ADMIN_EVENT_LABELS: Record<string, string> = {
   SESSIONS_REVOKED: 'Sessions révoquées',
   PASSWORD_RESET_REQUEST_HANDLED: 'Demande de reset traitée',
 };
+
+export function formatAdminEventLabel(eventType: string): string {
+  return ADMIN_EVENT_LABELS[eventType] ?? "Événement d'administration";
+}
 
 export interface AuditEventTarget {
   scope?: string;
@@ -81,7 +99,7 @@ export const WORKSHOP_EVENT_LABELS: Record<string, string> = {
   DELETE_REQUEST_REJECTED: 'Annulation refusée',
   PRIORITY_CHANGED: 'Priorité modifiée',
   ORDER_CHANGED: 'Réordonnancement',
-  RESPONSIBLE_COMMENT_UPDATED: 'Consigne responsable',
+  RESPONSIBLE_COMMENT_UPDATED: 'Consigne du responsable',
   STATUS_CHANGED: 'Statut modifié',
   ARBITRATION_CONSULTED: "Dossier d'arbitrage consulté",
 };

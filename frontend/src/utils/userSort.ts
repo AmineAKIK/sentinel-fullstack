@@ -1,5 +1,5 @@
 import { SentinelUser, SortOrder } from '../types';
-import { ROLE_LABELS } from './labels';
+import { formatRoleLabel } from './labels';
 
 export type UserSortField = 'name' | 'badge' | 'role' | 'status' | 'created_at';
 
@@ -24,7 +24,7 @@ export function compareUsers(
       sensitivity: 'base',
     });
   } else if (field === 'role') {
-    result = (ROLE_LABELS[a.role] || a.role).localeCompare(ROLE_LABELS[b.role] || b.role, 'fr', {
+    result = formatRoleLabel(a.role).localeCompare(formatRoleLabel(b.role), 'fr', {
       sensitivity: 'base',
     });
   } else if (field === 'status') {

@@ -3,7 +3,7 @@ import { UserFormData } from './UserForm';
 import { SentinelUser } from '../types';
 import { activateAccount, deactivateAccount, updateAccount } from '../api/accounts';
 import { apiErrorMessage } from '../api/errorMessages';
-import { ROLE_LABELS } from '../utils/labels';
+import { formatRoleLabel } from '../utils/labels';
 import { useMutationRunner } from './ui/MutationFeedback';
 
 interface EditSummaryModalProps {
@@ -24,7 +24,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 function roleLabel(val: string): string {
-  return ROLE_LABELS[val] || val;
+  return formatRoleLabel(val);
 }
 
 export default function EditSummaryModal({

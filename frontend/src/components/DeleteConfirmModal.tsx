@@ -3,6 +3,7 @@ import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { SentinelUser } from '../types';
 import { deleteAccount, getAccountImpact } from '../api/accounts';
 import { useMutationRunner } from './ui/MutationFeedback';
+import { formatCount, inflect } from '../utils/french';
 
 interface DeleteConfirmModalProps {
   user: SentinelUser;
@@ -54,13 +55,24 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       </p>
       {impact && (impact.reported_incidents > 0 || impact.taken_incidents > 0) && (
         <div className="notice">
-          Impact historique : {impact.reported_incidents} incident(s) signalé(s),{' '}
-          {impact.taken_incidents} incident(s) pris en charge.
+          Impact historique :{' '}
+          {formatCount(impact.reported_incidents, 'incident signalé', 'incidents signalés')},{' '}
+          {formatCount(
+            impact.taken_incidents,
+            'incident pris en charge',
+            'incidents pris en charge'
+          )}
+          .
           {hasActiveTakenIncidents && (
             <>
               {' '}
-              Suppression bloquée tant que {impact.active_taken_incidents} incident(s) actif(s)
-              restent pris en charge.
+              Suppression bloquée tant que{' '}
+              {formatCount(
+                impact.active_taken_incidents,
+                'incident actif',
+                'incidents actifs'
+              )}{' '}
+              {inflect(impact.active_taken_incidents, 'reste', 'restent')} pris en charge.
             </>
           )}
         </div>

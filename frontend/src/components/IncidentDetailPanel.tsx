@@ -16,7 +16,7 @@ import { ProductionLine, WorkshopIncident } from '../types';
 import { Role } from '../types/common';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
-import { ROLE_LABELS } from '../utils/labels';
+import { formatRoleLabel } from '../utils/labels';
 import { ModalStateApi, ReviewType } from '../hooks/useModalState';
 import { useIncidentPermissions } from '../hooks/useIncidentPermissions';
 import {
@@ -117,7 +117,7 @@ function NarrativeItem({
   value: string | null | undefined;
   primary?: boolean;
 }) {
-  if (!value) return null;
+  if (!value?.trim()) return null;
 
   return (
     <div className={`incident-narrative-item${primary ? ' incident-narrative-item--primary' : ''}`}>
@@ -302,10 +302,10 @@ export default function IncidentDetailPanel({
   // suspendu (à la reprise il est effacé, mais reste dans l'historique).
   const waitingReason = incident.status === 'PENDING' ? incident.waiting_reason : null;
   const hasNarrative =
-    Boolean(incident.comment) ||
-    Boolean(incident.diagnostic) ||
-    Boolean(waitingReason) ||
-    Boolean(incident.intervention_note);
+    Boolean(incident.comment?.trim()) ||
+    Boolean(incident.diagnostic?.trim()) ||
+    Boolean(waitingReason?.trim()) ||
+    Boolean(incident.intervention_note?.trim());
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
 
@@ -530,18 +530,14 @@ export default function IncidentDetailPanel({
               {takenByName ? (
                 <>
                   {takenByName}
-                  {incident.taken_by_role
-                    ? ` · ${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role}`
-                    : ''}
+                  {incident.taken_by_role ? ` · ${formatRoleLabel(incident.taken_by_role)}` : ''}
                 </>
               ) : (
                 <span className="detail-value-muted">Aucun technicien</span>
               )}
             </DetailField>
             <DetailField label="Déclaré par">{creatorName}</DetailField>
-            <DetailField label="Rôle créateur">
-              {ROLE_LABELS[incident.role] ?? incident.role}
-            </DetailField>
+            <DetailField label="Rôle créateur">{formatRoleLabel(incident.role)}</DetailField>
             <DetailField label="Création">{formatDateTime(incident.created_at)}</DetailField>
           </div>
         </DrawerSection>
@@ -549,7 +545,7 @@ export default function IncidentDetailPanel({
         {hasNarrative && (
           <DrawerSection title="Suivi de l'incident">
             <div className="incident-narrative-list">
-              <NarrativeItem label="Signalement" value={incident.comment} primary />
+              <NarrativeItem label="Signalement initial" value={incident.comment} primary />
               <NarrativeItem label="Motif de mise en attente" value={waitingReason} />
               <NarrativeItem label="Diagnostic" value={incident.diagnostic} />
               <NarrativeItem label="Intervention" value={incident.intervention_note} />
@@ -558,7 +554,7 @@ export default function IncidentDetailPanel({
         )}
 
         {hasResponsibleInstruction && (
-          <DrawerSection title="Consigne responsable">
+          <DrawerSection title="Consigne du responsable">
             {incident.responsible_comment && (
               <div className="incident-instruction-card">
                 <p>{incident.responsible_comment}</p>
@@ -568,7 +564,7 @@ export default function IncidentDetailPanel({
               <div className="incident-responsible-editor">
                 <div className="form-group">
                   <label className="sr-only" htmlFor={`responsible-comment-detail-${incident.id}`}>
-                    Consigne responsable
+                    Consigne du responsable
                   </label>
                   <textarea
                     id={`responsible-comment-detail-${incident.id}`}

@@ -1,5 +1,5 @@
 import type { IncidentStatus, WorkshopBoardIncident } from '../../types';
-import { STATE_LABELS } from '../../utils/labels';
+import { formatStateLabel } from '../../utils/labels';
 import { isOpenOverSevenDays, statusLabel } from '../../utils/boardUtils';
 import { formatElapsed } from '../../utils/date';
 import { incidentAttentionLevel } from '../../utils/attention';
@@ -75,9 +75,7 @@ export default function BoardIncidentGrid({
             <div className="board-incident-top">
               <strong>Ligne {incident.line_number}</strong>
               <div className="board-incident-top-status">
-                <span className="board-incident-state">
-                  {STATE_LABELS[incident.state] ?? incident.state}
-                </span>
+                <span className="board-incident-state">{formatStateLabel(incident.state)}</span>
                 {incident.is_priority && (
                   <span className="board-chip board-chip-priority">Urgent</span>
                 )}

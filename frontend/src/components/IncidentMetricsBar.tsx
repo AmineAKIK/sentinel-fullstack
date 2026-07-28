@@ -182,6 +182,7 @@ export default function IncidentMetricsBar({
 
   function renderMetricTile(cfg: MetricConfig, metricData: WorkshopIncidentMetrics) {
     const value = cfg.getValue(metricData, extras);
+    const followedResolved = metricData.followed_resolved ?? 0;
     const badgeValue = cfg.getBadgeValue?.(metricData, extras) ?? 0;
     const hasNotificationBadge = badgeValue > 0;
     const badgeLabel = badgeValue > 99 ? '99+' : String(badgeValue);
@@ -208,8 +209,10 @@ export default function IncidentMetricsBar({
             {badgeLabel}
           </span>
         )}
-        {cfg.key === 'followed' && (metricData.followed_resolved ?? 0) > 0 && (
-          <small>{metricData.followed_resolved} clôturé(s)</small>
+        {cfg.key === 'followed' && followedResolved > 0 && (
+          <small>
+            {followedResolved} {followedResolved > 1 ? 'clôturés' : 'clôturé'}
+          </small>
         )}
       </button>
     );

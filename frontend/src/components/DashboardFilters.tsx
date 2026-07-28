@@ -97,7 +97,7 @@ export default function DashboardFilters({
 
         <FilterSummary
           count={filteredCount}
-          countLabel="incident(s) affiché(s)"
+          countLabel={{ singular: 'incident affiché', plural: 'incidents affichés' }}
           chips={filterChips}
           emptyText="Aucun filtre actif"
           className="filter-summary-embedded"

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { listWorkshopHistoryEvents, listWorkshopLines } from '../api/workshop';
 import { ProductionLine, WorkshopHistoryEvent } from '../types';
-import { EVENT_LABELS, formatEventActor } from '../utils/workshopHistory';
+import { formatEventActor, formatEventLabel } from '../utils/workshopHistory';
 import {
   buildIncidentWorkspaceParams,
   withWorkshopLineFilter,
@@ -184,11 +184,7 @@ export function useJournalData() {
           return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         case 'action':
           return (
-            dir *
-            (EVENT_LABELS[a.event_type] ?? a.event_type).localeCompare(
-              EVENT_LABELS[b.event_type] ?? b.event_type,
-              'fr'
-            )
+            dir * formatEventLabel(a.event_type).localeCompare(formatEventLabel(b.event_type), 'fr')
           );
         case 'incident':
           return (

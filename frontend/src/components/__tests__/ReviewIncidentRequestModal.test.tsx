@@ -176,6 +176,25 @@ describe('ReviewIncidentRequestModal', () => {
     vi.clearAllMocks();
   });
 
+  it('ne rend aucune section Diagnostic pour une valeur vide ou blanche', () => {
+    render(
+      <ReviewIncidentRequestModal
+        incident={mockIncident({
+          comment: null,
+          diagnostic: '   ',
+          intervention_note: null,
+        })}
+        lines={[]}
+        type="edit"
+        loading={false}
+        error=""
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText('Diagnostic')).not.toBeInTheDocument();
+  });
+
   it('sépare l’annulation et la consultation explicite du dossier', () => {
     const onReport = vi.fn();
     const onConsult = vi.fn();

@@ -499,7 +499,7 @@ export default function WorkshopDashboardPage() {
 
         <FilterSummary
           count={filteredIncidents.length}
-          countLabel="incident(s) affiché(s)"
+          countLabel={{ singular: 'incident affiché', plural: 'incidents affichés' }}
           chips={filterChips}
           onClear={clearAllFilters}
         />

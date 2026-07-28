@@ -6,6 +6,7 @@ import { ProductionLine } from '../types';
 import { LineFormData } from './LineForm';
 import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
 import { useMutationRunner } from './ui/MutationFeedback';
+import { formatCount } from '../utils/french';
 
 interface EditLineSummaryModalProps {
   line: ProductionLine;
@@ -60,8 +61,8 @@ export default function EditLineSummaryModal({
     changes.push({
       field: 'machines',
       label: 'Ordre des machines',
-      oldVal: `${line.machines.length} machine(s) — ${formatMachineOrder(line.machines)}`,
-      newVal: `${form.machines.length} machine(s) — ${formatMachineOrder(form.machines.map(normalizeLineMachine))}`,
+      oldVal: `${formatCount(line.machines.length, 'machine', 'machines')} — ${formatMachineOrder(line.machines)}`,
+      newVal: `${formatCount(form.machines.length, 'machine', 'machines')} — ${formatMachineOrder(form.machines.map(normalizeLineMachine))}`,
     });
   }
 

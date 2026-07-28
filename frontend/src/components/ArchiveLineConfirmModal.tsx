@@ -3,6 +3,7 @@ import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { archiveLine, getLineImpact } from '../api/lines';
 import { ProductionLine } from '../types';
 import { useMutationRunner } from './ui/MutationFeedback';
+import { formatCount, inflect } from '../utils/french';
 
 interface ArchiveLineConfirmModalProps {
   line: ProductionLine;
@@ -40,14 +41,20 @@ export default function ArchiveLineConfirmModal({
     onSuccess();
   }
 
-  const title = forceMode ? `Archiver et annuler ${activeCount} incident(s)` : 'Archiver la ligne';
+  const title = forceMode
+    ? `Archiver et annuler ${formatCount(activeCount, 'incident', 'incidents')}`
+    : 'Archiver la ligne';
 
   return (
     <AdminPasswordConfirmModal
       title={title}
       onClose={onClose}
       onConfirm={handleConfirm}
-      confirmLabel={forceMode ? `Annuler ${activeCount} incident(s) et archiver` : 'Archiver'}
+      confirmLabel={
+        forceMode
+          ? `Annuler ${formatCount(activeCount, 'incident', 'incidents')} et archiver`
+          : 'Archiver'
+      }
       mutationKey={`admin:line:${line.id}:archive`}
       successMessage="Ligne archivée."
       failureMessage="Impossible d’archiver la ligne."
@@ -60,11 +67,12 @@ export default function ArchiveLineConfirmModal({
 
       {impact && impact.incidents > 0 && (
         <div className="notice" style={{ marginTop: 12 }}>
-          {impact.incidents} incident(s) lié(s) à cette ligne au total.
+          {formatCount(impact.incidents, 'incident lié', 'incidents liés')} à cette ligne au total.
           {hasActiveIncidents && (
             <>
               {' '}
-              <strong>{activeCount} actif(s)</strong> — doivent être traités avant archivage.
+              <strong>{formatCount(activeCount, 'actif', 'actifs')}</strong> —{' '}
+              {inflect(activeCount, 'doit être traité', 'doivent être traités')} avant archivage.
             </>
           )}
         </div>
@@ -78,7 +86,7 @@ export default function ArchiveLineConfirmModal({
             style={{ fontSize: 13, width: '100%' }}
             onClick={() => setForceMode(true)}
           >
-            Annuler les {activeCount} incident(s) actif(s) et archiver
+            Annuler {formatCount(activeCount, 'incident actif', 'incidents actifs')} et archiver
           </button>
           <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 6 }}>
             Les incidents actifs seront annulés automatiquement. Cette action est irréversible.
@@ -88,8 +96,9 @@ export default function ArchiveLineConfirmModal({
 
       {forceMode && (
         <div className="notice notice--danger" style={{ marginTop: 12 }}>
-          <strong>Attention :</strong> {activeCount} incident(s) actif(s) seront annulés
-          définitivement avec la ligne.
+          <strong>Attention :</strong>{' '}
+          {formatCount(activeCount, 'incident actif', 'incidents actifs')}{' '}
+          {inflect(activeCount, 'sera annulé', 'seront annulés')} définitivement avec la ligne.
           <button
             type="button"
             className="btn btn-ghost"

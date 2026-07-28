@@ -32,8 +32,8 @@ describe('formatEventLabel (lot 9 — aucune donnée technique)', () => {
 });
 
 describe('formatEventActor', () => {
-  it('retourne "Systeme" si pas de prénom', () => {
-    expect(formatEventActor(event({ first_name: null }))).toBe('Systeme');
+  it('traduit le rôle si le nom est absent', () => {
+    expect(formatEventActor(event({ first_name: null, role: null }))).toBe('Système');
   });
 
   it('concatène prénom nom', () => {
@@ -47,7 +47,7 @@ describe('formatEventActor', () => {
       event({ first_name: 'Bob', last_name: 'Smith', role: 'MAINTENANCE' })
     );
     expect(result).toContain('Bob Smith');
-    expect(result).toContain('MAINTENANCE');
+    expect(result).toContain('Technicien');
   });
 });
 

@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { WorkshopIncident } from '../types';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { incidentAttentionLevel } from '../utils/attention';
-import { ROLE_LABELS } from '../utils/labels';
+import { formatRoleLabel } from '../utils/labels';
 import {
   IncidentFollowedChip,
   IncidentPriorityChip,
@@ -159,9 +159,7 @@ export default function IncidentCard({
                   <strong>
                     {`${incident.taken_by_first_name} ${incident.taken_by_last_name || ''}`.trim()}
                   </strong>
-                  {incident.taken_by_role
-                    ? ` (${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role})`
-                    : ''}
+                  {incident.taken_by_role ? ` (${formatRoleLabel(incident.taken_by_role)})` : ''}
                 </span>
               ) : (
                 <span className="incident-meta-item">Non pris</span>
@@ -171,12 +169,12 @@ export default function IncidentCard({
         </div>
         <div className="incident-card-footer">
           Créé par {`${incident.first_name} ${incident.last_name}`.trim()} ·{' '}
-          {ROLE_LABELS[incident.role] || incident.role}
+          {formatRoleLabel(incident.role)}
         </div>
 
         {incident.responsible_comment && (
           <div className="incident-responsible-instruction">
-            <strong>Consigne responsable</strong>
+            <strong>Consigne du responsable</strong>
             <p>{incident.responsible_comment}</p>
           </div>
         )}

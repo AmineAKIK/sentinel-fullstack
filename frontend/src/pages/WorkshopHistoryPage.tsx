@@ -6,7 +6,7 @@ import ErrorBanner from '../components/ui/ErrorBanner';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import WorkshopFilterCard from '../components/WorkshopFilterCard';
 import IncidentDossier from '../components/IncidentDossier';
-import { STATUS_LABELS, STATE_LABELS } from '../utils/labels';
+import { formatStateLabel, formatStatusLabel } from '../utils/labels';
 import { formatDateTime } from '../utils/workshopHistory';
 import {
   lineFilterChip,
@@ -60,7 +60,7 @@ export default function WorkshopHistoryPage() {
       ? [
           {
             key: 'status',
-            label: `Statut: ${STATUS_LABELS[statusFilter] ?? statusFilter}`,
+            label: `Statut: ${formatStatusLabel(statusFilter)}`,
             onRemove: () => {
               setStatusFilter('all');
               updateSearchFilter('status', 'all');
@@ -122,7 +122,7 @@ export default function WorkshopHistoryPage() {
             updateSearchFilter('state', v);
           }}
           count={incidents.length}
-          countLabel="incident(s) affiché(s)"
+          countLabel={{ singular: 'incident affiché', plural: 'incidents affichés' }}
           chips={filterChips}
           onClear={clearFilters}
           emptyText="Historique complet"
@@ -169,9 +169,7 @@ export default function WorkshopHistoryPage() {
                           Ligne {inc.line_number} · {inc.machine_id}
                         </span>
                         <span className="history-incident-pills">
-                          <span className="status-pill">
-                            {STATUS_LABELS[inc.status] ?? inc.status}
-                          </span>
+                          <span className="status-pill">{formatStatusLabel(inc.status)}</span>
                           {inc.status === 'CLOSED' && inc.intervention_note && (
                             <span className="status-pill status-pill-soft">Connaissance</span>
                           )}
@@ -180,8 +178,7 @@ export default function WorkshopHistoryPage() {
                           )}
                         </span>
                         <span className="history-incident-meta">
-                          {STATE_LABELS[inc.state] ?? inc.state} · {inc.robot_label} · Tête{' '}
-                          {inc.head_number}
+                          {formatStateLabel(inc.state)} · {inc.robot_label} · Tête {inc.head_number}
                         </span>
                         <span className="history-incident-footer">
                           <span className="history-incident-meta">

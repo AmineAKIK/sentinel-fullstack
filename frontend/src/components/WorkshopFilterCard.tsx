@@ -1,4 +1,4 @@
-import FilterSummary, { FilterChip } from './FilterSummary';
+import FilterSummary, { CountLabel, FilterChip } from './FilterSummary';
 import SelectField from './ui/SelectField';
 import { STATUS_LABELS, STATE_LABELS } from '../utils/labels';
 import { getWorkshopMachineOptions } from '../utils/workshopFilters';
@@ -24,7 +24,7 @@ type WorkshopFilterCardProps = {
   stateFilter: string;
   onStateFilterChange: (value: string) => void;
   count: number;
-  countLabel: string;
+  countLabel: CountLabel;
   chips: FilterChip[];
   onClear: () => void;
   emptyText: string;

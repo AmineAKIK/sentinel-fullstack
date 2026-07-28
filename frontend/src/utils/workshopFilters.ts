@@ -1,7 +1,7 @@
 import type { IncidentWorkspaceParams } from '../api/workshop';
 import type { FilterChip } from '../components/FilterSummary';
 import type { ProductionLine } from '../types';
-import { STATE_LABELS } from './workshopHistory';
+import { formatStateLabel } from './labels';
 
 export function getWorkshopMachineOptions(
   lines: ProductionLine[],
@@ -94,7 +94,7 @@ export function stateFilterChip(stateFilter: string, onRemove: () => void): Filt
   return [
     {
       key: 'state',
-      label: `État ligne : ${STATE_LABELS[stateFilter] || stateFilter}`,
+      label: `État ligne : ${formatStateLabel(stateFilter)}`,
       onRemove,
     },
   ];
