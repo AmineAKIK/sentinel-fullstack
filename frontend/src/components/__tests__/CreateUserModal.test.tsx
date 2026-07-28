@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as testingLibraryRender, screen, waitFor } from '@testing-library/react';
 
 vi.mock('../../api/accounts', () => ({
   checkBadgeAvailability: vi.fn(),
@@ -10,6 +10,11 @@ vi.mock('../../api/accounts', () => ({
 import * as accountsApi from '../../api/accounts';
 import CreateUserModal from '../CreateUserModal';
 import type { SentinelUser } from '../../types';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
+
+function render(ui: React.ReactNode) {
+  return testingLibraryRender(<MutationFeedbackProvider>{ui}</MutationFeedbackProvider>);
+}
 
 beforeEach(() => {
   vi.clearAllMocks();

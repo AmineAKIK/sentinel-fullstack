@@ -29,4 +29,32 @@ test.describe('Accès Board', () => {
     await expect(page.locator('main.board-page')).toBeVisible();
     await expect(page.getByLabel("Code d'accès")).not.toBeVisible();
   });
+
+  test('un échec réseau à la sortie conserve le Board et permet un vrai réessai', async ({
+    page,
+  }) => {
+    await page.goto('/board');
+    await page.getByLabel("Code d'accès").fill(E2E_BOARD_CODE);
+    await page.getByRole('button', { name: 'Accéder au tableau' }).click();
+    await expect(page.locator('main.board-page')).toBeVisible();
+
+    let logoutRequests = 0;
+    const failLogout = async (route: import('@playwright/test').Route) => {
+      logoutRequests += 1;
+      await route.abort('failed');
+    };
+    await page.route('**/api/board/logout', failLogout);
+
+    const quit = page.getByRole('button', { name: 'Quitter' });
+    await quit.click();
+    await expect(page.getByRole('alert')).toHaveText('Impossible de quitter le Board. Réessayez.');
+    await expect(page.locator('main.board-page')).toBeVisible();
+    await expect(quit).toBeEnabled();
+    await expect(quit).toBeFocused();
+    expect(logoutRequests).toBe(1);
+
+    await page.unroute('**/api/board/logout', failLogout);
+    await quit.click();
+    await page.waitForURL('**/login');
+  });
 });

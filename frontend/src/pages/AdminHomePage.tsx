@@ -13,8 +13,9 @@ import {
 } from '../api/admin';
 import { ReferenceDashboard, ReferenceQuality } from '../types';
 import { formatDateTime } from '../utils/date';
-import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
+import { formatAdminEventLabel, formatAuditEventTarget } from '../utils/labels';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { inflect } from '../utils/french';
 
 export default function AdminHomePage() {
   usePageTitle('Accueil administration');
@@ -115,31 +116,61 @@ export default function AdminHomePage() {
                   {quality.users_without_password.length > 0 && (
                     <button className="quality-item" onClick={() => navigate('/admin/users')}>
                       <strong>{quality.users_without_password.length}</strong>
-                      <span>utilisateur(s) actif(s) sans mot de passe</span>
+                      <span>
+                        {inflect(
+                          quality.users_without_password.length,
+                          'utilisateur actif sans mot de passe',
+                          'utilisateurs actifs sans mot de passe'
+                        )}
+                      </span>
                     </button>
                   )}
                   {quality.inactive_users.length > 0 && (
                     <button className="quality-item" onClick={() => navigate('/admin/users')}>
                       <strong>{quality.inactive_users.length}</strong>
-                      <span>utilisateur(s) inactif(s)</span>
+                      <span>
+                        {inflect(
+                          quality.inactive_users.length,
+                          'utilisateur inactif',
+                          'utilisateurs inactifs'
+                        )}
+                      </span>
                     </button>
                   )}
                   {quality.inactive_lines.length > 0 && (
                     <button className="quality-item" onClick={() => navigate('/admin/lines')}>
                       <strong>{quality.inactive_lines.length}</strong>
-                      <span>ligne(s) inactive(s)</span>
+                      <span>
+                        {inflect(
+                          quality.inactive_lines.length,
+                          'ligne inactive',
+                          'lignes inactives'
+                        )}
+                      </span>
                     </button>
                   )}
                   {quality.malformed_machines.length > 0 && (
                     <button className="quality-item" onClick={() => navigate('/admin/lines')}>
                       <strong>{quality.malformed_machines.length}</strong>
-                      <span>machine(s) à compléter</span>
+                      <span>
+                        {inflect(
+                          quality.malformed_machines.length,
+                          'machine à compléter',
+                          'machines à compléter'
+                        )}
+                      </span>
                     </button>
                   )}
                   {quality.duplicate_machines.length > 0 && (
                     <button className="quality-item" onClick={() => navigate('/admin/lines')}>
                       <strong>{quality.duplicate_machines.length}</strong>
-                      <span>machine(s) en doublon</span>
+                      <span>
+                        {inflect(
+                          quality.duplicate_machines.length,
+                          'machine en doublon',
+                          'machines en doublon'
+                        )}
+                      </span>
                     </button>
                   )}
                 </div>
@@ -168,7 +199,7 @@ export default function AdminHomePage() {
                   {recentEvents.map((event) => (
                     <div className="audit-item" key={`${event.scope}-${event.id}`}>
                       <div>
-                        <strong>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</strong>
+                        <strong>{formatAdminEventLabel(event.event_type)}</strong>
                         <span>{formatAuditEventTarget(event)}</span>
                       </div>
                       <small>{formatDateTime(event.created_at)}</small>

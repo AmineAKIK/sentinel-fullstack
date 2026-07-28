@@ -1,5 +1,6 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface DeleteRequestModalProps {
   incident: WorkshopIncident;
@@ -26,6 +27,7 @@ export default function DeleteRequestModal({
       placeholder="Erreur de saisie, doublon, mauvais équipement..."
       confirmLabel="Envoyer la demande"
       loadingLabel="Envoi…"
+      mutationKey={WORKSHOP_MUTATION_KEYS.REQUEST_CANCEL}
       requiredMessage="Merci de renseigner le motif d’annulation."
       failureMessage="Impossible d'envoyer la demande d’annulation."
       textareaId="deleteRequestReason"

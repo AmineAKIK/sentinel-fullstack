@@ -4,7 +4,7 @@ import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import WorkshopFilterCard from '../components/WorkshopFilterCard';
-import { STATUS_LABELS } from '../utils/labels';
+import { formatStatusLabel } from '../utils/labels';
 import {
   EVENT_LABELS,
   formatDateTime,
@@ -20,6 +20,7 @@ import {
 } from '../utils/workshopFilters';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useJournalData, SortCol } from '../hooks/useJournalData';
+import { formatCount } from '../utils/french';
 
 // Les 19 types d'événement effectivement émis par le backend (grep sur les
 // appels logIncidentEvent). INCIDENT_REORDERED, ORDER_CHANGED (réordonnancement
@@ -95,7 +96,7 @@ export default function WorkshopJournalPage() {
       ? [
           {
             key: 'status',
-            label: `Statut: ${STATUS_LABELS[statusFilter] ?? statusFilter}`,
+            label: `Statut: ${formatStatusLabel(statusFilter)}`,
             onRemove: () => {
               setStatusFilter('all');
               updateSearchFilter('status', 'all');
@@ -175,7 +176,7 @@ export default function WorkshopJournalPage() {
             updateSearchFilter('state', v);
           }}
           count={historyEvents.length}
-          countLabel="action(s) affichée(s)"
+          countLabel={{ singular: 'action affichée', plural: 'actions affichées' }}
           chips={filterChips}
           onClear={clearFilters}
           emptyText="Journal complet"
@@ -227,7 +228,9 @@ export default function WorkshopJournalPage() {
                 </button>
               )}
               <span className="history-event-count muted">
-                {historyEventsLoading ? 'Chargement…' : `${historyEvents.length} action(s)`}
+                {historyEventsLoading
+                  ? 'Chargement…'
+                  : formatCount(historyEvents.length, 'action', 'actions')}
               </span>
             </div>
 

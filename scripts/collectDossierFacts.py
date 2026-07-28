@@ -8,15 +8,15 @@ Le script ÉCHOUE (exit 1, exception explicite) dès qu'un fait ne peut pas êtr
 
 Les compteurs de tests proviennent de rapports JSON produits par les suites
 réellement exécutées (Jest --json, Vitest --reporter=json, Playwright
---list --reporter=json), passés en argument. Le script refuse un rapport dont
-`success` n'est pas vrai : on ne compte que des tests réellement passants.
+--reporter=json), passés en argument. Le script refuse tout rapport incomplet
+ou non vert : on ne compte que des tests réellement passants.
 
 Usage :
   # 1. produire les rapports (depuis backend/ et frontend/)
   cd backend  && npm test -- --selectProjects unit        --json --outputFile=/tmp/unit.json
   cd backend  && DATABASE_URL=... npm run test:integration -- --json --outputFile=/tmp/integ.json
   cd frontend && npx vitest run --reporter=json --outputFile=/tmp/front.json
-  cd frontend && npx playwright test --list --reporter=json > /tmp/e2e.json
+  cd frontend && npx playwright test --reporter=json > /tmp/e2e.json
   # 2. collecter
   python3 scripts/collectDossierFacts.py \
       --unit-report /tmp/unit.json --integration-report /tmp/integ.json \
@@ -134,20 +134,25 @@ def read_jest_report(path: Path) -> int:
     return int(total)
 
 
-def read_playwright_list(path: Path) -> int:
+def read_playwright_report(path: Path) -> int:
     data = json.loads(path.read_text(encoding="utf-8"))
-    count = 0
-
-    def walk(suites: list) -> None:
-        nonlocal count
-        for suite in suites:
-            count += len(suite.get("specs", []))
-            walk(suite.get("suites", []))
-
-    walk(data.get("suites", []))
-    if count <= 0:
-        raise FactError(f"Aucun test Playwright listé : {path}")
-    return count
+    stats = data.get("stats")
+    if not isinstance(stats, dict):
+        raise FactError(f"Statistiques Playwright absentes : {path}")
+    expected = stats.get("expected")
+    skipped = stats.get("skipped")
+    unexpected = stats.get("unexpected")
+    flaky = stats.get("flaky")
+    if not all(isinstance(value, int) for value in (expected, skipped, unexpected, flaky)):
+        raise FactError(f"Statistiques Playwright incohérentes : {path}")
+    if expected <= 0:
+        raise FactError(f"Rapport Playwright sans test passant : {path}")
+    if skipped != 0 or unexpected != 0 or flaky != 0:
+        raise FactError(
+            "Rapport Playwright non entièrement vert "
+            f"(passed={expected}, skipped={skipped}, unexpected={unexpected}, flaky={flaky}) : {path}"
+        )
+    return int(expected)
 
 
 def main() -> int:
@@ -170,7 +175,7 @@ def main() -> int:
     unit = read_jest_report(args.unit_report)
     integration = read_jest_report(args.integration_report)
     frontend = read_jest_report(args.frontend_report)
-    e2e = read_playwright_list(args.e2e_report)
+    e2e = read_playwright_report(args.e2e_report)
 
     tables = collect_tables()
     facts = {

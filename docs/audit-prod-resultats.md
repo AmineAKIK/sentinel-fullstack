@@ -151,6 +151,11 @@ du lot de stabilisation, notamment Express 5, React 19, React Router 7, Zod 4 et
 TypeScript 7. Elles exigent chacune une campagne dédiée et ne sont pas introduites
 à la veille d'une soutenance.
 
+Au contrôle RC4 du 28 juillet 2026, l'audit production backend signale zéro
+vulnérabilité. L'audit frontend conserve deux advisories React Router modérées,
+suivies dans l'issue `#29`. La migration React Router 7 reste hors RC4 et aucun
+`npm audit fix --force` n'est admis.
+
 Dependabot regroupe les mises à jour mineures et correctives, tandis que les
 versions majeures restent réservées à ces campagnes de migration. Les mises à
 jour de sécurité ne sont pas désactivées. Pour l'image frontend, la branche
@@ -196,9 +201,11 @@ courte devra être consignée.
 Ces points ne constituent pas une preuve locale et restent obligatoires avant un
 GO de production :
 
-1. restauration réelle d'un backup sur un environnement isolé avec mesure RTO ;
+1. sauvegarde réelle du VPS, copie hors site et RTO sur l'infrastructure cible
+   (l'exercice PostgreSQL jetable local RC4 est vert `11/11`, RTO `5 s`) ;
 2. charge et endurance sur un volume représentatif ;
-3. audit axe/Lighthouse, clavier et lecteur d'écran ;
+3. Lighthouse et lecteur d'écran manuel (axe-core, clavier et focus RC4 sont
+   verts localement) ;
 4. recette Chrome, Edge, Firefox, Safari et écran Board cible ;
 5. déploiement du candidat validé, puis vérification HTTPS des cookies, headers,
    CORS, SMTP, logs et du SHA retourné par `/api/health`.

@@ -399,7 +399,7 @@ describe('archiveLineService', () => {
     const result = await archiveLineService(1, 1, true);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.message).toContain('3 incident(s) actif(s) annulé(s)');
+      expect(result.data.message).toContain('3 incidents actifs annulés');
       expect(result.data.canceledIncidents).toBe(3);
     }
     const logIncidentEvent = jest.mocked(workshopEvents.logIncidentEvent);

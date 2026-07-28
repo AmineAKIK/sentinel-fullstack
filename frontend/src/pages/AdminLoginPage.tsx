@@ -7,6 +7,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { isDigitsOnly } from '../utils/identifiers';
 import { isWithinBcryptByteLimit } from '../utils/passwordPolicy';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
 
 export default function AdminLoginPage() {
   usePageTitle('Connexion administration');
@@ -14,7 +15,8 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const loading = mutation.pending;
 
   const { setSession } = useAppAuth();
   const navigate = useNavigate();
@@ -35,19 +37,20 @@ export default function AdminLoginPage() {
     }
 
     if (!showPassword) {
-      setLoading(true);
-      try {
-        const response = await unifiedLogin(identifier.trim());
+      const result = await mutation.execute(() => unifiedLogin(identifier.trim()), {
+        key: 'auth:admin:identify',
+        errorPresentation: 'local',
+        toErrorMessage: () => 'Identifiant ou mot de passe incorrect.',
+        onError: (_err, safeMessage) => setError(safeMessage),
+      });
+      if (result.status === 'success') {
+        const response = result.value;
         if ('requiresPassword' in response) {
           setShowPassword(true);
           setPassword('');
         } else {
           setError('Identifiant ou mot de passe incorrect.');
         }
-      } catch {
-        setError('Identifiant ou mot de passe incorrect.');
-      } finally {
-        setLoading(false);
       }
       return;
     }
@@ -61,10 +64,15 @@ export default function AdminLoginPage() {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await unifiedLogin(identifier.trim(), password);
+    const result = await mutation.execute(() => unifiedLogin(identifier.trim(), password), {
+      key: 'auth:admin:login',
+      errorPresentation: 'local',
+      toErrorMessage: (err) => apiErrorMessage(err, 'Identifiant ou mot de passe incorrect.'),
+      onError: (_err, safeMessage) => setError(safeMessage),
+    });
 
+    if (result.status === 'success') {
+      const response = result.value;
       if ('requiresPassword' in response || 'requiresPasswordSetup' in response) {
         setError('Identifiant ou mot de passe incorrect.');
         return;
@@ -77,10 +85,6 @@ export default function AdminLoginPage() {
 
       setSession({ accountType: 'admin', admin: { id: response.id, username: response.username } });
       navigate('/admin/accueil', { replace: true, state: null });
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Identifiant ou mot de passe incorrect.'));
-    } finally {
-      setLoading(false);
     }
   }
 

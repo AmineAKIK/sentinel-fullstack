@@ -22,6 +22,7 @@ import {
 import { logIncidentEvent } from '../workshop/workshop.events';
 import { supersedeOpenArbitrationCases } from '../workshop/workshop.arbitration.repository';
 import { CreateLineInput, UpdateLineInput } from './lines.validation';
+import { formatCount } from '../../utils/french';
 
 const lineNumberConstraints = new Set([
   'idx_production_lines_line_number_active',
@@ -215,7 +216,11 @@ export async function updateLineService(
         ok: false,
         status: 409,
         code: 'RESOURCE_IN_USE',
-        message: `Impossible de modifier la structure de cette ligne : ${result.activeIncidents} incident(s) actif(s) y sont encore liés.`,
+        message: `Impossible de modifier la structure de cette ligne : ${formatCount(
+          result.activeIncidents,
+          'incident actif y est encore lié',
+          'incidents actifs y sont encore liés'
+        )}.`,
         details: { reason: 'LINE_STRUCTURE_LOCKED', count: result.activeIncidents },
       };
     }
@@ -275,7 +280,11 @@ export async function archiveLineService(
       ok: false,
       status: 409,
       code: 'LINE_HAS_ACTIVE_INCIDENTS',
-      message: `Cette ligne a ${result.activeCount} incident(s) actif(s). Annulez-les d'abord ou forcez l'archivage.`,
+      message: `Cette ligne a ${formatCount(
+        result.activeCount,
+        'incident actif',
+        'incidents actifs'
+      )}. Annulez-les d'abord ou forcez l'archivage.`,
     };
   }
 
@@ -284,7 +293,11 @@ export async function archiveLineService(
     data: {
       message:
         result.canceledCount > 0
-          ? `Ligne archivée. ${result.canceledCount} incident(s) actif(s) annulé(s).`
+          ? `Ligne archivée. ${formatCount(
+              result.canceledCount,
+              'incident actif annulé',
+              'incidents actifs annulés'
+            )}.`
           : 'Ligne archivée.',
       canceledIncidents: result.canceledCount,
     },

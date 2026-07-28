@@ -4,7 +4,7 @@ Une publication est autorisée uniquement lorsque chaque contrôle applicable es
 coché et rattaché au commit candidat.
 
 La stabilisation `v1.0.0` est pilotée dans
-[release-readiness.md](release-readiness.md). Aucun candidat ne peut recevoir un
+[release-readiness-rc4.md](release-readiness-rc4.md). Aucun candidat ne peut recevoir un
 `GO` tant qu'un constat `P0` ou `P1` de ce registre n'est pas `VERIFIED`.
 
 ## 1. Dépôt
@@ -90,6 +90,11 @@ npm run test:e2e
 - [ ] Reporter conserve le cas actif et ouvre le dossier en haut sur mobile
 - [ ] aucune modale, aucun bouton et aucun contenu ne déborde horizontalement
 - [ ] le body est verrouillé pendant une modale et redevient scrollable après fermeture
+- [ ] corps de carte, titre, Entrée et Espace activent le dossier ; étoile et arbitrage restent indépendants
+- [ ] panneau haut/milieu/bas, molette interne, mobile, resize et zoom 200 % sont verts
+- [ ] motif Board avant/après reprise, correction et annulation complètes sont verts
+- [ ] erreurs et réessais Admin/Auth/Board/Support conservent saisie, modale et focus
+- [ ] axe-core ne signale aucune violation critique ou sérieuse sur les pages et états principaux
 
 ## 6. Configuration production
 
@@ -120,7 +125,9 @@ npm run test:e2e
 - [ ] PostgreSQL n'est attaché qu'au réseau interne
 - [ ] healthchecks backend, frontend et PostgreSQL passent
 - [ ] les logs sont bornés par rotation
-- [ ] ShellCheck valide `scripts/backup.sh` et `scripts/restore.sh`
+- [ ] ShellCheck valide tous les scripts shell suivis
+- [ ] les deux advisories React Router modérées restent rattachées à l'issue `#29`
+      sans migration React Router 7 ni `npm audit fix --force`
 
 ## 8. Recette manuelle
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getBoardData, logoutBoardSession } from '../api/board';
 import { ApiResponseError } from '../api/client';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
 import Modal from '../components/Modal';
 import SelectField from '../components/ui/SelectField';
 import BoardIncidentGrid, { BoardEmptyState } from '../components/board/BoardIncidentGrid';
@@ -20,6 +21,7 @@ import {
 } from '../utils/boardUtils';
 import { usePageTitle } from '../hooks/usePageTitle';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import { inflect } from '../utils/french';
 
 type BoardView = 'alerts' | 'all' | 'lines';
 const VIEWS: BoardView[] = ['alerts', 'all', 'lines'];
@@ -152,6 +154,7 @@ function applyPreset(preset: BoardPreset, current: BoardSettings): BoardSettings
 }
 
 export default function WorkshopBoardPage() {
+  const mutation = useMutationRunner();
   usePageTitle('Tableau temps réel');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -159,6 +162,7 @@ export default function WorkshopBoardPage() {
   // On détecte localement un utilisateur atelier connecté (échec silencieux
   // pour un écran kiosque sans session) pour afficher le retour dashboard.
   const [isWorkshopUser, setIsWorkshopUser] = useState(false);
+  const exitButtonRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void getUnifiedMe(controller.signal)
@@ -362,19 +366,42 @@ export default function WorkshopBoardPage() {
     setDraftSettings((prev) => ({ ...prev, ...updates, preset: 'custom' }));
   }
 
-  function saveSettings() {
-    if (!saveBoardSettings(storageKey, draftSettings)) {
-      setSettingsError("Impossible d'enregistrer les paramètres sur cet écran.");
-      return;
-    }
-    setSettings(normalizeBoardSettings(draftSettings));
+  async function saveSettings() {
     setSettingsError('');
-    setShowSettings(false);
+    await mutation.execute(
+      () => {
+        if (!saveBoardSettings(storageKey, draftSettings)) {
+          throw new Error('BOARD_SETTINGS_STORAGE_FAILED');
+        }
+        return Promise.resolve(normalizeBoardSettings(draftSettings));
+      },
+      {
+        key: 'board:settings:save',
+        successMessage: 'Paramètres d’affichage enregistrés.',
+        errorPresentation: 'local',
+        toErrorMessage: () => "Impossible d'enregistrer les paramètres sur cet écran.",
+        onSuccess: (nextSettings) => {
+          setSettings(nextSettings);
+          setShowSettings(false);
+        },
+        onError: (_err, safeMessage) => setSettingsError(safeMessage),
+      }
+    );
   }
 
   async function closeBoardAccess() {
-    await logoutBoardSession().catch(() => undefined);
-    void navigate('/login', { replace: true });
+    const result = await mutation.execute(logoutBoardSession, {
+      key: 'auth:board:logout',
+      toErrorMessage: () => 'Impossible de quitter le Board. Réessayez.',
+      onSuccess: () => void navigate('/login', { replace: true }),
+    });
+    if (result.status === 'error') {
+      requestAnimationFrame(() => {
+        if (exitButtonRef.current?.isConnected) {
+          exitButtonRef.current.focus({ preventScroll: true });
+        }
+      });
+    }
   }
 
   function handleLineToggle(lineId: string) {
@@ -476,9 +503,11 @@ export default function WorkshopBoardPage() {
             </button>
           ) : (
             <button
+              ref={exitButtonRef}
               className="board-exit"
               onClick={() => void closeBoardAccess()}
               aria-label="Quitter"
+              disabled={mutation.isPending('auth:board:logout')}
             >
               <svg
                 width="15"
@@ -496,7 +525,7 @@ export default function WorkshopBoardPage() {
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              Quitter
+              {mutation.isPending('auth:board:logout') ? 'Déconnexion…' : 'Quitter'}
             </button>
           )}
         </div>
@@ -623,8 +652,12 @@ export default function WorkshopBoardPage() {
               >
                 Réinitialiser
               </button>
-              <button className="btn btn-primary" onClick={saveSettings}>
-                Enregistrer
+              <button
+                className="btn btn-primary"
+                onClick={() => void saveSettings()}
+                disabled={mutation.isPending('board:settings:save')}
+              >
+                {mutation.isPending('board:settings:save') ? 'Enregistrement…' : 'Enregistrer'}
               </button>
             </>
           }
@@ -793,7 +826,11 @@ export default function WorkshopBoardPage() {
                       ? 'Toutes les lignes'
                       : draftSettings.lineIds.includes(NO_LINES_SELECTED)
                         ? 'Aucune ligne'
-                        : `${draftSettings.lineIds.length} ligne(s) sélectionnée(s)`}
+                        : `${draftSettings.lineIds.length} ${inflect(
+                            draftSettings.lineIds.length,
+                            'ligne sélectionnée',
+                            'lignes sélectionnées'
+                          )}`}
                   </small>
                 </span>
               </summary>
@@ -846,7 +883,9 @@ export default function WorkshopBoardPage() {
                 {draftSettings.lineIds.length > 0 &&
                   !draftSettings.lineIds.includes(NO_LINES_SELECTED) && (
                     <div className="board-lines-selected-summary">
-                      {draftSettings.lineIds.length} ligne(s) affichée(s) :{' '}
+                      {draftSettings.lineIds.length}{' '}
+                      {inflect(draftSettings.lineIds.length, 'ligne affichée', 'lignes affichées')}{' '}
+                      :{' '}
                       {safeLines
                         .filter((line) => draftSettings.lineIds.includes(String(line.id)))
                         .map((line) => `Ligne ${line.line_number}`)

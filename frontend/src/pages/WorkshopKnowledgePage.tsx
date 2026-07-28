@@ -8,7 +8,7 @@ import WorkshopNavBar from '../components/WorkshopNavBar';
 import WorkshopFilterCard from '../components/WorkshopFilterCard';
 import { WorkshopIncident } from '../types';
 import { formatDateTime } from '../utils/workshopHistory';
-import { STATE_LABELS } from '../utils/labels';
+import { formatStateLabel } from '../utils/labels';
 import { formatElapsed } from '../utils/date';
 import {
   lineFilterChip,
@@ -52,7 +52,7 @@ function KnowledgeCard({ incident, active, onClick }: KnowledgeCardProps) {
     <button type="button" className={`kb-card${active ? ' kb-card-active' : ''}`} onClick={onClick}>
       <div className="kb-card-top">
         <span className={`kb-state-badge ${stateToneClass(incident.state)}`}>
-          {STATE_LABELS[incident.state] || incident.state}
+          {formatStateLabel(incident.state)}
         </span>
         <span className="kb-card-date">{shortDate(incident.updated_at)}</span>
       </div>
@@ -102,7 +102,7 @@ function KnowledgeDetail({
           </h2>
         </div>
         <span className={`kb-state-badge kb-state-badge-lg ${stateToneClass(incident.state)}`}>
-          {STATE_LABELS[incident.state] || incident.state}
+          {formatStateLabel(incident.state)}
         </span>
       </div>
 
@@ -142,7 +142,7 @@ function KnowledgeDetail({
           </div>
         )}
 
-        {incident.diagnostic && (
+        {incident.diagnostic?.trim() && (
           <div className="kb-section">
             <span className="detail-field-label">Diagnostic</span>
             <p>{incident.diagnostic}</p>
@@ -156,7 +156,7 @@ function KnowledgeDetail({
 
         {incident.responsible_comment && (
           <div className="kb-section kb-section-instruction">
-            <span className="detail-field-label">Consigne responsable</span>
+            <span className="detail-field-label">Consigne du responsable</span>
             <p>{incident.responsible_comment}</p>
           </div>
         )}
@@ -178,7 +178,7 @@ function KnowledgeDetail({
                   onClick={() => onSelectRelated(r.id)}
                 >
                   <span className={`kb-state-badge ${stateToneClass(r.state)}`}>
-                    {STATE_LABELS[r.state] || r.state}
+                    {formatStateLabel(r.state)}
                   </span>
                   <span className="kb-related-where">
                     Ligne {r.line_number} · {r.machine_id}
@@ -328,7 +328,7 @@ export default function WorkshopKnowledgePage() {
             updateSearchFilter('state', v);
           }}
           count={incidents.length}
-          countLabel="fiche(s) affichée(s)"
+          countLabel={{ singular: 'fiche affichée', plural: 'fiches affichées' }}
           chips={filterChips}
           onClear={clearFilters}
           emptyText="Base complète"

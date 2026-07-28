@@ -1,6 +1,7 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface CloseIncidentModalProps {
   incident: WorkshopIncident;
@@ -19,13 +20,15 @@ export default function CloseIncidentModal({
       title="Clôturer l'incident"
       notice={
         <>
-          Vous allez clôturer l'incident {incident.line_number} · {incident.machine_id}.
+          Vous allez clôturer l'incident {incident.line_number} · {incident.machine_id}. Cette
+          clôture est définitive. L’incident sera conservé dans l’historique.
         </>
       }
       label="Compte rendu / intervention *"
       placeholder="Décrivez l'intervention réalisée"
       confirmLabel="Clôturer"
       loadingLabel="Clôture…"
+      mutationKey={WORKSHOP_MUTATION_KEYS.CLOSE}
       requiredMessage="Merci de renseigner le compte rendu."
       failureMessage="Impossible de clôturer l'incident."
       textareaId="closeNote"

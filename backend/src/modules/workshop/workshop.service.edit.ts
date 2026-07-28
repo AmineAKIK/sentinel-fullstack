@@ -471,11 +471,20 @@ export async function withdrawEditRequestService(
       'Retrait par le demandeur',
       client
     );
+    const requestPayload = isVersionedCorrectionPayload(arbitration.payload)
+      ? arbitration.payload
+      : {
+          withdrawnFields: requestedChangeKeys(
+            current.edit_request as Record<string, unknown> | null
+          ),
+        };
     await logIncidentEvent(
       incidentId,
       actorUserId,
       'EDIT_REQUEST_WITHDRAWN',
       {
+        ...requestPayload,
+        requestEventId: arbitration.request_event_id ?? undefined,
         withdrawnBy: actorUserId,
       },
       client

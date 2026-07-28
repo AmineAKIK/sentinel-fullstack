@@ -1,5 +1,6 @@
 import ConfirmModal from './ConfirmModal';
 import { WorkshopIncident } from '../types';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface UnfollowIncidentConfirmModalProps {
   incident: WorkshopIncident;
@@ -17,6 +18,7 @@ export default function UnfollowIncidentConfirmModal({
   return (
     <ConfirmModal
       title="Retirer du suivi"
+      mutationKey={WORKSHOP_MUTATION_KEYS.FOLLOW}
       onClose={onClose}
       onConfirm={onConfirm}
       confirmLabel="Retirer du suivi"

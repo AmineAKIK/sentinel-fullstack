@@ -83,6 +83,38 @@ describe('getBoardData', () => {
     expect(boardData.incidents[0]?.has_cancel_arbitration).toBe(true);
     expect(boardData.incidents[0]?.has_edit_arbitration).toBe(false);
   });
+
+  it('projette uniquement le motif courant PENDING et garde les trois requêtes en lecture seule', async () => {
+    mockedPool.query
+      .mockResolvedValueOnce(result([{ id: 1, line_number: 'L01' }]))
+      .mockResolvedValueOnce(
+        result([
+          {
+            id: 10,
+            line_id: 1,
+            line_number: 'L01',
+            waiting_reason: 'Attente pièce complète',
+          },
+        ])
+      )
+      .mockResolvedValueOnce(
+        result([{ total: 1, open_count: 0, pending_count: 1, open_over_7d: 0 }])
+      );
+
+    const boardData = await getBoardData();
+    const queries = mockedPool.query.mock.calls.map(([query]) => String(query));
+    const incidentQuery = queries[1];
+
+    expect(incidentQuery).toMatch(
+      /CASE\s+WHEN status = 'PENDING'\s+AND NULLIF\(btrim\(waiting_reason\), ''\) IS NOT NULL\s+THEN waiting_reason\s+ELSE NULL\s+END AS waiting_reason/
+    );
+    expect(boardData.incidents[0]?.waiting_reason).toBe('Attente pièce complète');
+    expect(incidentQuery).not.toMatch(/\bJOIN\b/i);
+    for (const query of queries) {
+      expect(query.trimStart()).toMatch(/^SELECT\b/i);
+      expect(query).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|FOR\s+UPDATE)\b/i);
+    }
+  });
 });
 
 describe('incident line lock protocol', () => {

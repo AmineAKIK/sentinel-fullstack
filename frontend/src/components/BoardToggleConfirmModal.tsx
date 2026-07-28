@@ -1,4 +1,5 @@
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 type BoardToggleConfirmModalProps = {
   enabling: boolean;
@@ -11,6 +12,7 @@ export default function BoardToggleConfirmModal({
   onClose,
   onConfirm,
 }: BoardToggleConfirmModalProps) {
+  useMutationRunner();
   return (
     <AdminPasswordConfirmModal
       title={enabling ? 'Activer le board atelier ?' : 'Désactiver le board atelier ?'}
@@ -18,6 +20,8 @@ export default function BoardToggleConfirmModal({
       onConfirm={onConfirm}
       confirmLabel={enabling ? 'Activer' : 'Désactiver'}
       loadingLabel={enabling ? 'Activation…' : 'Désactivation…'}
+      mutationKey={`admin:board:${enabling ? 'enable' : 'disable'}`}
+      successMessage={enabling ? 'Board activé.' : 'Board désactivé. Sessions Board révoquées.'}
     >
       {enabling ? (
         <p

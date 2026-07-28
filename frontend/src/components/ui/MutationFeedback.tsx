@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * Mécanisme global unique de retour d'action (contrat UX RC3, lot 1).
@@ -33,19 +34,33 @@ export const SUCCESS_AUTO_DISMISS_MS = 6000;
 type FeedbackState = {
   kind: FeedbackKind | null;
   message: string | null;
+  actionKey: string | null;
+  presentation: 'global' | 'local';
 };
 
 type MutationFeedbackContextValue = FeedbackState & {
-  notifySuccess: (message: string) => void;
-  notifyError: (message: string) => void;
+  pendingKey: string | null;
+  notifySuccess: (message: string, actionKey?: string) => void;
+  notifyError: (message: string, actionKey?: string, presentation?: 'global' | 'local') => void;
   dismiss: () => void;
+  beginMutation: (owner: symbol, actionKey: string) => boolean;
+  finishMutation: (owner: symbol) => void;
 };
 
 const MutationFeedbackContext = createContext<MutationFeedbackContextValue | null>(null);
 
 export function MutationFeedbackProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<FeedbackState>({ kind: null, message: null });
+  const [state, setState] = useState<FeedbackState>({
+    kind: null,
+    message: null,
+    actionKey: null,
+    presentation: 'global',
+  });
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeMutation = useRef<{ owner: symbol; actionKey: string } | null>(null);
+  const mounted = useRef(true);
+  const lastUsefulFocus = useRef<HTMLElement | null>(null);
 
   const clearTimer = useCallback(() => {
     if (dismissTimer.current !== null) {
@@ -56,36 +71,106 @@ export function MutationFeedbackProvider({ children }: { children: React.ReactNo
 
   const dismiss = useCallback(() => {
     clearTimer();
-    setState({ kind: null, message: null });
+    const focused = document.activeElement;
+    if (
+      focused instanceof HTMLElement &&
+      focused.closest('.mutation-feedback-region') &&
+      lastUsefulFocus.current?.isConnected
+    ) {
+      lastUsefulFocus.current.focus({ preventScroll: true });
+    }
+    setState({
+      kind: null,
+      message: null,
+      actionKey: null,
+      presentation: 'global',
+    });
   }, [clearTimer]);
 
   const notifySuccess = useCallback(
-    (message: string) => {
+    (message: string, actionKey = 'feedback') => {
       clearTimer();
-      setState({ kind: 'success', message });
+      setState({ kind: 'success', message, actionKey, presentation: 'global' });
       // Un succès non critique reste affiché ~6 s puis s'efface.
       dismissTimer.current = setTimeout(() => {
         dismissTimer.current = null;
-        setState({ kind: null, message: null });
+        const focused = document.activeElement;
+        if (
+          focused instanceof HTMLElement &&
+          focused.closest('.mutation-feedback-region') &&
+          lastUsefulFocus.current?.isConnected
+        ) {
+          lastUsefulFocus.current.focus({ preventScroll: true });
+        }
+        if (mounted.current) {
+          setState({
+            kind: null,
+            message: null,
+            actionKey: null,
+            presentation: 'global',
+          });
+        }
       }, SUCCESS_AUTO_DISMISS_MS);
     },
     [clearTimer]
   );
 
   const notifyError = useCallback(
-    (message: string) => {
+    (message: string, actionKey = 'feedback', presentation: 'global' | 'local' = 'global') => {
       // Une erreur ne disparaît jamais automatiquement : aucun timer.
       clearTimer();
-      setState({ kind: 'error', message });
+      setState({ kind: 'error', message, actionKey, presentation });
     },
     [clearTimer]
   );
 
-  useEffect(() => clearTimer, [clearTimer]);
+  const beginMutation = useCallback((owner: symbol, actionKey: string): boolean => {
+    // Le ref rend le verrou synchrone : deux activations dans le même tour
+    // d'événement ne peuvent pas précéder la mise à jour React.
+    if (activeMutation.current !== null) return false;
+    activeMutation.current = { owner, actionKey };
+    if (mounted.current) setPendingKey(actionKey);
+    return true;
+  }, []);
+
+  const finishMutation = useCallback((owner: symbol): void => {
+    if (activeMutation.current?.owner !== owner) return;
+    activeMutation.current = null;
+    if (mounted.current) setPendingKey(null);
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    const rememberUsefulFocus = (event: FocusEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        !target.closest('.mutation-feedback-region') &&
+        target.isConnected
+      ) {
+        lastUsefulFocus.current = target;
+      }
+    };
+    document.addEventListener('focusin', rememberUsefulFocus);
+    return () => {
+      mounted.current = false;
+      clearTimer();
+      activeMutation.current = null;
+      document.removeEventListener('focusin', rememberUsefulFocus);
+    };
+  }, [clearTimer]);
 
   const value = useMemo<MutationFeedbackContextValue>(
-    () => ({ ...state, notifySuccess, notifyError, dismiss }),
-    [state, notifySuccess, notifyError, dismiss]
+    () => ({
+      ...state,
+      pendingKey,
+      notifySuccess,
+      notifyError,
+      dismiss,
+      beginMutation,
+      finishMutation,
+    }),
+    [state, pendingKey, notifySuccess, notifyError, dismiss, beginMutation, finishMutation]
   );
 
   return (
@@ -104,8 +189,13 @@ export function MutationFeedbackProvider({ children }: { children: React.ReactNo
 function GlobalFeedbackRegion() {
   const ctx = useContext(MutationFeedbackContext);
   const success = ctx?.kind === 'success' ? ctx.message : null;
-  const error = ctx?.kind === 'error' ? ctx.message : null;
-  return (
+  const error = ctx?.kind === 'error' && ctx.presentation === 'global' ? ctx.message : null;
+  const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'));
+  // Une erreur globale doit appartenir à la modale encore ouverte (le #root est
+  // alors inert). Un succès ferme souvent cette modale dans le même rendu :
+  // son statut est donc toujours porté par body afin de survivre à la fermeture.
+  const target = error ? (dialogs[dialogs.length - 1] ?? document.body) : document.body;
+  return createPortal(
     <div className="mutation-feedback-region">
       <div className="mutation-feedback-polite" role="status" aria-live="polite" aria-atomic="true">
         {success ? (
@@ -129,7 +219,8 @@ function GlobalFeedbackRegion() {
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    target
   );
 }
 
@@ -141,20 +232,30 @@ export function useMutationFeedback(): MutationFeedbackContextValue {
   return ctx;
 }
 
-export type RunOptions = {
+export type RunOptions<T = unknown> = {
+  /** Identifiant stable de l'action, utilisé pour le pending et la récupération locale. */
+  key?: string;
   /** Message de succès (résultat métier) ; si absent, aucun succès n'est annoncé globalement. */
   successMessage?: string;
   /** Traduit l'erreur capturée en message métier. Par défaut, un fallback générique. */
   toErrorMessage?: (error: unknown) => string;
+  /** Une erreur locale reste gérée par le runner mais est rendue près de son champ. */
+  errorPresentation?: 'global' | 'local';
   /** Élément à refocaliser après une exécution réussie (restauration du focus). */
-  restoreFocusTo?: HTMLElement | null;
+  restoreFocusTo?: HTMLElement | null | (() => HTMLElement | null);
   /** Appelé après un succès (ex. fermer une modale). */
-  onSuccess?: (result: unknown) => void;
+  onSuccess?: (result: T) => void;
   /** Appelé après un échec (ex. garder la modale ouverte, replacer le focus). */
-  onError?: (error: unknown) => void;
+  onError?: (error: unknown, safeMessage: string) => void;
 };
 
 const GENERIC_ERROR = 'Une erreur est survenue. Veuillez réessayer.';
+
+export type MutationResult<T> =
+  | { status: 'success'; value: T }
+  | { status: 'error'; error: unknown }
+  | { status: 'blocked' }
+  | { status: 'aborted' };
 
 /**
  * Runner de mutation lié à un déclencheur unique. `pending` vaut vrai pendant
@@ -163,36 +264,63 @@ const GENERIC_ERROR = 'Une erreur est survenue. Veuillez réessayer.';
  */
 export function useMutationRunner() {
   const feedback = useMutationFeedback();
-  const [pending, setPending] = useState(false);
-  const inFlight = useRef(false);
+  const finishMutation = feedback.finishMutation;
+  const owner = useRef(Symbol('mutation-runner'));
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    const currentOwner = owner.current;
+    return () => {
+      mounted.current = false;
+      finishMutation(currentOwner);
+    };
+  }, [finishMutation]);
 
   const execute = useCallback(
-    async <T,>(run: () => Promise<T>, options: RunOptions = {}): Promise<T | undefined> => {
-      if (inFlight.current) return undefined; // verrou anti-double soumission
-      inFlight.current = true;
-      setPending(true);
+    async <T,>(run: () => Promise<T>, options: RunOptions<T> = {}): Promise<MutationResult<T>> => {
+      const actionKey = options.key ?? 'mutation';
+      const currentOwner = owner.current;
+      if (!feedback.beginMutation(currentOwner, actionKey)) {
+        return { status: 'blocked' };
+      }
       try {
         const result = await run();
-        if (options.successMessage) feedback.notifySuccess(options.successMessage);
+        if (!mounted.current) return { status: 'aborted' };
+        if (options.successMessage) {
+          feedback.notifySuccess(options.successMessage, actionKey);
+        }
         options.onSuccess?.(result);
         // Restauration du focus après succès (ex. retour au bouton déclencheur).
         if (options.restoreFocusTo) {
+          const resolveFocusTarget = options.restoreFocusTo;
           // Laisser React refermer d'éventuelles modales avant de refocaliser.
-          requestAnimationFrame(() => options.restoreFocusTo?.focus());
+          requestAnimationFrame(() => {
+            if (!mounted.current) return;
+            const target =
+              typeof resolveFocusTarget === 'function' ? resolveFocusTarget() : resolveFocusTarget;
+            if (target?.isConnected) target.focus({ preventScroll: true });
+          });
         }
-        return result;
+        return { status: 'success', value: result };
       } catch (error) {
+        if (!mounted.current) return { status: 'aborted' };
         const message = options.toErrorMessage ? options.toErrorMessage(error) : GENERIC_ERROR;
-        feedback.notifyError(message);
-        options.onError?.(error);
-        return undefined;
+        feedback.notifyError(message, actionKey, options.errorPresentation ?? 'global');
+        options.onError?.(error, message);
+        return { status: 'error', error };
       } finally {
-        inFlight.current = false;
-        setPending(false);
+        feedback.finishMutation(currentOwner);
       }
     },
     [feedback]
   );
 
-  return { pending, execute } as const;
+  return {
+    pending: feedback.pendingKey !== null,
+    pendingKey: feedback.pendingKey,
+    errorKey: feedback.kind === 'error' ? feedback.actionKey : null,
+    isPending: (key: string) => feedback.pendingKey === key,
+    execute,
+  } as const;
 }

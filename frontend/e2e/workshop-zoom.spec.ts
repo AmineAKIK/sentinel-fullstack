@@ -49,7 +49,14 @@ test('le dossier ouvert reste lisible et sans débordement à 200 %', async ({ p
   await page.goto('/workshop/dashboard');
   const card = page.locator('.incident-card').first();
   await expect(card).toBeVisible();
-  await card.locator('.incident-card-open').click();
+  await card.scrollIntoViewIfNeeded();
+  const metadata = card.locator('.incident-card-meta');
+  const metadataBox = await metadata.boundingBox();
+  expect(metadataBox).not.toBeNull();
+  await page.mouse.click(
+    metadataBox!.x + metadataBox!.width / 2,
+    metadataBox!.y + metadataBox!.height / 2
+  );
 
   const dossier = page.locator('.incident-detail-drawer');
   await expect(dossier).toBeVisible();

@@ -1,5 +1,6 @@
 import TextConfirmModal from './TextConfirmModal';
 import { WorkshopIncident } from '../types';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface InvalidateIncidentModalProps {
   incident: WorkshopIncident;
@@ -19,13 +20,15 @@ export default function InvalidateIncidentModal({
       notice={
         <>
           L’incident {incident.line_number} · {incident.machine_id} restera dans le journal, mais il
-          sera exclu des statistiques et de la base de connaissance.
+          sera exclu des statistiques et de la base de connaissance. Cette invalidation est
+          définitive.
         </>
       }
       label="Motif d’invalidation *"
       placeholder="Doublon, erreur de saisie, clôture non exploitable..."
       confirmLabel="Confirmer l’invalidation"
       loadingLabel="Invalidation…"
+      mutationKey={WORKSHOP_MUTATION_KEYS.INVALIDATE}
       requiredMessage="Merci de renseigner le motif d’invalidation."
       failureMessage="Impossible d’invalider l’incident."
       textareaId="invalidateReason"

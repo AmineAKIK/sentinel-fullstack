@@ -1,6 +1,7 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { MutationFeedbackProvider } from '../../components/ui/MutationFeedback';
 import WorkshopDashboardPage from '../WorkshopDashboardPage';
@@ -171,6 +172,10 @@ function mockViewportQuery(isStackedDetailLayout = false) {
 }
 
 describe('WorkshopDashboardPage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockViewportQuery(false);
@@ -183,22 +188,20 @@ describe('WorkshopDashboardPage', () => {
         machine_id: 'MCH-4119',
         robot_label: 'Droite 8',
         head_number: 1,
+        current_product: 'PRODUIT-CIBLE',
       }),
     ]);
   });
 
-  it('ouvre le dossier incident dans le workbench sous les filtres', async () => {
+  it('ouvre le dossier incident depuis une métadonnée hors du titre', async () => {
+    const user = userEvent.setup();
     const { container } = renderDashboard();
 
     const workbench = container.querySelector('.workshop-results-workbench');
     expect(workbench).toBeDefined();
     expect(workbench?.classList.contains('is-detail-open')).toBe(false);
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /Ouvrir incident ligne 117, machine MCH-2117/i,
-      })
-    );
+    await user.click(screen.getByText('aida', { exact: true }));
 
     await waitFor(() => {
       expect(container.querySelector('.workshop-results-workbench.is-detail-open')).not.toBeNull();
@@ -211,34 +214,111 @@ describe('WorkshopDashboardPage', () => {
     expect(inlineDrawer?.getAttribute('aria-label')).toContain("Détail de l'incident ligne 117");
   });
 
-  it('remonte automatiquement au haut du dossier en layout empilé', async () => {
-    mockViewportQuery(true);
-    const scrollIntoView = vi.fn();
-    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+  it("n'exécute aucun recentrage programmatique à l'ouverture d'une carte basse", async () => {
+    const user = userEvent.setup();
+    mockViewportQuery(false);
+    const pageScroll = vi.fn();
+    const elementScroll = vi.fn();
+    const pageScrollMethod = ['scroll', 'By'].join('');
+    const elementScrollMethod = ['scroll', 'IntoView'].join('');
+    Object.defineProperty(window, pageScrollMethod, {
       configurable: true,
-      value: scrollIntoView,
+      value: pageScroll,
+    });
+    Object.defineProperty(Element.prototype, elementScrollMethod, {
+      configurable: true,
+      value: elementScroll,
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.classList.contains('nav-bar')) {
+        return DOMRect.fromRect({ x: 0, y: 0, width: 1440, height: 56 });
+      }
+      if (this.classList.contains('workshop-results-workbench')) {
+        return DOMRect.fromRect({ x: 100, y: 100, width: 1240, height: 1800 });
+      }
+      if (this.matches('[data-incident-card-id="2"]')) {
+        return DOMRect.fromRect({ x: 100, y: 840, width: 780, height: 160 });
+      }
+      if (this.classList.contains('incident-detail-drawer')) {
+        return DOMRect.fromRect({ x: 900, y: 72, width: 440, height: 600 });
+      }
+      return DOMRect.fromRect();
     });
 
-    renderDashboard();
+    const { container } = renderDashboard();
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /Ouvrir incident ligne 119, machine MCH-4119/i,
-      })
-    );
+    await user.click(screen.getByText('PRODUIT-CIBLE', { exact: true }));
 
     await waitFor(() => {
-      expect(scrollIntoView).toHaveBeenCalledWith(
-        expect.objectContaining({
-          block: 'start',
-          behavior: 'smooth',
-        })
-      );
+      expect(container.querySelector('.incident-detail-drawer')).not.toBeNull();
+    });
+    await new Promise<void>((resolve) =>
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+    );
+
+    expect(pageScroll).not.toHaveBeenCalled();
+    expect(elementScroll).not.toHaveBeenCalled();
+  });
+
+  it("n'injecte aucun offset de carte dans le style du dossier", async () => {
+    const user = userEvent.setup();
+    const { container } = renderDashboard();
+
+    await user.click(screen.getByText('PRODUIT-CIBLE', { exact: true }));
+
+    const drawer = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>('.incident-detail-drawer');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+
+    const removedOffsetProperty = ['--incident-detail', 'offset-top'].join('-');
+    expect(drawer.style.getPropertyValue(removedOffsetProperty)).toBe('');
+  });
+
+  it("sépare l'en-tête fixe du corps scrollable dans le dossier", async () => {
+    const user = userEvent.setup();
+    const { container } = renderDashboard();
+
+    await user.click(screen.getByText('aida', { exact: true }));
+
+    const drawer = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>('.incident-detail-drawer');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+
+    expect(drawer.children[0]).toHaveClass('incident-detail-topbar');
+    expect(drawer.children[1]).toHaveClass('incident-detail-content');
+  });
+
+  it('restaure exactement le focus sur l’activateur après fermeture par la croix', async () => {
+    const user = userEvent.setup();
+    const { container } = renderDashboard();
+    const openActivator = screen.getByLabelText(/Ouvrir incident ligne 117, machine MCH-2117/i);
+
+    await user.click(screen.getByText('aida', { exact: true }));
+
+    await waitFor(() => {
+      expect(container.querySelector('.workshop-results-workbench.is-detail-open')).not.toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Fermer le détail' }));
+
+    await waitFor(() => {
+      expect(container.querySelector('.workshop-results-workbench.is-detail-open')).toBeNull();
+      expect(openActivator).toHaveFocus();
     });
   });
 
-  it('ferme le dossier depuis Escape sans modifier la zone dashboard', async () => {
-    const { container } = renderDashboard('/workshop/dashboard?incident=2');
+  it('restaure exactement le focus sur l’activateur après fermeture par Échap', async () => {
+    const user = userEvent.setup();
+    const { container } = renderDashboard();
+    const openActivator = screen.getByLabelText(/Ouvrir incident ligne 117, machine MCH-2117/i);
+
+    await user.click(screen.getByText('aida', { exact: true }));
 
     await waitFor(() => {
       expect(container.querySelector('.workshop-results-workbench.is-detail-open')).not.toBeNull();
@@ -247,11 +327,37 @@ describe('WorkshopDashboardPage', () => {
     expect(screen.getByRole('heading', { name: 'Tableau de bord atelier' })).toBeDefined();
     expect(screen.getByLabelText(/Recherche/i)).toBeDefined();
 
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     await waitFor(() => {
       expect(container.querySelector('.workshop-results-workbench.is-detail-open')).toBeNull();
+      expect(openActivator).toHaveFocus();
     });
+    expect(container.querySelector('.incident-detail-drawer')).toBeNull();
+  });
+
+  it("ouvre l'arbitrage depuis la carte sans ouvrir le dossier incident", async () => {
+    const user = userEvent.setup();
+    mockDashboardData([
+      mockIncident({
+        id: 4,
+        line_id: 4,
+        line_number: '119',
+        machine_id: 'MCH-4119',
+        robot_label: 'Droite 8',
+        head_number: 1,
+        edit_request: { state: 'ARRET' },
+      }),
+    ]);
+
+    const { container } = renderDashboard();
+
+    await user.click(screen.getByRole('button', { name: 'Modification à arbitrer' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Arbitrage correction' })).toBeDefined();
+    });
+    expect(container.querySelector('.workshop-results-workbench.is-detail-open')).toBeNull();
     expect(container.querySelector('.incident-detail-drawer')).toBeNull();
   });
 

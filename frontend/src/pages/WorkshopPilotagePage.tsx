@@ -6,7 +6,7 @@ import SelectField from '../components/ui/SelectField';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import LineHeatmap from '../components/pilotage/LineHeatmap';
 import { Sparkline, TrendChart, Ranking } from '../components/pilotage/PilotageCharts';
-import { STATE_LABELS } from '../utils/labels';
+import { formatStateLabel } from '../utils/labels';
 import {
   getWorkshopMachineOptions,
   lineFilterChip,
@@ -134,7 +134,7 @@ export default function WorkshopPilotagePage() {
       count: item.count,
     })),
     states: (analytics?.by_state ?? []).map((item) => ({
-      label: STATE_LABELS[item.state] ?? item.state,
+      label: formatStateLabel(item.state),
       count: item.count,
     })),
   };
@@ -405,7 +405,10 @@ export default function WorkshopPilotagePage() {
               </div>
               <FilterSummary
                 count={analytics?.total ?? 0}
-                countLabel="incident(s) dans le périmètre"
+                countLabel={{
+                  singular: 'incident dans le périmètre',
+                  plural: 'incidents dans le périmètre',
+                }}
                 chips={filterChips}
                 onClear={clearFilters}
                 emptyText="Périmètre par défaut — 7 derniers jours, toutes lignes"

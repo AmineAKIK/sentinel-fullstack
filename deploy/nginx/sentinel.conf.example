@@ -7,9 +7,9 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    # Syntaxe HTTP/2 compatible avec le Nginx 1.18.0 du serveur hôte.
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name sentinel.akiksystems.fr;
     server_tokens off;
 
@@ -21,9 +21,17 @@ server {
 
     client_max_body_size 64k;
 
+    # Une directive add_header définie dans ce serveur empêche l'héritage en
+    # bloc des add_header globaux de http{}. La valeur vide n'est jamais émise :
+    # cette barrière protège des doublons sans devenir un en-tête public.
+    add_header X-Sentinel-Inheritance-Barrier "";
+
+    # Le Nginx hôte est l'unique autorité HSTS publique. Les HSTS des deux
+    # upstreams sont masqués dans leurs locations respectives.
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     location /api/ {
+        # Node reste l'autorité des autres en-têtes de sécurité de /api/*.
         proxy_pass http://127.0.0.1:13000;
         proxy_hide_header Strict-Transport-Security;
         proxy_http_version 1.1;
@@ -36,6 +44,7 @@ server {
     }
 
     location / {
+        # Le Nginx frontend reste l'autorité des en-têtes de ses statiques.
         proxy_pass http://127.0.0.1:18080;
         proxy_hide_header Strict-Transport-Security;
         proxy_http_version 1.1;

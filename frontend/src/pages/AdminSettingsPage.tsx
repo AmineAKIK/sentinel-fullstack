@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useRef } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { changeAdminPassword, getAdminEmail, updateAdminEmail } from '../api/adminSecurity';
@@ -17,10 +17,11 @@ import {
 import { apiErrorMessage, translateApiError, fieldInError } from '../api/errorMessages';
 import { useAppAuth } from '../routes/AppAuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
-import SuccessBanner from '../components/ui/SuccessBanner';
 import ErrorBanner from '../components/ui/ErrorBanner';
 import BoardToggleConfirmModal from '../components/BoardToggleConfirmModal';
 import RevokeSessionsConfirmModal from '../components/RevokeSessionsConfirmModal';
+import ConfirmModal from '../components/ConfirmModal';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
 import {
   hasMinimumPasswordLength,
   isWithinBcryptByteLimit,
@@ -115,40 +116,13 @@ export default function AdminSettingsPage() {
   usePageTitle('Paramètres — Administration');
   const navigate = useNavigate();
   const { logout } = useAppAuth();
-  const successTimersRef = useRef<Record<'email' | 'board' | 'app', number | null>>({
-    email: null,
-    board: null,
-    app: null,
-  });
-
-  function scheduleSuccessClear(
-    key: 'email' | 'board' | 'app',
-    clearMessage: () => void,
-    delayMs: number
-  ): void {
-    const existingTimer = successTimersRef.current[key];
-    if (existingTimer !== null) window.clearTimeout(existingTimer);
-    successTimersRef.current[key] = window.setTimeout(() => {
-      clearMessage();
-      successTimersRef.current[key] = null;
-    }, delayMs);
-  }
-
-  useEffect(
-    () => () => {
-      Object.values(successTimersRef.current).forEach((timer) => {
-        if (timer !== null) window.clearTimeout(timer);
-      });
-    },
-    []
-  );
-
+  const mutation = useMutationRunner();
   // ─── Mot de passe ─────────────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwdError, setPwdError] = useState('');
-  const [pwdLoading, setPwdLoading] = useState(false);
+  const pwdLoading = mutation.isPending('admin:security:password');
 
   function validatePassword(): string | null {
     if (!currentPassword) return 'Renseignez votre mot de passe actuel.';
@@ -172,18 +146,18 @@ export default function AdminSettingsPage() {
       setPwdError(err);
       return;
     }
-    setPwdLoading(true);
-    try {
-      await changeAdminPassword(currentPassword, newPassword);
+    const result = await mutation.execute(() => changeAdminPassword(currentPassword, newPassword), {
+      key: 'admin:security:password',
+      errorPresentation: 'local',
+      toErrorMessage: (requestError) => apiErrorMessage(requestError, 'Une erreur est survenue.'),
+      onError: (_requestError, safeMessage) => setPwdError(safeMessage),
+    });
+    if (result.status === 'success') {
       await logout();
       navigate('/admin/login', {
         replace: true,
         state: { reason: 'Mot de passe modifié. Reconnectez-vous.' },
       });
-    } catch (err) {
-      setPwdError(apiErrorMessage(err, 'Une erreur est survenue.'));
-    } finally {
-      setPwdLoading(false);
     }
   }
 
@@ -193,9 +167,8 @@ export default function AdminSettingsPage() {
   const [newEmail, setNewEmail] = useState('');
   const [currentEmail, setCurrentEmail] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
-  const [emailLoading, setEmailLoading] = useState(false);
+  const emailLoading = mutation.isPending('admin:security:email');
   const [emailError, setEmailError] = useState('');
-  const [emailSuccess, setEmailSuccess] = useState('');
   const [emailInitialLoading, setEmailInitialLoading] = useState(true);
   const [emailLoadError, setEmailLoadError] = useState('');
 
@@ -224,13 +197,11 @@ export default function AdminSettingsPage() {
     setCurrentEmail('');
     setEmailPassword('');
     setEmailError('');
-    setEmailSuccess('');
   }
 
   async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault();
     setEmailError('');
-    setEmailSuccess('');
     const normalized = newEmail.trim().toLowerCase();
     if (normalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
       setEmailError('Nouvelle adresse email invalide.');
@@ -248,24 +219,28 @@ export default function AdminSettingsPage() {
       setEmailError(`Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
-    setEmailLoading(true);
-    try {
-      await updateAdminEmail({
-        email: normalized || null,
-        ...(hasEmail ? { currentEmail: currentEmail.trim().toLowerCase() } : {}),
-        currentPassword: emailPassword,
-      });
-      const updated = await getAdminEmail();
-      setHasEmail(updated.hasEmail);
-      setEmailHint(updated.hint);
-      resetEmailForm();
-      setEmailSuccess('Email mis à jour.');
-      scheduleSuccessClear('email', () => setEmailSuccess(''), 4000);
-    } catch (err) {
-      setEmailError(apiErrorMessage(err, 'Une erreur est survenue.'));
-    } finally {
-      setEmailLoading(false);
-    }
+    await mutation.execute(
+      async () => {
+        await updateAdminEmail({
+          email: normalized || null,
+          ...(hasEmail ? { currentEmail: currentEmail.trim().toLowerCase() } : {}),
+          currentPassword: emailPassword,
+        });
+        return getAdminEmail();
+      },
+      {
+        key: 'admin:security:email',
+        successMessage: 'Adresse email mise à jour.',
+        errorPresentation: 'local',
+        toErrorMessage: (requestError) => apiErrorMessage(requestError, 'Une erreur est survenue.'),
+        onSuccess: (updated) => {
+          setHasEmail(updated.hasEmail);
+          setEmailHint(updated.hint);
+          resetEmailForm();
+        },
+        onError: (_requestError, safeMessage) => setEmailError(safeMessage),
+      }
+    );
   }
 
   // ─── Préférences notifications ────────────────────────────────────────────
@@ -274,7 +249,6 @@ export default function AdminSettingsPage() {
   const [prefsLoadError, setPrefsLoadError] = useState('');
   const [prefsError, setPrefsError] = useState('');
   const [savingPref, setSavingPref] = useState<keyof AdminNotifPrefs | null>(null);
-  const savingPrefRef = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -294,21 +268,25 @@ export default function AdminSettingsPage() {
   }, []);
 
   async function handleToggle(key: keyof AdminNotifPrefs, value: boolean) {
-    if (savingPrefRef.current) return;
-    savingPrefRef.current = true;
     setPrefsError('');
     setPrefs((p) => ({ ...p, [key]: value }));
     setSavingPref(key);
-    try {
-      const updated = await patchAdminNotifPrefs({ [key]: value });
-      setPrefs(updated);
-    } catch {
-      setPrefs((p) => ({ ...p, [key]: !value }));
-      setPrefsError("Impossible d'enregistrer la préférence. Réessayez.");
-    } finally {
-      savingPrefRef.current = false;
-      setSavingPref(null);
-    }
+    await mutation.execute(() => patchAdminNotifPrefs({ [key]: value }), {
+      key: `admin:notifications:${key}`,
+      successMessage: 'Préférence de notification enregistrée.',
+      errorPresentation: 'local',
+      toErrorMessage: () => "Impossible d'enregistrer la préférence. Réessayez.",
+      onSuccess: (updated) => {
+        setPrefs(updated);
+        setSavingPref(null);
+      },
+      onError: (_requestError, safeMessage) => {
+        setPrefs((p) => ({ ...p, [key]: !value }));
+        setPrefsError(safeMessage);
+        setSavingPref(null);
+        requestAnimationFrame(() => document.getElementById(key)?.focus());
+      },
+    });
   }
 
   // ─── Board ────────────────────────────────────────────────────────────────
@@ -320,9 +298,9 @@ export default function AdminSettingsPage() {
   const [boardConfirmCode, setBoardConfirmCode] = useState('');
   const [boardPassword, setBoardPassword] = useState('');
   const [boardError, setBoardError] = useState('');
-  const [boardSuccess, setBoardSuccess] = useState('');
-  const [boardSubmitting, setBoardSubmitting] = useState(false);
+  const boardSubmitting = mutation.isPending('admin:board:code');
   const [boardTogglePending, setBoardTogglePending] = useState<boolean | null>(null);
+  const [showBoardCodeConfirm, setShowBoardCodeConfirm] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -360,13 +338,11 @@ export default function AdminSettingsPage() {
     setBoardConfirmCode('');
     setBoardPassword('');
     setBoardError('');
-    setBoardSuccess('');
   }
 
-  async function handleBoardCodeSubmit(e: FormEvent) {
+  function handleBoardCodeSubmit(e: FormEvent) {
     e.preventDefault();
     setBoardError('');
-    setBoardSuccess('');
     if (!hasMinimumPasswordLength(boardNewCode.trim(), MIN_BOARD_CODE_LENGTH)) {
       setBoardError(`Le code board doit contenir au moins ${MIN_BOARD_CODE_LENGTH} caractères.`);
       return;
@@ -387,22 +363,28 @@ export default function AdminSettingsPage() {
       setBoardError(`Le mot de passe ne peut pas dépasser ${MAX_PASSWORD_BYTES} octets UTF-8.`);
       return;
     }
-    setBoardSubmitting(true);
-    try {
-      await patchBoardCode({
-        newCode: boardNewCode.trim(),
-        confirmCode: boardConfirmCode.trim(),
-        currentPassword: boardPassword,
-      });
-      setBoardHasCode(true);
-      resetBoardForm();
-      setBoardSuccess('Code mis à jour. Sessions révoquées.');
-      scheduleSuccessClear('board', () => setBoardSuccess(''), 5000);
-    } catch (err) {
-      setBoardError(apiErrorMessage(err, 'Une erreur est survenue.'));
-    } finally {
-      setBoardSubmitting(false);
-    }
+    setShowBoardCodeConfirm(true);
+  }
+
+  async function confirmBoardCodeChange() {
+    await mutation.execute(
+      () =>
+        patchBoardCode({
+          newCode: boardNewCode.trim(),
+          confirmCode: boardConfirmCode.trim(),
+          currentPassword: boardPassword,
+        }),
+      {
+        key: 'admin:board:code',
+        successMessage: 'Code Board mis à jour. Sessions Board révoquées.',
+        toErrorMessage: (requestError) => apiErrorMessage(requestError, 'Une erreur est survenue.'),
+        onSuccess: () => {
+          setBoardHasCode(true);
+          resetBoardForm();
+          setShowBoardCodeConfirm(false);
+        },
+      }
+    );
   }
 
   // ─── App settings ─────────────────────────────────────────────────────────
@@ -417,9 +399,8 @@ export default function AdminSettingsPage() {
   const [appSettingsLoading, setAppSettingsLoading] = useState(true);
   const [appSettingsLoadError, setAppSettingsLoadError] = useState('');
   const [appSettingsDraft, setAppSettingsDraft] = useState<AppSettings | null>(null);
-  const [appSettingsSaving, setAppSettingsSaving] = useState(false);
+  const appSettingsSaving = mutation.isPending('admin:settings:save');
   const [appSettingsError, setAppSettingsError] = useState('');
-  const [appSettingsSuccess, setAppSettingsSuccess] = useState('');
   const [revokeAdmin, setRevokeAdmin] = useState(false);
   const [revokeWorkshop, setRevokeWorkshop] = useState(false);
   const [revokeBoard, setRevokeBoard] = useState(false);
@@ -460,7 +441,6 @@ export default function AdminSettingsPage() {
     setRevokeWorkshop(false);
     setRevokeBoard(false);
     setAppSettingsError('');
-    setAppSettingsSuccess('');
   }
 
   const appSettingsDirty =
@@ -479,13 +459,11 @@ export default function AdminSettingsPage() {
       return;
     }
     setAppSettingsError('');
-    setAppSettingsSuccess('');
-    setAppSettingsSaving(true);
     const didRevokeAdmin = revokeAdmin;
     const didRevokeWorkshop = revokeWorkshop;
     const didRevokeBoard = revokeBoard;
-    try {
-      // N'envoyer que les champs effectivement modifiés par rapport à la valeur serveur
+
+    const buildPatch = (): AppSettingsPatch => {
       const patch: AppSettingsPatch = {};
       if (appSettingsDraft) {
         (Object.keys(appSettingsDraft) as (keyof AppSettings)[]).forEach((key) => {
@@ -497,37 +475,34 @@ export default function AdminSettingsPage() {
       if (didRevokeAdmin) patch.revokeAdminSessions = true;
       if (didRevokeWorkshop) patch.revokeWorkshopSessions = true;
       if (didRevokeBoard) patch.revokeBoardSessions = true;
-      // L'API exige le mot de passe pour toute révocation (fourni par le modal).
       if (confirmPassword) patch.currentPassword = confirmPassword;
-      const raw = await patchAppSettings(patch);
+      return patch;
+    };
+
+    const applyUpdatedSettings = (raw: AppSettings) => {
       const updated = normalizeAppSettings(raw);
       setAppSettings(updated);
       setAppSettingsDraft(updated);
       setRevokeAdmin(false);
       setRevokeWorkshop(false);
       setRevokeBoard(false);
+    };
 
+    const afterSuccess = () => {
       if (didRevokeAdmin) {
-        // La session courante vient d'être révoquée — logout immédiat
-        await logout();
-        navigate('/login', {
-          replace: true,
-          state: { reason: 'Sessions administrateur révoquées. Reconnectez-vous.' },
-        });
-        return;
+        window.setTimeout(() => {
+          void logout().then(() => {
+            navigate('/login', {
+              replace: true,
+              state: { reason: 'Sessions administrateur révoquées. Reconnectez-vous.' },
+            });
+          });
+        }, 0);
       }
+    };
 
-      const parts: string[] = ['Paramètres enregistrés.'];
-      if (didRevokeWorkshop) parts.push('Sessions atelier révoquées.');
-      if (didRevokeBoard) parts.push('Sessions board révoquées.');
-      setAppSettingsSuccess(parts.join(' '));
-      scheduleSuccessClear('app', () => setAppSettingsSuccess(''), 5000);
-    } catch (err) {
-      // Message métier traduit (jamais le message brut du backend). Les saisies
-      // sont conservées : appSettingsDraft n'est pas réinitialisé sur erreur.
-      setAppSettingsError(translateApiError(err));
-      // Focus ramené vers le champ concerné lorsqu'il est identifiable. On mappe
-      // le champ public (details.field) vers l'id DOM de l'input existant.
+    const handleError = (err: unknown, safeMessage = translateApiError(err)) => {
+      setAppSettingsError(safeMessage);
       const field = fieldInError(err);
       const domId = field ? APP_SETTING_FIELD_DOM_ID[field] : undefined;
       if (domId) {
@@ -535,9 +510,31 @@ export default function AdminSettingsPage() {
           document.getElementById(domId)?.focus();
         });
       }
-    } finally {
-      setAppSettingsSaving(false);
+    };
+
+    if (confirmPassword) {
+      try {
+        const raw = await patchAppSettings(buildPatch());
+        applyUpdatedSettings(raw);
+        afterSuccess();
+      } catch (err) {
+        handleError(err);
+        throw err;
+      }
+      return;
     }
+
+    await mutation.execute(() => patchAppSettings(buildPatch()), {
+      key: 'admin:settings:save',
+      successMessage: 'Paramètres enregistrés.',
+      errorPresentation: 'local',
+      toErrorMessage: translateApiError,
+      onSuccess: (raw) => {
+        applyUpdatedSettings(raw);
+        afterSuccess();
+      },
+      onError: (err, safeMessage) => handleError(err, safeMessage),
+    });
   }
 
   return (
@@ -789,7 +786,6 @@ export default function AdminSettingsPage() {
                         {boardError}
                       </div>
                     )}
-                    {boardSuccess && <SuccessBanner>{boardSuccess}</SuccessBanner>}
                     <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                       <button
                         type="button"
@@ -932,7 +928,6 @@ export default function AdminSettingsPage() {
                         {emailError}
                       </div>
                     )}
-                    {emailSuccess && <SuccessBanner>{emailSuccess}</SuccessBanner>}
                     <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                       <button
                         type="button"
@@ -1221,7 +1216,7 @@ export default function AdminSettingsPage() {
                     style={{ borderTop: '1px solid var(--color-border)', margin: '20px 0 16px' }}
                   />
                   <p className="settings-section-title" style={{ marginBottom: 4 }}>
-                    Révoquer des sessions
+                    Révoquer les sessions
                   </p>
                   <p
                     style={{
@@ -1295,7 +1290,6 @@ export default function AdminSettingsPage() {
                       {appSettingsError}
                     </div>
                   )}
-                  {appSettingsSuccess && <SuccessBanner>{appSettingsSuccess}</SuccessBanner>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                     <button
                       type="button"
@@ -1349,11 +1343,29 @@ export default function AdminSettingsPage() {
           revokeBoard={revokeBoard}
           onClose={() => setShowRevokeConfirm(false)}
           onConfirm={async (password) => {
-            setShowRevokeConfirm(false);
             const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
             await handleAppSettingsSubmit(fakeEvent, password);
+            setShowRevokeConfirm(false);
           }}
         />
+      )}
+
+      {showBoardCodeConfirm && (
+        <ConfirmModal
+          title="Confirmer le changement du code Board"
+          onClose={() => setShowBoardCodeConfirm(false)}
+          onConfirm={confirmBoardCodeChange}
+          mutationKey="admin:board:code"
+          confirmLabel="Changer le code et révoquer les sessions"
+          loadingLabel="Modification…"
+          variant="danger"
+        >
+          <p>
+            Le nouveau code remplacera immédiatement l’ancien. Toutes les sessions Board seront
+            déconnectées et devront saisir le nouveau code. Cette action est définitive pour les
+            sessions actuelles.
+          </p>
+        </ConfirmModal>
       )}
     </>
   );

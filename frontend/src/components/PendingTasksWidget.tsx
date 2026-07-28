@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { PasswordResetRequest, markPasswordResetRequestHandled } from '../api/admin';
 import { formatElapsed } from '../utils/date';
 import ConfirmModal from './ConfirmModal';
+import { useMutationRunner } from './ui/MutationFeedback';
+import { apiErrorMessage } from '../api/errorMessages';
 
 interface PendingTasksWidgetProps {
   requests: PasswordResetRequest[];
@@ -12,18 +14,23 @@ interface PendingTasksWidgetProps {
 export default function PendingTasksWidget({ requests, onHandled }: PendingTasksWidgetProps) {
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState<PasswordResetRequest | null>(null);
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const key = confirming ? `admin:reset-request:${confirming.id}:handled` : 'admin:reset-request';
+  const loading = mutation.isPending(key);
 
   async function handleConfirm() {
     if (!confirming) return;
-    setLoading(true);
-    try {
-      await markPasswordResetRequestHandled(confirming.id);
-      onHandled(confirming.id);
-      setConfirming(null);
-    } finally {
-      setLoading(false);
-    }
+    const id = confirming.id;
+    await mutation.execute(() => markPasswordResetRequestHandled(id), {
+      key,
+      successMessage: 'Demande marquée comme traitée.',
+      toErrorMessage: (err) =>
+        apiErrorMessage(err, 'Impossible de marquer cette demande comme traitée.'),
+      onSuccess: () => {
+        onHandled(id);
+        setConfirming(null);
+      },
+    });
   }
 
   return (
@@ -78,6 +85,7 @@ export default function PendingTasksWidget({ requests, onHandled }: PendingTasks
           confirmLabel="Marquer traité"
           loadingLabel="En cours…"
           loading={loading}
+          mutationKey={key}
         >
           <p
             style={{

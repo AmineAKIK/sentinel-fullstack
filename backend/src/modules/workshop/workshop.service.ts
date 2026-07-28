@@ -64,7 +64,9 @@ import {
 
 // ─── Lecture / board / lignes ─────────────────────────────────────────────────
 
-export async function getBoardDataService(): Promise<ServiceResult<unknown>> {
+export async function getBoardDataService(): Promise<
+  ServiceResult<workshopRepository.WorkshopBoardData>
+> {
   return ok(await workshopRepository.getBoardData());
 }
 

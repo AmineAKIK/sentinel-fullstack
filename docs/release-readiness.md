@@ -194,8 +194,8 @@ commit audité au démarrage de cette branche.
 | `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | VERIFIED |
 | `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | VERIFIED |
 | `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | VERIFIED |
-| `DOC-01` | P0 | 11 | Dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | Faits générés depuis le candidat final. | OPEN |
-| `DOC-02` | P1 | 11 | `rebuildDossier.py` conserve des faits en dur. | Générateur sans nombres volatils codés en dur. | OPEN |
+| `DOC-01` | P0 | 11 | Ancien dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | RC4 : 15 tables, 50 migrations, 1 297 tests, 6 jobs et 57 E2E dérivés par le collecteur. | VERIFIED_LOCAL_RC4 |
+| `DOC-02` | P1 | 11 | `rebuildDossier.py` conservait des faits volatils en dur. | Générateur paramétré pour tables, migrations, jobs et quatre familles de tests. | VERIFIED_LOCAL_RC4 |
 | `DOC-03` | P1 | 11 | Sources suivies avec marqueurs incomplets et anciens SHA. | Scan interdit sans résultat. | OPEN |
 | `DOC-04` | P1 | 11 | Source/assets par défaut du générateur absents du dépôt. | Chaîne reproductible ou dépendances explicitement externes sans faux défaut. | OPEN |
 | `DOC-05` | P0 | 11 | Calcul de Fermi et fourchette 200–290 non entièrement dérivés. | Formules, source et sensibilité recalculables. | OPEN |
@@ -504,10 +504,13 @@ HTTPS) se ferment au déploiement effectif ; `REL-01` (tag final `v1.0.0`) reste
 dossier jury, en promouvant le même commit et les mêmes images, ou via un
 `rc.2` si une correction versionnée s'avère nécessaire.
 
-Outillage du dossier (lot 11) : `scripts/collectDossierFacts.py` dérive
-automatiquement chaque fait chiffré depuis le dépôt (SHA, 48 migrations, 15
-tables, 6 jobs, 471+ fichiers, 1022 tests) et échoue si un fait n'est pas
-établissable — plus aucun nombre codé en dur (`DOC-01`, `DOC-02`).
+Outillage du dossier : `scripts/collectDossierFacts.py` dérive automatiquement
+chaque fait chiffré depuis le dépôt. Sur le candidat code RC4
+`2c5207ef4ac13ddf7413863f49df1d59fe4e0f1b`, après indexation des quatre
+documents jury, il a établi 534 fichiers suivis,
+50 migrations, 15 tables, 6 jobs et 1 297 tests disjoints
+(`511 + 146 + 583 + 57`). `rebuildDossier.py` reçoit désormais ces valeurs en
+arguments au lieu de conserver tables, migrations, jobs ou E2E en dur.
 
 ## 6. Contrôles de chaque lot
 

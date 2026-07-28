@@ -34,8 +34,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <FieldLimitsProvider>
-        <AppAuthProvider>
-          <MutationFeedbackProvider>
+        <MutationFeedbackProvider>
+          <AppAuthProvider>
             <a className="skip-link" href="#main-content">
               Passer au contenu principal
             </a>
@@ -179,8 +179,8 @@ export default function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
-          </MutationFeedbackProvider>
-        </AppAuthProvider>
+          </AppAuthProvider>
+        </MutationFeedbackProvider>
       </FieldLimitsProvider>
     </ErrorBoundary>
   );

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from './ui/EmptyState';
 import { WorkshopIncident, WorkshopIncidentEvent } from '../types';
-import { ROLE_LABELS, STATE_LABELS, STATUS_LABELS } from '../utils/labels';
+import { formatRoleLabel, formatStateLabel, formatStatusLabel } from '../utils/labels';
 import {
   formatDateTime,
   formatEventActor,
@@ -21,7 +21,7 @@ type IncidentTextSectionProps = {
 
 function IncidentTextSection({ label, value, primary }: IncidentTextSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  if (!value) return null;
+  if (!value?.trim()) return null;
   const isTruncatable = value.length > TEXT_COLLAPSE_THRESHOLD;
   const displayValue =
     isTruncatable && !expanded ? value.slice(0, TEXT_COLLAPSE_THRESHOLD) + '…' : value;
@@ -73,7 +73,7 @@ export default function IncidentDossier({
               Ligne {incident.line_number} · {incident.machine_id}
             </h2>
           </div>
-          <span className="status-pill">{STATUS_LABELS[incident.status] ?? incident.status}</span>
+          <span className="status-pill">{formatStatusLabel(incident.status)}</span>
         </div>
         <div className="action-bar history-knowledge-actions">
           {hasKnowledge && (
@@ -101,7 +101,7 @@ export default function IncidentDossier({
           <strong>
             {incident.robot_label} · Tête {incident.head_number}
           </strong>
-          <p>{STATE_LABELS[incident.state] ?? incident.state}</p>
+          <p>{formatStateLabel(incident.state)}</p>
         </div>
         <div>
           <span className="detail-field-label">Produit</span>
@@ -112,7 +112,7 @@ export default function IncidentDossier({
           <strong>
             {incident.first_name} {incident.last_name}
           </strong>
-          <p>{ROLE_LABELS[incident.role] ?? incident.role}</p>
+          <p>{formatRoleLabel(incident.role)}</p>
         </div>
         <div>
           <span className="detail-field-label">Technicien</span>
@@ -121,11 +121,7 @@ export default function IncidentDossier({
               ? `${incident.taken_by_first_name} ${incident.taken_by_last_name ?? ''}`.trim()
               : 'Non pris en charge'}
           </strong>
-          <p>
-            {incident.taken_by_role
-              ? (ROLE_LABELS[incident.taken_by_role] ?? incident.taken_by_role)
-              : '—'}
-          </p>
+          <p>{incident.taken_by_role ? formatRoleLabel(incident.taken_by_role) : '—'}</p>
         </div>
         <div>
           <span className="detail-field-label">Durée dossier</span>
@@ -144,7 +140,7 @@ export default function IncidentDossier({
           value={incident.intervention_note}
           primary
         />
-        <IncidentTextSection label="Consigne responsable" value={incident.responsible_comment} />
+        <IncidentTextSection label="Consigne du responsable" value={incident.responsible_comment} />
       </div>
 
       <div className="history-trace-header">

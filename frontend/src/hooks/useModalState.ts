@@ -13,7 +13,6 @@ export type ActiveModal =
   | 'close'
   | 'invalidate'
   | 'maintenanceDirect'
-  | 'maintenanceApprove'
   | 'filters'
   | null;
 
@@ -22,7 +21,6 @@ interface ModalState {
   reviewIncident: WorkshopIncident | null;
   reviewType: ReviewType | null;
   reviewError: string;
-  reviewLoading: boolean;
   unfollowConfirmIncident: WorkshopIncident | null;
   deleteResponsibleCommentIncident: WorkshopIncident | null;
 }
@@ -33,7 +31,6 @@ type ModalAction =
   | { type: 'OPEN_REVIEW'; incident: WorkshopIncident; reviewType: ReviewType }
   | { type: 'CLOSE_REVIEW' }
   | { type: 'SET_REVIEW_ERROR'; error: string }
-  | { type: 'SET_REVIEW_LOADING'; loading: boolean }
   | { type: 'SET_UNFOLLOW_CONFIRM'; incident: WorkshopIncident | null }
   | { type: 'SET_DELETE_COMMENT_CONFIRM'; incident: WorkshopIncident | null };
 
@@ -42,7 +39,6 @@ const initialState: ModalState = {
   reviewIncident: null,
   reviewType: null,
   reviewError: '',
-  reviewLoading: false,
   unfollowConfirmIncident: null,
   deleteResponsibleCommentIncident: null,
 };
@@ -50,7 +46,7 @@ const initialState: ModalState = {
 function modalReducer(state: ModalState, action: ModalAction): ModalState {
   switch (action.type) {
     case 'OPEN':
-      return { ...state, activeModal: action.modal, reviewError: '', reviewLoading: false };
+      return { ...state, activeModal: action.modal, reviewError: '' };
     case 'CLOSE':
       return { ...state, activeModal: null };
     case 'OPEN_REVIEW':
@@ -59,7 +55,6 @@ function modalReducer(state: ModalState, action: ModalAction): ModalState {
         reviewIncident: action.incident,
         reviewType: action.reviewType,
         reviewError: '',
-        reviewLoading: false,
       };
     case 'CLOSE_REVIEW':
       return {
@@ -67,13 +62,10 @@ function modalReducer(state: ModalState, action: ModalAction): ModalState {
         reviewIncident: null,
         reviewType: null,
         reviewError: '',
-        reviewLoading: false,
         activeModal: null,
       };
     case 'SET_REVIEW_ERROR':
       return { ...state, reviewError: action.error };
-    case 'SET_REVIEW_LOADING':
-      return { ...state, reviewLoading: action.loading };
     case 'SET_UNFOLLOW_CONFIRM':
       return { ...state, unfollowConfirmIncident: action.incident };
     case 'SET_DELETE_COMMENT_CONFIRM':
@@ -88,7 +80,6 @@ export interface ModalStateApi {
   openReview: (incident: WorkshopIncident, type: ReviewType) => void;
   closeReview: () => void;
   setReviewError: (error: string) => void;
-  setReviewLoading: (loading: boolean) => void;
   setUnfollowConfirm: (incident: WorkshopIncident | null) => void;
   setDeleteCommentConfirm: (incident: WorkshopIncident | null) => void;
 }
@@ -106,10 +97,6 @@ export function useModalState(): ModalStateApi {
   const closeReview = useCallback(() => dispatch({ type: 'CLOSE_REVIEW' }), []);
   const setReviewError = useCallback(
     (error: string) => dispatch({ type: 'SET_REVIEW_ERROR', error }),
-    []
-  );
-  const setReviewLoading = useCallback(
-    (loading: boolean) => dispatch({ type: 'SET_REVIEW_LOADING', loading }),
     []
   );
   const setUnfollowConfirm = useCallback(
@@ -130,7 +117,6 @@ export function useModalState(): ModalStateApi {
       openReview,
       closeReview,
       setReviewError,
-      setReviewLoading,
       setUnfollowConfirm,
       setDeleteCommentConfirm,
     }),
@@ -141,7 +127,6 @@ export function useModalState(): ModalStateApi {
       openReview,
       closeReview,
       setReviewError,
-      setReviewLoading,
       setUnfollowConfirm,
       setDeleteCommentConfirm,
     ]

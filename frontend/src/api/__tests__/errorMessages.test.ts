@@ -178,7 +178,7 @@ describe('apiErrorMessage — abstraction sûre (C-03)', () => {
     });
     const text = translateApiError(err);
     expect(text).toBe(
-      'Impossible de modifier la structure de cette ligne : 3 incident(s) actif(s) y sont encore liés.'
+      'Impossible de modifier la structure de cette ligne : 3 incidents actifs y sont encore liés.'
     );
     expect(text).not.toContain('raw server text');
   });
@@ -188,6 +188,6 @@ describe('apiErrorMessage — abstraction sûre (C-03)', () => {
       reason: 'USER_HAS_ACTIVE_INCIDENTS',
       count: 2,
     });
-    expect(translateApiError(err)).toMatch(/2 incident\(s\) actif\(s\) en cours/);
+    expect(translateApiError(err)).toContain('2 incidents actifs en cours');
   });
 });

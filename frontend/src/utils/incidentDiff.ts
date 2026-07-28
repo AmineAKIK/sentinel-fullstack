@@ -1,5 +1,5 @@
 import { IncidentState, ProductionLine, WorkshopIncident } from '../types';
-import { STATE_LABELS } from './labels';
+import { formatStateLabel } from './labels';
 
 export interface ChangeRow {
   label: string;
@@ -77,8 +77,8 @@ export function computeIncidentDiff(
   if (requestedState && requestedState !== incident.state) {
     rows.push({
       label: 'État',
-      current: STATE_LABELS[incident.state],
-      requested: STATE_LABELS[requestedState] || requestedState,
+      current: formatStateLabel(incident.state),
+      requested: formatStateLabel(requestedState),
     });
   }
   if (requestedProduct !== undefined && requestedProduct !== (incident.current_product || '')) {

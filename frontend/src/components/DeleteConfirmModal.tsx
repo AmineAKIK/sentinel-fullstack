@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { SentinelUser } from '../types';
 import { deleteAccount, getAccountImpact } from '../api/accounts';
+import { useMutationRunner } from './ui/MutationFeedback';
+import { formatCount, inflect } from '../utils/french';
 
 interface DeleteConfirmModalProps {
   user: SentinelUser;
@@ -10,6 +12,7 @@ interface DeleteConfirmModalProps {
 }
 
 export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteConfirmModalProps) {
+  useMutationRunner();
   const [impact, setImpact] = useState<{
     reported_incidents: number;
     taken_incidents: number;
@@ -39,6 +42,9 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       onClose={onClose}
       onConfirm={handleConfirm}
       disabled={hasActiveTakenIncidents}
+      mutationKey={`admin:user:${user.id}:delete`}
+      successMessage="Utilisateur supprimé."
+      failureMessage="Impossible de supprimer l’utilisateur."
     >
       <p style={{ fontWeight: 500, marginBottom: 8 }}>
         Supprimer {user.first_name} {user.last_name} ?
@@ -49,13 +55,24 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       </p>
       {impact && (impact.reported_incidents > 0 || impact.taken_incidents > 0) && (
         <div className="notice">
-          Impact historique : {impact.reported_incidents} incident(s) signalé(s),{' '}
-          {impact.taken_incidents} incident(s) pris en charge.
+          Impact historique :{' '}
+          {formatCount(impact.reported_incidents, 'incident signalé', 'incidents signalés')},{' '}
+          {formatCount(
+            impact.taken_incidents,
+            'incident pris en charge',
+            'incidents pris en charge'
+          )}
+          .
           {hasActiveTakenIncidents && (
             <>
               {' '}
-              Suppression bloquée tant que {impact.active_taken_incidents} incident(s) actif(s)
-              restent pris en charge.
+              Suppression bloquée tant que{' '}
+              {formatCount(
+                impact.active_taken_incidents,
+                'incident actif',
+                'incidents actifs'
+              )}{' '}
+              {inflect(impact.active_taken_incidents, 'reste', 'restent')} pris en charge.
             </>
           )}
         </div>

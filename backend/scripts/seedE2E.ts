@@ -14,6 +14,7 @@
 import 'dotenv/config';
 import pool from '../src/db/pool';
 import { hashAdminPassword, hashWorkshopPassword } from '../src/auth/bcrypt';
+import { FIELD_LIMITS } from '../src/domain/constants';
 import { hashBoardCode } from '../src/modules/board/board.auth';
 import { createLineData } from '../src/modules/lines/lines.repository';
 import {
@@ -220,6 +221,44 @@ async function createArbitrationIncidents(lineId: number, operatorId: number): P
   if (!withdrawRequest.ok) throw new Error(`Demande retrait E2E: ${withdrawRequest.message}`);
 }
 
+async function createScrollGeometryIncidents(lineId: number, operatorId: number): Promise<void> {
+  // Liste volontairement longue pour les recettes navigateur du panneau incident.
+  // La tête 5 reste libre : incident-lifecycle.spec.ts l'utilise pour sa création.
+  const heads = [4, 6, 7, 8, 9, 10, 11, 12];
+  const longCommentSegment =
+    'Incident E2E de géométrie avec un commentaire volontairement détaillé afin que le dossier dépasse réellement la hauteur disponible et que sa région interne doive défiler à la molette. ';
+  const longComment = longCommentSegment.repeat(3).trim().slice(0, FIELD_LIMITS.COMMENT);
+
+  for (const headNumber of heads) {
+    const incident = await createIncidentService(
+      {
+        lineId,
+        machineId: E2E_MACHINE_ID,
+        robotLabel: '1',
+        headNumber,
+        state: 'DEGRADEE',
+        comment: longComment,
+        currentProduct: `E2E-SCROLL-${String(headNumber).padStart(2, '0')}`,
+      },
+      operatorId,
+      'OPERATOR'
+    );
+    if (!incident.ok) {
+      throw new Error(`Création géométrie E2E tête ${headNumber}: ${incident.message}`);
+    }
+    const incidentId = createdIncidentId(
+      incident.data,
+      `Création géométrie E2E tête ${headNumber}`
+    );
+    // Le tri atelier utilise display_order avant created_at : fixer cette valeur
+    // évite que l'ordre des cartes dépende de la résolution temporelle de PostgreSQL.
+    await pool.query('UPDATE workshop_incidents SET display_order = $1 WHERE id = $2', [
+      headNumber,
+      incidentId,
+    ]);
+  }
+}
+
 async function main(): Promise<void> {
   assertSafeTestDatabaseUrl(process.env.DATABASE_URL, 'e2e');
   await upsertAdmin();
@@ -246,6 +285,7 @@ async function main(): Promise<void> {
     role: 'MAINTENANCE',
   });
   await createArbitrationIncidents(lineId, operatorId);
+  await createScrollGeometryIncidents(lineId, operatorId);
   console.log(
     `Seed E2E OK — admin « ${E2E_ADMIN_USERNAME} », atelier « ${E2E_RESPONSABLE_BADGE} », ` +
       `ligne admin ${E2E_ADMIN_LINE_NUMBER} (${E2E_ADMIN_MACHINE_ID}), ` +

@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
 import CharCounter from './ui/CharCounter';
+import { useMutationRunner } from './ui/MutationFeedback';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
-import { apiErrorMessage } from '../api/errorMessages';
 
 type TextConfirmModalProps = {
   title: string;
@@ -12,6 +12,7 @@ type TextConfirmModalProps = {
   placeholder?: string;
   confirmLabel: string;
   loadingLabel: string;
+  mutationKey: string;
   requiredMessage: string;
   failureMessage: string;
   onClose: () => void;
@@ -28,8 +29,8 @@ export default function TextConfirmModal({
   placeholder,
   confirmLabel,
   loadingLabel,
+  mutationKey,
   requiredMessage,
-  failureMessage,
   onClose,
   onConfirm,
   variant = 'default',
@@ -37,52 +38,51 @@ export default function TextConfirmModal({
   maxLength = FIELD_LIMITS.COMMENT,
 }: TextConfirmModalProps) {
   const [value, setValue] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const submittingRef = useRef(false);
+  const [requiredError, setRequiredError] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { errorKey, isPending } = useMutationRunner();
+  const pending = isPending(mutationKey);
   const buttonClassName = variant === 'danger' ? 'btn btn-danger' : 'btn btn-primary';
 
-  async function handleConfirm() {
-    if (submittingRef.current) return;
+  useEffect(() => {
+    if (errorKey === mutationKey) {
+      textareaRef.current?.focus({ preventScroll: true });
+    }
+  }, [errorKey, mutationKey]);
+
+  function handleConfirm() {
+    if (pending) return;
     const trimmed = value.trim();
     if (!trimmed) {
-      setError(requiredMessage);
+      setRequiredError(requiredMessage);
+      textareaRef.current?.focus({ preventScroll: true });
       return;
     }
 
-    submittingRef.current = true;
-    setLoading(true);
-    setError('');
-    try {
-      await onConfirm(trimmed);
-    } catch (requestError) {
-      setError(apiErrorMessage(requestError, failureMessage));
-    } finally {
-      submittingRef.current = false;
-      setLoading(false);
-    }
+    setRequiredError('');
+    void onConfirm(trimmed);
   }
 
   return (
     <Modal
       title={title}
-      onClose={loading ? undefined : onClose}
+      onClose={pending ? undefined : onClose}
       closeOnOverlay={false}
       isDirty={value.trim().length > 0}
-      isLoading={loading}
+      isLoading={pending}
       variant={variant}
       footer={
         <>
-          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={loading}>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
             Annuler
           </button>
           <button
             className={buttonClassName}
             type="button"
-            onClick={() => void handleConfirm()}
-            disabled={loading}
+            onClick={handleConfirm}
+            disabled={pending}
           >
-            {loading ? loadingLabel : confirmLabel}
+            {pending ? loadingLabel : confirmLabel}
           </button>
         </>
       }
@@ -93,18 +93,19 @@ export default function TextConfirmModal({
           {label}
         </label>
         <textarea
+          ref={textareaRef}
           id={textareaId}
           className="form-input"
           rows={4}
           value={value}
           onChange={(event) => setValue(event.target.value.slice(0, maxLength))}
           maxLength={maxLength}
-          disabled={loading}
+          disabled={pending}
           placeholder={placeholder}
         />
         <CharCounter current={value.length} max={maxLength} />
       </div>
-      {error && <ErrorBanner>{error}</ErrorBanner>}
+      {requiredError && <ErrorBanner>{requiredError}</ErrorBanner>}
     </Modal>
   );
 }

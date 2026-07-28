@@ -48,16 +48,16 @@ test.beforeEach(async ({ page }) => {
   await loginAsResponsable(page);
 });
 
-test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut', async ({ page }) => {
+test('annuler conserve l’arbitrage actif et ouvre le dossier mobile en haut', async ({ page }) => {
   const card = page.locator('.incident-card').filter({ hasText: 'E2E-ANNULATION' });
   await expect(card).toBeVisible();
-  // A11Y-01 : seul le titre (bouton natif) ouvre le dossier, plus toute la carte.
-  const openCard = card.locator('.incident-card-open');
-  await openCard.click();
+  // RC4 : l'activateur natif couvre toute la zone non interactive de la carte.
+  const cardActivationArea = card.getByRole('link', { name: /Ouvrir incident/i });
+  await cardActivationArea.click();
 
   const dialog = page.getByRole('dialog', { name: 'Arbitrage annulation' });
   await expectCompactModal(page, dialog);
-  await dialog.getByRole('button', { name: 'Reporter' }).click();
+  await dialog.getByRole('button', { name: 'Annuler' }).click();
   await expect(dialog).toBeHidden();
 
   const dossier = page.getByLabel(/Détail de l'incident ligne 999, machine E2E-MCH-1/);
@@ -71,14 +71,18 @@ test('reporter conserve l’arbitrage actif et ouvre le dossier mobile en haut',
   expect(page.url()).toContain('incident=');
 
   await dossier.getByRole('button', { name: 'Fermer le détail' }).click();
-  await openCard.click();
-  await expect(page.getByRole('dialog', { name: 'Arbitrage annulation' })).toBeVisible();
+  await cardActivationArea.click();
+  const resumedDialog = page.getByRole('dialog', { name: 'Arbitrage annulation' });
+  await expect(resumedDialog).toBeVisible();
+  await resumedDialog.getByRole('button', { name: 'Consulter le dossier' }).click();
+  await expect(resumedDialog).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Dossier d’arbitrage consulté.');
 });
 
 test('la correction se décide directement depuis le modal mobile', async ({ page }) => {
   const card = page.locator('.incident-card').filter({ hasText: 'E2E-CORRECTION' });
   await expect(card).toBeVisible();
-  await card.locator('.incident-card-open').click();
+  await card.getByRole('link', { name: /Ouvrir incident/i }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Arbitrage correction' });
   await expectCompactModal(page, dialog);

@@ -12,12 +12,11 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function NavBar() {
-  const { logout } = useAppAuth();
+  const { logout, logoutPending } = useAppAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
-    await logout();
-    navigate('/login', { replace: true });
+    if (await logout()) navigate('/login', { replace: true });
   }
 
   return (
@@ -27,8 +26,8 @@ export default function NavBar() {
       section="Administration"
       items={NAV_ITEMS}
       actions={
-        <button className="nav-logout" onClick={handleLogout}>
-          Déconnexion
+        <button className="nav-logout" onClick={handleLogout} disabled={logoutPending}>
+          {logoutPending ? 'Déconnexion…' : 'Déconnexion'}
         </button>
       }
     />

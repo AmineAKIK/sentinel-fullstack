@@ -6,6 +6,7 @@ import WorkshopDashboardPage from '../WorkshopDashboardPage';
 import { useIncidentsData } from '../../hooks/useIncidentsData';
 import { listWorkshopFollowedResolvedIncidents } from '../../api/workshop';
 import { WorkshopIncident, WorkshopIncidentMetrics } from '../../types';
+import { MutationFeedbackProvider } from '../../components/ui/MutationFeedback';
 
 vi.mock('../../routes/AppAuthContext', () => ({
   useAppAuth: () => ({
@@ -125,7 +126,9 @@ function mockDashboardData(incidents: WorkshopIncident[]) {
 function renderDashboard() {
   return render(
     <MemoryRouter initialEntries={['/workshop/dashboard']}>
-      <WorkshopDashboardPage />
+      <MutationFeedbackProvider>
+        <WorkshopDashboardPage />
+      </MutationFeedbackProvider>
     </MemoryRouter>
   );
 }

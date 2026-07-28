@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { archiveLine, getLineImpact } from '../api/lines';
 import { ProductionLine } from '../types';
-import { apiErrorMessage } from '../api/errorMessages';
+import { useMutationRunner } from './ui/MutationFeedback';
+import { formatCount, inflect } from '../utils/french';
 
 interface ArchiveLineConfirmModalProps {
   line: ProductionLine;
@@ -15,12 +16,12 @@ export default function ArchiveLineConfirmModal({
   onClose,
   onSuccess,
 }: ArchiveLineConfirmModalProps) {
+  useMutationRunner();
   const [impact, setImpact] = useState<{
     incidents: number;
     open_or_pending_incidents: number;
   } | null>(null);
   const [forceMode, setForceMode] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -36,23 +37,27 @@ export default function ArchiveLineConfirmModal({
   const hasActiveIncidents = activeCount > 0;
 
   async function handleConfirm() {
-    setError('');
-    try {
-      await archiveLine(line.id, forceMode);
-      onSuccess();
-    } catch (requestError) {
-      setError(apiErrorMessage(requestError, "Impossible d'archiver la ligne."));
-    }
+    await archiveLine(line.id, forceMode);
+    onSuccess();
   }
 
-  const title = forceMode ? `Archiver et annuler ${activeCount} incident(s)` : 'Archiver la ligne';
+  const title = forceMode
+    ? `Archiver et annuler ${formatCount(activeCount, 'incident', 'incidents')}`
+    : 'Archiver la ligne';
 
   return (
     <AdminPasswordConfirmModal
       title={title}
       onClose={onClose}
       onConfirm={handleConfirm}
-      confirmLabel={forceMode ? `Annuler ${activeCount} incident(s) et archiver` : 'Archiver'}
+      confirmLabel={
+        forceMode
+          ? `Annuler ${formatCount(activeCount, 'incident', 'incidents')} et archiver`
+          : 'Archiver'
+      }
+      mutationKey={`admin:line:${line.id}:archive`}
+      successMessage="Ligne archivée."
+      failureMessage="Impossible d’archiver la ligne."
     >
       <p style={{ fontWeight: 500, marginBottom: 8 }}>Archiver la ligne {line.line_number} ?</p>
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
@@ -62,11 +67,12 @@ export default function ArchiveLineConfirmModal({
 
       {impact && impact.incidents > 0 && (
         <div className="notice" style={{ marginTop: 12 }}>
-          {impact.incidents} incident(s) lié(s) à cette ligne au total.
+          {formatCount(impact.incidents, 'incident lié', 'incidents liés')} à cette ligne au total.
           {hasActiveIncidents && (
             <>
               {' '}
-              <strong>{activeCount} actif(s)</strong> — doivent être traités avant archivage.
+              <strong>{formatCount(activeCount, 'actif', 'actifs')}</strong> —{' '}
+              {inflect(activeCount, 'doit être traité', 'doivent être traités')} avant archivage.
             </>
           )}
         </div>
@@ -80,7 +86,7 @@ export default function ArchiveLineConfirmModal({
             style={{ fontSize: 13, width: '100%' }}
             onClick={() => setForceMode(true)}
           >
-            Annuler les {activeCount} incident(s) actif(s) et archiver
+            Annuler {formatCount(activeCount, 'incident actif', 'incidents actifs')} et archiver
           </button>
           <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 6 }}>
             Les incidents actifs seront annulés automatiquement. Cette action est irréversible.
@@ -90,8 +96,9 @@ export default function ArchiveLineConfirmModal({
 
       {forceMode && (
         <div className="notice notice--danger" style={{ marginTop: 12 }}>
-          <strong>Attention :</strong> {activeCount} incident(s) actif(s) seront annulés
-          définitivement avec la ligne.
+          <strong>Attention :</strong>{' '}
+          {formatCount(activeCount, 'incident actif', 'incidents actifs')}{' '}
+          {inflect(activeCount, 'sera annulé', 'seront annulés')} définitivement avec la ligne.
           <button
             type="button"
             className="btn btn-ghost"
@@ -100,12 +107,6 @@ export default function ArchiveLineConfirmModal({
           >
             ← Revenir à l'archivage simple
           </button>
-        </div>
-      )}
-
-      {error && (
-        <div className="error-message" role="alert" style={{ marginTop: 8 }}>
-          {error}
         </div>
       )}
     </AdminPasswordConfirmModal>

@@ -106,12 +106,7 @@ afterAll(async () => {
 describe('projection Board — indicateur d’arbitrage minimal (lot 5, C-06)', () => {
   it('dérive un booléen par type de demande, sans motif ni identité', async () => {
     const board = await getBoardData();
-    const byId = new Map(
-      board.incidents.map((incident) => [
-        (incident as { id: number }).id,
-        incident as Record<string, unknown>,
-      ])
-    );
+    const byId = new Map(board.incidents.map((incident) => [incident.id, incident]));
 
     const cancelRow = byId.get(cancelIncidentId)!;
     const editRow = byId.get(editIncidentId)!;

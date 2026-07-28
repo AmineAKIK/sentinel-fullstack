@@ -12,7 +12,7 @@ import Spinner from '../components/ui/Spinner';
 import { listAccounts } from '../api/accounts';
 import { SentinelUser, Role, SortOrder } from '../types';
 import { formatDate } from '../utils/date';
-import { ROLE_LABELS } from '../utils/labels';
+import { formatRoleLabel, ROLE_LABELS } from '../utils/labels';
 import { makeSortCodec } from '../utils/sortCodec';
 import { UserSortField, compareUsers } from '../utils/userSort';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -129,7 +129,7 @@ export default function UserListPage() {
       ? [
           {
             key: 'role',
-            label: `Rôle: ${ROLE_LABELS[filterRole] || filterRole}`,
+            label: `Rôle: ${formatRoleLabel(filterRole)}`,
             onRemove: () => setFilterRole(''),
           },
         ]
@@ -245,7 +245,7 @@ export default function UserListPage() {
         </div>
         <FilterSummary
           count={filteredUsers.length}
-          countLabel="utilisateur(s) affiché(s)"
+          countLabel={{ singular: 'utilisateur affiché', plural: 'utilisateurs affichés' }}
           chips={filterChips}
           onClear={clearAllFilters}
         />
@@ -316,7 +316,7 @@ export default function UserListPage() {
                         </td>
                         <td>{user.badge_number}</td>
                         <td>
-                          <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
+                          <span className="badge-role">{formatRoleLabel(user.role)}</span>
                         </td>
                         <td>
                           <span
@@ -363,7 +363,7 @@ export default function UserListPage() {
                       <span className="user-card-badge">Badge {user.badge_number}</span>
                     </span>
                     <span className="user-card-meta">
-                      <span className="badge-role">{ROLE_LABELS[user.role] || user.role}</span>
+                      <span className="badge-role">{formatRoleLabel(user.role)}</span>
                       <span className={`badge-status ${user.is_active ? 'active' : 'inactive'}`}>
                         {user.is_active ? 'Actif' : 'Inactif'}
                       </span>

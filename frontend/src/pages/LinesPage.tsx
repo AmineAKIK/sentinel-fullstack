@@ -240,7 +240,7 @@ export default function LinesPage() {
 
         <FilterSummary
           count={filteredLines.length}
-          countLabel="ligne(s) affichée(s)"
+          countLabel={{ singular: 'ligne affichée', plural: 'lignes affichées' }}
           chips={filterChips}
           onClear={clearAllFilters}
         />

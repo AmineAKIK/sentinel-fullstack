@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Modal from './Modal';
 import CharCounter from './ui/CharCounter';
 import { ProductionLine, WorkshopIncident } from '../types';
-import { ROLE_LABELS, STATE_LABELS } from '../utils/labels';
+import { formatRoleLabel, STATE_LABELS } from '../utils/labels';
 import { FIELD_LIMITS } from '../utils/fieldLimits';
 import { computeIncidentDiff } from '../utils/incidentDiff';
 import { formatDateTime, formatElapsed } from '../utils/date';
@@ -146,6 +146,11 @@ export default function ReviewIncidentRequestModal({
   const [rejectReason, setRejectReason] = useState('');
   const rejectInputRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    if (!error || !rejectMode) return;
+    rejectInputRef.current?.focus();
+  }, [error, rejectMode]);
+
   function enterRejectMode() {
     setRejectMode(true);
     // Focus au champ dès son apparition.
@@ -202,26 +207,24 @@ export default function ReviewIncidentRequestModal({
   const isDelete = type === 'delete';
   const decisionTitle = isDelete ? 'Annulation opérateur' : 'Correction opérateur';
   const modalTitle = isDelete ? 'Arbitrage annulation' : 'Arbitrage correction';
-  const requesterRole = ROLE_LABELS[incident.role] ?? incident.role;
+  const requesterRole = formatRoleLabel(incident.role);
   const takenByLabel = takenByName
     ? `${takenByName}${
-        incident.taken_by_role
-          ? ` · ${ROLE_LABELS[incident.taken_by_role] ?? incident.taken_by_role}`
-          : ''
+        incident.taken_by_role ? ` · ${formatRoleLabel(incident.taken_by_role)}` : ''
       }`
     : 'Non pris';
   const priorityLabel = incident.is_priority ? 'Urgent' : 'Normal';
   const hasNarrativeContext =
-    Boolean(incident.comment) ||
-    Boolean(incident.diagnostic) ||
-    Boolean(incident.intervention_note);
+    Boolean(incident.comment?.trim()) ||
+    Boolean(incident.diagnostic?.trim()) ||
+    Boolean(incident.intervention_note?.trim());
 
   const footer =
     type === 'edit' ? (
       <div className="arbitration-footer">
         <div className="arbitration-footer-group">
           <button className="btn btn-secondary" onClick={report} disabled={loading}>
-            Reporter
+            Annuler
           </button>
           {onConsult && hasConsultableArbitration && (
             <button className="btn btn-outline" onClick={onConsult} disabled={loading}>
@@ -267,7 +270,7 @@ export default function ReviewIncidentRequestModal({
       <div className="arbitration-footer">
         <div className="arbitration-footer-group">
           <button className="btn btn-secondary" onClick={report} disabled={loading}>
-            Reporter
+            Annuler
           </button>
           {onConsult && hasConsultableArbitration && (
             <button className="btn btn-outline" onClick={onConsult} disabled={loading}>
@@ -372,6 +375,10 @@ export default function ReviewIncidentRequestModal({
                   <span className="detail-field-label">Motif opérateur</span>
                   <p>{incident.cancel_request_reason || 'Non renseigné'}</p>
                 </div>
+                <div className="arbitration-system-note arbitration-system-note--danger">
+                  Cette annulation est définitive. L’incident sera conservé dans l’historique avec
+                  la trace de la décision.
+                </div>
                 {deleteWarning && <div className="arbitration-system-note">{deleteWarning}</div>}
                 {deleteApprovalDisabled && (
                   <div className="arbitration-system-note arbitration-system-note--danger">
@@ -453,20 +460,20 @@ export default function ReviewIncidentRequestModal({
 
           {incident.responsible_comment && (
             <div className="arbitration-responsible-callout">
-              <span className="detail-field-label">Consigne responsable</span>
+              <span className="detail-field-label">Consigne du responsable</span>
               <p>{incident.responsible_comment}</p>
             </div>
           )}
 
           {hasNarrativeContext && (
             <div className="arbitration-narrative-strip" aria-label="Contexte atelier">
-              {incident.comment && (
-                <DecisionField label="Signalement">{incident.comment}</DecisionField>
+              {incident.comment?.trim() && (
+                <DecisionField label="Signalement initial">{incident.comment}</DecisionField>
               )}
-              {incident.diagnostic && (
+              {incident.diagnostic?.trim() && (
                 <DecisionField label="Diagnostic">{incident.diagnostic}</DecisionField>
               )}
-              {incident.intervention_note && (
+              {incident.intervention_note?.trim() && (
                 <DecisionField label="Intervention">{incident.intervention_note}</DecisionField>
               )}
             </div>
@@ -480,7 +487,11 @@ export default function ReviewIncidentRequestModal({
           </div>
         )}
 
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <div className="error-message" role="alert">
+            {error}
+          </div>
+        )}
       </div>
     </Modal>
   );

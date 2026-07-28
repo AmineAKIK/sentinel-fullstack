@@ -93,7 +93,7 @@ test('ligne avec incident actif : la modification structurelle est refusée', as
   const preview = page.getByRole('dialog', { name: 'Aperçu machine' });
   await expect(
     preview.getByText(
-      /Impossible de modifier la structure de cette ligne : [1-9]\d* incident\(s\) actif\(s\) y sont encore liés\./
+      /Impossible de modifier la structure de cette ligne : [1-9]\d* incidents? (?:actif|actifs) y (?:est|sont) encore lié(?:s)?\./
     )
   ).toBeVisible();
   await expect(page.getByText('Machine modifiée avec succès.')).toHaveCount(0);

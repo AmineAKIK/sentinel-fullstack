@@ -8,6 +8,7 @@ import DetailField from './ui/DetailField';
 import ErrorBanner from './ui/ErrorBanner';
 import Spinner from './ui/Spinner';
 import { normalizeLineMachine, validateLineForm } from '../utils/lineMachines';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface CreateLineModalProps {
   onClose: () => void;
@@ -19,7 +20,10 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
   const [error, setError] = useState('');
   const [lineError, setLineError] = useState('');
   const [fieldError, setFieldError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const mutation = useMutationRunner();
+  const mutationPending = mutation.isPending('admin:line:create');
+  const loading = checking || mutationPending;
   const [step, setStep] = useState<'form' | 'preview'>('form');
 
   async function handlePreview() {
@@ -38,7 +42,7 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
       return;
     }
 
-    setLoading(true);
+    setChecking(true);
     try {
       const machineIds = form.machines.map((machine) => machine.machineId.trim()).filter(Boolean);
       const conflicts = await checkLineConflicts({
@@ -57,7 +61,7 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
     } catch (err) {
       setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
-      setLoading(false);
+      setChecking(false);
     }
   }
 
@@ -66,18 +70,21 @@ export default function CreateLineModal({ onClose, onSuccess }: CreateLineModalP
     setLineError('');
     setFieldError('');
 
-    setLoading(true);
-    try {
-      const line = await createLine({
-        lineNumber: form.lineNumber.trim(),
-        machines: form.machines.map(normalizeLineMachine),
-      });
-      onSuccess(line);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-    } finally {
-      setLoading(false);
-    }
+    await mutation.execute(
+      () =>
+        createLine({
+          lineNumber: form.lineNumber.trim(),
+          machines: form.machines.map(normalizeLineMachine),
+        }),
+      {
+        key: 'admin:line:create',
+        successMessage: 'Ligne créée.',
+        errorPresentation: 'local',
+        toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+        onSuccess,
+        onError: (_err, safeMessage) => setError(safeMessage),
+      }
+    );
   }
 
   function handleBack() {

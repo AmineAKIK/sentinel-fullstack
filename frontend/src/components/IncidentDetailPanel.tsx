@@ -16,7 +16,7 @@ import { ProductionLine, WorkshopIncident } from '../types';
 import { Role } from '../types/common';
 import { formatDateTime, formatElapsed } from '../utils/date';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
-import { ROLE_LABELS } from '../utils/labels';
+import { formatRoleLabel } from '../utils/labels';
 import { ModalStateApi, ReviewType } from '../hooks/useModalState';
 import { useIncidentPermissions } from '../hooks/useIncidentPermissions';
 import {
@@ -30,8 +30,9 @@ import ChevronDownIcon from './icons/ChevronDownIcon';
 import CloseIcon from './icons/CloseIcon';
 import StarIcon from './icons/StarIcon';
 import ErrorBanner from './ui/ErrorBanner';
-import { translateApiError } from '../api/errorMessages';
-import { useMutationFeedback } from './ui/MutationFeedback';
+import { apiErrorMessage } from '../api/errorMessages';
+import { useMutationRunner } from './ui/MutationFeedback';
+import { WORKSHOP_MUTATION_KEYS } from '../utils/workshopMutationKeys';
 
 interface IncidentDetailPanelProps {
   incident: WorkshopIncident;
@@ -56,7 +57,7 @@ interface IncidentDetailPanelProps {
   onResumeIncident: () => Promise<void>;
   onCloseIncident: (note: string) => Promise<void>;
   onInvalidateIncident: (reason: string) => Promise<void>;
-  onMaintenanceDeleteConfirm: (mode: 'direct' | 'approve') => Promise<void>;
+  onMaintenanceDeleteConfirm: () => Promise<void>;
   onEditSuccess: (updated: WorkshopIncident) => void;
   onDeleteCommentConfirm: (incident: WorkshopIncident) => Promise<void>;
   patchIncident: (id: number, payload: Record<string, unknown>) => Promise<WorkshopIncident>;
@@ -116,7 +117,7 @@ function NarrativeItem({
   value: string | null | undefined;
   primary?: boolean;
 }) {
-  if (!value) return null;
+  if (!value?.trim()) return null;
 
   return (
     <div className={`incident-narrative-item${primary ? ' incident-narrative-item--primary' : ''}`}>
@@ -248,10 +249,9 @@ export default function IncidentDetailPanel({
   const FIELD_LIMITS = useFieldLimits();
   const [responsibleDraft, setResponsibleDraft] = useState(incident.responsible_comment ?? '');
   const [actionError, setActionError] = useState('');
-  const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const pendingActionRef = useRef(false);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
-  const { notifySuccess } = useMutationFeedback();
+  const responsibleInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const mutation = useMutationRunner();
 
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
@@ -264,33 +264,8 @@ export default function IncidentDetailPanel({
   // carte de la liste. Le titre est focusable programmatiquement (tabIndex=-1)
   // sans entrer dans l'ordre de tabulation (lot 8, accessibilité).
   useEffect(() => {
-    titleRef.current?.focus();
+    titleRef.current?.focus({ preventScroll: true });
   }, [incident.id]);
-
-  // Runner des actions du panneau : verrou anti-double (pendingActionRef), état
-  // « en cours » (pendingAction), erreur locale TRADUITE près de l'action, et
-  // succès métier annoncé globalement lorsqu'un message est fourni.
-  async function runPanelAction(
-    actionName: string,
-    action: () => Promise<unknown>,
-    fallback: string,
-    successMessage?: string
-  ): Promise<void> {
-    if (pendingActionRef.current) return;
-    pendingActionRef.current = true;
-    setPendingAction(actionName);
-    setActionError('');
-    try {
-      await action();
-      if (successMessage) notifySuccess(successMessage);
-    } catch (requestError) {
-      // `fallback` reste le repli métier si l'erreur n'est pas une ApiResponseError.
-      setActionError(requestError ? translateApiError(requestError) : fallback);
-    } finally {
-      pendingActionRef.current = false;
-      setPendingAction(null);
-    }
-  }
 
   const machineContextQuery = `line=${incident.line_id}&machine=${encodeURIComponent(incident.machine_id)}`;
 
@@ -327,10 +302,10 @@ export default function IncidentDetailPanel({
   // suspendu (à la reprise il est effacé, mais reste dans l'historique).
   const waitingReason = incident.status === 'PENDING' ? incident.waiting_reason : null;
   const hasNarrative =
-    Boolean(incident.comment) ||
-    Boolean(incident.diagnostic) ||
-    Boolean(waitingReason) ||
-    Boolean(incident.intervention_note);
+    Boolean(incident.comment?.trim()) ||
+    Boolean(incident.diagnostic?.trim()) ||
+    Boolean(waitingReason?.trim()) ||
+    Boolean(incident.intervention_note?.trim());
   const editArbitrationWaiting = incident.arbitration?.edit?.state === 'WAITING';
   const cancelArbitrationWaiting = incident.arbitration?.cancel?.state === 'WAITING';
 
@@ -354,7 +329,7 @@ export default function IncidentDetailPanel({
                 type="button"
                 className="incident-detail-iconbtn"
                 onClick={navigation.onPrev}
-                disabled={navigation.index <= 0}
+                disabled={mutation.pending || navigation.index <= 0}
                 aria-label="Incident précédent"
                 title="Incident précédent"
               >
@@ -367,7 +342,7 @@ export default function IncidentDetailPanel({
                 type="button"
                 className="incident-detail-iconbtn"
                 onClick={navigation.onNext}
-                disabled={navigation.index >= navigation.total - 1}
+                disabled={mutation.pending || navigation.index >= navigation.total - 1}
                 aria-label="Incident suivant"
                 title="Incident suivant"
               >
@@ -381,15 +356,15 @@ export default function IncidentDetailPanel({
               className={`incident-detail-iconbtn incident-detail-followbtn${
                 incident.is_followed ? ' is-active' : ''
               }`}
-              onClick={() =>
-                void runPanelAction(
-                  'follow',
-                  () => onToggleFollow(incident),
-                  'Impossible de modifier le suivi.'
-                )
+              onClick={() => void onToggleFollow(incident)}
+              disabled={mutation.pending}
+              aria-label={
+                mutation.isPending(WORKSHOP_MUTATION_KEYS.FOLLOW)
+                  ? 'Modification du suivi…'
+                  : incident.is_followed
+                    ? 'Retirer du suivi'
+                    : 'Suivre cet incident'
               }
-              disabled={pendingAction !== null}
-              aria-label={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
               title={incident.is_followed ? 'Retirer du suivi' : 'Suivre cet incident'}
             >
               <StarIcon filled={Boolean(incident.is_followed)} />
@@ -399,6 +374,7 @@ export default function IncidentDetailPanel({
             type="button"
             className="incident-detail-iconbtn"
             onClick={onBack}
+            disabled={mutation.pending}
             aria-label="Fermer le détail"
             title="Fermer"
           >
@@ -407,7 +383,7 @@ export default function IncidentDetailPanel({
         </div>
       </div>
 
-      <div className="incident-detail-content">
+      <div className="incident-detail-content" aria-busy={mutation.pending || undefined}>
         {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
         <section className="incident-summary-strip" aria-label="Synthèse de l'incident">
           <SummaryItem label="État">
@@ -446,38 +422,52 @@ export default function IncidentDetailPanel({
           <DrawerSection title="Pilotage du traitement" eyebrow="Actions">
             <div className="incident-action-row">
               {canTake && (
-                <button className="btn btn-primary" onClick={() => modal.openModal('takeCharge')}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => modal.openModal('takeCharge')}
+                  disabled={mutation.pending}
+                >
                   Prendre en charge
                 </button>
               )}
               {canResume && (
-                <button className="btn btn-primary" onClick={() => modal.openModal('resume')}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => modal.openModal('resume')}
+                  disabled={mutation.pending}
+                >
                   Reprendre
                 </button>
               )}
               {canSetPending && (
-                <button className="btn btn-outline" onClick={() => modal.openModal('pending')}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => modal.openModal('pending')}
+                  disabled={mutation.pending}
+                >
                   Suspendre
                 </button>
               )}
               {canClose && (
-                <button className="btn btn-primary" onClick={() => modal.openModal('close')}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => modal.openModal('close')}
+                  disabled={mutation.pending}
+                >
                   Clôturer
                 </button>
               )}
               {canSetPriority && (
                 <button
                   className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-warning'}
-                  onClick={() =>
-                    void runPanelAction(
-                      'priority',
-                      () => onToggleUrgent(incident),
-                      "Impossible de modifier l'urgence."
-                    )
-                  }
-                  disabled={pendingAction !== null}
+                  onClick={() => void onToggleUrgent(incident)}
+                  disabled={mutation.pending}
                 >
-                  {incident.is_priority ? "Retirer l'urgence" : 'Déclarer urgent'}
+                  {mutation.isPending(WORKSHOP_MUTATION_KEYS.PRIORITY)
+                    ? 'Modification…'
+                    : incident.is_priority
+                      ? "Retirer l'urgence"
+                      : 'Déclarer urgent'}
                 </button>
               )}
             </div>
@@ -488,23 +478,40 @@ export default function IncidentDetailPanel({
           <DrawerSection title="Actions disponibles">
             <div className="incident-action-row">
               {(canRequestEdit || canDirectEdit || canResponsableEdit) && (
-                <button className="btn btn-outline" onClick={() => modal.openModal('edit')}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => modal.openModal('edit')}
+                  disabled={mutation.pending}
+                >
                   {canRequestEdit ? 'Demander une correction' : 'Modifier'}
                 </button>
               )}
               {canWithdrawEdit && (
                 <button
                   className="btn btn-secondary"
-                  onClick={() =>
-                    void runPanelAction(
-                      'withdraw-edit',
+                  onClick={(event) => {
+                    const trigger = event.currentTarget;
+                    setActionError('');
+                    void mutation.execute(
                       () => patchIncident(incident.id, { withdrawEditRequest: true }),
-                      'Impossible de retirer la demande de correction.'
-                    )
-                  }
-                  disabled={pendingAction !== null}
+                      {
+                        key: WORKSHOP_MUTATION_KEYS.WITHDRAW_EDIT,
+                        successMessage: 'Demande de correction retirée.',
+                        errorPresentation: 'local',
+                        toErrorMessage: (error) =>
+                          apiErrorMessage(error, 'Impossible de retirer la demande de correction.'),
+                        onError: (_error, safeMessage) => {
+                          setActionError(safeMessage);
+                          requestAnimationFrame(() => trigger.focus({ preventScroll: true }));
+                        },
+                      }
+                    );
+                  }}
+                  disabled={mutation.pending}
                 >
-                  Retirer ma demande
+                  {mutation.isPending(WORKSHOP_MUTATION_KEYS.WITHDRAW_EDIT)
+                    ? 'Retrait…'
+                    : 'Retirer ma demande'}
                 </button>
               )}
             </div>
@@ -523,18 +530,14 @@ export default function IncidentDetailPanel({
               {takenByName ? (
                 <>
                   {takenByName}
-                  {incident.taken_by_role
-                    ? ` · ${ROLE_LABELS[incident.taken_by_role] || incident.taken_by_role}`
-                    : ''}
+                  {incident.taken_by_role ? ` · ${formatRoleLabel(incident.taken_by_role)}` : ''}
                 </>
               ) : (
                 <span className="detail-value-muted">Aucun technicien</span>
               )}
             </DetailField>
             <DetailField label="Déclaré par">{creatorName}</DetailField>
-            <DetailField label="Rôle créateur">
-              {ROLE_LABELS[incident.role] ?? incident.role}
-            </DetailField>
+            <DetailField label="Rôle créateur">{formatRoleLabel(incident.role)}</DetailField>
             <DetailField label="Création">{formatDateTime(incident.created_at)}</DetailField>
           </div>
         </DrawerSection>
@@ -542,7 +545,7 @@ export default function IncidentDetailPanel({
         {hasNarrative && (
           <DrawerSection title="Suivi de l'incident">
             <div className="incident-narrative-list">
-              <NarrativeItem label="Signalement" value={incident.comment} primary />
+              <NarrativeItem label="Signalement initial" value={incident.comment} primary />
               <NarrativeItem label="Motif de mise en attente" value={waitingReason} />
               <NarrativeItem label="Diagnostic" value={incident.diagnostic} />
               <NarrativeItem label="Intervention" value={incident.intervention_note} />
@@ -551,7 +554,7 @@ export default function IncidentDetailPanel({
         )}
 
         {hasResponsibleInstruction && (
-          <DrawerSection title="Consigne responsable">
+          <DrawerSection title="Consigne du responsable">
             {incident.responsible_comment && (
               <div className="incident-instruction-card">
                 <p>{incident.responsible_comment}</p>
@@ -561,10 +564,11 @@ export default function IncidentDetailPanel({
               <div className="incident-responsible-editor">
                 <div className="form-group">
                   <label className="sr-only" htmlFor={`responsible-comment-detail-${incident.id}`}>
-                    Consigne responsable
+                    Consigne du responsable
                   </label>
                   <textarea
                     id={`responsible-comment-detail-${incident.id}`}
+                    ref={responsibleInputRef}
                     className="form-input"
                     rows={3}
                     value={responsibleDraft}
@@ -572,6 +576,7 @@ export default function IncidentDetailPanel({
                       setResponsibleDraft(e.target.value.slice(0, FIELD_LIMITS.COMMENT))
                     }
                     maxLength={FIELD_LIMITS.COMMENT}
+                    disabled={mutation.pending}
                     placeholder="Consigne courte pour orienter le traitement"
                   />
                   <CharCounter current={responsibleDraft.length} max={FIELD_LIMITS.COMMENT} />
@@ -579,25 +584,43 @@ export default function IncidentDetailPanel({
                 <div className="incident-action-row incident-action-row--compact">
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() =>
-                      void runPanelAction(
-                        'responsible-comment',
+                    onClick={() => {
+                      setActionError('');
+                      void mutation.execute(
                         () =>
                           patchIncident(incident.id, {
                             responsibleComment: responsibleDraft.trim(),
                           }),
-                        "Impossible d'enregistrer la consigne.",
-                        'Consigne enregistrée.'
-                      )
-                    }
-                    disabled={!responsibleDraft.trim() || pendingAction !== null}
+                        {
+                          key: WORKSHOP_MUTATION_KEYS.RESPONSIBLE_COMMENT,
+                          successMessage: 'Consigne enregistrée.',
+                          errorPresentation: 'local',
+                          toErrorMessage: (error) =>
+                            apiErrorMessage(error, "Impossible d'enregistrer la consigne."),
+                          onError: (_error, safeMessage) => {
+                            setActionError(safeMessage);
+                            requestAnimationFrame(() =>
+                              responsibleInputRef.current?.focus({
+                                preventScroll: true,
+                              })
+                            );
+                          },
+                        }
+                      );
+                    }}
+                    disabled={!responsibleDraft.trim() || mutation.pending}
                   >
-                    {incident.responsible_comment ? 'Enregistrer' : 'Ajouter'}
+                    {mutation.isPending(WORKSHOP_MUTATION_KEYS.RESPONSIBLE_COMMENT)
+                      ? 'Enregistrement…'
+                      : incident.responsible_comment
+                        ? 'Enregistrer'
+                        : 'Ajouter'}
                   </button>
                   {incident.responsible_comment && (
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => modal.setDeleteCommentConfirm(incident)}
+                      disabled={mutation.pending}
                     >
                       Retirer la consigne
                     </button>
@@ -638,6 +661,7 @@ export default function IncidentDetailPanel({
                       ? modal.openModal('maintenanceDirect')
                       : modal.openModal('deleteRequest')
                   }
+                  disabled={mutation.pending}
                 >
                   {canCancel ? "Annuler l'incident" : "Demander l'annulation"}
                 </button>
@@ -645,21 +669,37 @@ export default function IncidentDetailPanel({
               {canWithdrawCancel && (
                 <button
                   className="btn btn-secondary"
-                  onClick={() =>
-                    void runPanelAction(
-                      'withdraw-cancel',
+                  onClick={(event) => {
+                    const trigger = event.currentTarget;
+                    setActionError('');
+                    void mutation.execute(
                       () => patchIncident(incident.id, { withdrawCancelRequest: true }),
-                      "Impossible de retirer la demande d'annulation.",
-                      'Demande d’annulation retirée.'
-                    )
-                  }
-                  disabled={pendingAction !== null}
+                      {
+                        key: WORKSHOP_MUTATION_KEYS.WITHDRAW_CANCEL,
+                        successMessage: 'Demande d’annulation retirée.',
+                        errorPresentation: 'local',
+                        toErrorMessage: (error) =>
+                          apiErrorMessage(error, "Impossible de retirer la demande d'annulation."),
+                        onError: (_error, safeMessage) => {
+                          setActionError(safeMessage);
+                          requestAnimationFrame(() => trigger.focus({ preventScroll: true }));
+                        },
+                      }
+                    );
+                  }}
+                  disabled={mutation.pending}
                 >
-                  Retirer ma demande
+                  {mutation.isPending(WORKSHOP_MUTATION_KEYS.WITHDRAW_CANCEL)
+                    ? 'Retrait…'
+                    : 'Retirer ma demande'}
                 </button>
               )}
               {canInvalidateClosed && (
-                <button className="btn btn-danger" onClick={() => modal.openModal('invalidate')}>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => modal.openModal('invalidate')}
+                  disabled={mutation.pending}
+                >
                   Invalider
                 </button>
               )}
@@ -723,35 +763,15 @@ export default function IncidentDetailPanel({
           onConfirm={onInvalidateIncident}
         />
       )}
-      {(modal.state.activeModal === 'maintenanceDirect' ||
-        modal.state.activeModal === 'maintenanceApprove') &&
-        (modal.state.activeModal === 'maintenanceDirect' || modal.state.reviewIncident) && (
-          <MaintenanceDeleteConfirmModal
-            incident={
-              modal.state.activeModal === 'maintenanceApprove'
-                ? modal.state.reviewIncident!
-                : incident
-            }
-            title={
-              modal.state.activeModal === 'maintenanceApprove'
-                ? "Valider l'annulation"
-                : "Annuler l'incident"
-            }
-            message={
-              modal.state.activeModal === 'maintenanceApprove'
-                ? "Cette validation annule l'incident demandé par l'opérateur et conserve la trace dans l'historique."
-                : "Cette action annule l'incident et le conserve dans l'historique. Confirmez uniquement s'il s'agit d'une erreur ou d'un doublon."
-            }
-            error={modal.state.reviewError}
-            loading={modal.state.reviewLoading}
-            onClose={() => modal.closeModal()}
-            onConfirm={() =>
-              onMaintenanceDeleteConfirm(
-                modal.state.activeModal === 'maintenanceDirect' ? 'direct' : 'approve'
-              )
-            }
-          />
-        )}
+      {modal.state.activeModal === 'maintenanceDirect' && (
+        <MaintenanceDeleteConfirmModal
+          incident={incident}
+          title="Annuler l'incident"
+          error={modal.state.reviewError}
+          onClose={() => modal.closeModal()}
+          onConfirm={onMaintenanceDeleteConfirm}
+        />
+      )}
       {modal.state.unfollowConfirmIncident && (
         <UnfollowIncidentConfirmModal
           incident={modal.state.unfollowConfirmIncident}

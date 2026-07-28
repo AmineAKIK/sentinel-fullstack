@@ -7,7 +7,7 @@ import SelectField from '../components/ui/SelectField';
 import { listReferenceAudit } from '../api/admin';
 import { ReferenceAuditEvent } from '../types';
 import { formatDateTime } from '../utils/date';
-import { ADMIN_EVENT_LABELS, formatAuditEventTarget } from '../utils/labels';
+import { formatAdminEventLabel, formatAuditEventTarget } from '../utils/labels';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
@@ -72,7 +72,7 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
       setup_code_ttl_hours: 'durée code setup',
       board_label: 'nom du board',
     };
-    return keys.map((k) => settingLabels[k] ?? k).join(', ');
+    return keys.map((k) => settingLabels[k] ?? 'paramètre applicatif').join(', ');
   }
   if (eventType === 'ADMIN_NOTIF_UPDATED') {
     const notifLabels: Record<string, string> = {
@@ -83,7 +83,7 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
     };
     return keys
       .map((k) => {
-        const label = notifLabels[k] ?? k;
+        const label = notifLabels[k] ?? 'préférence de notification';
         return `${label} : ${changes[k] ? 'activé' : 'désactivé'}`;
       })
       .join(', ');
@@ -120,7 +120,7 @@ function changesLabel(changes: Record<string, unknown> | null, eventType?: strin
         };
         return actionLabels[action] ?? labels[key];
       }
-      return labels[key] || key;
+      return labels[key] || 'champ modifié';
     })
     .join(', ');
 }
@@ -415,7 +415,7 @@ export default function AdminAuditPage() {
           </div>
           <FilterSummary
             count={events.length}
-            countLabel="événement(s) affiché(s)"
+            countLabel={{ singular: 'événement affiché', plural: 'événements affichés' }}
             chips={filterChips}
             emptyText="Journal complet"
             className="filter-summary-embedded"
@@ -476,7 +476,7 @@ export default function AdminAuditPage() {
                               ? 'Système'
                               : 'Utilisateur'}
                         </td>
-                        <td>{ADMIN_EVENT_LABELS[event.event_type] || event.event_type}</td>
+                        <td>{formatAdminEventLabel(event.event_type)}</td>
                         <td>{formatAuditEventTarget(event, true)}</td>
                         <td>{changesLabel(event.changes, event.event_type)}</td>
                       </tr>
@@ -494,7 +494,7 @@ export default function AdminAuditPage() {
                   >
                     <span className="user-card-main">
                       <span className="user-card-name">
-                        {ADMIN_EVENT_LABELS[event.event_type] || event.event_type}
+                        {formatAdminEventLabel(event.event_type)}
                       </span>
                       <span className="user-card-badge">{formatAuditEventTarget(event, true)}</span>
                     </span>

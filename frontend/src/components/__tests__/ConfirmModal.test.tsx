@@ -1,8 +1,101 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render as testingLibraryRender,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import ConfirmModal from '../../components/ConfirmModal';
+import CloseIncidentModal from '../CloseIncidentModal';
+import InvalidateIncidentModal from '../InvalidateIncidentModal';
+import MaintenanceDeleteConfirmModal from '../MaintenanceDeleteConfirmModal';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 import { ApiResponseError } from '../../api/client';
+import type { WorkshopIncident } from '../../types';
+
+function render(ui: React.ReactNode) {
+  return testingLibraryRender(<MutationFeedbackProvider>{ui}</MutationFeedbackProvider>);
+}
+
+const destructiveIncident = {
+  id: 42,
+  line_number: 'L42',
+  machine_id: 'M-7',
+  status: 'OPEN',
+} as WorkshopIncident;
+const closedIncident = { ...destructiveIncident, status: 'CLOSED' } as WorkshopIncident;
+
+type DestructiveConfirmationCase = {
+  name: string;
+  dialogName: string;
+  triggerLabel: string;
+  primaryLabel: string;
+  consequence: RegExp;
+  renderModal: (onClose: () => void) => React.ReactNode;
+};
+
+const destructiveConfirmationCases: DestructiveConfirmationCase[] = [
+  {
+    name: 'clôture',
+    dialogName: "Clôturer l'incident",
+    triggerLabel: 'Ouvrir la clôture',
+    primaryLabel: 'Clôturer',
+    consequence: /conservé dans l’historique/i,
+    renderModal: (onClose) => (
+      <CloseIncidentModal
+        incident={destructiveIncident}
+        onClose={onClose}
+        onConfirm={() => Promise.resolve()}
+      />
+    ),
+  },
+  {
+    name: 'invalidation',
+    dialogName: 'Invalider l’incident clôturé',
+    triggerLabel: "Ouvrir l'invalidation",
+    primaryLabel: 'Confirmer l’invalidation',
+    consequence: /restera dans le journal.*exclu des statistiques.*base de connaissance/is,
+    renderModal: (onClose) => (
+      <InvalidateIncidentModal
+        incident={closedIncident}
+        onClose={onClose}
+        onConfirm={() => Promise.resolve()}
+      />
+    ),
+  },
+  {
+    name: 'annulation définitive',
+    dialogName: "Annuler l'incident",
+    triggerLabel: "Ouvrir l'annulation",
+    primaryLabel: 'Confirmer l’annulation',
+    consequence: /conserve.*historique/i,
+    renderModal: (onClose) => (
+      <MaintenanceDeleteConfirmModal
+        incident={destructiveIncident}
+        title="Annuler l'incident"
+        onClose={onClose}
+        onConfirm={() => Promise.resolve()}
+      />
+    ),
+  },
+];
+
+function DestructiveConfirmationHarness({
+  triggerLabel,
+  renderModal,
+}: Pick<DestructiveConfirmationCase, 'triggerLabel' | 'renderModal'>) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <MutationFeedbackProvider>
+      <button type="button" onClick={() => setOpen(true)}>
+        {triggerLabel}
+      </button>
+      {open ? renderModal(() => setOpen(false)) : null}
+    </MutationFeedbackProvider>
+  );
+}
 
 // ─── rendering ────────────────────────────────────────────────────────────────
 
@@ -212,4 +305,45 @@ describe('ConfirmModal – variant', () => {
     const confirmBtn = screen.getByRole('button', { name: 'Confirmer' });
     expect(confirmBtn.className).toContain('btn-primary');
   });
+});
+
+describe('Confirmations Atelier destructives et finales', () => {
+  it.each(destructiveConfirmationCases)(
+    '$name décrit l’incident, la conséquence et le caractère définitif avec deux choix explicites',
+    ({ dialogName, primaryLabel, consequence, renderModal }) => {
+      render(<MutationFeedbackProvider>{renderModal(vi.fn())}</MutationFeedbackProvider>);
+
+      const dialog = screen.getByRole('dialog', { name: dialogName });
+      expect(dialog).toHaveTextContent('L42 · M-7');
+      expect(within(dialog).getByRole('button', { name: primaryLabel })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Annuler' })).toBeInTheDocument();
+      expect(dialog).toHaveTextContent(consequence);
+      expect(dialog).toHaveTextContent(/définiti(?:f|ve)/i);
+    }
+  );
+
+  it.each(destructiveConfirmationCases)(
+    '$name place le focus sur une commande sûre puis le rend au déclencheur après abandon',
+    async ({ dialogName, triggerLabel, primaryLabel, renderModal }) => {
+      render(
+        <DestructiveConfirmationHarness triggerLabel={triggerLabel} renderModal={renderModal} />
+      );
+
+      const trigger = screen.getByRole('button', { name: triggerLabel });
+      trigger.focus();
+      fireEvent.click(trigger);
+
+      const dialog = screen.getByRole('dialog', { name: dialogName });
+      const primary = within(dialog).getByRole('button', { name: primaryLabel });
+      await waitFor(() => {
+        expect(dialog.contains(document.activeElement)).toBe(true);
+      });
+      expect(primary).not.toHaveFocus();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: dialogName })).toBeNull());
+      expect(trigger).toHaveFocus();
+    }
+  );
 });

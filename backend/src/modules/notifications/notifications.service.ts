@@ -433,7 +433,7 @@ export async function notifyTechnicianResponsibleComment(
 
   return sendMail(
     email,
-    incidentUpdateTemplate.subjectIncidentUpdate('Consigne responsable', incidentId),
+    incidentUpdateTemplate.subjectIncidentUpdate('Consigne du responsable', incidentId),
     incidentUpdateTemplate.htmlIncidentUpdate({
       incidentId,
       lineNumber: incident.line_number,

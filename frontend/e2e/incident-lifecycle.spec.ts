@@ -35,11 +35,27 @@ test('cycle de vie complet d’un incident : création → prise en charge → s
   await page.getByPlaceholder('Référence produit').fill(productRef);
   await page.getByRole('button', { name: 'Aperçu' }).click();
   await expect(page.getByText("Aperçu de l'incident")).toBeVisible();
-  await page.getByRole('button', { name: 'Valider la création' }).click();
+  const createDialog = page.getByRole('dialog', { name: "Aperçu de l'incident" });
+  const createButton = createDialog.getByRole('button', { name: 'Valider la création' });
+  const createRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/api/workshop/incidents')) {
+      createRequests.push(request.url());
+    }
+  });
+  const createBox = await createButton.boundingBox();
+  expect(createBox).not.toBeNull();
+  await page.mouse.dblclick(
+    createBox!.x + createBox!.width / 2,
+    createBox!.y + createBox!.height / 2
+  );
+  await expect(page.getByRole('status')).toContainText('Incident signalé.');
+  expect(createRequests).toHaveLength(1);
 
-  const card = page.locator('article', { hasText: productRef }).locator('.incident-card-open');
-  await expect(card).toBeVisible();
-  await card.click();
+  const card = page.locator('article', { hasText: productRef });
+  const cardActivationArea = card.getByRole('link', { name: /Ouvrir incident/i });
+  await expect(cardActivationArea).toBeVisible();
+  await cardActivationArea.click();
 
   const panel = page.locator('aside.incident-detail-drawer');
   await expect(panel.getByText(productRef)).toBeVisible();
@@ -50,33 +66,82 @@ test('cycle de vie complet d’un incident : création → prise en charge → s
   const maintenancePage = await maintenanceContext.newPage();
   await loginAsWorkshop(maintenancePage, E2E_MAINTENANCE_BADGE);
 
-  const maintenanceCard = maintenancePage
-    .locator('article', { hasText: productRef })
-    .locator('.incident-card-open');
-  await expect(maintenanceCard).toBeVisible();
-  await maintenanceCard.click();
+  const maintenanceCard = maintenancePage.locator('article', { hasText: productRef });
+  const maintenanceCardActivationArea = maintenanceCard.getByRole('link', {
+    name: /Ouvrir incident/i,
+  });
+  await expect(maintenanceCardActivationArea).toBeVisible();
+  await maintenanceCardActivationArea.click();
 
   await maintenancePage.getByRole('button', { name: 'Prendre en charge' }).click();
   await maintenancePage.getByRole('button', { name: 'Confirmer' }).click();
+  await expect(maintenancePage.getByRole('status')).toContainText('Prise en charge enregistrée.');
   await expect(maintenancePage.getByRole('button', { name: 'Suspendre' })).toBeVisible();
 
   await maintenancePage.getByRole('button', { name: 'Suspendre' }).click();
   // Terminologie RC3 lot 7/9 : « Motif de mise en attente » (plus « Justification »).
-  await maintenancePage
-    .getByLabel('Motif de mise en attente *')
-    .fill('Attente pièce détachée (E2E).');
-  await maintenancePage.getByRole('button', { name: 'Suspendre', exact: true }).last().click();
+  const pendingDialog = maintenancePage.getByRole('dialog', {
+    name: "Suspendre l'incident",
+  });
+  const waitingDraft = '  Attente pièce détachée (E2E).\nContrôle\tqualité  ';
+  const waitingReason = pendingDialog.getByLabel('Motif de mise en attente *');
+  await waitingReason.fill(waitingDraft);
+  let failWaitingOnce = true;
+  const pendingFailureRoute = async (route: import('@playwright/test').Route) => {
+    const request = route.request();
+    const payload = request.postDataJSON() as { waitingReason?: string } | null;
+    if (
+      failWaitingOnce &&
+      request.method() === 'PATCH' &&
+      typeof payload?.waitingReason === 'string'
+    ) {
+      failWaitingOnce = false;
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  };
+  await maintenancePage.route('**/api/workshop/incidents/*', pendingFailureRoute);
+  await pendingDialog.getByRole('button', { name: 'Suspendre', exact: true }).click();
+  await expect(pendingDialog.getByRole('alert')).toContainText(
+    'Connexion impossible. Vérifiez votre réseau puis réessayez.'
+  );
+  await expect(waitingReason).toHaveValue(waitingDraft);
+  await expect(waitingReason).toBeFocused();
+  await expect(pendingDialog).toBeVisible();
+  await maintenancePage.unroute('**/api/workshop/incidents/*', pendingFailureRoute);
+
+  await pendingDialog.getByRole('button', { name: 'Suspendre', exact: true }).click();
+  await expect(maintenancePage.getByRole('status')).toContainText('Incident mis en attente.');
   await expect(maintenancePage.getByRole('button', { name: 'Reprendre' })).toBeVisible();
 
   await maintenancePage.getByRole('button', { name: 'Reprendre' }).click();
   await maintenancePage.getByRole('button', { name: 'Confirmer' }).click();
+  await expect(maintenancePage.getByRole('status')).toContainText('Traitement repris.');
   await expect(maintenancePage.getByRole('button', { name: 'Clôturer' })).toBeVisible();
 
-  await maintenancePage.getByRole('button', { name: 'Clôturer' }).click();
-  await maintenancePage
+  const closeTrigger = maintenancePage.getByRole('button', { name: 'Clôturer' });
+  await closeTrigger.click();
+  const firstCloseDialog = maintenancePage.getByRole('dialog', {
+    name: "Clôturer l'incident",
+  });
+  await expect(firstCloseDialog).toContainText(/définitive/i);
+  await expect(firstCloseDialog).toContainText(/conservé dans l’historique/i);
+  await firstCloseDialog.getByRole('button', { name: 'Annuler' }).click();
+  await expect(firstCloseDialog).toBeHidden();
+  await expect(closeTrigger).toBeFocused();
+
+  await closeTrigger.click();
+  const closeDialog = maintenancePage.getByRole('dialog', {
+    name: "Clôturer l'incident",
+  });
+  await closeDialog
     .getByPlaceholder("Décrivez l'intervention réalisée")
     .fill('Pièce remplacée, incident résolu (E2E).');
-  await maintenancePage.getByRole('button', { name: 'Clôturer', exact: true }).last().click();
+  await closeDialog.getByRole('button', { name: 'Clôturer', exact: true }).click();
+  await expect(maintenancePage.getByRole('status')).toContainText(
+    'Incident clôturé et conservé dans l’historique.'
+  );
 
   const closedPanel = maintenancePage.locator('aside.incident-detail-drawer');
   await expect(closedPanel.getByText('Clôturé')).toBeVisible();

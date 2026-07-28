@@ -1,4 +1,5 @@
 import { ApiResponseError, type ApiErrorDetails } from './client';
+import { formatCount } from '../utils/french';
 
 /**
  * Traduction de présentation (lot 2 RC3). Convertit une erreur API structurée
@@ -110,11 +111,19 @@ function describeResourceInUse(details: ApiErrorDetails | undefined): string | n
   switch (details?.reason) {
     case 'LINE_STRUCTURE_LOCKED':
       return count !== null
-        ? `Impossible de modifier la structure de cette ligne : ${count} incident(s) actif(s) y sont encore liés.`
+        ? `Impossible de modifier la structure de cette ligne : ${formatCount(
+            count,
+            'incident actif y est encore lié',
+            'incidents actifs y sont encore liés'
+          )}.`
         : 'Impossible de modifier la structure de cette ligne : des incidents actifs y sont encore liés.';
     case 'USER_HAS_ACTIVE_INCIDENTS':
       return count !== null
-        ? `Ce technicien a ${count} incident(s) actif(s) en cours. Réassignez-les ou clôturez-les avant de continuer.`
+        ? `Ce technicien a ${formatCount(
+            count,
+            'incident actif',
+            'incidents actifs'
+          )} en cours. Réassignez-les ou clôturez-les avant de continuer.`
         : 'Ce technicien a des incidents actifs en cours. Réassignez-les ou clôturez-les avant de continuer.';
     default:
       return null;

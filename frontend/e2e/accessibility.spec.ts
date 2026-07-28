@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   E2E_ADMIN_PASSWORD,
   E2E_ADMIN_USERNAME,
+  E2E_BOARD_CODE,
   E2E_RESPONSABLE_BADGE,
   E2E_WORKSHOP_PASSWORD,
 } from './fixtures';
@@ -54,6 +55,14 @@ test.describe('Accessibilité (axe-core, lot 8, A11Y-06) — espace public', () 
     await page.goto('/board');
     await expectNoSeriousViolations(page);
   });
+
+  test('Board authentifié', async ({ page }) => {
+    await page.goto('/board');
+    await page.getByLabel("Code d'accès").fill(E2E_BOARD_CODE);
+    await page.getByRole('button', { name: 'Accéder au tableau' }).click();
+    await expect(page.locator('main.board-page')).toBeVisible();
+    await expectNoSeriousViolations(page);
+  });
 });
 
 test.describe('Accessibilité (axe-core, lot 8, A11Y-06) — espace Atelier (RESPONSABLE)', () => {
@@ -63,6 +72,17 @@ test.describe('Accessibilité (axe-core, lot 8, A11Y-06) — espace Atelier (RES
 
   test('dashboard atelier', async ({ page }) => {
     await page.goto('/workshop/dashboard');
+    await expectNoSeriousViolations(page);
+  });
+
+  test('dossier et arbitrage ouverts', async ({ page }) => {
+    const card = page.locator('article', { hasText: 'E2E-ANNULATION' });
+    await card.getByRole('link', { name: /Ouvrir incident/i }).click();
+    const dialog = page.getByRole('dialog', { name: 'Arbitrage annulation' });
+    await expect(dialog).toBeVisible();
+    await expectNoSeriousViolations(page);
+    await dialog.getByRole('button', { name: 'Annuler' }).click();
+    await expect(page.locator('aside.incident-detail-drawer')).toBeVisible();
     await expectNoSeriousViolations(page);
   });
 

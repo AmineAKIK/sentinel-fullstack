@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as testingLibraryRender, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
@@ -11,6 +11,7 @@ vi.mock('../../api/lines', () => ({
 import * as linesApi from '../../api/lines';
 import EditMachineModal from '../EditMachineModal';
 import { LineMachine, ProductionLine } from '../../types';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,11 @@ function mockLine(overrides: Partial<ProductionLine> = {}): ProductionLine {
 }
 
 function renderModal(line = mockLine(), onClose = vi.fn(), onSuccess = vi.fn()) {
-  render(<EditMachineModal line={line} machineIndex={0} onClose={onClose} onSuccess={onSuccess} />);
+  testingLibraryRender(
+    <MutationFeedbackProvider>
+      <EditMachineModal line={line} machineIndex={0} onClose={onClose} onSuccess={onSuccess} />
+    </MutationFeedbackProvider>
+  );
   return { onClose, onSuccess };
 }
 

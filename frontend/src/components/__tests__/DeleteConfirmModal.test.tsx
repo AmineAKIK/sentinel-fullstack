@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as testingLibraryRender, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ vi.mock('../../routes/AppAuthContext', () => ({
 import * as accountsApi from '../../api/accounts';
 import DeleteConfirmModal from '../DeleteConfirmModal';
 import { SentinelUser } from '../../types';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,10 +53,12 @@ function mockImpact(overrides = {}) {
 }
 
 function renderModal(user = mockUser(), onClose = vi.fn(), onSuccess = vi.fn()) {
-  return render(
-    <MemoryRouter>
-      <DeleteConfirmModal user={user} onClose={onClose} onSuccess={onSuccess} />
-    </MemoryRouter>
+  return testingLibraryRender(
+    <MutationFeedbackProvider>
+      <MemoryRouter>
+        <DeleteConfirmModal user={user} onClose={onClose} onSuccess={onSuccess} />
+      </MemoryRouter>
+    </MutationFeedbackProvider>
   );
 }
 
