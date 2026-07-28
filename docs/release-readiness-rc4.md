@@ -159,7 +159,7 @@ pas de `Cache-Control` dans le contrat actuel.
 | **R4-05** | **P0** | Plan RC4 §8.1–8.2, §12 lots 4–5, §14.5 | Rouge initial : zéro consommateur. Lots 4–5 : toutes les mutations explicites des 61 lignes passent par le runner partagé ; les deux seules exceptions sont des réactions système à `401`. | Contrat shell exact et tests d'architecture Atelier/hors Atelier ; voir §6 | Lot 5 rouge : `35 failed`; vert ciblé : `76/76`; branche `LegacyConfirmModal`, `submittingRef` et machines locales transitoires supprimées | `MutationFeedback.tsx`, confirmations, pages Administration/Auth/Board/Support, inventaire complet | Aucun travail d'adoption restant ; préserver le contrat dans les lots suivants. | Contrat commun, course, démontage, timers, anti-double, focus, erreurs réseau/métier et tests positifs par surface. | 59 lignes `COVERED`, 2 réactions système `EXCEPTION_PROVEN`, zéro trou | Régression future ou nouveau consommateur contournant le runner. | `VERIFIED` |
 | **R4-06** | **P0** | Plan RC4 §8.1, §8.3–8.4, §14.3–14.5 | Les `61` lignes sont traitées après les lots 4–5 : `59 COVERED`, `2 EXCEPTION_PROVEN`, `0 PARTIAL`, `0 GAP`. | Rouge ciblé par famille, registre courant détaillé dans `docs/rc4-mutation-inventory.md` | Lot 4 : matrice Atelier rouge puis `102/102`; lot 5 : architecture/support rouge `35 failed`, puis `76/76`; suite frontend verte | Toutes les lignes de l'inventaire ; confirmations de désactivation, suppression, archivage, révocation et code Board | Aucun correctif de mutation restant ; conserver la matrice au lot 8. | Erreurs sûres, conservation, réessai, anti-double, succès exact, focus ; E2E transversaux complétés au lot 8. | Inventaire `61/61`, zéro ligne sans état ni preuve | Régression E2E possible, couverte par R4-09 au lot 8. | `VERIFIED` |
 | **R4-07** | **P1** | Plan RC4 §9.1–9.2, §12 lot 6 | Les pseudo-pluralisations, anciens libellés, rôles bruts, fallbacks d'enums et sections Diagnostic blanches ont été reproduits par des tests permanents avant correction. | Trois rouges permanents : terminologie `10/10 failed`, fallback enum `34` restitutions brutes, Diagnostic blanc `2/2 failed` ; commandes et sorties §6. | Accords `0/1/2`, cinq rôles, `33` pseudo-pluriels et `10` anciens libellés en échec ; puis `34` fallbacks bruts et deux sections Diagnostic blanches rendues. | Helpers français et libellés sûrs ; erreurs, filtres, confirmations, journaux, Board, administration et courriels ; tests existants alignés sur le glossaire sans changer les enums internes. | Tests permanents de source et DOM ; rôles/fallbacks sûrs ; Diagnostic absent si null/vide/blanc ; balayages obligatoires classifiés ; backend notifications/lignes. | Ciblés frontend `15/15`, `204/204` ; backend `2/2`, `26/26` ; builds, ESLint et Prettier des deux applications verts ; balayage pseudo-pluriels vide. | Les enums et clés restantes sont exclusivement types, logique, accès DTO/configuration et fixtures négatives ; aucun fallback brut de table de libellés ne subsiste. | `VERIFIED` |
-| **R4-08** | **P1** | Plan RC4 §10.1–10.3, §14.6 | Le modèle Nginx hôte versionné ne contient aucune directive effective `X-Sentinel-Inheritance-Barrier`, aucun contrôle public `verify-public-headers.sh` n'existe et aucun test ne couvre l'héritage global ou l'unicité. Le modèle hôte ne contient que HSTS et masquage upstream. | `npm test -- src/middlewares/__tests__/securityHeaders.test.ts -t 'RC4 RED — versionne la barrière qui bloque les add_header globaux'` depuis `backend/` ; sortie détaillée §6 | Code `1` : `deploy/nginx/sentinel.conf.example` ne contient pas la directive exacte `add_header X-Sentinel-Inheritance-Barrier "";`. | `deploy/nginx/sentinel.conf.example` ; nouveau contrôle versionné sous `scripts/` ; test local Nginx ; `docs/runbook.md` ; contrôles CI/ops si nécessaire | Versionner la barrière au niveau HTTPS approprié, expliquer les autorités, vérifier `/login` et `/api/health`, occurrences et valeurs exactes, refuser l'en-tête interne ; documenter sauvegarde/application atomique/`nginx -t`/reload/validation/rollback, sans VPS. | Test local avec héritage global et upstream simulés ; `nginx -t` compatible 1.18 ; script public en environnement local ; tests négatifs doublon, mauvaise valeur et barrière exposée ; vérification externe différée. | `PENDING_EXECUTION[R4-08:GREEN_EVIDENCE]` | Sémantique subtile d'héritage `add_header`, incompatibilité Nginx 1.18, HSTS en double, barrière publique, script divulguant un secret, confusion preuve locale/VPS. | `RED_PROVEN` |
+| **R4-08** | **P1** | Plan RC4 §10.1–10.3, §14.6 | La barrière, les scripts et la syntaxe 1.18 manquaient ; le modèle employait en outre `http2 on`, directive inconnue de Nginx 1.18.0. | Jest permanent `3 failed / 15 passed`, puis simulation réelle Nginx 1.18.0 rouge après les probes : modèle sans barrière ; détails §6. | Barrière absente, syntaxe HTTP/2 incompatible, deux scripts absents ; le vrai contrôle reproduit l'héritage sans barrière, le bloque avec, valide les valeurs publiques, puis sort `1` sur le modèle non corrigé. | Modèle hôte, vérificateur public, simulation locale, runbook et contrôle CI 1.18.0. | Barrière vide au serveur HTTPS ; syntaxe `listen ... ssl http2` ; autorités HSTS/statiques/API ; contrôle exact de six en-têtes, cache et non-exposition ; sauvegarde/application/rollback atomiques. | Jest `18/18`, vrai Nginx `1.18.0 (Ubuntu)` code `0`, `nginx -t` du modèle vert, ShellCheck et `bash -n` verts. | Les alertes initiales du binaire extrait vers son chemin de log compilé sont sans effet ; aucune requête VPS ni vérification publique externe n'a été effectuée. | `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION` |
 | **R4-09** | **P0** | Plan RC4 §5.2, §6.3, §7.3, §8.4, §14 | Les E2E ne cliquent pas le corps de carte ; ne prouvent ni géométrie haut/milieu/bas ni molette interne ; Board ne couvre que l'accès/session ; le cycle de vie ne vérifie pas motif sur les trois surfaces et dans l'historique. Échecs réseau/métier, doubles clics et récupérations sont incomplets. | Pas de scénario global au lot 0 : au lot 8, chaque parcours de §14 sera ajouté puis exécuté isolément avec `npx playwright test <fichier> -g '<interaction exacte>'` avant correction de ce parcours | Non exécuté au lot 0 conformément au §12. Chaque scénario devra échouer sur le comportement réellement absent, sans `force`, retry ni timeout arbitraire ; un scénario global ne localiserait pas l'interaction. | `frontend/e2e/incident-lifecycle.spec.ts` ; `board.spec.ts` ; `accessibility.spec.ts` ; `workshop-arbitration-mobile.spec.ts` ; `workshop-cancel-withdrawal.spec.ts` ; `workshop-zoom.spec.ts` ; fixtures E2E | Ajouter les parcours déterministes manquants sur vraie surface, avec attentes d'états observables et géométrie réelle ; compléter axe, responsive, clavier, focus et matrice de mutations. | Section 14 intégrale : carte/panneau, attente, correction, annulation, mutations transversales, sécurité/courriel ; desktop, mobile, zoom 200 %, axe zéro critique/sérieuse. | `PENDING_EXECUTION[R4-09:GREEN_EVIDENCE]` | Flakes, fixtures non représentatives, sélecteurs de substitution, interceptions qui ne prouvent pas la vraie API, tests trop globaux pour diagnostiquer. | `OPEN_RED_PENDING` |
 | **R4-10** | **P1** | Plan RC4 §12 lots 9–10, §16 portes D–E, §18 | Aucune capture image n'est suivie ; la liste reste « à réaliser ». Des faits documentaires sont périmés, dont `38` migrations et `579` tests. La readiness RC3 admet que captures, VPS et SMTP restent externes. | Au lot 9, lancer des recherches ciblées avec `rg -n` sur chaque valeur/version/SHA périmé dans les documents concernés avant leur synchronisation ; aucune capture ne peut être testée avant déploiement autorisé | Non exécuté au lot 0 conformément au §12. Les valeurs déjà localisées constituent le périmètre, mais chaque contrôle documentaire devra d'abord retourner un résultat non vide ; les captures et faits externes resteront explicitement en attente. | `docs/release-readiness-rc4.md` ; `docs/dossier-projet/liste-captures-a-realiser.md` ; `docs/dossier-projet/corrections-dossier-final.md` ; runbook, dossier jury et documents citant des totaux/version/SHA | Recalculer tous les faits au SHA candidat, synchroniser readiness/runbook/dossier, préparer la liste exacte des captures post-déploiement et distinguer preuves locales, CI et externes. | Recherches de valeurs périmées ; validation liens/SHA/totaux ; revue terminale documentaire ; captures uniquement après GO déploiement sur RC4 réellement servie. | `PENDING_EXECUTION[R4-10:GREEN_EVIDENCE]` | Faits recopiés, total non disjoint, capture RC3 attribuée à RC4, preuve externe inventée, document mis à jour avant le SHA final. | `OPEN_RED_PENDING` |
 | **R4-11** | **P0** | Plan RC4 §11, §14.3–14.6, §15 | Patrimoine RC3 présent à préserver : migrations 049/050, session Board sans expiration et révocable, correction v2 avec snapshots, arbitrages, suivi explicite, séparation motif/diagnostic, erreurs structurées, courriel multipart, redaction des secrets, SelectField et provenance OCI. Lacunes de preuve supplémentaires du diagnostic et les `16 GAP`/`11 EXCEPTION_TO_REVIEW` de l'inventaire sont détaillés en §7, notamment correction annoncée à tort appliquée, succès absents, modales fermées ou figées en erreur, faux succès reset et saisie Support perdue. | Aucun rouge générique valable pour un groupe d'invariants : baseline par `git diff --exit-code v1.0.0-rc.3 -- backend/migrations/` et recomptages §3 ; chaque défaut fonctionnel de §7 recevra sa commande rouge exacte avant correction | La baseline est verte (diff vide ; `1 146` tests recensés, suites locales exécutées vertes) et n'est pas présentée comme un rouge. Les lacunes de §7 restent ouvertes ; les regrouper sous une commande représentative violerait la règle d'interaction exacte. | `backend/migrations/049_*` et `050_*` ; tests Board auth/session ; tests correction/arbitrage PostgreSQL ; repository/service Atelier ; tests suivi et erreurs ; modèles courriel ; logs/redaction ; composant `SelectField` ; workflows/images OCI ; E2E attente/correction/annulation ; surfaces de l'inventaire | Ne modifier aucune migration ; compléter uniquement les preuves manquantes et corriger minimalement tout écart réellement reproduit, sans changer les permissions ou contrats métier. | Diff byte-identique migrations ; PostgreSQL réel et concurrence exactement un gagnant ; retraits de demandes par leur demandeur ; motifs obligatoires aux refus ; requête HTTP d'une ancienne session après révocation ; suivi explicite ; motif séparé sur Atelier/panneau/Board/historique ; erreurs sûres ; courriel HTML+texte avec lien correct ; logs sans cookie/JWT ; SelectField mesuré au viewport ; OCI et préflight registry-only ; cycles ciblés des lacunes d'inventaire ; SMTP externe après GO. | `PENDING_EXECUTION[R4-11:GREEN_EVIDENCE]` ; invariant migrations et socle de suites confirmés au lot 0 | Régression métier silencieuse, test unitaire confondu avec preuve HTTP/SQL/navigateur, concurrence non déterministe, SMTP réel faussement déclaré local, lacune de mutation oubliée, altération accidentelle d'une migration. | `OPEN_RED_PENDING` |
@@ -891,9 +891,77 @@ npm test -- src/middlewares/__tests__/securityHeaders.test.ts -t 'RC4 RED — ve
 - cause : la directive est absente de
   `deploy/nginx/sentinel.conf.example`.
 
-Vert : `PENDING_EXECUTION[R4-08:GREEN_AFTER_LOT7]`, avec simulation locale de
-l'héritage, unicité des en-têtes et absence de barrière publique encore
-obligatoires.
+Le test temporaire du lot 0 ayant été retiré comme annoncé, sa relance au lot
+7 sélectionne `0` test (`508 skipped`, code `0`) et ne constitue pas le vert.
+Les gardes permanentes ont été exécutées avant correction :
+
+```bash
+npx jest --selectProjects unit --runTestsByPath src/middlewares/__tests__/securityHeaders.test.ts
+```
+
+- code `1`, `3 failed / 15 passed` ;
+- aucune barrière dans le modèle ;
+- `http2 on;` détecté alors que cette syntaxe n'est pas comprise par Nginx
+  1.18.0 ;
+- `verify-public-headers.sh` et `test-nginx-header-inheritance.sh` absents.
+
+Le vrai binaire a été obtenu sans installation système ni image Docker :
+paquets Ubuntu `nginx-core` et `nginx-common` `1.18.0-6ubuntu14`, extraits sous
+`/tmp`. Version réellement exécutée :
+
+```text
+nginx version: nginx/1.18.0 (Ubuntu)
+```
+
+Après ajout des deux scripts, mais avant correction du modèle :
+
+```bash
+scripts/test-nginx-header-inheritance.sh --nginx-bin /tmp/sentinel-nginx-1.18/root/usr/sbin/nginx
+```
+
+- code `1` ;
+- Nginx reproduit `X-Sentinel-Global-Probe: inherited` sans barrière ;
+- le même serveur, avec uniquement la barrière vide ajoutée, n'expose ni le
+  probe global ni `X-Sentinel-Inheritance-Barrier` ;
+- la simulation proxy valide déjà les valeurs exactes de `/login` et
+  `/api/health` ;
+- l'exécution s'arrête ensuite sur
+  `Le modèle hôte doit contenir exactement une barrière d'héritage.`
+
+Vert réel du lot 7, même commande :
+
+- code `0` ;
+- les configurations avec et sans barrière passent chacune `nginx -t` ;
+- le contrôle négatif observe l'héritage attendu sans barrière ;
+- le contrôle positif prouve son absence avec barrière ;
+- `/login` et `/api/health` possèdent exactement une occurrence des six
+  en-têtes et les valeurs figées en §4.2 ;
+- `/login` possède un unique `Cache-Control: no-cache` ;
+- `/api/health` ne possède aucun `Cache-Control` ;
+- la barrière et le probe global sont absents des deux réponses ;
+- le modèle hôte final passe réellement `nginx -t` sous Nginx 1.18.0 ;
+- sortie terminale :
+  `Nginx 1.18.0 : héritage, valeurs publiques et modèle hôte conformes.`
+
+Contrôles complémentaires :
+
+```bash
+npx jest --selectProjects unit --runTestsByPath src/middlewares/__tests__/securityHeaders.test.ts
+bash -n scripts/verify-public-headers.sh scripts/test-nginx-header-inheritance.sh
+shellcheck scripts/verify-public-headers.sh scripts/test-nginx-header-inheritance.sh
+```
+
+- Jest code `0`, `18/18` ;
+- `bash -n` code `0` ;
+- ShellCheck `0.8.0` code `0`.
+
+Le modèle CI est désormais validé par `nginx:1.18.0`. Le runbook décrit les
+autorités, la sauvegarde et l'application atomiques, `nginx -t`, le reload, le
+contrôle public et le rollback. Aucune commande VPS ni requête vers l'instance
+publique n'a été exécutée : la vérification externe reste soumise à une
+autorisation séparée.
+
+R4-08 passe à `IMPLEMENTED_AWAITING_EXTERNAL_VERIFICATION`.
 
 ### Cycles restant à ouvrir
 

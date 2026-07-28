@@ -50,6 +50,87 @@ sudo systemctl status nginx
 sudo tail -n 100 /var/log/nginx/error.log
 ```
 
+### Contrat des en-têtes du Nginx hôte
+
+Le modèle versionné est `deploy/nginx/sentinel.conf.example`. Il conserve trois
+autorités disjointes :
+
+- le Nginx hôte est l'unique autorité HSTS et masque le HSTS des upstreams ;
+- le Nginx frontend pose les autres en-têtes des documents et statiques ;
+- Node pose les autres en-têtes de `/api/*`.
+
+La directive suivante, placée dans le serveur HTTPS, empêche l'héritage en bloc
+d'éventuels `add_header` globaux :
+
+```nginx
+add_header X-Sentinel-Inheritance-Barrier "";
+```
+
+Nginx n'émet pas un en-tête dont la valeur est vide. Cette barrière ne doit donc
+jamais apparaître dans une réponse publique. Le modèle utilise la syntaxe
+`listen ... ssl http2` comprise par le Nginx `1.18.0` du serveur hôte.
+
+Le contrôle local reproductible exige un vrai binaire Nginx 1.18.0 :
+
+```bash
+./scripts/test-nginx-header-inheritance.sh --nginx-bin /chemin/vers/nginx
+```
+
+Il reproduit d'abord la fuite d'un `add_header` global sans barrière, prouve sa
+disparition avec la barrière, vérifie les valeurs et occurrences exactes sur
+`/login` et `/api/health`, puis exécute `nginx -t` sur le modèle hôte.
+
+### Application atomique du modèle hôte
+
+Cette procédure est une opération de déploiement séparée : ne l'exécuter
+qu'après autorisation explicite, depuis un checkout du tag validé. Commencer par
+identifier le fichier réellement inclus avec `sudo nginx -T`; ne pas supposer
+son chemin. L'exemple ci-dessous emploie
+`/etc/nginx/sites-available/sentinel`.
+
+```bash
+SENTINEL_NGINX_TARGET=/etc/nginx/sites-available/sentinel
+SENTINEL_NGINX_BACKUP=/etc/nginx/sites-available/sentinel.before-rc4
+SENTINEL_NGINX_STAGE=/etc/nginx/sites-available/.sentinel.rc4.new
+
+# 1. sauvegarde atomique, conservée jusqu'à validation complète
+sudo install -m 0600 "$SENTINEL_NGINX_TARGET" "${SENTINEL_NGINX_BACKUP}.tmp"
+sudo mv "${SENTINEL_NGINX_BACKUP}.tmp" "$SENTINEL_NGINX_BACKUP"
+
+# 2. copie puis bascule atomique sur le même système de fichiers
+sudo install -m 0644 deploy/nginx/sentinel.conf.example "$SENTINEL_NGINX_STAGE"
+sudo mv "$SENTINEL_NGINX_STAGE" "$SENTINEL_NGINX_TARGET"
+
+# 3. validation avant tout reload
+sudo nginx -t
+
+# 4. reload sans arrêt si, et seulement si, nginx -t est vert
+sudo systemctl reload nginx
+
+# 5. contrôle public exact, sans secret ni donnée d'authentification
+./scripts/verify-public-headers.sh https://sentinel.akiksystems.fr
+```
+
+Si `nginx -t`, le reload ou le contrôle public échoue, restaurer immédiatement
+la sauvegarde par une seconde bascule atomique, revalider, puis recharger :
+
+```bash
+SENTINEL_NGINX_TARGET=/etc/nginx/sites-available/sentinel
+SENTINEL_NGINX_BACKUP=/etc/nginx/sites-available/sentinel.before-rc4
+SENTINEL_NGINX_ROLLBACK=/etc/nginx/sites-available/.sentinel.rollback
+
+sudo install -m 0644 "$SENTINEL_NGINX_BACKUP" "$SENTINEL_NGINX_ROLLBACK"
+sudo mv "$SENTINEL_NGINX_ROLLBACK" "$SENTINEL_NGINX_TARGET"
+sudo nginx -t
+sudo systemctl reload nginx
+./scripts/verify-public-headers.sh https://sentinel.akiksystems.fr
+```
+
+Conserver la sortie de `nginx -t`, du reload et du vérificateur dans la trace
+d'intervention. La présence d'une seule valeur dupliquée, d'un
+`X-Sentinel-Inheritance-Barrier` public ou d'un `Cache-Control` inattendu rend
+la validation invalide.
+
 ## 2. Variables critiques
 
 | Variable | Obligatoire | Rôle |

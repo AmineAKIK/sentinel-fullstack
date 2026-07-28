@@ -93,6 +93,51 @@ describe('alignement des en-têtes Nginx frontend (anti-dérive C-08)', () => {
   });
 });
 
+describe('Nginx hôte RC4 — autorité unique et compatibilité 1.18', () => {
+  const repositoryRoot = path.join(__dirname, '../../../..');
+  const hostNginxPath = path.join(repositoryRoot, 'deploy/nginx/sentinel.conf.example');
+  const hostNginx = readFileSync(hostNginxPath, 'utf8');
+
+  it('versionne exactement une barrière d’héritage vide au niveau du serveur HTTPS', () => {
+    expect(hostNginx.match(/add_header X-Sentinel-Inheritance-Barrier "";/g) ?? []).toHaveLength(1);
+    expect(hostNginx).toMatch(
+      /server\s*\{[\s\S]*listen 443[\s\S]*add_header X-Sentinel-Inheritance-Barrier "";/
+    );
+  });
+
+  it('emploie la syntaxe HTTP/2 comprise par Nginx 1.18.0', () => {
+    expect(hostNginx).not.toMatch(/^\s*http2\s+on\s*;/m);
+    expect(hostNginx).toContain('listen 443 ssl http2;');
+    expect(hostNginx).toContain('listen [::]:443 ssl http2;');
+  });
+
+  it('versionne les contrôles public et d’héritage réellement exécutables', () => {
+    const publicVerifier = path.join(repositoryRoot, 'scripts/verify-public-headers.sh');
+    const inheritanceTest = path.join(repositoryRoot, 'scripts/test-nginx-header-inheritance.sh');
+    const workflow = readFileSync(path.join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8');
+    const publicVerifierSource = readFileSync(publicVerifier, 'utf8');
+    const inheritanceTestSource = readFileSync(inheritanceTest, 'utf8');
+
+    for (const path of ['/login', '/api/health']) {
+      expect(publicVerifierSource).toContain(path);
+    }
+    for (const headerName of [
+      'Strict-Transport-Security',
+      'Content-Security-Policy',
+      'X-Content-Type-Options',
+      'X-Frame-Options',
+      'Referrer-Policy',
+      'Permissions-Policy',
+      'X-Sentinel-Inheritance-Barrier',
+    ]) {
+      expect(publicVerifierSource).toContain(headerName);
+    }
+    expect(inheritanceTestSource).toContain('X-Sentinel-Global-Probe');
+    expect(inheritanceTestSource).toContain('nginx/1.18.0');
+    expect(workflow).toContain('nginx:1.18.0 nginx -t');
+  });
+});
+
 describe('securityHeaders — cache', () => {
   it.each(['/api/auth/me', '/api/admin/dashboard', '/api/workshop/lines', '/api/board/data'])(
     'prevents caching for authenticated API space %s',
