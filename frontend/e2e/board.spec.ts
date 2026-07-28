@@ -47,12 +47,19 @@ test.describe('Accès Board', () => {
 
     const quit = page.getByRole('button', { name: 'Quitter' });
     await quit.click();
-    await expect(page.getByRole('alert')).toHaveText('Impossible de quitter le Board. Réessayez.');
+    await expect(page.getByRole('alert')).toContainText(
+      'Impossible de quitter le Board. Réessayez.'
+    );
     await expect(page.locator('main.board-page')).toBeVisible();
     await expect(quit).toBeEnabled();
     await expect(quit).toBeFocused();
     expect(logoutRequests).toBe(1);
 
+    // L'erreur est persistante : l'utilisateur la ferme explicitement avant de
+    // réactiver la commande située sous la carte en haut à droite.
+    await page.getByRole('button', { name: 'Fermer la notification' }).click();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(quit).toBeFocused();
     await page.unroute('**/api/board/logout', failLogout);
     await quit.click();
     await page.waitForURL('**/login');

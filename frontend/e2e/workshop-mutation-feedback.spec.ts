@@ -286,6 +286,7 @@ test('suivi, urgence et consigne : une mutation réelle et un feedback précis',
   await expect(page.getByRole('status')).toContainText('Incident déclaré urgent.');
   expect(mutationRequests.filter((request) => request.startsWith('PATCH'))).toHaveLength(1);
   await expect(panel.getByRole('button', { name: "Retirer l'urgence" })).toBeVisible();
+  await page.getByRole('button', { name: 'Fermer la notification' }).click();
 
   const follow = panel.getByRole('button', { name: 'Suivre cet incident' });
   const followBox = await follow.boundingBox();
@@ -297,6 +298,7 @@ test('suivi, urgence et consigne : une mutation réelle et un feedback précis',
   await expect(page.getByRole('status')).toContainText('Suivi activé.');
   expect(mutationRequests.filter((request) => request.startsWith('POST'))).toHaveLength(1);
   await expect(panel.getByRole('button', { name: 'Retirer du suivi' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fermer la notification' }).click();
 
   const instruction = panel.getByLabel('Consigne du responsable');
   await instruction.fill('  Prioriser après contrôle qualité β.  ');
@@ -305,6 +307,7 @@ test('suivi, urgence et consigne : une mutation réelle et un feedback précis',
   await expect(
     panel.locator('.incident-instruction-card').getByText('Prioriser après contrôle qualité β.')
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Fermer la notification' }).click();
 
   await panel.getByRole('button', { name: 'Retirer la consigne' }).click();
   const deleteDialog = page.getByRole('dialog', { name: 'Retirer la consigne' });

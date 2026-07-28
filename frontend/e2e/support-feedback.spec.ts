@@ -75,9 +75,14 @@ for (const surface of surfaces) {
     await page.route(surface.endpoint, businessFailure);
 
     await textarea.press('Enter');
-    await expect(page.getByRole('alert')).toHaveText(
+    await expect(page.getByRole('alert')).toContainText(
       'Le service est momentanément indisponible. Réessayez plus tard.'
     );
+    const errorNotification = page.locator('[data-feedback="error"]');
+    await expect(errorNotification.getByText('Action impossible', { exact: true })).toBeVisible();
+    await expect(
+      errorNotification.getByRole('button', { name: 'Fermer la notification' })
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(technicalMessage);
     await expect(textarea).toHaveValue(draft);
     await expect(textarea).toBeEnabled();
@@ -98,6 +103,9 @@ for (const surface of surfaces) {
 
     await page.getByRole('button', { name: 'Envoyer le message' }).click();
     await expect(page.getByRole('status')).toContainText('Message envoyé.');
+    await expect(
+      page.locator('[data-feedback="success"]').getByText('Action réussie', { exact: true })
+    ).toBeVisible();
     await expect(page.getByText(`Réponse sûre pour ${surface.name}.`)).toBeVisible();
     await expect(textarea).toHaveValue('');
     await expect(page.getByRole('alert')).toHaveCount(0);

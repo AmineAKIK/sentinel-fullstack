@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import EditUserModal from '../components/EditUserModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DetailField from '../components/ui/DetailField';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import SuccessBanner from '../components/ui/SuccessBanner';
 import FullPageLoader from '../components/ui/FullPageLoader';
 import { getAccount } from '../api/accounts';
 import { SentinelUser } from '../types';
@@ -20,8 +19,6 @@ export default function UserDetailPage() {
   usePageTitle(user ? `${user.first_name} ${user.last_name}` : 'Fiche utilisateur');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const successTimerRef = useRef<number | null>(null);
 
   const [modal, setModal] = useState<'edit' | 'delete' | null>(null);
 
@@ -47,22 +44,6 @@ export default function UserDetailPage() {
       });
     return () => controller.abort();
   }, [id, navigate]);
-
-  useEffect(
-    () => () => {
-      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
-    },
-    []
-  );
-
-  function showSuccess(msg: string) {
-    if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
-    setSuccessMsg(msg);
-    successTimerRef.current = window.setTimeout(() => {
-      setSuccessMsg('');
-      successTimerRef.current = null;
-    }, 5000);
-  }
 
   function passwordStatusLabel(account: SentinelUser): string {
     if (account.has_password) return 'Défini';
@@ -115,8 +96,6 @@ export default function UserDetailPage() {
           </span>
         </div>
 
-        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
-
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-body">
             <div className="detail-grid">
@@ -153,7 +132,6 @@ export default function UserDetailPage() {
           onSuccess={(updated) => {
             setUser(updated);
             setModal(null);
-            showSuccess('Utilisateur mis à jour avec succès.');
           }}
         />
       )}

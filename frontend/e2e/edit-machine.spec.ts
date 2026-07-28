@@ -54,7 +54,7 @@ test("aucun changement : Aperçu désactivé, aucune confirmation ne s'affiche",
 
   // On ferme la modale et on s'assure qu'aucun message de succès n'est apparu.
   await page.getByRole('button', { name: 'Annuler' }).click();
-  await expect(page.getByText('Machine modifiée avec succès.')).toHaveCount(0);
+  await expect(page.locator('[data-feedback="success"]')).toHaveCount(0);
 });
 
 test('modification réelle : aperçu avant/après puis confirmation', async ({ page }) => {
@@ -78,7 +78,8 @@ test('modification réelle : aperçu avant/après puis confirmation', async ({ p
   await page.getByRole('button', { name: 'Confirmer' }).click();
 
   // Cette fois, le message de succès apparaît bien.
-  await expect(page.getByText('Machine modifiée avec succès.')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Action réussie');
+  await expect(page.getByRole('status')).toContainText('Machine modifiée.');
 });
 
 test('ligne avec incident actif : la modification structurelle est refusée', async ({ page }) => {
@@ -96,5 +97,5 @@ test('ligne avec incident actif : la modification structurelle est refusée', as
       /Impossible de modifier la structure de cette ligne : [1-9]\d* incidents? (?:actif|actifs) y (?:est|sont) encore lié(?:s)?\./
     )
   ).toBeVisible();
-  await expect(page.getByText('Machine modifiée avec succès.')).toHaveCount(0);
+  await expect(page.locator('[data-feedback="success"]')).toHaveCount(0);
 });

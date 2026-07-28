@@ -38,9 +38,14 @@ async function proveRecoverableLogout(page: Page, login: (page: Page) => Promise
   const logout = page.getByRole('button', { name: 'Déconnexion' });
   await logout.click();
 
-  await expect(page.getByRole('alert')).toHaveText(
+  await expect(page.getByRole('alert')).toContainText(
     'Connexion impossible. Vérifiez votre réseau puis réessayez.'
   );
+  const errorNotification = page.locator('[data-feedback="error"]');
+  await expect(errorNotification.getByText('Action impossible', { exact: true })).toBeVisible();
+  await expect(
+    errorNotification.getByRole('button', { name: 'Fermer la notification' })
+  ).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${authenticatedPath}$`));
   await expect(logout).toBeVisible();
   await expect(logout).toBeEnabled();
