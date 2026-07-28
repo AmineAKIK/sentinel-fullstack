@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
 import { SentinelUser } from '../types';
 import { deleteAccount, getAccountImpact } from '../api/accounts';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface DeleteConfirmModalProps {
   user: SentinelUser;
@@ -10,6 +11,7 @@ interface DeleteConfirmModalProps {
 }
 
 export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteConfirmModalProps) {
+  useMutationRunner();
   const [impact, setImpact] = useState<{
     reported_incidents: number;
     taken_incidents: number;
@@ -39,6 +41,9 @@ export default function DeleteConfirmModal({ user, onClose, onSuccess }: DeleteC
       onClose={onClose}
       onConfirm={handleConfirm}
       disabled={hasActiveTakenIncidents}
+      mutationKey={`admin:user:${user.id}:delete`}
+      successMessage="Utilisateur supprimé."
+      failureMessage="Impossible de supprimer l’utilisateur."
     >
       <p style={{ fontWeight: 500, marginBottom: 8 }}>
         Supprimer {user.first_name} {user.last_name} ?

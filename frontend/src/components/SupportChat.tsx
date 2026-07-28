@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiErrorMessage } from '../api/errorMessages';
 import type { ChatMessage } from '../api/support';
 import { renderMarkdown } from '../utils/markdownParser';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface Props {
   onSend: (message: string, history: ChatMessage[], signal: AbortSignal) => Promise<string>;
@@ -10,8 +11,8 @@ interface Props {
 export default function SupportChat({ onSend }: Props) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useMutationRunner();
+  const loading = mutation.isPending('support:send');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -37,36 +38,28 @@ export default function SupportChat({ onSend }: Props) {
     const message = input.trim();
     if (!message || loading) return;
 
-    const userMsg: ChatMessage = { role: 'user', content: message };
-    const nextHistory = [...history, userMsg];
-
-    setHistory(nextHistory);
-    setInput('');
-    setError(null);
-    setLoading(true);
     const controller = new AbortController();
     requestRef.current = controller;
 
-    try {
-      const reply = await onSend(message, history, controller.signal);
-      if (controller.signal.aborted) return;
-      setHistory([...nextHistory, { role: 'assistant', content: reply }]);
-    } catch (requestError) {
-      if (controller.signal.aborted) return;
-      setError(
+    await mutation.execute(() => onSend(message, history, controller.signal), {
+      key: 'support:send',
+      successMessage: 'Message envoyé.',
+      toErrorMessage: (requestError) =>
         apiErrorMessage(
           requestError,
           'Une erreur est survenue. Vérifiez votre connexion et réessayez.'
-        )
-      );
-    } finally {
-      if (requestRef.current === controller) requestRef.current = null;
-      if (!controller.signal.aborted) {
-        setLoading(false);
-        // Re-focus after the re-render re-enables the textarea (disabled while loading).
+        ),
+      onSuccess: (reply) => {
+        if (controller.signal.aborted) return;
+        const userMsg: ChatMessage = { role: 'user', content: message };
+        setHistory([...history, userMsg, { role: 'assistant', content: reply }]);
+        setInput('');
+      },
+      onError: () => {
         requestAnimationFrame(() => textareaRef.current?.focus());
-      }
-    }
+      },
+    });
+    if (requestRef.current === controller) requestRef.current = null;
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -77,7 +70,7 @@ export default function SupportChat({ onSend }: Props) {
   }
 
   return (
-    <div className="support-layout">
+    <div className="support-layout" aria-busy={loading}>
       <div className="support-chat-header">
         <div className="support-agent">
           <div className="support-agent-mark" aria-hidden="true">
@@ -133,12 +126,6 @@ export default function SupportChat({ onSend }: Props) {
                 <span />
               </span>
             </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="support-error" role="alert">
-            {error}
           </div>
         )}
 

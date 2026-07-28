@@ -4,6 +4,7 @@ import { ProductionLine } from '../types';
 import { updateLine } from '../api/lines';
 import { apiErrorMessage } from '../api/errorMessages';
 import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface LinePlanModalProps {
   line: ProductionLine;
@@ -15,7 +16,9 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
   const [machines, setMachines] = useState(line.machines.map(normalizeLineMachine));
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const key = `admin:line:${line.id}:plan`;
+  const loading = mutation.isPending(key);
   const [step, setStep] = useState<'plan' | 'preview'>('plan');
 
   const hasChanges = useMemo(() => {
@@ -36,14 +39,14 @@ export default function LinePlanModal({ line, onClose, onSuccess }: LinePlanModa
 
   async function handleSave() {
     setError('');
-    setLoading(true);
-    try {
-      const updated = await updateLine(line.id, { machines });
-      onSuccess(updated);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-      setLoading(false);
-    }
+    await mutation.execute(() => updateLine(line.id, { machines }), {
+      key,
+      successMessage: 'Ordre des machines mis à jour.',
+      errorPresentation: 'local',
+      toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+      onSuccess,
+      onError: (_err, safeMessage) => setError(safeMessage),
+    });
   }
 
   function handlePreview() {

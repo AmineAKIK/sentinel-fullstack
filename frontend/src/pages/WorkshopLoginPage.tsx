@@ -13,6 +13,7 @@ import {
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD_LENGTH_WORKSHOP,
 } from '../utils/passwordPolicy';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
 
 type Mode = 'identifier' | 'password' | 'setup';
 
@@ -26,7 +27,8 @@ export default function WorkshopLoginPage() {
   const [mode, setMode] = useState<Mode>('identifier');
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const loading = mutation.pending;
   const [resetSent, setResetSent] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
 
@@ -38,14 +40,18 @@ export default function WorkshopLoginPage() {
   async function handleForgotPassword() {
     setResetSent(false);
     setError('');
-    setLoading(true);
-    try {
-      await requestPasswordReset(identifier.trim());
-    } finally {
-      setLoading(false);
-      setConfirmingReset(false);
-      setResetSent(true);
-    }
+    await mutation.execute(() => requestPasswordReset(identifier.trim()), {
+      key: 'auth:workshop:reset-request',
+      successMessage: 'Demande de réinitialisation envoyée.',
+      errorPresentation: 'local',
+      toErrorMessage: (err) =>
+        apiErrorMessage(err, 'Impossible d’envoyer la demande de réinitialisation.'),
+      onSuccess: () => {
+        setConfirmingReset(false);
+        setResetSent(true);
+      },
+      onError: (_err, safeMessage) => setError(safeMessage),
+    });
   }
 
   function resetToIdentifier() {
@@ -71,9 +77,20 @@ export default function WorkshopLoginPage() {
     }
 
     if (mode === 'identifier') {
-      setLoading(true);
-      try {
-        const response = await unifiedLogin(identifier.trim());
+      const result = await mutation.execute(() => unifiedLogin(identifier.trim()), {
+        key: 'auth:workshop:identify',
+        errorPresentation: 'local',
+        toErrorMessage: (err) =>
+          err instanceof ApiResponseError && err.status === 403
+            ? translateApiError(err)
+            : 'Identifiant ou mot de passe incorrect.',
+        onError: (err, safeMessage) => {
+          if (err instanceof ApiResponseError && err.status === 403) setWarning(safeMessage);
+          else setError(safeMessage);
+        },
+      });
+      if (result.status === 'success') {
+        const response = result.value;
         if ('requiresPasswordSetup' in response) {
           setMode('setup');
         } else if ('requiresPassword' in response) {
@@ -82,14 +99,6 @@ export default function WorkshopLoginPage() {
         } else {
           setError('Identifiant ou mot de passe incorrect.');
         }
-      } catch (err) {
-        if (err instanceof ApiResponseError && err.status === 403) {
-          setWarning(translateApiError(err));
-        } else {
-          setError('Identifiant ou mot de passe incorrect.');
-        }
-      } finally {
-        setLoading(false);
       }
       return;
     }
@@ -103,9 +112,20 @@ export default function WorkshopLoginPage() {
         setError('Identifiant ou mot de passe incorrect.');
         return;
       }
-      setLoading(true);
-      try {
-        const response = await unifiedLogin(identifier.trim(), password);
+      const result = await mutation.execute(() => unifiedLogin(identifier.trim(), password), {
+        key: 'auth:workshop:login',
+        errorPresentation: 'local',
+        toErrorMessage: (err) =>
+          err instanceof ApiResponseError && err.status === 403
+            ? translateApiError(err)
+            : apiErrorMessage(err, 'Identifiant ou mot de passe incorrect.'),
+        onError: (err, safeMessage) => {
+          if (err instanceof ApiResponseError && err.status === 403) setWarning(safeMessage);
+          else setError(safeMessage);
+        },
+      });
+      if (result.status === 'success') {
+        const response = result.value;
         if ('requiresPassword' in response || 'requiresPasswordSetup' in response) {
           setError('Identifiant ou mot de passe incorrect.');
           return;
@@ -126,14 +146,6 @@ export default function WorkshopLoginPage() {
           },
         });
         navigate('/workshop/dashboard', { replace: true });
-      } catch (err) {
-        if (err instanceof ApiResponseError && err.status === 403) {
-          setWarning(translateApiError(err));
-        } else {
-          setError(apiErrorMessage(err, 'Identifiant ou mot de passe incorrect.'));
-        }
-      } finally {
-        setLoading(false);
       }
       return;
     }
@@ -157,9 +169,17 @@ export default function WorkshopLoginPage() {
         setError('Les mots de passe ne correspondent pas.');
         return;
       }
-      setLoading(true);
-      try {
-        const response = await unifiedLogin(identifier.trim(), undefined, newPassword, setupCode);
+      const result = await mutation.execute(
+        () => unifiedLogin(identifier.trim(), undefined, newPassword, setupCode),
+        {
+          key: 'auth:workshop:setup',
+          errorPresentation: 'local',
+          toErrorMessage: (err) => apiErrorMessage(err, 'Code temporaire incorrect.'),
+          onError: (_err, safeMessage) => setError(safeMessage),
+        }
+      );
+      if (result.status === 'success') {
+        const response = result.value;
         if (!('accountType' in response) || response.accountType !== 'workshop') {
           setError('Code temporaire incorrect.');
           return;
@@ -175,10 +195,6 @@ export default function WorkshopLoginPage() {
           },
         });
         navigate('/workshop/dashboard', { replace: true });
-      } catch (err) {
-        setError(apiErrorMessage(err, 'Code temporaire incorrect.'));
-      } finally {
-        setLoading(false);
       }
     }
   }
@@ -363,6 +379,7 @@ export default function WorkshopLoginPage() {
           confirmLabel="Envoyer la demande"
           loadingLabel="Envoi…"
           loading={loading}
+          mutationKey="auth:workshop:reset-request"
         >
           <p
             style={{

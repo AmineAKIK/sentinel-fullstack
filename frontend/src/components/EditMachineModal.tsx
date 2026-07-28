@@ -14,6 +14,7 @@ import {
   switchMachineRobotMode,
   validateMachineAgainstLine,
 } from '../utils/lineMachines';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface EditMachineModalProps {
   line: ProductionLine;
@@ -31,7 +32,10 @@ export default function EditMachineModal({
   const [form, setForm] = useState<LineMachine>({ ...line.machines[machineIndex] });
   const [error, setError] = useState('');
   const [fieldError, setFieldError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const mutation = useMutationRunner();
+  const key = `admin:line:${line.id}:machine:${machineIndex}:update`;
+  const loading = checking || mutation.isPending(key);
   const [step, setStep] = useState<'form' | 'preview'>('form');
 
   function updateField(field: string, value: string | number | boolean) {
@@ -61,7 +65,7 @@ export default function EditMachineModal({
       return;
     }
 
-    setLoading(true);
+    setChecking(true);
     try {
       const nextMachines = line.machines.map((machine, index) =>
         index === machineIndex ? normalizeLineMachine(form) : machine
@@ -82,7 +86,7 @@ export default function EditMachineModal({
     } catch (err) {
       setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
     } finally {
-      setLoading(false);
+      setChecking(false);
     }
   }
 
@@ -97,19 +101,24 @@ export default function EditMachineModal({
       return;
     }
 
-    setLoading(true);
-    try {
-      const updatedMachines = line.machines.map((machine, index) =>
-        index === machineIndex ? normalizeLineMachine(form) : machine
-      );
-      const updated = await updateLine(line.id, {
-        machines: updatedMachines,
-      });
-      onSuccess(updated);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-      setLoading(false);
-    }
+    await mutation.execute(
+      async () => {
+        const updatedMachines = line.machines.map((machine, index) =>
+          index === machineIndex ? normalizeLineMachine(form) : machine
+        );
+        return updateLine(line.id, {
+          machines: updatedMachines,
+        });
+      },
+      {
+        key,
+        successMessage: 'Machine modifiée.',
+        errorPresentation: 'local',
+        toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+        onSuccess,
+        onError: (_err, safeMessage) => setError(safeMessage),
+      }
+    );
   }
 
   function handleBack() {

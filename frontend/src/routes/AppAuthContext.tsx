@@ -11,6 +11,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminInfo, WorkshopUser } from '../types';
 import { getUnifiedMe, unifiedLogout, MeResponse } from '../api/unifiedAuth';
 import { setOn401Handler, ApiResponseError } from '../api/client';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
+import { apiErrorMessage } from '../api/errorMessages';
 
 export type AuthSession =
   | { accountType: 'admin'; admin: AdminInfo }
@@ -43,6 +45,7 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession>(null);
   const [loading, setLoading] = useState(true);
   const redirectingRef = useRef(false);
+  const mutation = useMutationRunner();
 
   // Callback stable appelé sur 401 — protégé par ref pour ne déclencher qu'une fois.
   const markExpired = useCallback(
@@ -124,9 +127,12 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   }, [location.pathname, markExpired]);
 
   const logout = useCallback(async () => {
-    await unifiedLogout().catch(() => undefined);
-    setSession(null);
-  }, []);
+    await mutation.execute(unifiedLogout, {
+      key: 'auth:logout',
+      toErrorMessage: (err) => apiErrorMessage(err, 'Impossible de se déconnecter. Réessayez.'),
+      onSuccess: () => setSession(null),
+    });
+  }, [mutation]);
 
   const contextValue = useMemo(
     () => ({ session, loading, setSession, logout }),

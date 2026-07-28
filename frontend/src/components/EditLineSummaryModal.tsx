@@ -5,6 +5,7 @@ import { apiErrorMessage } from '../api/errorMessages';
 import { ProductionLine } from '../types';
 import { LineFormData } from './LineForm';
 import { lineMachinesEqual, normalizeLineMachine } from '../utils/lineMachines';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface EditLineSummaryModalProps {
   line: ProductionLine;
@@ -30,7 +31,9 @@ export default function EditLineSummaryModal({
   onSuccess,
 }: EditLineSummaryModalProps) {
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const key = `admin:line:${line.id}:update`;
+  const loading = mutation.isPending(key);
 
   const changes: { field: string; label: string; oldVal: string; newVal: string }[] = [];
 
@@ -51,6 +54,7 @@ export default function EditLineSummaryModal({
       newVal: form.isActive ? 'Actif' : 'Inactif',
     });
   }
+  const statusChange = form.isActive !== undefined && form.isActive !== line.is_active;
 
   if (machinesChanged(line, form)) {
     changes.push({
@@ -63,20 +67,27 @@ export default function EditLineSummaryModal({
 
   async function handleSave() {
     setError('');
-    setLoading(true);
-
-    try {
-      const updated = await updateLine(line.id, {
-        lineNumber: form.lineNumber.trim(),
-        isActive: form.isActive,
-        machines: form.machines.map(normalizeLineMachine),
-      });
-      onSuccess(updated);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-    } finally {
-      setLoading(false);
-    }
+    await mutation.execute(
+      () =>
+        updateLine(line.id, {
+          lineNumber: form.lineNumber.trim(),
+          isActive: form.isActive,
+          machines: form.machines.map(normalizeLineMachine),
+        }),
+      {
+        key,
+        successMessage:
+          statusChange && form.isActive
+            ? 'Ligne activée.'
+            : statusChange
+              ? 'Ligne désactivée.'
+              : 'Ligne modifiée.',
+        errorPresentation: 'local',
+        toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+        onSuccess,
+        onError: (_err, safeMessage) => setError(safeMessage),
+      }
+    );
   }
 
   return (
@@ -130,7 +141,17 @@ export default function EditLineSummaryModal({
           ))}
         </div>
       )}
-      {error && <div className="error-message">{error}</div>}
+      {statusChange && !form.isActive ? (
+        <div className="notice notice--danger">
+          La désactivation retirera cette ligne de la gestion active. Son historique restera
+          conservé. Confirmez uniquement après avoir vérifié les incidents en cours.
+        </div>
+      ) : null}
+      {error && (
+        <div className="error-message" role="alert">
+          {error}
+        </div>
+      )}
     </Modal>
   );
 }

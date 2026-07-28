@@ -1,4 +1,5 @@
 import AdminPasswordConfirmModal from './AdminPasswordConfirmModal';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 type RevokeSessionsConfirmModalProps = {
   revokeAdmin: boolean;
@@ -15,6 +16,7 @@ export default function RevokeSessionsConfirmModal({
   onClose,
   onConfirm,
 }: RevokeSessionsConfirmModalProps) {
+  useMutationRunner();
   const scopes: string[] = [];
   if (revokeAdmin) scopes.push('Sessions administrateur');
   if (revokeWorkshop) scopes.push('Sessions atelier (tous les utilisateurs)');
@@ -27,6 +29,8 @@ export default function RevokeSessionsConfirmModal({
       onConfirm={onConfirm}
       confirmLabel="Révoquer"
       loadingLabel="Révocation…"
+      mutationKey="admin:sessions:revoke"
+      successMessage="Sessions révoquées."
     >
       <p
         style={{

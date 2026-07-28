@@ -8,6 +8,7 @@ import { ApiResponseError } from '../api/client';
 import { apiErrorMessage } from '../api/errorMessages';
 import { formatDateTime } from '../utils/date';
 import { useUserForm } from '../hooks/useUserForm';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface CreateUserModalProps {
   onClose: () => void;
@@ -29,7 +30,8 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
     isDirty,
   } = useUserForm();
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const loading = mutation.isPending('admin:user:create');
   const [createdUser, setCreatedUser] = useState<SentinelUser | null>(null);
 
   const displayError = error || formError;
@@ -39,30 +41,33 @@ export default function CreateUserModal({ onClose, onSuccess }: CreateUserModalP
     setError('');
     setBadgeError('');
 
-    setLoading(true);
-    try {
-      const user = await createAccount({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        badgeNumber: form.badgeNumber.trim(),
-        email: form.email?.trim() || null,
-        role: form.role as Role,
-      });
-      setCreatedUser(user);
-      setStep('created');
-    } catch (err) {
-      if (err instanceof ApiResponseError) {
-        if (err.code === 'BADGE_ALREADY_EXISTS') {
-          setBadgeError('Ce numéro de badge existe déjà.');
-          return;
-        }
-        setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-      } else {
-        setError('Une erreur inattendue est survenue.');
+    await mutation.execute(
+      () =>
+        createAccount({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          badgeNumber: form.badgeNumber.trim(),
+          email: form.email?.trim() || null,
+          role: form.role as Role,
+        }),
+      {
+        key: 'admin:user:create',
+        successMessage: 'Utilisateur créé.',
+        errorPresentation: 'local',
+        toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+        onSuccess: (user) => {
+          setCreatedUser(user);
+          setStep('created');
+        },
+        onError: (err, safeMessage) => {
+          if (err instanceof ApiResponseError && err.code === 'BADGE_ALREADY_EXISTS') {
+            setBadgeError('Ce numéro de badge existe déjà.');
+          } else {
+            setError(safeMessage);
+          }
+        },
       }
-    } finally {
-      setLoading(false);
-    }
+    );
   }
 
   function handleClose() {

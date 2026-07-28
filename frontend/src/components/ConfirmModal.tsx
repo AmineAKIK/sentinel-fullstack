@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import ErrorBanner from './ui/ErrorBanner';
 import Spinner from './ui/Spinner';
@@ -19,6 +18,7 @@ type ConfirmModalProps = {
   variant?: 'default' | 'danger';
   closeOnOverlay?: boolean;
   failureMessage?: string;
+  successMessage?: string;
   mutationKey?: string;
 };
 
@@ -122,51 +122,37 @@ function SharedMutationConfirmModal({
   );
 }
 
-function LegacyConfirmModal({
+function DefaultMutationConfirmModal({
   loading = false,
   error = '',
   disabled = false,
   failureMessage = 'Impossible de confirmer cette action.',
+  successMessage,
   onConfirm,
+  title,
   ...surfaceProps
 }: ConfirmModalProps) {
-  const [submitting, setSubmitting] = useState(false);
-  const [submissionError, setSubmissionError] = useState('');
-  const mountedRef = useRef(true);
-  const submittingRef = useRef(false);
-  const effectiveLoading = loading || submitting;
-  const effectiveError = error || submissionError;
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  const mutation = useMutationRunner();
+  const key = `confirmation:${title}`;
+  const effectiveLoading = loading || mutation.isPending(key);
 
   async function handleConfirm(): Promise<void> {
-    if (!onConfirm || effectiveLoading || disabled || submittingRef.current) return;
-    submittingRef.current = true;
-    setSubmitting(true);
-    setSubmissionError('');
-    try {
-      await onConfirm();
-    } catch (requestError) {
-      if (mountedRef.current) {
-        setSubmissionError(apiErrorMessage(requestError, failureMessage));
-      }
-    } finally {
-      submittingRef.current = false;
-      if (mountedRef.current) setSubmitting(false);
-    }
+    if (!onConfirm || effectiveLoading || disabled) return;
+    await mutation.execute(() => Promise.resolve(onConfirm()), {
+      key,
+      successMessage,
+      toErrorMessage: (requestError) => apiErrorMessage(requestError, failureMessage),
+    });
   }
 
   return (
     <ConfirmModalSurface
+      title={title}
       {...surfaceProps}
       onConfirm={onConfirm}
       disabled={disabled}
       effectiveLoading={effectiveLoading}
-      effectiveError={effectiveError}
+      effectiveError={error}
       onConfirmAction={() => void handleConfirm()}
     />
   );
@@ -177,7 +163,5 @@ export default function ConfirmModal(props: ConfirmModalProps) {
     return <SharedMutationConfirmModal {...props} mutationKey={props.mutationKey} />;
   }
 
-  // Compatibilité strictement transitoire pour les consommateurs hors Atelier :
-  // leur migration vers le runner partagé appartient au lot 5.
-  return <LegacyConfirmModal {...props} />;
+  return <DefaultMutationConfirmModal {...props} />;
 }

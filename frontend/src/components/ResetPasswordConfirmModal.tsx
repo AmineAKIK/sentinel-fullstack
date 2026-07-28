@@ -5,6 +5,7 @@ import { resetAccountPassword } from '../api/accounts';
 import { apiErrorMessage } from '../api/errorMessages';
 import { SentinelUser } from '../types';
 import { formatDateTime } from '../utils/date';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface ResetPasswordConfirmModalProps {
   user: SentinelUser;
@@ -17,21 +18,18 @@ export default function ResetPasswordConfirmModal({
   onClose,
   onSuccess,
 }: ResetPasswordConfirmModalProps) {
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const key = `admin:user:${user.id}:reset-password`;
+  const loading = mutation.isPending(key);
   const [updatedUser, setUpdatedUser] = useState<SentinelUser | null>(null);
 
   async function handleConfirm() {
-    setError('');
-    setLoading(true);
-    try {
-      const updated = await resetAccountPassword(user.id);
-      setUpdatedUser(updated);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-    } finally {
-      setLoading(false);
-    }
+    await mutation.execute(() => resetAccountPassword(user.id), {
+      key,
+      successMessage: 'Code temporaire généré.',
+      toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+      onSuccess: setUpdatedUser,
+    });
   }
 
   function handleClose() {
@@ -54,8 +52,8 @@ export default function ResetPasswordConfirmModal({
       confirmLabel={hasPasswordOrSetupCode ? 'Réinitialiser' : 'Générer un code'}
       cancelLabel={updatedUser ? 'Fermer' : 'Annuler'}
       loading={loading}
+      mutationKey={key}
       loadingLabel="Réinitialisation…"
-      error={error}
     >
       {updatedUser ? (
         <div>

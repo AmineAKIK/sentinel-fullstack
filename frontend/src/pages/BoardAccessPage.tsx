@@ -5,6 +5,7 @@ import { apiErrorMessage } from '../api/errorMessages';
 import WorkshopBoardPage from './WorkshopBoardPage';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../utils/passwordPolicy';
+import { useMutationRunner } from '../components/ui/MutationFeedback';
 
 type AccessState = 'checking' | 'locked' | 'ready';
 
@@ -13,7 +14,8 @@ export default function BoardAccessPage() {
   const [state, setState] = useState<AccessState>('checking');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const loading = mutation.isPending('auth:board:login');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,16 +43,16 @@ export default function BoardAccessPage() {
       return;
     }
 
-    setLoading(true);
-    try {
-      await createBoardSession(code.trim());
-      setCode('');
-      setState('ready');
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Accès impossible. Vérifiez votre code.'));
-    } finally {
-      setLoading(false);
-    }
+    await mutation.execute(() => createBoardSession(code.trim()), {
+      key: 'auth:board:login',
+      errorPresentation: 'local',
+      toErrorMessage: (err) => apiErrorMessage(err, 'Accès impossible. Vérifiez votre code.'),
+      onSuccess: () => {
+        setCode('');
+        setState('ready');
+      },
+      onError: (_err, safeMessage) => setError(safeMessage),
+    });
   }
 
   if (state === 'checking') {

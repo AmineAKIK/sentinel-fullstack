@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import Modal from './Modal';
 import { UserFormData } from './UserForm';
 import { SentinelUser } from '../types';
 import { activateAccount, deactivateAccount, updateAccount } from '../api/accounts';
-import { ApiResponseError } from '../api/client';
 import { apiErrorMessage } from '../api/errorMessages';
 import { ROLE_LABELS } from '../utils/labels';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 interface EditSummaryModalProps {
   user: SentinelUser;
@@ -35,8 +34,9 @@ export default function EditSummaryModal({
   onClose,
   onSuccess,
 }: EditSummaryModalProps) {
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const key = `admin:user:${user.id}:update`;
+  const loading = mutation.isPending(key);
 
   const changes: { field: string; label: string; oldVal: string; newVal: string }[] = [];
 
@@ -94,9 +94,6 @@ export default function EditSummaryModal({
   const statusChange = form.isActive !== undefined && form.isActive !== user.is_active;
 
   async function handleSave() {
-    setError('');
-    setLoading(true);
-
     const payload: Record<string, string | null> = {};
     if (form.firstName.trim() !== user.first_name) payload.firstName = form.firstName.trim();
     if (form.lastName.trim() !== user.last_name) payload.lastName = form.lastName.trim();
@@ -105,24 +102,31 @@ export default function EditSummaryModal({
     if (form.role !== user.role) payload.role = form.role;
     if (formEmail !== userEmail) payload.email = formEmail;
 
-    try {
-      let updated = user;
-      if (Object.keys(payload).length > 0) {
-        updated = await updateAccount(user.id, payload);
+    await mutation.execute(
+      async () => {
+        let updated = user;
+        if (Object.keys(payload).length > 0) {
+          updated = await updateAccount(user.id, payload);
+        }
+        if (statusChange) {
+          updated = form.isActive
+            ? await activateAccount(user.id)
+            : await deactivateAccount(user.id);
+        }
+        return updated;
+      },
+      {
+        key,
+        successMessage:
+          statusChange && form.isActive
+            ? 'Compte activé.'
+            : statusChange
+              ? 'Compte désactivé.'
+              : 'Utilisateur mis à jour.',
+        toErrorMessage: (err) => apiErrorMessage(err, 'Une erreur inattendue est survenue.'),
+        onSuccess,
       }
-      if (statusChange) {
-        updated = form.isActive ? await activateAccount(user.id) : await deactivateAccount(user.id);
-      }
-      onSuccess(updated);
-    } catch (err) {
-      if (err instanceof ApiResponseError) {
-        setError(apiErrorMessage(err, 'Une erreur inattendue est survenue.'));
-      } else {
-        setError('Une erreur inattendue est survenue.');
-      }
-    } finally {
-      setLoading(false);
-    }
+    );
   }
 
   return (
@@ -185,7 +189,12 @@ export default function EditSummaryModal({
           </table>
         </div>
       )}
-      {error && <div className="error-message">{error}</div>}
+      {statusChange && !form.isActive ? (
+        <div className="notice notice--danger">
+          La désactivation déconnectera cet utilisateur et empêchera ses prochaines connexions.
+          Confirmez uniquement après avoir vérifié ses incidents en cours.
+        </div>
+      ) : null}
     </Modal>
   );
 }

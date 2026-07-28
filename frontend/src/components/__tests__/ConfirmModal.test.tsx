@@ -1,6 +1,12 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import {
+  render as testingLibraryRender,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import ConfirmModal from '../../components/ConfirmModal';
 import CloseIncidentModal from '../CloseIncidentModal';
 import InvalidateIncidentModal from '../InvalidateIncidentModal';
@@ -8,6 +14,10 @@ import MaintenanceDeleteConfirmModal from '../MaintenanceDeleteConfirmModal';
 import { MutationFeedbackProvider } from '../ui/MutationFeedback';
 import { ApiResponseError } from '../../api/client';
 import type { WorkshopIncident } from '../../types';
+
+function render(ui: React.ReactNode) {
+  return testingLibraryRender(<MutationFeedbackProvider>{ui}</MutationFeedbackProvider>);
+}
 
 const destructiveIncident = {
   id: 42,

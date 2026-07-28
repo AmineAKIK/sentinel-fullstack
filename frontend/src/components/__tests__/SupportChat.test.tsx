@@ -1,7 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as testingLibraryRender, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiResponseError } from '../../api/client';
 import SupportChat from '../SupportChat';
+import { MutationFeedbackProvider } from '../ui/MutationFeedback';
+
+function render(ui: React.ReactNode) {
+  return testingLibraryRender(<MutationFeedbackProvider>{ui}</MutationFeedbackProvider>);
+}
 
 describe('SupportChat', () => {
   it('sends the trimmed message and renders the assistant response', async () => {
@@ -46,13 +51,17 @@ describe('SupportChat', () => {
       );
     render(<SupportChat onSend={onSend} />);
 
-    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+    const input = screen.getByLabelText<HTMLInputElement>('Message');
+    fireEvent.change(input, { target: { value: '  Question byte-for-byte  ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer le message' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Le service est momentanément indisponible. Réessayez plus tard.'
     );
     expect(document.body.textContent).not.toContain('raw server text');
+    expect(input).toHaveValue('  Question byte-for-byte  ');
+    expect(input).not.toBeDisabled();
+    await waitFor(() => expect(input).toHaveFocus());
   });
 
   it('aborts the pending request when unmounted', () => {

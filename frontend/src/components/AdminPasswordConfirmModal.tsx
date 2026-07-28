@@ -4,6 +4,7 @@ import { ApiResponseError } from '../api/client';
 import { apiErrorMessage } from '../api/errorMessages';
 import ConfirmModal from './ConfirmModal';
 import { isWithinBcryptByteLimit, MAX_PASSWORD_BYTES } from '../utils/passwordPolicy';
+import { useMutationRunner } from './ui/MutationFeedback';
 
 type AdminPasswordConfirmModalProps = {
   title: string;
@@ -15,6 +16,9 @@ type AdminPasswordConfirmModalProps = {
   disabled?: boolean;
   confirmLabel?: string;
   loadingLabel?: string;
+  mutationKey: string;
+  successMessage: string;
+  failureMessage?: string;
 };
 
 export default function AdminPasswordConfirmModal({
@@ -25,11 +29,15 @@ export default function AdminPasswordConfirmModal({
   disabled = false,
   confirmLabel = 'Confirmer',
   loadingLabel = 'Suppression…',
+  mutationKey,
+  successMessage,
+  failureMessage = 'Une erreur est survenue.',
 }: AdminPasswordConfirmModalProps) {
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationRunner();
+  const loading = mutation.isPending(mutationKey);
 
   async function handleConfirm() {
     setError('');
@@ -44,24 +52,30 @@ export default function AdminPasswordConfirmModal({
       return;
     }
 
-    setLoading(true);
-    try {
-      await verifyAdminPassword(password);
-      await onConfirm(password);
-    } catch (err) {
-      if (err instanceof ApiResponseError) {
-        if (err.code === 'REAUTHENTICATION_FAILED') {
-          setPasswordError('Mot de passe incorrect.');
-        } else if (err.code === 'SESSION_REVOKED') {
-          // Le gestionnaire global 401 redirige avec le motif structuré.
-        } else {
-          setError(apiErrorMessage(err, 'Une erreur est survenue.'));
-        }
-      } else {
-        setError('Une erreur inattendue est survenue.');
+    await mutation.execute(
+      async () => {
+        await verifyAdminPassword(password);
+        await onConfirm(password);
+      },
+      {
+        key: mutationKey,
+        successMessage,
+        errorPresentation: 'local',
+        toErrorMessage: (err) => apiErrorMessage(err, failureMessage),
+        onError: (err, safeMessage) => {
+          if (err instanceof ApiResponseError && err.code === 'REAUTHENTICATION_FAILED') {
+            setPasswordError('Mot de passe incorrect.');
+          } else if (err instanceof ApiResponseError && err.code === 'SESSION_REVOKED') {
+            // Le gestionnaire global 401 redirige avec le motif structuré.
+          } else {
+            setError(safeMessage);
+          }
+          requestAnimationFrame(() => {
+            document.getElementById('adminPassword')?.focus();
+          });
+        },
       }
-      setLoading(false);
-    }
+    );
   }
 
   return (
@@ -71,6 +85,7 @@ export default function AdminPasswordConfirmModal({
       onConfirm={handleConfirm}
       disabled={disabled}
       loading={loading}
+      mutationKey={mutationKey}
       confirmLabel={confirmLabel}
       loadingLabel={loadingLabel}
       variant="danger"

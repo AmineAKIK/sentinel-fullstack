@@ -41,6 +41,7 @@ Abréviations des preuves existantes :
 - `UT-CM` : `frontend/src/components/__tests__/ConfirmModal.test.tsx` ;
 - `UT-MF` : `frontend/src/components/ui/__tests__/MutationFeedback.test.tsx` ;
 - `UT-ARCH` : `frontend/src/components/__tests__/WorkshopMutationArchitecture.test.ts` ;
+- `UT-ARCH5` : `frontend/src/components/__tests__/RemainingMutationArchitecture.test.ts` ;
 - `UT-TEXT` : `frontend/src/components/__tests__/WorkshopTextMutationContract.test.tsx` ;
 - `UT-CU` : `frontend/src/components/__tests__/CreateUserModal.test.tsx` ;
 - `UT-DU` : `frontend/src/components/__tests__/DeleteConfirmModal.test.tsx` ;
@@ -84,7 +85,7 @@ Abréviations des preuves existantes :
 | Atelier | Refuser une demande d'annulation — formulaire de motif | `updateWorkshopIncident({ rejectDeleteRequest: true, decisionReason })` | Oui, décision définitive | Motif obligatoire et libellé final | Runner partagé, commandes désactivées, un appel | `Demande d’annulation refusée.` | Motif byte-identique, erreur sûre | Focus au motif et réessai | `UT-IA`, `UT-RIR` | `COVERED` |
 | Atelier | Annuler directement côté maintenance/responsable | `cancelWorkshopIncident({ expectArbitration: false })` — `POST /cancel` | Oui | Conséquence définitive et historique explicités | Runner partagé, `aria-busy`, un appel | `Incident annulé et conservé dans l’historique.` | Erreur sûre, confirmation maintenue | Réessai et restauration du déclencheur | `UT-IA`, `UT-CM` | `COVERED` |
 
-## Administration
+## Administration — diagnostic initial lot 0 (historique)
 
 | Surface | Déclencheur | API/service | Destructive ? | Confirmation | Pending | Succès | Échec | Focus/récupération | Tests | État |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -113,7 +114,7 @@ Abréviations des preuves existantes :
 | Administration | Révoquer les sessions Admin, Atelier et/ou Board — cases puis `RevokeSessionsConfirmModal` | `patchAppSettings({ revoke*Sessions, currentPassword })` | Oui | Modale danger, scopes listés et mot de passe | La modale possède un pending, mais l'appelant la ferme **avant** l'appel API | Message de succès pour Atelier/Board ; navigation pour Admin | Erreur affichée dans le formulaire sous-jacent ; brouillon gardé mais modale fermée et mot de passe perdu | Violation directe « une erreur ne ferme jamais la modale » ; nouvel essai complet requis | Aucun test ciblé | `GAP` |
 | Administration | Marquer une demande de réinitialisation comme traitée — `PendingTasksWidget` | `markPasswordResetRequestHandled` — `PATCH /api/admin/password-reset-requests/:id/handle` | Oui, retire la tâche de la liste | Confirmation expliquant le prérequis de communication | `loading` + `ConfirmModal`, commandes désactivées et `aria-busy` | La tâche disparaît, **sans message de succès** | Erreur sûre du socle, modale maintenue, bouton réactivé | Réessai possible | `UT-CM` socle uniquement | `GAP` |
 
-## Authentification et Board
+## Authentification et Board — diagnostic initial lot 0 (historique)
 
 | Surface | Déclencheur | API/service | Destructive ? | Confirmation | Pending | Succès | Échec | Focus/récupération | Tests | État |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -129,12 +130,58 @@ Abréviations des preuves existantes :
 | Board | Révocation/expiration détectée au rafraîchissement — `WorkshopBoardPage.refreshBoard` | `getBoardData` reçoit `401`, puis `logoutBoardSession` | Système, pas une mutation utilisateur | Sans objet | Un seul rafraîchissement via `refreshControllerRef` | Navigation avec `Session board expirée ou révoquée.` | Erreur de logout absorbée | Motif transmis à la navigation | Aucun test ciblé d'ancienne session révoquée | `EXCEPTION_TO_REVIEW` |
 | Board | Enregistrer les paramètres d'affichage locaux — `WorkshopBoardPage`, « Paramètres d'affichage » | `saveBoardSettings` — `localStorage.setItem` par écran | Non, local au navigateur | Aucune requise | Opération synchrone, aucun pending | Fermeture de la modale et application immédiate, sans zone de statut | Erreur locale, modale maintenue et brouillon conservé | Réessai possible ; focus restauré à la fermeture | `E2E-BOARD` vérifie seulement la présence du bouton Réglages | `EXCEPTION_TO_REVIEW` |
 
-## Support
+## Support — diagnostic initial lot 0 (historique)
 
 | Surface | Déclencheur | API/service | Destructive ? | Confirmation | Pending | Succès | Échec | Focus/récupération | Tests | État |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Support Admin | Envoyer un message — `AdminSupportPage` → `SupportChat` | `sendAdminSupportMessage` — `POST /api/admin/support/chat` | Non | Aucune requise | `loading`, compositeur désactivé, indicateur de réponse et garde anti-double ; pas d'`aria-busy` | Réponse ajoutée au journal `aria-live="polite"` | Erreur sûre persistante, mais **la saisie a déjà été vidée et n'est pas restaurée** | Textarea refocalisée, mais l'utilisateur doit ressaisir son message | `UT-SC` succès, anti-double, erreur sûre et abort ; aucun test spécifique à l'endpoint Admin | `GAP` |
 | Support Atelier | Envoyer un message — `WorkshopSupportPage` → `SupportChat` | `sendWorkshopSupportMessage` — `POST /api/workshop/support/chat` | Non | Aucune requise | Même gestion partagée | Même réponse dans le journal vivant | Même perte de saisie sur erreur | Même refocus sans restauration du texte | `UT-SC` sur le composant partagé ; aucun test spécifique à l'endpoint Atelier | `GAP` |
+
+## État courant après le lot 5
+
+Les colonnes détaillées déclencheur/API/destructivité des tableaux historiques
+ci-dessus restent la source de traçabilité. Le registre courant ci-dessous
+reclasse séparément les 37 lignes après exécution du rouge puis du vert du lot 5.
+
+| Surface | Interaction | Contrat et preuve après lot 5 | État |
+| --- | --- | --- | --- |
+| Administration | Créer un compte | Runner partagé, aperçu, succès exact, erreur sûre, conservation ; `UT-CU`, `UT-ARCH5` | `COVERED` |
+| Administration | Modifier identité, badge, rôle ou email | Runner partagé, récapitulatif maintenu, succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Activer un compte | Confirmation récapitulative, succès `Compte activé.` ; `UT-ARCH5` | `COVERED` |
+| Administration | Désactiver un compte | Conséquence de déconnexion explicite, succès `Compte désactivé.` ; `UT-ARCH5` | `COVERED` |
+| Administration | Réinitialiser le mot de passe | Confirmation, pending partagé, code temporaire et succès exact ; `UT-CM`, `UT-ARCH5` | `COVERED` |
+| Administration | Supprimer un compte | Réauthentification, impact, anti-double, erreur maintenue, succès exact ; `UT-DU`, `UT-ARCH5` | `COVERED` |
+| Administration | Créer une ligne | Aperçu, runner partagé, formulaire conservé, succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Modifier une ligne | Récapitulatif, runner partagé, erreur sûre, succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Activer une ligne | Confirmation récapitulative et succès `Ligne activée.` ; `UT-ARCH5` | `COVERED` |
+| Administration | Désactiver une ligne | Conséquence explicite et succès `Ligne désactivée.` ; `UT-ARCH5` | `COVERED` |
+| Administration | Modifier une machine | Runner partagé, conflit sûr, valeurs conservées ; `UT-EM`, `E2E-MACHINE` | `COVERED` |
+| Administration | Réordonner le plan d'une ligne | Aperçu avant/après, runner partagé, succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Archiver une ligne | Confirmation avec mot de passe, erreur propagée et réessai ; `UT-ARCH5` | `COVERED` |
+| Administration | Archiver en force et annuler les incidents actifs | Conséquence irréversible et nombre explicités, même contrat partagé ; `UT-ARCH5` | `COVERED` |
+| Administration | Modifier une préférence de notification | Anti-double partagé, rollback, refocus et succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Activer le Board | Confirmation réauthentifiée et succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Désactiver le Board | Déconnexion des sessions annoncée, confirmation et succès exact ; `UT-ARCH5` | `COVERED` |
+| Administration | Changer le code Board | Nouvelle confirmation dédiée, sessions déconnectées annoncées, saisies conservées ; `UT-ARCH5` | `COVERED` |
+| Administration | Modifier la durée ou l'absence d'expiration Board | Runner partagé, application aux nouvelles sessions explicitée ; `UT-ARCH5` | `COVERED` |
+| Administration | Modifier les paramètres applicatifs | Runner partagé, champ en erreur refocalisé, brouillon conservé ; `UT-ARCH5` | `COVERED` |
+| Administration | Changer le mot de passe administrateur | Runner partagé puis navigation de succès ; erreur et saisies conservées ; `UT-ARCH5` | `COVERED` |
+| Administration | Ajouter, modifier ou retirer l'email admin | Runner partagé, succès exact, conservation et réessai ; `UT-ARCH5` | `COVERED` |
+| Administration | Révoquer des sessions | Modale fermée seulement après succès, scopes et conséquence explicités ; `UT-ARCH5` | `COVERED` |
+| Administration | Marquer une demande de reset comme traitée | Confirmation, anti-double, succès exact et erreur maintenue ; `UT-CM`, `UT-ARCH5` | `COVERED` |
+| Authentification Admin | Identifier puis connecter | Runner partagé, pending, anti-double, erreur locale sûre, navigation de succès ; `UT-ARCH5` | `COVERED` |
+| Authentification Atelier | Identifier puis connecter | Même contrat, saisies conservées et navigation de succès ; `UT-ARCH5` | `COVERED` |
+| Authentification Atelier | Première connexion et définition du mot de passe | Runner partagé, secrets conservés en erreur, navigation de succès ; `UT-ARCH5` | `COVERED` |
+| Authentification Admin | Déconnexion | Runner partagé dans `AppAuthContext`, erreur persistante et navigation après succès ; `UT-ARCH5` | `COVERED` |
+| Authentification Atelier | Déconnexion | Même contrat partagé ; `UT-ARCH5` | `COVERED` |
+| Authentification Atelier | Demander une réinitialisation | Confirmation maintenue en erreur, faux succès supprimé, succès exact ; `UT-CM`, `UT-ARCH5` | `COVERED` |
+| Board | Connexion Board | Runner partagé, code conservé en erreur, navigation de succès ; `UT-ARCH5`, `E2E-BOARD` | `COVERED` |
+| Board | Quitter le Board | Runner partagé, pending visible, navigation seulement après succès ; `UT-ARCH5` | `COVERED` |
+| Authentification Admin/Atelier | Réaction système à un `401` | Garde de redirection unique ; aucune action utilisateur ni saisie ; contrat HTTP vérifié par `E2E-SEC` | `EXCEPTION_PROVEN` |
+| Board | Réaction système à un `401` de rafraîchissement | Rafraîchissement unique, assainissement meilleur effort et motif de navigation ; interaction utilisateur sans objet | `EXCEPTION_PROVEN` |
+| Board | Enregistrer les paramètres locaux d'affichage | Runner partagé même pour l'écriture synchrone, succès exact, erreur et brouillon conservés ; `UT-ARCH5` | `COVERED` |
+| Support Admin | Envoyer un message | Runner partagé, anti-double, succès exact, saisie byte-identique en erreur, refocus ; `UT-SC`, `UT-ARCH5` | `COVERED` |
+| Support Atelier | Envoyer un message | Même composant et même contrat ; `UT-SC`, `UT-ARCH5` | `COVERED` |
 
 ## Synthèse
 
@@ -158,27 +205,22 @@ Après le lot 4, sans reclasser les surfaces réservées au lot 5 :
 - 13 `GAP` ;
 - 10 `EXCEPTION_TO_REVIEW`.
 
-Le contrat partagé est désormais consommé en production par les quatre points
-d'orchestration Atelier (`CreateIncidentModal`, `useIncidentActions`,
-`IncidentDetailPanel`, `WorkshopDashboardPage`) et observé par les confirmations
-communes. Il centralise le verrou anti-double synchrone, le pending par clé, les
-succès accessibles, les erreurs publiques sûres, le refocus et la protection des
-callbacks après démontage. Les états locaux `runSimple`, `runPanelAction`,
-`reviewActionRef`, `pendingActionRef` et `reviewLoading` ont disparu du périmètre
-Atelier. Le `submittingRef` restant dans la branche de compatibilité de
-`ConfirmModal` ne sert qu'aux consommateurs non-Atelier, réservés au lot 5.
+Après le lot 5 :
 
-Les lacunes transversales restant à traiter sont :
+- 59 `COVERED` ;
+- 2 `EXCEPTION_PROVEN` strictement systémiques ;
+- 0 `PARTIAL` ;
+- 0 `GAP` ;
+- 0 `EXCEPTION_TO_REVIEW`.
 
-1. les mutations Administration, Authentification/Board et Support restent au
-   lot 5 et conservent leurs classements `PARTIAL`, `GAP` ou exception ;
-2. les préférences de notification, les bascules Board et le traitement d'une
-   demande de reset n'annoncent pas leur succès ;
-3. l'archivage de ligne reste bloqué en chargement sur erreur ;
-4. la révocation de sessions ferme sa modale avant le résultat ;
-5. la demande de réinitialisation Atelier affiche un faux succès même en cas
-   d'échec ;
-6. le support efface la saisie avant l'appel et ne la restaure pas après échec ;
-7. les exceptions de navigation login/logout et de stockage local Board restent
-   à formaliser et à tester ;
-8. R4-09 reste ouvert pour les parcours navigateur hors matrice Atelier du lot 4.
+Les deux exceptions sont les réactions automatiques à une réponse `401` dans
+`AppAuthContext` et dans le rafraîchissement Board. Elles ne sont pas déclenchées
+par une action utilisateur, n'ont aucune saisie à conserver et possèdent une
+garde empêchant les redirections concurrentes. Login, logout et stockage local
+Board ne sont plus des exceptions : ils utilisent le runner partagé.
+
+Le contrat est donc adopté par les 61 lignes. Les tests d'architecture prouvent
+ses consommateurs de production ; les tests communs prouvent anti-double, course
+entre succès et erreur, démontage, timer, traduction sûre, conservation, réessai
+et focus. Les parcours navigateur transversaux restent à compléter au lot 8 :
+R4-09 demeure ouvert jusque-là.
