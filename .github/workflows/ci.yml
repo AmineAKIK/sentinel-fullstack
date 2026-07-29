@@ -40,11 +40,11 @@ jobs:
       - run: npm run verify:reliability
       # Audit des dépendances de PRODUCTION (celles réellement expédiées).
       # Portée : --omit=dev ne couvre PAS l'intégralité de la chaîne d'outillage
-      # de dev ; il valide ce qui part en production. Les paquets de dev (Jest,
-      # ESLint) tirent des versions de brace-expansion (1.1.16, 2.1.2) déjà
-      # corrigées mais que l'avis GHSA-mh99-v99m-4gvg — aplati par npm en une
-      # plage unique `<=5.0.7` — signale à tort ; aucune ne part en production.
-      # La version 5.x réellement vulnérable est épinglée en 5.0.8 via overrides.
+      # de dev ; il valide ce qui part en production. Les chaînes Jest/ts-jest
+      # tirent encore brace-expansion 1.1.16/2.1.2, dans la plage officielle
+      # `<=5.0.7` de GHSA-mh99-v99m-4gvg. Ces vulnérabilités high de
+      # développement restent à traiter séparément ; aucune ne part dans l'image
+      # runtime. Seule l'instance 5.x est corrigée en 5.0.8 via overrides.
       - run: npm audit --omit=dev --audit-level=high
 
   frontend:
@@ -67,8 +67,8 @@ jobs:
       - run: npm run build
       - run: npm run test:coverage
       # Voir le job backend : audit des dépendances de production (pas de toute
-      # la chaîne de dev) ; les faux positifs brace-expansion viennent de
-      # l'outillage de dev, jamais expédié.
+      # la chaîne de dev). Les vulnérabilités high de développement
+      # brace-expansion sont réelles mais ne sont pas expédiées.
       - run: npm audit --omit=dev --audit-level=high
 
   integration:
