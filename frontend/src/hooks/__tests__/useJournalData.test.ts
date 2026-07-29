@@ -1,6 +1,6 @@
 import React from 'react';
-import { act, renderHook, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { listWorkshopHistoryEvents, listWorkshopLines } from '../../api/workshop';
 import { WorkshopHistoryEvent } from '../../types';
 import { useJournalData } from '../useJournalData';
@@ -33,6 +33,24 @@ function event(id: number, createdAt: string): WorkshopHistoryEvent {
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(MemoryRouter, null, children);
+}
+
+function JournalNavigationHarness() {
+  const journal = useJournalData();
+  return React.createElement(
+    'output',
+    { 'aria-label': 'filtres Journal' },
+    [
+      journal.query,
+      journal.statusFilter,
+      journal.lineFilter,
+      journal.machineFilter,
+      journal.stateFilter,
+      journal.eventTypeFilter,
+      journal.startFilter,
+      journal.endFilter,
+    ].join('|')
+  );
 }
 
 describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
@@ -150,5 +168,49 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
       unmount();
       vi.unstubAllEnvs();
     }
+  });
+
+  it('resynchronise toute l’interface lors des navigations retour puis avance', async () => {
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({ items: [], nextCursor: null });
+    const before =
+      '/workshop/journal?q=avant&status=OPEN&line=1&machine=M-1&state=DEGRADEE&event=INCIDENT_TAKEN&start=2026-01-01&end=2026-01-02';
+    const after =
+      '/workshop/journal?q=apres&status=CLOSED&line=2&machine=M-2&state=INDISPONIBLE&event=INCIDENT_CLOSED&start=2026-02-01&end=2026-02-02';
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalNavigationHarness),
+        },
+      ],
+      { initialEntries: [before, after], initialIndex: 1 }
+    );
+    render(React.createElement(RouterProvider, { router }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'apres|CLOSED|2|M-2|INDISPONIBLE|INCIDENT_CLOSED|2026-02-01|2026-02-02'
+      )
+    );
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(router.state.location.pathname + router.state.location.search).toBe(before);
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'avant|OPEN|1|M-1|DEGRADEE|INCIDENT_TAKEN|2026-01-01|2026-01-02'
+      )
+    );
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    expect(router.state.location.pathname + router.state.location.search).toBe(after);
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'apres|CLOSED|2|M-2|INDISPONIBLE|INCIDENT_CLOSED|2026-02-01|2026-02-02'
+      )
+    );
   });
 });

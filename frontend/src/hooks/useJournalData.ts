@@ -46,6 +46,17 @@ export function useJournalData() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   useEffect(() => {
+    setQuery(searchParams.get('q') ?? '');
+    setStatusFilter(readHistoryStatusFilter(searchParams.get('status')));
+    setLineFilter(searchParams.get('line') ?? 'all');
+    setMachineFilter(searchParams.get('machine') ?? 'all');
+    setStateFilter(searchParams.get('state') ?? 'all');
+    setEventTypeFilter(searchParams.get('event') ?? 'all');
+    setStartFilter(searchParams.get('start') ?? '');
+    setEndFilter(searchParams.get('end') ?? '');
+  }, [searchParams]);
+
+  useEffect(() => {
     const controller = new AbortController();
     void listWorkshopLines(controller.signal)
       .then(setLines)
