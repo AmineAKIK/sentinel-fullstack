@@ -145,7 +145,6 @@ export default function WorkshopJournalPage() {
         </div>
 
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
-        {periodError && <ErrorBanner style={{ marginBottom: 16 }}>{periodError}</ErrorBanner>}
 
         <WorkshopFilterCard
           searchInputId="journal-search"
@@ -184,39 +183,75 @@ export default function WorkshopJournalPage() {
 
         <div className="card">
           <div className="card-body">
+            {periodError && (
+              <ErrorBanner id="journal-period-error" style={{ marginBottom: 14 }}>
+                {periodError}
+              </ErrorBanner>
+            )}
             <div className="history-event-filter">
-              <select
-                className="history-event-select"
-                aria-label="Filtrer par type d'action"
-                value={eventTypeFilter}
-                onChange={(e) => {
-                  setEventTypeFilter(e.target.value);
-                  updateSearchFilter('event', e.target.value);
-                }}
-              >
-                <option value="all">Toutes les actions</option>
-                {EVENT_FILTER_OPTIONS.map((key) => (
-                  <option key={key} value={key}>
-                    {EVENT_LABELS[key]}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                aria-label="Depuis le"
-                value={startFilter}
-                onChange={(e) => updateStartFilter(e.target.value)}
-              />
-              <input
-                type="date"
-                aria-label="Jusqu'au"
-                value={endFilter}
-                onChange={(e) => updateEndFilter(e.target.value)}
-              />
+              <div className="history-grid history-event-filter-grid">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="journal-event-filter">
+                    Action
+                  </label>
+                  <select
+                    id="journal-event-filter"
+                    className="form-select"
+                    aria-label="Filtrer par type d'action"
+                    value={eventTypeFilter}
+                    onChange={(e) => {
+                      setEventTypeFilter(e.target.value);
+                      updateSearchFilter('event', e.target.value);
+                    }}
+                  >
+                    <option value="all">Toutes les actions</option>
+                    {EVENT_FILTER_OPTIONS.map((key) => (
+                      <option key={key} value={key}>
+                        {EVENT_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="journal-date-start">
+                    Début
+                  </label>
+                  <input
+                    id="journal-date-start"
+                    type="date"
+                    className="form-input"
+                    aria-label="Depuis le"
+                    value={startFilter}
+                    onChange={(e) => updateStartFilter(e.target.value)}
+                    aria-describedby={periodError ? 'journal-period-error' : undefined}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="journal-date-end">
+                    Fin
+                  </label>
+                  <input
+                    id="journal-date-end"
+                    type="date"
+                    className="form-input"
+                    aria-label="Jusqu'au"
+                    value={endFilter}
+                    onChange={(e) => updateEndFilter(e.target.value)}
+                    aria-describedby={periodError ? 'journal-period-error' : undefined}
+                  />
+                </div>
+                <div className="history-event-result">
+                  <span className="history-event-count muted">
+                    {historyEventsLoading
+                      ? 'Chargement…'
+                      : formatCount(historyEvents.length, 'action', 'actions')}
+                  </span>
+                </div>
+              </div>
               {eventTypeFilter !== 'all' && (
                 <button
                   type="button"
-                  className="filter-chip"
+                  className="filter-chip history-event-chip"
                   onClick={() => {
                     setEventTypeFilter('all');
                     updateSearchFilter('event', 'all');
@@ -227,11 +262,6 @@ export default function WorkshopJournalPage() {
                   <span aria-hidden="true">×</span>
                 </button>
               )}
-              <span className="history-event-count muted">
-                {historyEventsLoading
-                  ? 'Chargement…'
-                  : formatCount(historyEvents.length, 'action', 'actions')}
-              </span>
             </div>
 
             {/* Tableau desktop */}
