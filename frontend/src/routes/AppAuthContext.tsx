@@ -46,7 +46,10 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession>(null);
   const [loading, setLoading] = useState(true);
   const redirectingRef = useRef(false);
+  const logoutFocusTargetRef = useRef<HTMLElement | null>(null);
   const mutation = useMutationRunner();
+  const logoutPending = mutation.isPending('auth:logout');
+  const logoutFailed = mutation.errorKey === 'auth:logout';
 
   // Callback stable appelé sur 401 — protégé par ref pour ne déclencher qu'une fois.
   const markExpired = useCallback(
@@ -127,18 +130,24 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
     return () => controller.abort();
   }, [location.pathname, markExpired]);
 
+  useEffect(() => {
+    if (logoutPending || !logoutFailed) return;
+    const target = logoutFocusTargetRef.current;
+    logoutFocusTargetRef.current = null;
+    requestAnimationFrame(() => {
+      if (target?.isConnected) target.focus({ preventScroll: true });
+    });
+  }, [logoutFailed, logoutPending]);
+
   const logout = useCallback(async () => {
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    logoutFocusTargetRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const result = await mutation.execute(unifiedLogout, {
       key: 'auth:logout',
       toErrorMessage: (err) => apiErrorMessage(err, 'Impossible de se déconnecter. Réessayez.'),
       onSuccess: () => setSession(null),
-      onError: () => {
-        requestAnimationFrame(() => {
-          if (trigger?.isConnected) trigger.focus({ preventScroll: true });
-        });
-      },
     });
+    if (result.status !== 'error') logoutFocusTargetRef.current = null;
     return result.status === 'success';
   }, [mutation]);
 
@@ -148,9 +157,9 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       setSession,
       logout,
-      logoutPending: mutation.isPending('auth:logout'),
+      logoutPending,
     }),
-    [session, loading, logout, mutation]
+    [session, loading, logout, logoutPending]
   );
 
   return <AppAuthContext.Provider value={contextValue}>{children}</AppAuthContext.Provider>;
