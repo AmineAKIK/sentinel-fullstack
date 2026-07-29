@@ -62,17 +62,26 @@ async function tamperCookie(context: BrowserContext, name: string): Promise<void
   ]);
 }
 
-async function verifyWrongAdminPassword(page: Page): Promise<{ status: number; code: string }> {
-  return page.evaluate(async (url) => {
-    const response = await fetch(url, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: 'E2eWrongPassword!23' }),
-    });
-    const body = (await response.json()) as { error?: { code?: string } };
-    return { status: response.status, code: body.error?.code ?? '' };
-  }, `${API_ORIGIN}/api/admin/security/verify-password`);
+async function verifyAdminPassword(
+  page: Page,
+  password: string
+): Promise<{ status: number; code: string }> {
+  return page.evaluate(
+    async ({ url, password: submittedPassword }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: submittedPassword }),
+      });
+      const body = (await response.json()) as { error?: { code?: string } };
+      return { status: response.status, code: body.error?.code ?? '' };
+    },
+    {
+      url: `${API_ORIGIN}/api/admin/security/verify-password`,
+      password,
+    }
+  );
 }
 
 test('le cookie Admin absent ou altéré est refusé', async ({ page, context }) => {
@@ -120,15 +129,20 @@ test('la réauthentification révoque la session exactement au cinquième échec
 }) => {
   await loginAsAdmin(page);
 
+  await expect(verifyAdminPassword(page, E2E_ADMIN_PASSWORD)).resolves.toEqual({
+    status: 200,
+    code: '',
+  });
+
   for (let attempt = 1; attempt <= 4; attempt += 1) {
-    await expect(verifyWrongAdminPassword(page)).resolves.toEqual({
+    await expect(verifyAdminPassword(page, 'E2eWrongPassword!23')).resolves.toEqual({
       status: 401,
       code: 'REAUTHENTICATION_FAILED',
     });
     expect((await context.cookies()).some((cookie) => cookie.name === ADMIN_COOKIE)).toBe(true);
   }
 
-  await expect(verifyWrongAdminPassword(page)).resolves.toEqual({
+  await expect(verifyAdminPassword(page, 'E2eWrongPassword!23')).resolves.toEqual({
     status: 401,
     code: 'SESSION_REVOKED',
   });
