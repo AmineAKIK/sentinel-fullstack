@@ -1,6 +1,6 @@
 # Documentation technique Sentinel
 
-**État documenté :** 17 juillet 2026
+**État documenté :** 29 juillet 2026
 **Architecture :** SPA React + API Express + PostgreSQL + Docker Compose
 
 Cette référence décrit le code du dépôt. Les procédures d'exploitation sont
