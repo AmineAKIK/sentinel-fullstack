@@ -124,4 +124,31 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
 
     expect(vi.mocked(listWorkshopHistoryEvents).mock.calls.length).toBe(callsBefore);
   });
+
+  it('transmet au Journal les bornes locales inclusives de l’URL en hiver Europe/Paris', async () => {
+    vi.stubEnv('TZ', 'Europe/Paris');
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({ items: [], nextCursor: null });
+    const journalWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: ['/workshop/journal?start=2026-01-15&end=2026-01-15'] },
+        children
+      );
+
+    const { unmount } = renderHook(() => useJournalData(), { wrapper: journalWrapper });
+    try {
+      await waitFor(() =>
+        expect(listWorkshopHistoryEvents).toHaveBeenCalledWith(
+          expect.objectContaining({
+            start: '2026-01-14T23:00:00.000Z',
+            end: '2026-01-15T22:59:59.999Z',
+          }),
+          expect.anything()
+        )
+      );
+    } finally {
+      unmount();
+      vi.unstubAllEnvs();
+    }
+  });
 });

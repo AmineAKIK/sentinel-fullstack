@@ -2,18 +2,17 @@ import { AnalyticsParams } from '../api/workshop';
 import { HistoryPeriod } from './workshopHistory';
 
 /**
- * Borne de début de journée en ISO 8601. Une date sans heure (`YYYY-MM-DD`)
- * est déjà interprétée à minuit par le moteur JS — aucun recalage nécessaire.
+ * Borne de début de journée locale en ISO 8601. Une date seule (`YYYY-MM-DD`)
+ * serait interprétée en UTC par le moteur JS : l'heure explicite sans fuseau
+ * conserve le jour civil choisi dans le navigateur.
  */
 export function dayStartIso(dateInput: string): string {
-  return new Date(dateInput).toISOString();
+  return new Date(`${dateInput}T00:00:00.000`).toISOString();
 }
 
 /** Borne de fin de journée (23:59:59.999, horloge locale) en ISO 8601. */
 export function dayEndIso(dateInput: string): string {
-  const date = new Date(dateInput);
-  date.setHours(23, 59, 59, 999);
-  return date.toISOString();
+  return new Date(`${dateInput}T23:59:59.999`).toISOString();
 }
 
 /** Sérialise une Date en `YYYY-MM-DD` (jour local), format natif d'un `<input type="date">`. */

@@ -3,11 +3,15 @@ import { buildAnalyticsParams, dayEndIso, dayStartIso } from '../workshopAnalyti
 
 describe('buildAnalyticsParams', () => {
   beforeEach(() => {
+    vi.stubEnv('TZ', 'Europe/Paris');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-16T10:30:00.000Z'));
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
 
   it('builds the current-day interval and optional filters', () => {
     const params = buildAnalyticsParams('today', '', '', '12', 'MCH-12');
@@ -30,10 +34,10 @@ describe('buildAnalyticsParams', () => {
     });
   });
 
-  it('uses inclusive local-day boundaries for a custom interval', () => {
+  it('transmet à Pilotage les bornes locales inclusives d’une période personnalisée estivale', () => {
     expect(buildAnalyticsParams('custom', '2026-07-01', '2026-07-02', 'all', 'all')).toEqual({
-      start: new Date('2026-07-01').toISOString(),
-      end: new Date('2026-07-02T23:59:59.999').toISOString(),
+      start: '2026-06-30T22:00:00.000Z',
+      end: '2026-07-02T21:59:59.999Z',
     });
   });
 
@@ -52,13 +56,30 @@ describe('buildAnalyticsParams', () => {
 });
 
 describe('dayStartIso / dayEndIso (réutilisés par le filtre période du Journal, ANA-03)', () => {
-  it('dayStartIso does not shift a plain YYYY-MM-DD date (already midnight)', () => {
-    expect(dayStartIso('2026-03-15')).toBe(new Date('2026-03-15').toISOString());
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Europe/Paris');
   });
 
-  it('dayEndIso sets the local end-of-day boundary', () => {
-    const expected = new Date('2026-03-15');
-    expected.setHours(23, 59, 59, 999);
-    expect(dayEndIso('2026-03-15')).toBe(expected.toISOString());
-  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    {
+      saison: 'été',
+      input: '2026-07-15',
+      start: '2026-07-14T22:00:00.000Z',
+      end: '2026-07-15T21:59:59.999Z',
+    },
+    {
+      saison: 'hiver',
+      input: '2026-01-15',
+      start: '2026-01-14T23:00:00.000Z',
+      end: '2026-01-15T22:59:59.999Z',
+    },
+  ])(
+    'interprète le jour civil local Europe/Paris en $saison sans décalage de date',
+    ({ input, start, end }) => {
+      expect(dayStartIso(input)).toBe(start);
+      expect(dayEndIso(input)).toBe(end);
+    }
+  );
 });
