@@ -16,7 +16,7 @@ export default function NavBar() {
   const navigate = useNavigate();
 
   async function handleLogout() {
-    if (await logout()) navigate('/login', { replace: true });
+    if (await logout()) void navigate('/login', { replace: true });
   }
 
   return (

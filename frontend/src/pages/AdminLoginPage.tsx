@@ -84,7 +84,7 @@ export default function AdminLoginPage() {
       }
 
       setSession({ accountType: 'admin', admin: { id: response.id, username: response.username } });
-      navigate('/admin/accueil', { replace: true, state: null });
+      void navigate('/admin/accueil', { replace: true, state: null });
     }
   }
 

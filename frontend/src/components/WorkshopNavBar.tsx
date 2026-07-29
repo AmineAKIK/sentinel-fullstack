@@ -27,7 +27,7 @@ export default function WorkshopNavBar() {
       : BASE_NAV_ITEMS;
 
   async function handleLogout() {
-    if (await logout()) navigate('/login', { replace: true });
+    if (await logout()) void navigate('/login', { replace: true });
   }
 
   return (

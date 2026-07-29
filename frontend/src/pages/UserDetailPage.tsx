@@ -25,7 +25,7 @@ export default function UserDetailPage() {
   useEffect(() => {
     const numId = parseInt(id || '', 10);
     if (isNaN(numId)) {
-      navigate('/admin/users', { replace: true });
+      void navigate('/admin/users', { replace: true });
       return undefined;
     }
 
@@ -141,7 +141,7 @@ export default function UserDetailPage() {
           user={user}
           onClose={() => setModal(null)}
           onSuccess={() => {
-            navigate('/admin/users', { replace: true });
+            void navigate('/admin/users', { replace: true });
           }}
         />
       )}

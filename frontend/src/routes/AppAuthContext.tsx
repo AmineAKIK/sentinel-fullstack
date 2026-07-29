@@ -60,7 +60,7 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
           ? 'Session révoquée après cinq tentatives de mot de passe incorrectes.'
           : 'Session expirée ou révoquée. Reconnectez-vous.';
       sessionStorage.setItem('sentinel.login.reason', reason);
-      navigate('/login', { replace: true });
+      void navigate('/login', { replace: true });
     },
     [navigate]
   );

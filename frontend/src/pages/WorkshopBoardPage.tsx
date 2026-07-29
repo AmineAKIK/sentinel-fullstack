@@ -230,7 +230,7 @@ export default function WorkshopBoardPage() {
       if (err instanceof ApiResponseError && err.status === 401) {
         // Session board révoquée ou board désactivé — retour à l'accueil
         await logoutBoardSession().catch(() => undefined);
-        navigate('/login', {
+        void navigate('/login', {
           replace: true,
           state: { reason: 'Session board expirée ou révoquée.' },
         });

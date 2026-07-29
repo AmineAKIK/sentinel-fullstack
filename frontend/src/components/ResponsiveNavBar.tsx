@@ -55,7 +55,7 @@ export default function ResponsiveNavBar({
   }
 
   function navigateTo(path: string) {
-    navigate(path);
+    void navigate(path);
   }
 
   return (
