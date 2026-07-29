@@ -101,6 +101,60 @@ async function enterBoard(page: Page): Promise<void> {
   await expect(page.locator('main.board-page')).toBeVisible();
 }
 
+async function openWorkshopFixture(page: Page, productPrefix: string) {
+  const card = page.locator('article.incident-card', { hasText: productPrefix });
+  await expect(card).toHaveCount(1);
+  await card.getByRole('link', { name: /Ouvrir incident/i }).click();
+  return { card, panel: page.locator('aside.incident-detail-drawer') };
+}
+
+async function cancelOpenIncident(page: Page): Promise<void> {
+  const panel = page.locator('aside.incident-detail-drawer');
+  await panel.getByRole('button', { name: "Annuler l'incident" }).click();
+  const dialog = page.getByRole('dialog', { name: "Annuler l'incident" });
+  await dialog.getByRole('button', { name: 'Confirmer l’annulation' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('status')).toContainText(
+    'Incident annulé et conservé dans l’historique.'
+  );
+}
+
+test.afterAll(async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    await loginAsWorkshop(page, E2E_RESPONSABLE_BADGE);
+
+    const { card: cancelCard } = await openWorkshopFixture(page, 'E2E-BOARD-CANCEL');
+    const cancellationReview = page.getByRole('dialog', {
+      name: 'Arbitrage annulation',
+    });
+    await expect(cancellationReview).toBeVisible();
+    await cancellationReview.getByRole('button', { name: "Confirmer l'annulation" }).click();
+    await expect(cancelCard).toHaveCount(0);
+
+    await openWorkshopFixture(page, 'E2E-BOARD-EDIT');
+    const editReview = page.getByRole('dialog', { name: 'Arbitrage correction' });
+    await expect(editReview).toBeVisible();
+    await editReview.getByRole('button', { name: 'Appliquer la correction' }).click();
+    await expect(editReview).toBeHidden();
+    await cancelOpenIncident(page);
+
+    await openWorkshopFixture(page, 'E2E-BOARD-PLAIN');
+    await cancelOpenIncident(page);
+
+    await page.goto('/workshop/dashboard');
+    for (const productPrefix of ['E2E-BOARD-CANCEL', 'E2E-BOARD-EDIT', 'E2E-BOARD-PLAIN']) {
+      await expect(page.locator('article.incident-card', { hasText: productPrefix })).toHaveCount(
+        0
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 /**
  * Configure le Board pour un accès déterministe aux cartes de test : filtre
  * "Urgences uniquement" (les deux fiches créées sont urgentes) et pagination
