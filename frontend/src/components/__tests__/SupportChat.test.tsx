@@ -79,3 +79,42 @@ describe('SupportChat', () => {
     expect(requestSignal?.aborted).toBe(true);
   });
 });
+
+describe('SupportChat — scroll confiné au transcript (RC5-9)', () => {
+  it('affiche le titre avec une espace insécable avant le "?"', () => {
+    render(<SupportChat onSend={vi.fn()} />);
+
+    const title = screen.getByText(/Comment puis-je vous aider/);
+    expect(title.textContent).toContain(' ?');
+    expect(title.textContent).not.toMatch(/aider \?/);
+  });
+
+  it('ne fait défiler ni window ni document au montage (conversation vide)', () => {
+    const windowScrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    render(<SupportChat onSend={vi.fn()} />);
+
+    expect(windowScrollTo).not.toHaveBeenCalled();
+    windowScrollTo.mockRestore();
+  });
+
+  it('fait défiler uniquement le conteneur des messages après un nouvel échange, jamais window', async () => {
+    const onSend = vi.fn().mockResolvedValue('Réponse.');
+    const windowScrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    render(<SupportChat onSend={onSend} />);
+
+    // JSDOM ne définit pas Element.prototype.scrollTo : le composant l'appelle
+    // en optional chaining (el.scrollTo?.(...)), on la fournit ici pour espionner
+    // l'appel réel sans changer ce contrat défensif.
+    const log = screen.getByRole('log');
+    const elementScrollTo = vi.fn();
+    (log as unknown as { scrollTo: typeof elementScrollTo }).scrollTo = elementScrollTo;
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le message' }));
+
+    await waitFor(() => expect(elementScrollTo).toHaveBeenCalled());
+    expect(windowScrollTo).not.toHaveBeenCalled();
+
+    windowScrollTo.mockRestore();
+  });
+});

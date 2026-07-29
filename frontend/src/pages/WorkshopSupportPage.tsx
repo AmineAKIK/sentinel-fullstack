@@ -16,11 +16,11 @@ async function handleSend(
 export default function WorkshopSupportPage() {
   usePageTitle('Assistance atelier');
   return (
-    <>
+    <div className="support-page-shell">
       <WorkshopNavBar />
       <main id="main-content" className="page-container support-page">
         <SupportChat onSend={handleSend} />
       </main>
-    </>
+    </div>
   );
 }
