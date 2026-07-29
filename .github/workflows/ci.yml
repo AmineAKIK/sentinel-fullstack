@@ -38,14 +38,27 @@ jobs:
       - run: npm run build
       - run: npm run test:coverage
       - run: npm run verify:reliability
-      # Audit des dépendances de PRODUCTION (celles réellement expédiées).
-      # Portée : --omit=dev ne couvre PAS l'intégralité de la chaîne d'outillage
-      # de dev ; il valide ce qui part en production. Les chaînes Jest/ts-jest
-      # tirent encore brace-expansion 1.1.16/2.1.2, dans la plage officielle
-      # `<=5.0.7` de GHSA-mh99-v99m-4gvg. Ces vulnérabilités high de
-      # développement restent à traiter séparément ; aucune ne part dans l'image
-      # runtime. Seule l'instance 5.x est corrigée en 5.0.8 via overrides.
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Enforce bounded dependency exceptions
+        run: |
+          python3 ../scripts/dependency_exception_guard.py repository
+          set +e
+          npm audit --omit=dev --audit-level=high --json > "${RUNNER_TEMP}/backend-runtime-audit.json"
+          runtime_status=$?
+          npm audit --audit-level=high --json > "${RUNNER_TEMP}/backend-full-audit.json"
+          full_status=$?
+          set -e
+          if [ "$runtime_status" -gt 1 ] || [ "$full_status" -gt 1 ]; then
+            echo "npm audit failed without a reviewable vulnerability result" >&2
+            exit 1
+          fi
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace backend \
+            --audit-kind runtime \
+            --audit-json "${RUNNER_TEMP}/backend-runtime-audit.json"
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace backend \
+            --audit-kind full \
+            --audit-json "${RUNNER_TEMP}/backend-full-audit.json"
 
   frontend:
     name: Frontend / Quality
@@ -66,10 +79,27 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
-      # Voir le job backend : audit des dépendances de production (pas de toute
-      # la chaîne de dev). Les vulnérabilités high de développement
-      # brace-expansion sont réelles mais ne sont pas expédiées.
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Enforce bounded dependency exceptions
+        run: |
+          python3 ../scripts/dependency_exception_guard.py repository
+          set +e
+          npm audit --omit=dev --audit-level=high --json > "${RUNNER_TEMP}/frontend-runtime-audit.json"
+          runtime_status=$?
+          npm audit --audit-level=high --json > "${RUNNER_TEMP}/frontend-full-audit.json"
+          full_status=$?
+          set -e
+          if [ "$runtime_status" -gt 1 ] || [ "$full_status" -gt 1 ]; then
+            echo "npm audit failed without a reviewable vulnerability result" >&2
+            exit 1
+          fi
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace frontend \
+            --audit-kind runtime \
+            --audit-json "${RUNNER_TEMP}/frontend-runtime-audit.json"
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace frontend \
+            --audit-kind full \
+            --audit-json "${RUNNER_TEMP}/frontend-full-audit.json"
 
   integration:
     name: Backend / PostgreSQL integration
@@ -185,6 +215,7 @@ jobs:
           python3 scripts/test-release-policy.py
           python3 scripts/test-release-gate.py
           python3 scripts/test-release-workflow.py
+          python3 scripts/test-dependency-exception-policy.py
       - name: Validate GitHub Actions workflow structure
         run: >-
           docker run --rm
@@ -227,6 +258,11 @@ jobs:
             --build-arg BUILD_SHA="$BUILD_SHA" \
             --tag sentinel-frontend:ci \
             ./frontend
+      - name: Enforce bounded exceptions in application image payloads
+        run: >-
+          python3 scripts/dependency_exception_guard.py images
+          --backend-image sentinel-backend:ci
+          --frontend-image sentinel-frontend:ci
       - name: Assert non-root image users
         run: |
           test "$(docker image inspect --format '{{.Config.User}}' sentinel-backend:ci)" = "node"

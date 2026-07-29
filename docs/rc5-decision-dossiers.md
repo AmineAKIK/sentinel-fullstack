@@ -893,6 +893,62 @@ Malgré les preuves fonctionnelles vertes, le verdict de publication RC5 reste
 parente disponible, protections GitHub externes absentes et dossier O non
 autorisé.
 
+## 7. Fermeture bornée des alertes de dépendances
+
+Mise à jour au 30 juillet 2026. Cette section conserve les constats et essais
+des sections 1 à 6, puis enregistre la décision ultérieure qui les traite. Elle
+ne réécrit pas le fait historique que D2 est `BLOCKED_UPSTREAM`.
+
+Deux exceptions exactes, et aucune autre, sont désormais acceptées jusqu'au
+31 août 2026 inclus, sous la responsabilité explicite de
+`repository-owner:AmineAKIK` :
+
+| ID | Classification | Justification limitée | Condition automatique de fermeture |
+| --- | --- | --- | --- |
+| `GHSA-qwww-vcr4-c8h2` | `not-applicable` | l'advisory `react-router >=7.12.0 <8.3.0` vise uniquement les APIs instables RSC; Sentinel reste sous React 18, Router/Router DOM `7.18.2` exacts et Declarative Mode sans RSC | version/mode Router ou React différents, dépendance/API RSC, Framework/Data Mode de production, autre portée d'audit ou expiration |
+| `GHSA-mh99-v99m-4gvg` | `upstream-dev-only` | les instances `brace-expansion <=5.0.7` restent confinées aux chemins Jest/ts-jest/ESLint/jsx-a11y inventoriés; aucun import applicatif, aucune fermeture runtime et aucun payload applicatif d'image ne les contient | lockfile ou chemin changé, Brace/glob/minimatch runtime, import applicatif ou payload image, autre portée d'audit ou expiration |
+
+Le contrat machine-readable est
+[`security/dependency-exceptions.json`](../security/dependency-exceptions.json);
+son mode opératoire est
+[`dependency-security-exceptions.md`](dependency-security-exceptions.md). Le
+garde permanent :
+
+```text
+scripts/dependency_exception_guard.py
+scripts/test-dependency-exception-policy.py
+```
+
+refuse l'expiration, une troisième GHSA directe ou cachée, toute variation des
+deux lockfiles, des installations/chemins Brace, de React/Router/du mode, de la
+surface RSC et des payloads applicatifs des images. Un changement de lockfile
+impose explicitement une nouvelle évaluation D2; la mise à jour du seul hash
+n'est pas le processus de réévaluation documenté.
+
+Les jobs Quality produisent et analysent les audits runtime et complets. Le job
+Containers inspecte les deux payloads construits. Le cycle ciblé permanent a
+échoué avant l'existence du garde (`15` tests, `25` assertions en échec), puis
+passe après implémentation (`15/15`).
+
+Les quatre audits npm JSON réels passent le garde :
+
+| Portée | Nœuds high/critical | GHSA terminales acceptées |
+| --- | ---: | --- |
+| backend runtime | `0 / 0` | aucune |
+| backend complet | `20 / 0` | `GHSA-mh99-v99m-4gvg` uniquement |
+| frontend runtime | `2 / 0` | `GHSA-qwww-vcr4-c8h2` uniquement |
+| frontend complet | `8 / 0` | les deux GHSA exactes |
+
+Cette décision lève le blocage local non borné décrit en 6.1 et fournit le
+traitement temporaire du constat 6.4; elle ne prétend pas que les packages
+Brace sont corrigés. D2 doit être rejoué à chaque lockfile et la politique doit
+être retirée dès qu'une version parente compatible est disponible. L'échéance,
+une nouvelle surface ou toute nouvelle GHSA fait échouer la CI.
+
+Le verdict global ne devient pas `GO` par cette seule décision : les protections
+GitHub exigées par P2, la vérité opérationnelle O et les autres preuves externes
+restent gouvernées par leurs portes et autorisations propres.
+
 ## Sources officielles consultées le 29 juillet 2026
 
 - GitHub Advisory Database :

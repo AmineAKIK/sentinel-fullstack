@@ -15,29 +15,41 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 ### Mise à jour documentaire RC5
 
 **Statut RC5 : BLOCKED.** Les décisions R1, P2, C1+C3 et D2 sont désormais
-enregistrées dans la section 6 de
+enregistrées dans les sections 6 et 7 de
 [rc5-decision-dossiers.md](rc5-decision-dossiers.md). R1, P2 et C1+C3 sont
-implémentées localement; D2 est `BLOCKED_UPSTREAM`; O reste
+implémentées localement. D2 reste factuellement `BLOCKED_UPSTREAM`, mais ses
+alertes, avec l'alerte Router restante de R1, disposent désormais d'un
+traitement explicite, automatique et expirant au 31 août 2026; O reste
 `PENDING_AUTHORIZATION`.
 
 Les blocages exacts sont :
 
-- `react-router@7.18.2`, version exacte imposée par R1, est dans la plage high de
-  `GHSA-qwww-vcr4-c8h2`; Sentinel n'utilise pas RSC, mais aucun waiver n'est
-  créé et l'audit runtime frontend échoue;
-- aucune combinaison parente Jest/ts-jest/ESLint/jsx-a11y officiellement
-  compatible n'élimine les anciennes chaînes `brace-expansion`;
 - les environnements et rulesets GitHub indispensables à P2 ne sont pas
   configurés ou prouvés; l'historique du workflow de tag impose ce verrou;
-- aucune lecture de la topologie publique O n'a été autorisée.
+- aucune lecture de la topologie publique O n'a été autorisée;
+- les preuves de dossier, de recette et de publication encore marquées
+  `OPEN`/`BLOCKED_EXTERNAL` restent à produire sur le candidat final;
+- la CI distante doit encore confirmer les six jobs sur le SHA final avec le
+  nouveau garde.
+
+Les constats dépendances ne sont pas effacés : Router `7.18.2` reste dans la
+plage de `GHSA-qwww-vcr4-c8h2` et les anciennes chaînes Brace restent dans
+`GHSA-mh99-v99m-4gvg`. La politique fermée
+[`security/dependency-exceptions.json`](../security/dependency-exceptions.json)
+les accepte seulement dans leurs surfaces constatées, avec propriétaire,
+échéance, hashes des deux lockfiles, graphes transitifs et tests de refus. Toute
+nouvelle GHSA high/critical, surface RSC, variation Router/React, présence Brace
+runtime/image, usage applicatif contrôlable, modification de lockfile ou
+expiration remet immédiatement la CI en échec.
 
 La narration des lots, SHA et runs antérieurs est conservée comme historique
 daté. Pour le candidat RC5 courant, les faits structurels dérivés du dépôt sont
 `50` migrations (`001..050`), `15` tables physiques (`14` applicatives et
 `schema_migrations`) et `6` jobs CI. Les preuves locales courantes sont
 `604` tests backend, `165` PostgreSQL, `754` frontend et `156` Chromium
-(`156/156` sur trois bases fraîches, axe inclus). Ces nombres ne ferment ni
-l'audit frontend, ni les preuves GitHub/VPS externes.
+(`156/156` sur trois bases fraîches, axe inclus). Le garde de dépendances passe
+ses `15/15` tests et les quatre audits JSON réels dans leurs portées exactes.
+Ces nombres ne ferment ni la CI distante, ni les preuves GitHub/VPS externes.
 
 ## 1. Règles de pilotage
 
