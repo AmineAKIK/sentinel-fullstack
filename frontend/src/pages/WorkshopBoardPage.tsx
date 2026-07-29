@@ -163,6 +163,15 @@ export default function WorkshopBoardPage() {
   // pour un écran kiosque sans session) pour afficher le retour dashboard.
   const [isWorkshopUser, setIsWorkshopUser] = useState(false);
   const exitButtonRef = useRef<HTMLButtonElement | null>(null);
+  const logoutPending = mutation.isPending('auth:board:logout');
+  const logoutFailed = mutation.errorKey === 'auth:board:logout';
+
+  useEffect(() => {
+    if (!logoutPending && logoutFailed && exitButtonRef.current?.isConnected) {
+      exitButtonRef.current.focus({ preventScroll: true });
+    }
+  }, [logoutFailed, logoutPending]);
+
   useEffect(() => {
     const controller = new AbortController();
     void getUnifiedMe(controller.signal)
@@ -390,18 +399,11 @@ export default function WorkshopBoardPage() {
   }
 
   async function closeBoardAccess() {
-    const result = await mutation.execute(logoutBoardSession, {
+    await mutation.execute(logoutBoardSession, {
       key: 'auth:board:logout',
       toErrorMessage: () => 'Impossible de quitter le Board. Réessayez.',
       onSuccess: () => void navigate('/login', { replace: true }),
     });
-    if (result.status === 'error') {
-      requestAnimationFrame(() => {
-        if (exitButtonRef.current?.isConnected) {
-          exitButtonRef.current.focus({ preventScroll: true });
-        }
-      });
-    }
   }
 
   function handleLineToggle(lineId: string) {
@@ -507,7 +509,7 @@ export default function WorkshopBoardPage() {
               className="board-exit"
               onClick={() => void closeBoardAccess()}
               aria-label="Quitter"
-              disabled={mutation.isPending('auth:board:logout')}
+              disabled={logoutPending}
             >
               <svg
                 width="15"
@@ -525,7 +527,7 @@ export default function WorkshopBoardPage() {
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              {mutation.isPending('auth:board:logout') ? 'Déconnexion…' : 'Quitter'}
+              {logoutPending ? 'Déconnexion…' : 'Quitter'}
             </button>
           )}
         </div>
