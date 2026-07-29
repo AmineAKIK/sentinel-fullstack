@@ -459,9 +459,10 @@ export default function IncidentDetailPanel({
               )}
               {canSetPriority && (
                 <button
-                  className={incident.is_priority ? 'btn btn-secondary' : 'btn btn-warning'}
+                  className={incident.is_priority ? 'btn btn-critical-outline' : 'btn btn-critical'}
                   onClick={() => void onToggleUrgent(incident)}
                   disabled={mutation.pending}
+                  aria-pressed={incident.is_priority}
                 >
                   {mutation.isPending(WORKSHOP_MUTATION_KEYS.PRIORITY)
                     ? 'Modification…'

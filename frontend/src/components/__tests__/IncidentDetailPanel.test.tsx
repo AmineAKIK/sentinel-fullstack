@@ -84,7 +84,7 @@ function renderPanel({
 } = {}) {
   const modal = mockModal();
 
-  render(
+  const view = render(
     <MemoryRouter>
       <MutationFeedbackProvider>
         <IncidentDetailPanel
@@ -112,7 +112,7 @@ function renderPanel({
     </MemoryRouter>
   );
 
-  return { modal, patchIncident };
+  return { modal, patchIncident, ...view };
 }
 
 describe('IncidentDetailPanel', () => {
@@ -442,5 +442,78 @@ describe('IncidentDetailPanel – mutations panneau via le runner partagé RC4',
 
     resolvePatch({ ...incident, responsible_comment: 'Prioriser ce contrôle' });
     await screen.findByText('Consigne enregistrée.');
+  });
+});
+
+describe('IncidentDetailPanel – sémantique visuelle de l’urgence (RC5)', () => {
+  it('rend l’activation avec la variante critique canonique, pas btn-warning', () => {
+    renderPanel({ incident: mockIncident({ is_priority: false }) });
+
+    const button = screen.getByRole('button', { name: 'Déclarer urgent' });
+    expect(button.className).toMatch(/\bbtn-critical\b/);
+    expect(button.className).not.toMatch(/\bbtn-warning\b/);
+  });
+
+  it('sa couleur calculée correspond au token urgent aligné sur le badge Urgent, pas à --color-warning', () => {
+    renderPanel({ incident: mockIncident({ is_priority: false }) });
+
+    const button = screen.getByRole('button', { name: 'Déclarer urgent' });
+    const backgroundColor = window.getComputedStyle(button).backgroundColor;
+    // --color-warning: #b45309 → rgb(180, 83, 9). Le bouton d'activation ne
+    // doit plus jamais résoudre vers cette teinte orange/brun.
+    expect(backgroundColor).not.toBe('rgb(180, 83, 9)');
+  });
+
+  it('distingue visuellement activation (critique pleine) et retrait (contour) de l’urgence', () => {
+    const { rerender } = renderPanel({ incident: mockIncident({ is_priority: false }) });
+    const activate = screen.getByRole('button', { name: 'Déclarer urgent' });
+    expect(activate.className).toMatch(/\bbtn-critical\b/);
+    expect(activate.className).not.toMatch(/\bbtn-critical-outline\b/);
+
+    rerender(
+      <MemoryRouter>
+        <MutationFeedbackProvider>
+          <IncidentDetailPanel
+            incident={mockIncident({ is_priority: true })}
+            lines={[]}
+            modal={mockModal()}
+            userRole="RESPONSABLE"
+            userId={1}
+            isResponsable
+            onBack={vi.fn()}
+            onToggleFollow={vi.fn(resolvedVoid)}
+            onToggleUrgent={vi.fn(resolvedVoid)}
+            onConfirmTakeCharge={vi.fn(resolvedVoid)}
+            onRequestDelete={vi.fn(resolvedVoid)}
+            onSetPending={vi.fn(resolvedVoid)}
+            onResumeIncident={vi.fn(resolvedVoid)}
+            onCloseIncident={vi.fn(resolvedVoid)}
+            onInvalidateIncident={vi.fn(resolvedVoid)}
+            onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+            onEditSuccess={vi.fn()}
+            onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+            patchIncident={vi.fn(() => Promise.resolve(mockIncident({ is_priority: true })))}
+          />
+        </MutationFeedbackProvider>
+      </MemoryRouter>
+    );
+
+    const remove = screen.getByRole('button', { name: "Retirer l'urgence" });
+    expect(remove.className).not.toMatch(/\bbtn-critical\b(?!-outline)/);
+  });
+
+  it('expose aria-pressed=false sur l’activation et aria-pressed=true sur le retrait', () => {
+    const { unmount } = renderPanel({ incident: mockIncident({ is_priority: false }) });
+    expect(screen.getByRole('button', { name: 'Déclarer urgent' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    unmount();
+
+    renderPanel({ incident: mockIncident({ is_priority: true }) });
+    expect(screen.getByRole('button', { name: "Retirer l'urgence" })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 });

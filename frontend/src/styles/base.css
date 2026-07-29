@@ -292,8 +292,8 @@ a {
 }
 
 /* Signal d'attention forte mais réversible sans conséquence destructrice
-   (ex. déclarer un incident urgent) : ne doit pas emprunter le rouge de
-   btn-danger, réservé aux actions à conséquence grave (annuler, invalider). */
+   (ex. suspendre, arbitrer) : ne doit pas emprunter le rouge de btn-danger,
+   réservé aux actions à conséquence grave (annuler, invalider). */
 .btn-warning {
   background-color: var(--color-warning);
   color: var(--color-primary-text);
@@ -303,6 +303,42 @@ a {
 .btn-warning:hover:not(:disabled) {
   background-color: var(--color-warning);
   opacity: 0.9;
+}
+
+/* Urgence métier (ex. déclarer/retirer l'urgence d'un incident) : reprend le
+   rouge du badge Urgent (--attention-critical-text) pour rester cohérent avec
+   sa sémantique, sans dupliquer la valeur et sans se confondre avec
+   btn-danger, réservé aux actions destructrices et irréversibles. */
+.btn-critical {
+  background-color: var(--attention-critical-text);
+  color: var(--color-primary-text);
+  border-color: var(--attention-critical-text);
+}
+
+.btn-critical:hover:not(:disabled) {
+  background-color: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
+}
+
+/* Retrait de l'urgence : même famille chromatique que btn-critical mais en
+   contour, pour distinguer visuellement l'activation (pleine) du retrait. */
+.btn-critical-outline {
+  background-color: var(--color-surface);
+  color: var(--attention-critical-text);
+  border-color: var(--attention-critical-text);
+}
+
+.btn-critical-outline:hover:not(:disabled) {
+  background-color: var(--color-danger-bg);
+}
+
+@media (max-width: 700px) {
+  /* Cible tactile élargie pour l'action d'urgence sur mobile étroit : les
+     40px communs à .btn suffisent au pointeur mais pas au doigt (WCAG 2.5.5). */
+  .btn-critical,
+  .btn-critical-outline {
+    min-height: 44px;
+  }
 }
 
 .btn-ghost {
