@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { E2E_MAINTENANCE_BADGE, E2E_OPERATOR_BADGE, E2E_WORKSHOP_PASSWORD } from './fixtures';
+import { E2E_OPERATOR_BADGE, E2E_WORKSHOP_PASSWORD } from './fixtures';
 
 test.describe.configure({ retries: 0 });
 
@@ -19,54 +19,6 @@ async function loginAsWorkshop(page: Page, badge: string): Promise<void> {
   await page.getByLabel('Mot de passe').fill(E2E_WORKSHOP_PASSWORD);
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await page.waitForURL('**/workshop/dashboard');
-}
-
-async function chooseSelectField(
-  page: Page,
-  ariaLabel: string,
-  optionText: string | RegExp
-): Promise<void> {
-  await page.getByRole('combobox', { name: ariaLabel }).click();
-  await page.getByRole('option', { name: optionText, exact: true }).click();
-}
-
-/**
- * Crée un incident, le clôture avec une note d'intervention (opérateur puis
- * technicien), le rendant éligible à la Base de connaissance (CLOSED +
- * intervention_note non vide, cf. workshop.repository.ts isKnowledgeEligible).
- */
-async function createKnowledgeIncident(
-  page: Page,
-  options: { head: number; product: string; comment: string; interventionNote: string }
-): Promise<void> {
-  await page.getByRole('button', { name: '+ Créer un incident' }).click();
-  await chooseSelectField(page, 'Ligne', '999');
-  await chooseSelectField(page, 'Machine', /E2E-MCH-1/);
-  await chooseSelectField(page, 'Robot', '1');
-  await chooseSelectField(page, 'Tête', String(options.head));
-  await chooseSelectField(page, 'État', 'Dégradée');
-  await page.getByPlaceholder('Référence produit').fill(options.product);
-  await page.getByLabel('Commentaire').fill(options.comment);
-  await page.getByRole('button', { name: 'Aperçu' }).click();
-  await page.getByRole('button', { name: 'Valider la création' }).click();
-  await expect(page.getByRole('status')).toContainText('Incident signalé.');
-
-  const card = page.locator('article', { hasText: options.product });
-  await card.getByRole('link', { name: /Ouvrir incident/i }).click();
-
-  await page.getByRole('button', { name: 'Prendre en charge' }).click();
-  await page.getByRole('button', { name: 'Confirmer' }).click();
-  await expect(page.getByRole('status')).toContainText('Prise en charge enregistrée.');
-
-  await page.getByRole('button', { name: 'Clôturer' }).click();
-  const closeDialog = page.getByRole('dialog', { name: "Clôturer l'incident" });
-  await closeDialog
-    .getByPlaceholder("Décrivez l'intervention réalisée")
-    .fill(options.interventionNote);
-  await closeDialog.getByRole('button', { name: 'Clôturer', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Incident clôturé');
-
-  await page.getByRole('button', { name: 'Fermer le détail' }).click();
 }
 
 async function goToKnowledge(page: Page): Promise<void> {
@@ -114,40 +66,47 @@ async function assertNoHorizontalOverflow(page: Page, label: string): Promise<vo
   expect(offenders, `aucun élément ne doit dépasser le viewport à ${label}`).toEqual([]);
 }
 
-test.describe('Base de connaissance — préparation des fiches (RC5-6)', () => {
-  test('setup : deux fiches clôturées avec contenu long, disponibles pour la connaissance', async ({
+test.describe('Base de connaissance — fixtures métier déterministes (RC5-6)', () => {
+  test('les deux interventions clôturées du seed sont de vraies fiches éligibles et consultables', async ({
     page,
   }) => {
-    await loginAsWorkshop(page, E2E_MAINTENANCE_BADGE);
-    // Tête 5 : utilisée aussi par incident-lifecycle.spec.ts, qui clôture
-    // systématiquement son incident (cycle de vie complet) — la contrainte
-    // d'unicité (OPEN/PENDING uniquement) libère donc la tête de façon fiable.
-    await createKnowledgeIncident(page, {
-      head: 5,
-      product: `E2E-KB-A-${Date.now()}`,
-      comment:
-        'Symptôme observé avec un texte volontairement long pour vérifier le retour à la ligne sur mobile sans provoquer de débordement horizontal du document complet.',
-      interventionNote:
-        'Solution détaillée et longue décrivant précisément chaque étape de l’intervention réalisée sur la machine afin de vérifier que le fond de la carte solution ne dépasse jamais la largeur de son conteneur parent.',
-    });
+    await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
+    await goToKnowledge(page);
+
+    const shortCard = page.locator('.kb-card', { hasText: 'E2E-KB-A' });
+    const longCard = page.locator('.kb-card', { hasText: 'E2E-KB-LONGPRODUCT' });
+    await expect(shortCard).toHaveCount(1);
+    await expect(longCard).toHaveCount(1);
+    await expect(shortCard).toBeVisible();
+    await expect(longCard).toBeVisible();
+
+    await shortCard.click();
+
+    await expect(page.locator('.kb-meta-item').filter({ hasText: 'Produit' })).toContainText(
+      'E2E-KB-A'
+    );
+    await expect(page.locator('.kb-section-solution p')).toContainText(
+      'Solution détaillée et longue'
+    );
   });
 
-  test('setup : fiche avec produit long, disponible pour la connaissance', async ({ page }) => {
-    await loginAsWorkshop(page, E2E_MAINTENANCE_BADGE);
-    // Tête 14 : le scénario d'annulation de workshop-mutation-feedback.spec.ts
-    // s'y termine toujours en statut CANCELED (hors OPEN/PENDING), donc la tête
-    // est libre. Têtes 13 et 15 sont évitées : certains chemins de ces specs
-    // laissent l'incident OPEN, ce qui provoquerait une collision durable.
-    await createKnowledgeIncident(page, {
-      head: 14,
-      // 120 caractères = limite réelle du champ produit (PRODUCT: 120, domain/constants.ts) —
-      // reproduit fidèlement un cas de contenu long réaliste, pas fabriqué au-delà du contrat.
-      product: `E2E-KB-LONGPRODUCT-${'X'.repeat(90)}-${Date.now()}`.slice(0, 120),
-      comment:
-        'Symptôme B avec un texte volontairement long pour vérifier le retour à la ligne sur mobile sans provoquer de débordement horizontal du document complet, sur plusieurs phrases.',
-      interventionNote:
-        'Solution B détaillée et longue décrivant précisément chaque étape de l’intervention réalisée sur la machine afin de vérifier que le fond de la carte solution ne dépasse jamais la largeur de son conteneur parent, même avec un paragraphe conséquent.',
-    });
+  test('la recherche isole la fiche au produit long puis son ouverture synchronise l’URL et le détail', async ({
+    page,
+  }) => {
+    await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
+    await goToKnowledge(page);
+
+    await page.getByRole('textbox', { name: 'Recherche' }).fill('E2E-KB-LONGPRODUCT');
+
+    const longCard = page.locator('.kb-card', { hasText: 'E2E-KB-LONGPRODUCT' });
+    await expect(longCard).toHaveCount(1);
+    await expect(longCard).toBeVisible();
+    await longCard.click();
+
+    await expect(page.locator('.kb-meta-item').filter({ hasText: 'Produit' })).toContainText(
+      'E2E-KB-LONGPRODUCT'
+    );
+    expect(new URL(page.url()).searchParams.get('incident')).toMatch(/^[1-9][0-9]*$/);
   });
 });
 
@@ -158,14 +117,9 @@ test.describe('Base de connaissance — géométrie multi-viewports (RC5-6)', ()
       await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
       await goToKnowledge(page);
 
-      const cardCount = await page.locator('.kb-card').count();
-      test.skip(cardCount === 0, 'Aucune fiche connaissance disponible dans cet environnement E2E');
       const longCard = page.locator('.kb-card', { hasText: 'E2E-KB-LONGPRODUCT' });
-      if (await longCard.count()) {
-        await longCard.first().click();
-      } else {
-        await page.locator('.kb-card').first().click();
-      }
+      await expect(longCard.first()).toBeVisible();
+      await longCard.first().click();
       await expect(page.locator('.kb-detail')).toBeVisible();
 
       await assertNoHorizontalOverflow(page, viewport.name);
@@ -207,8 +161,12 @@ test.describe('Base de connaissance — comportements préservés (RC5-6)', () =
     await goToKnowledge(page);
 
     const cards = page.locator('.kb-card');
+    await expect(cards.first()).toBeVisible();
     const count = await cards.count();
-    test.skip(count < 2, 'Il faut au moins deux fiches pour vérifier le changement de sélection');
+    expect(
+      count,
+      'le seed E2E doit fournir au moins deux fiches connaissance'
+    ).toBeGreaterThanOrEqual(2);
 
     const productValue = page.locator('.kb-meta-grid .kb-meta-item').nth(1).locator('strong');
 
@@ -229,10 +187,9 @@ test.describe('Base de connaissance — comportements préservés (RC5-6)', () =
     await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
     await goToKnowledge(page);
 
-    const cardCount = await page.locator('.kb-card').count();
-    test.skip(cardCount === 0, 'Aucune fiche connaissance disponible dans cet environnement E2E');
-
-    await page.locator('.kb-card').first().click();
+    const firstCard = page.locator('.kb-card').first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.click();
     await expect(page.locator('.kb-detail')).toBeVisible();
     const url = new URL(page.url());
     expect(url.searchParams.get('incident')).not.toBeNull();
@@ -250,9 +207,9 @@ test.describe('Base de connaissance — comportements préservés (RC5-6)', () =
     await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
     await goToKnowledge(page);
 
-    const cardCount = await page.locator('.kb-card').count();
-    test.skip(cardCount === 0, 'Aucune fiche connaissance disponible dans cet environnement E2E');
-    await page.locator('.kb-card').first().click();
+    const firstCard = page.locator('.kb-card').first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.click();
 
     const copyButton = page.getByRole('button', { name: 'Copier le lien' });
     await expect(copyButton).toBeVisible();
@@ -265,9 +222,9 @@ test.describe('Base de connaissance — comportements préservés (RC5-6)', () =
     await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
     await goToKnowledge(page);
 
-    const cardCount = await page.locator('.kb-card').count();
-    test.skip(cardCount === 0, 'Aucune fiche connaissance disponible dans cet environnement E2E');
-    await page.locator('.kb-card').first().click();
+    const firstCard = page.locator('.kb-card').first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.click();
 
     await page.getByRole('button', { name: 'Trace historique' }).click();
     await page.waitForURL('**/workshop/history?incident=*');
@@ -291,8 +248,7 @@ test.describe('Base de connaissance — comportements préservés (RC5-6)', () =
     await goToKnowledge(page);
 
     const relatedButtons = page.locator('.kb-related-item');
-    const relatedCount = await relatedButtons.count();
-    test.skip(relatedCount === 0, 'Aucune fiche similaire disponible dans cet environnement E2E');
+    await expect(relatedButtons.first()).toBeVisible();
 
     await relatedButtons.first().focus();
     await page.keyboard.press('Tab');
@@ -317,9 +273,9 @@ test.describe('Base de connaissance — accessibilité (axe-core, RC5-6)', () =>
     await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
     await goToKnowledge(page);
 
-    const cardCount = await page.locator('.kb-card').count();
-    test.skip(cardCount === 0, 'Aucune fiche connaissance disponible dans cet environnement E2E');
-    await page.locator('.kb-card').first().click();
+    const firstCard = page.locator('.kb-card').first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.click();
     await expect(page.locator('.kb-detail')).toBeVisible();
 
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
@@ -336,9 +292,9 @@ test.describe('Base de connaissance — accessibilité (axe-core, RC5-6)', () =>
     await loginAsWorkshop(page, E2E_OPERATOR_BADGE);
     await goToKnowledge(page);
 
-    const cardCount = await page.locator('.kb-card').count();
-    test.skip(cardCount === 0, 'Aucune fiche connaissance disponible dans cet environnement E2E');
-    await page.locator('.kb-card').first().click();
+    const firstCard = page.locator('.kb-card').first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.click();
     await expect(page.locator('.kb-detail')).toBeVisible();
 
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();

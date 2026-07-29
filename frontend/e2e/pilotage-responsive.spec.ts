@@ -28,7 +28,7 @@ async function goToPilotage(page: Page): Promise<void> {
   // Période "Aujourd'hui" garantit au moins un jour de trend non nul, puisque
   // le seed E2E crée ses incidents de la ligne 999 à l'exécution du seed.
   await chooseSelectField(page, 'Période', "Aujourd'hui");
-  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
 }
 
 const VIEWPORTS = [
@@ -164,13 +164,13 @@ test.describe('Pilotage — géométrie responsive KPI, répartitions, tendance 
     // a produit des incidents sur plusieurs jours ; sinon le test reste
     // valide avec une seule colonne (le ratio est alors 100% du tracé utile).
     await chooseSelectField(page, 'Période', '30 derniers jours');
-    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+    await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
 
     const scrollArea = page.locator('.pilotage-trend-scroll');
     await expect(scrollArea).toBeVisible();
     const cols = page.locator('.pilotage-trend-col');
+    await expect(cols.first()).toBeVisible();
     const colCount = await cols.count();
-    test.skip(colCount === 0, 'Aucune colonne de tendance disponible sur cette période E2E');
 
     const geometry = await scrollArea.evaluate((scrollEl) => {
       const scrollRect = scrollEl.getBoundingClientRect();
@@ -202,7 +202,7 @@ test.describe('Pilotage — géométrie responsive KPI, répartitions, tendance 
     await page.setViewportSize({ width: 390, height: 844 });
     await goToPilotage(page);
     await chooseSelectField(page, 'Période', '30 derniers jours');
-    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+    await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
 
     const overflowsDocument = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth
@@ -212,14 +212,10 @@ test.describe('Pilotage — géométrie responsive KPI, répartitions, tendance 
     );
 
     const cols = page.locator('.pilotage-trend-col');
-    const count = await cols.count();
-    if (count > 0) {
-      const widths = await cols.evaluateAll((els) =>
-        els.map((e) => e.getBoundingClientRect().width)
-      );
-      for (const w of widths) {
-        expect(w, 'aucune colonne ne doit être réduite à une largeur nulle').toBeGreaterThan(0);
-      }
+    await expect(cols.first()).toBeVisible();
+    const widths = await cols.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
+    for (const width of widths) {
+      expect(width, 'aucune colonne ne doit être réduite à une largeur nulle').toBeGreaterThan(0);
     }
   });
 
@@ -234,16 +230,11 @@ test.describe('Pilotage — géométrie responsive KPI, répartitions, tendance 
     // forcer un périmètre vide, sans fabriquer de données.
     await chooseSelectField(page, 'Ligne', '998');
     await chooseSelectField(page, 'Période', "Aujourd'hui");
-    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+    await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
 
-    const hasAnalyticsData = await page
-      .getByText('Aucun incident sur cette période — ajustez les filtres.')
-      .isVisible()
-      .catch(() => false);
-    test.skip(
-      !hasAnalyticsData,
-      'Le périmètre 998/Aujourd’hui contient des données dans cet environnement E2E'
-    );
+    await expect(
+      page.getByText('Aucun incident sur cette période — ajustez les filtres.')
+    ).toBeVisible();
   });
 
   test('mobile 390×844 et desktop 1440×900 : accessibilité axe-core sans violation sérieuse', async ({

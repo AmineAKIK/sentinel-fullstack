@@ -25,7 +25,7 @@ async function goToPilotage(page: Page): Promise<void> {
   await loginAsResponsable(page);
   await page.goto('/workshop/pilotage');
   await expect(page.getByRole('heading', { name: 'Pilotage atelier' })).toBeVisible();
-  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
 }
 
 test.describe('Pilotage — filtre de période bidirectionnel (RC5)', () => {
@@ -55,28 +55,42 @@ test.describe('Pilotage — filtre de période bidirectionnel (RC5)', () => {
     const earlierStart = new Date(newStart);
     earlierStart.setDate(earlierStart.getDate() - 2);
     const earlierStartValue = earlierStart.toISOString().slice(0, 10);
+    const dateChangeResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes('/api/workshop/analytics') &&
+        response.ok()
+    );
     await start.fill(earlierStartValue);
     await start.blur();
+    await dateChangeResponse;
 
     // 4. Bascule automatique vers "Personnalisée".
     await expect(periodCombobox).toContainText('Personnalisée');
     await expect(start).toHaveValue(earlierStartValue);
+    await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
 
     // 5. Une seule requête pour ce changement.
-    await page.waitForTimeout(50);
     const countAfterDateChange = requests.length;
-    expect(countAfterDateChange).toBeGreaterThan(0);
+    expect(countAfterDateChange).toBe(1);
 
     requests.length = 0;
 
     // 6. Sélection de "30 derniers jours".
+    const presetResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes('/api/workshop/analytics') &&
+        response.ok()
+    );
     await chooseSelectField(page, 'Période', '30 derniers jours');
+    await presetResponse;
 
     // 7. Resynchronisation des deux dates + une seule nouvelle requête.
     await expect(start).not.toHaveValue(earlierStartValue);
     await expect(start).not.toHaveValue('');
     await expect(end).not.toHaveValue('');
-    await page.waitForTimeout(50);
+    await expect(page.getByText('Chargement des indicateurs…')).toHaveCount(0);
     expect(requests.length).toBe(1);
 
     // 8. Aucun débordement horizontal.
