@@ -14,7 +14,7 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 
 ### Mise à jour documentaire RC5
 
-**Statut RC5 : BLOCKED_EXTERNAL.** Les décisions R1, P2, C1+C3 et D2 sont désormais
+**Statut RC5 : BLOCKED.** Les décisions R1, P2, C1+C3 et D2 sont désormais
 enregistrées dans les sections 6 et 7 de
 [rc5-decision-dossiers.md](rc5-decision-dossiers.md). R1, P2 et C1+C3 sont
 implémentées localement. D2 reste factuellement `BLOCKED_UPSTREAM`, mais ses
@@ -23,11 +23,19 @@ traitement explicite, automatique et expirant au 31 août 2026. L'observation
 publique O confirme le bord Nginx de la topologie B; l'intérieur du VPS n'est
 pas affirmé sans accès SSH nominatif.
 
-Le blocage de cette fermeture express a une cause externe unique : le dépôt ne
-possède ni reviewer réellement indépendant de l'initiateur, ni identité
-technique dédiée à la création contrôlée des tags. Les environnements protégés
-ne peuvent donc pas être configurés honnêtement. Aucun environnement factice
-n'a été créé et la création de tous les tags `v*` reste verrouillée.
+L'[audit final incrémental RC5](rc5-final-incremental-audit.md), couvert par son
+[registre `576/576`](rc5-final-audit-register.tsv), a ensuite identifié six P1
+locaux : divergence du contrat `CLIENT_ORIGIN` entre préflight et CSRF, course
+de pagination Journal, dates URL non validées strictement, puis trois défauts
+d'association ou de nom accessible. Ces constats ne sont pas corrigés dans la
+fermeture documentaire autorisée et interdisent le `GO`.
+
+Le blocage externe de gouvernance reste également ouvert : le dépôt ne possède
+ni reviewer réellement indépendant de l'initiateur, ni identité technique
+dédiée à la création contrôlée des tags. Les environnements protégés ne peuvent
+donc pas être configurés honnêtement. Aucun environnement factice n'a été créé
+et la création de tous les tags `v*` reste verrouillée. Cette cause n'est plus
+présentée comme unique.
 
 Les autres protections disponibles sont appliquées et relues : Actions
 GitHub-owned + `docker/*`, SHA complets obligatoires, ruleset `main` avec les

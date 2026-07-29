@@ -936,10 +936,10 @@ refocaliser; preuve ciblée `2/2`, frontend `754/754`, puis trois passages
   parent ef9dca2f9eaad36b429af18ad45b2952c58207a0
 ```
 
-Après la fermeture bornée de la section 7 et l'observation O ci-dessus, le
-verdict reste `BLOCKED_EXTERNAL` pour la seule cause détaillée en 6.2 :
-identités de gouvernance indispensables absentes pour les environnements
-protégés et la création contrôlée des tags.
+À ce point chronologique, avant l'audit incrémental final de la section 8, le
+verdict était `BLOCKED_EXTERNAL` pour la cause détaillée en 6.2 : identités de
+gouvernance indispensables absentes pour les environnements protégés et la
+création contrôlée des tags.
 
 ## 7. Fermeture bornée des alertes de dépendances
 
@@ -997,7 +997,36 @@ Le verdict global ne devient pas `GO` par cette seule décision : P2 reste
 bloqué par l'absence des identités de gouvernance nécessaires aux environnements
 et à la création contrôlée des tags. La vérité opérationnelle publique O est
 traitée en section 6.5; les effets de publication restent gouvernés par une
-autorisation séparée.
+autorisation séparée. L'audit incrémental ultérieur de la section 8 remplace le
+verdict externe seul par un blocage comprenant aussi six P1 locaux.
+
+## 8. Audit final incrémental
+
+L'audit de fermeture couvre `576/576` fichiers : `472` fichiers inchangés
+héritent du grand audit par identité de hash, `102` fichiers modifiés ou ajoutés
+ont été relus, puis les deux artefacts finaux ont été autorelus. Le rapport
+détaillé et le registre exhaustif sont :
+
+- [`rc5-final-incremental-audit.md`](rc5-final-incremental-audit.md);
+- [`rc5-final-audit-register.tsv`](rc5-final-audit-register.tsv).
+
+Six constats P1 locaux restent ouverts :
+
+| ID | Constat |
+| --- | --- |
+| `RC5-AUD-01` | `CLIENT_ORIGIN` avec slash final accepté par le préflight mais refusé par la garde CSRF avant écoute |
+| `RC5-AUD-02` | état de pagination Journal non réinitialisé atomiquement après abort ou période inversée |
+| `RC5-AUD-03` | dates Journal issues de l'URL non validées strictement, avec crash ou normalisation silencieuse |
+| `RC5-AUD-04` | erreur du mot de passe de confirmation Admin non associée au champ |
+| `RC5-AUD-05` | champ Board désactivé sans l'identifiant ciblé par son libellé |
+| `RC5-AUD-06` | noms accessibles des dates Journal différents des libellés visibles |
+
+Aucun P0, secret réel ou défaut exploitable dans les deux surfaces upstream
+bornées n'a été mis en évidence. Néanmoins, les conditions de la fermeture
+express exigent que seules ces deux alertes restent. Le verdict final est donc
+`BLOCKED`, pas `GO` ni `BLOCKED_EXTERNAL`. Les défauts applicatifs n'ont pas été
+modifiés sans autorisation; aucun push, PR, merge, tag, release, publication
+d'image ou changement VPS/DNS n'a été réalisé.
 
 ## Sources officielles consultées le 29 juillet 2026
 
