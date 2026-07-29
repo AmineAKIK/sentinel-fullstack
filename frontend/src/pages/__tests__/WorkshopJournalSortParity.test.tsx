@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { listWorkshopHistoryEvents, listWorkshopLines } from '../../api/workshop';
@@ -87,6 +87,11 @@ const INCIDENT_LABELS = {
   oldest: 'Ligne 020 · M-A',
 } as const;
 
+type JournalPage = Awaited<ReturnType<typeof listWorkshopHistoryEvents>>;
+
+let historyEventsResponse: Promise<JournalPage>;
+let resolveHistoryEvents: (page: JournalPage) => void;
+
 function incidentOrder(selector: string): string[] {
   const container = document.querySelector<HTMLElement>(selector);
   expect(container).not.toBeNull();
@@ -108,10 +113,19 @@ function sortHeader(label: string): HTMLElement {
 
 async function renderJournal(): Promise<void> {
   render(
-    <MemoryRouter initialEntries={['/workshop/journal']}>
+    <MemoryRouter
+      initialEntries={['/workshop/journal']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <WorkshopJournalPage />
     </MemoryRouter>
   );
+
+  expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    resolveHistoryEvents({ items: EVENTS, nextCursor: null });
+    await historyEventsResponse;
+  });
 
   await expectDesktopAndMobileOrder([
     INCIDENT_LABELS.newest,
@@ -123,10 +137,10 @@ async function renderJournal(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listWorkshopLines).mockResolvedValue([]);
-  vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
-    items: EVENTS,
-    nextCursor: null,
+  historyEventsResponse = new Promise<JournalPage>((resolve) => {
+    resolveHistoryEvents = resolve;
   });
+  vi.mocked(listWorkshopHistoryEvents).mockReturnValue(historyEventsResponse);
 });
 
 describe('WorkshopJournalPage — parité du tri tableau/cartes mobiles', () => {
