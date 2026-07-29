@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useId, useState } from 'react';
+import { ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 export type NavItem = {
@@ -25,6 +25,7 @@ export default function ResponsiveNavBar({
   const navigate = useNavigate();
   const location = useLocation();
   const menuId = useId();
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function ResponsiveNavBar({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setMenuOpen(false);
+        menuToggleRef.current?.focus({ preventScroll: true });
       }
     }
 
@@ -66,6 +68,7 @@ export default function ResponsiveNavBar({
       </div>
 
       <button
+        ref={menuToggleRef}
         className="nav-toggle"
         type="button"
         aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
