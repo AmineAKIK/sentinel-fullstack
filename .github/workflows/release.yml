@@ -1,118 +1,292 @@
 name: Release
 
-# Déclenché par un tag de version (v1.0.0, v1.0.0-rc.1, ...). Construit les
-# images backend/frontend au SHA exact du tag, les pousse vers GHCR taguées par
-# version et par SHA, consigne leurs digests immuables, et publie une release
-# GitHub qui référence ces digests (REL-01, REL-03). Le VPS déploie ensuite ces
-# images par digest, jamais une reconstruction locale.
+# P2: RC and stable releases are publishable only from the exact head of main,
+# after the same six CI jobs have completed successfully on the peeled tag SHA.
+# Invalid tags are caught before registry authentication. The protected
+# environment is selected only by the strict policy engine.
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing RC or stable tag to publish from the exact head of main
+        required: true
+        type: string
 
-permissions:
-  contents: write
-  packages: write
+permissions: {}
+
+concurrency:
+  group: release-publish-${{ github.repository }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ghcr.io/${{ github.repository }}
 
 jobs:
-  release:
-    name: Build, push and publish
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  validate:
+    name: Validate main-only release candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      tag: ${{ steps.gate.outputs.tag }}
+      tag_sha: ${{ steps.gate.outputs.tag_sha }}
+      kind: ${{ steps.gate.outputs.kind }}
+      environment: ${{ steps.gate.outputs.environment }}
+      prerelease: ${{ steps.gate.outputs.prerelease }}
+      ci_run_id: ${{ steps.gate.outputs.ci_run_id }}
+      backend_image: ${{ steps.gate.outputs.backend_image }}
+      frontend_image: ${{ steps.gate.outputs.frontend_image }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out main without persistent Git credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
 
-      - name: Resolve build metadata
-        id: meta
-        run: |
-          sha="$(git rev-parse HEAD)"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          # Namespace GHCR : minuscules obligatoires.
-          owner_repo="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          echo "backend_image=ghcr.io/${owner_repo}/backend" >> "$GITHUB_OUTPUT"
-          echo "frontend_image=ghcr.io/${owner_repo}/frontend" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
-
-      - name: Build images at the tagged SHA
+      - name: Validate tag, main head and the six CI jobs without publication credentials
+        id: gate
         env:
-          BUILD_SHA: ${{ steps.meta.outputs.sha }}
-          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
-          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
-        run: |
-          docker build \
-            --build-arg BUILD_SHA="$BUILD_SHA" \
-            --tag "$BACKEND_IMAGE:${{ github.ref_name }}" \
-            --tag "$BACKEND_IMAGE:sha-${BUILD_SHA}" \
-            ./backend
-          docker build \
-            --build-arg VITE_API_URL= \
-            --build-arg BUILD_SHA="$BUILD_SHA" \
-            --tag "$FRONTEND_IMAGE:${{ github.ref_name }}" \
-            --tag "$FRONTEND_IMAGE:sha-${BUILD_SHA}" \
-            ./frontend
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.tag }}
+        run: bash scripts/verify-release-candidate.sh
 
-      - name: Assert image provenance (non-root, revision label)
-        env:
-          BUILD_SHA: ${{ steps.meta.outputs.sha }}
-          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
-          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
-        run: |
-          test "$(docker image inspect --format '{{.Config.User}}' "$BACKEND_IMAGE:${{ github.ref_name }}")" = "node"
-          test "$(docker image inspect --format '{{.Config.User}}' "$FRONTEND_IMAGE:${{ github.ref_name }}")" = "nginx"
-          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$BACKEND_IMAGE:${{ github.ref_name }}")" = "$BUILD_SHA"
-          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$FRONTEND_IMAGE:${{ github.ref_name }}")" = "$BUILD_SHA"
+  publish:
+    name: Build, attest and publish
+    needs: validate
+    if: needs.validate.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: ${{ needs.validate.outputs.environment }}
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - name: Check out the validated commit without persistent Git credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.tag_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
 
-      - name: Push images
+      # Environment approval can remain pending while main advances. Repeat the
+      # complete read-only gate after approval and before registry login.
+      - name: Revalidate the candidate after protected-environment approval
         env:
-          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
-          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
-        run: |
-          docker push "$BACKEND_IMAGE:${{ github.ref_name }}"
-          docker push "$BACKEND_IMAGE:sha-${{ steps.meta.outputs.sha }}"
-          docker push "$FRONTEND_IMAGE:${{ github.ref_name }}"
-          docker push "$FRONTEND_IMAGE:sha-${{ steps.meta.outputs.sha }}"
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.validate.outputs.tag }}
+        run: bash scripts/verify-release-candidate.sh
 
-      - name: Capture immutable digests
-        id: digests
+      # Reserve the version before any image is pushed. If a later step fails,
+      # the draft remains and the publication path rejects every rerun of this
+      # tag before registry authentication.
+      - name: Reserve the release tag before any registry side effect
         env:
-          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
-          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.validate.outputs.tag }}
+          TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
         run: |
-          backend_digest="$(docker inspect --format '{{ index .RepoDigests 0 }}' "$BACKEND_IMAGE:${{ github.ref_name }}")"
-          frontend_digest="$(docker inspect --format '{{ index .RepoDigests 0 }}' "$FRONTEND_IMAGE:${{ github.ref_name }}")"
-          echo "backend=$backend_digest" >> "$GITHUB_OUTPUT"
-          echo "frontend=$frontend_digest" >> "$GITHUB_OUTPUT"
+          gh release create "$TAG_NAME" \
+            --draft \
+            --verify-tag \
+            --target "$TAG_SHA" \
+            --title "$TAG_NAME" \
+            --notes "Publication réservée pour $TAG_SHA ; artefacts en cours de génération."
 
-      - name: Publish GitHub release
+      - name: Install the digest-pinned Buildx CLI
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILDX_IMAGE: docker/buildx-bin:0.35.0@sha256:917570d8d0ae91ae49251f84f848a6801eedd114554c56a4fdf7ec88cac48eeb
+        run: |
+          buildx_container="$(docker create "$BUILDX_IMAGE")"
+          cleanup() {
+            docker rm "$buildx_container" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mkdir -p "$RUNNER_TEMP/docker-config/cli-plugins"
+          docker cp \
+            "$buildx_container:/buildx" \
+            "$RUNNER_TEMP/docker-config/cli-plugins/docker-buildx"
+          chmod 0755 "$RUNNER_TEMP/docker-config/cli-plugins/docker-buildx"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker-config" >>"$GITHUB_ENV"
+          DOCKER_CONFIG="$RUNNER_TEMP/docker-config" \
+            docker buildx version \
+            | grep -F 'github.com/docker/buildx v0.35.0 a319e5b15052cf6557ceb666eb8ff6e32380b782'
+
+      - name: Create a builder with digest-pinned BuildKit
+        run: |
+          docker buildx create \
+            --name sentinel-release \
+            --driver docker-container \
+            --driver-opt image=moby/buildkit:buildx-stable-1@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec \
+            --use
+          docker buildx inspect --bootstrap
+
+      - name: Log in to GHCR only after both policy gates
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push backend with maximal provenance
+        id: backend
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ needs.validate.outputs.backend_image }}:${{ needs.validate.outputs.tag }}
+          build-args: BUILD_SHA=${{ needs.validate.outputs.tag_sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.validate.outputs.tag_sha }}
+            org.opencontainers.image.title=sentinel-backend
+          provenance: mode=max
+
+      - name: Build and push frontend with maximal provenance
+        id: frontend
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ needs.validate.outputs.frontend_image }}:${{ needs.validate.outputs.tag }}
+          build-args: |
+            BUILD_SHA=${{ needs.validate.outputs.tag_sha }}
+            VITE_API_URL=
+          labels: |
+            org.opencontainers.image.revision=${{ needs.validate.outputs.tag_sha }}
+            org.opencontainers.image.title=sentinel-frontend
+          provenance: mode=max
+
+      - name: Verify immutable digests, users and revision labels
+        env:
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          BACKEND_IMAGE: ${{ needs.validate.outputs.backend_image }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest }}
+          FRONTEND_IMAGE: ${{ needs.validate.outputs.frontend_image }}
+          TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
+        run: |
+          [[ "$BACKEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$FRONTEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          docker pull "$BACKEND_IMAGE@$BACKEND_DIGEST"
+          docker pull "$FRONTEND_IMAGE@$FRONTEND_DIGEST"
+          test "$(docker image inspect --format '{{.Config.User}}' "$BACKEND_IMAGE@$BACKEND_DIGEST")" = "node"
+          test "$(docker image inspect --format '{{.Config.User}}' "$FRONTEND_IMAGE@$FRONTEND_DIGEST")" = "nginx"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$BACKEND_IMAGE@$BACKEND_DIGEST")" = "$TAG_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$FRONTEND_IMAGE@$FRONTEND_DIGEST")" = "$TAG_SHA"
+
+      - name: Generate SPDX SBOMs with digest-pinned Syft
+        env:
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          BACKEND_IMAGE: ${{ needs.validate.outputs.backend_image }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest }}
+          FRONTEND_IMAGE: ${{ needs.validate.outputs.frontend_image }}
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP:/output" \
+            anchore/syft:v1.33.0@sha256:f94e5d9fce1f2278491a8e3a63bd5f6ddb81fdfdbb8bf7a1637565c1d5344357 \
+            "docker:$BACKEND_IMAGE@$BACKEND_DIGEST" \
+            -o spdx-json=/output/sentinel-backend.spdx.json
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP:/output" \
+            anchore/syft:v1.33.0@sha256:f94e5d9fce1f2278491a8e3a63bd5f6ddb81fdfdbb8bf7a1637565c1d5344357 \
+            "docker:$FRONTEND_IMAGE@$FRONTEND_DIGEST" \
+            -o spdx-json=/output/sentinel-frontend.spdx.json
+          test -s "$RUNNER_TEMP/sentinel-backend.spdx.json"
+          test -s "$RUNNER_TEMP/sentinel-frontend.spdx.json"
+
+      - name: Attest backend provenance
+        id: backend_provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ needs.validate.outputs.backend_image }}
+          subject-digest: ${{ steps.backend.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Attest frontend provenance
+        id: frontend_provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ needs.validate.outputs.frontend_image }}
+          subject-digest: ${{ steps.frontend.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Attest backend SBOM
+        id: backend_sbom
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ needs.validate.outputs.backend_image }}
+          subject-digest: ${{ steps.backend.outputs.digest }}
+          sbom-path: ${{ runner.temp }}/sentinel-backend.spdx.json
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Attest frontend SBOM
+        id: frontend_sbom
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ needs.validate.outputs.frontend_image }}
+          subject-digest: ${{ steps.frontend.outputs.digest }}
+          sbom-path: ${{ runner.temp }}/sentinel-frontend.spdx.json
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Complete the reserved draft and publish it immutably
+        env:
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          BACKEND_IMAGE: ${{ needs.validate.outputs.backend_image }}
+          BACKEND_PROVENANCE_URL: ${{ steps.backend_provenance.outputs['attestation-url'] }}
+          BACKEND_SBOM_URL: ${{ steps.backend_sbom.outputs['attestation-url'] }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest }}
+          FRONTEND_IMAGE: ${{ needs.validate.outputs.frontend_image }}
+          FRONTEND_PROVENANCE_URL: ${{ steps.frontend_provenance.outputs['attestation-url'] }}
+          FRONTEND_SBOM_URL: ${{ steps.frontend_sbom.outputs['attestation-url'] }}
+          GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+          TAG_NAME: ${{ needs.validate.outputs.tag }}
+          TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
         run: |
           {
+            echo "## Source vérifiée"
+            echo
+            echo "- Tag : \`$TAG_NAME\`"
+            echo "- Commit : \`$TAG_SHA\`"
+            echo "- Politique : tête exacte de \`main\`, six checks CI verts sur ce SHA"
+            echo
             echo "## Images immuables"
             echo
-            echo "Déployer ces images par digest (jamais un rebuild local) :"
+            echo "- Backend : \`$BACKEND_IMAGE@$BACKEND_DIGEST\`"
+            echo "- Frontend : \`$FRONTEND_IMAGE@$FRONTEND_DIGEST\`"
             echo
-            echo '```'
-            echo "backend  ${{ steps.digests.outputs.backend }}"
-            echo "frontend ${{ steps.digests.outputs.frontend }}"
-            echo '```'
+            echo "## Provenance, attestations et SBOM"
             echo
-            echo "Commit : \`${{ steps.meta.outputs.sha }}\`"
+            echo "- [Provenance backend]($BACKEND_PROVENANCE_URL)"
+            echo "- [Provenance frontend]($FRONTEND_PROVENANCE_URL)"
+            echo "- [Attestation SBOM backend]($BACKEND_SBOM_URL)"
+            echo "- [Attestation SBOM frontend]($FRONTEND_SBOM_URL)"
+            echo "- [SBOM SPDX backend](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG_NAME/sentinel-backend.spdx.json)"
+            echo "- [SBOM SPDX frontend](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG_NAME/sentinel-frontend.spdx.json)"
             echo
-            echo "Vérifier après déploiement : \`GET /api/health\` renvoie \`version\` = ce commit."
-          } > release-notes.md
-          prerelease_flag=""
-          case "${{ github.ref_name }}" in
-            *-rc*|*-beta*|*-alpha*) prerelease_flag="--prerelease" ;;
-          esac
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-file release-notes.md \
-            $prerelease_flag
+            echo "Déployer uniquement les références par digest ci-dessus."
+            echo "Après déploiement, \`GET /api/health\` doit renvoyer \`version=$TAG_SHA\`."
+          } >"$RUNNER_TEMP/release-notes.md"
+
+          gh release upload "$TAG_NAME" \
+            "$RUNNER_TEMP/sentinel-backend.spdx.json" \
+            "$RUNNER_TEMP/sentinel-frontend.spdx.json"
+
+          gh release edit "$TAG_NAME" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --draft=false \
+            --prerelease="$IS_PRERELEASE"

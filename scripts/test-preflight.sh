@@ -75,6 +75,7 @@ TEST_ENV_FILE="$WORKDIR/test.env"
 # --- Ressources Docker créées par cette exécution (pour un nettoyage exact) ----
 REGISTRY_NAME="preflight-registry-${RUN_ID}"
 REGISTRY_VOLUME=""            # volume anonyme du registre, renseigné après run
+REGISTRY_IMAGE="registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
 WITNESS_TAG="sentinel-witness-${RUN_ID}:preexisting"  # alias tiers, nettoyé aussi
 LOCAL_TAG_BACKEND_OK="sentinel-backend:preflight-${RUN_ID}-ok"
 LOCAL_TAG_BACKEND_WRONG="sentinel-backend:preflight-${RUN_ID}-wrong"
@@ -167,7 +168,7 @@ do_cleanup() {
     fi
   done
   # Alias témoin (référence par NOM uniquement : retire l'alias, jamais son ID
-  # partagé avec registry:2).
+  # partagé avec l'image de registre immuable).
   docker rmi -f "$WITNESS_TAG" >/dev/null 2>&1 || true
   local id
   for id in ${CREATED_IMAGE_IDS[@]+"${CREATED_IMAGE_IDS[@]}"}; do
@@ -272,7 +273,11 @@ if [[ -z "$REGISTRY_PORT" ]]; then
   exit 1
 fi
 REGISTRY_HOST="127.0.0.1:${REGISTRY_PORT}"
-docker run -d --name "$REGISTRY_NAME" -p "${REGISTRY_HOST}:5000" registry:2 >/dev/null 2>&1
+# Le registre de test est lui aussi un outil réellement tiré par la CI : tag
+# versionné et digest OCI vérifié, sans dépendance à un tag mutable.
+docker run -d --name "$REGISTRY_NAME" -p "${REGISTRY_HOST}:5000" \
+  "$REGISTRY_IMAGE" \
+  >/dev/null 2>&1
 # Capture le volume anonyme du registre pour prouver sa disparition ensuite.
 REGISTRY_VOLUME="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/registry"}}{{.Name}}{{end}}{{end}}' "$REGISTRY_NAME" 2>/dev/null || true)"
 REGISTRY_READY=0
@@ -604,10 +609,12 @@ fi
 # références d'un ID. Nos images étant uniques par construction (label baké → ID
 # propre au run), aucune image tierce ne partage leur ID ; la suppression par ID
 # est en plus gardée par id_belongs_to_run. On matérialise un témoin d'ID
-# DIFFÉRENT (l'image registry:2, déjà présente, re-taggée) : il ne porte pas le
-# label du run et ne figure dans aucune de nos collections. Il DOIT survivre.
-docker tag registry:2 "$WITNESS_TAG" >/dev/null 2>&1 || true
-WITNESS_ID="$(docker image inspect --format '{{.Id}}' "$WITNESS_TAG" 2>/dev/null || true)"
+# DIFFÉRENT (la même image de registre immuable, déjà présente, re-taggée) : il
+# ne porte pas le label du run et ne figure dans aucune de nos collections. Il
+# DOIT survivre. Une absence de la source ou du témoin est une erreur de test,
+# jamais un cas à masquer.
+docker tag "$REGISTRY_IMAGE" "$WITNESS_TAG" >/dev/null
+WITNESS_ID="$(docker image inspect --format '{{.Id}}' "$WITNESS_TAG")"
 # Sûreté du test lui-même : le témoin ne doit partager l'ID d'aucune de nos
 # images (sinon la preuve serait faussée). Nos IDs sont labellisés du run.
 WITNESS_DISTINCT=1

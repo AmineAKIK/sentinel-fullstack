@@ -156,9 +156,17 @@ npm run test:e2e
 
 ## 10. Publication
 
+- [ ] les réglages distants de
+      [github-release-protection-checklist.md](github-release-protection-checklist.md)
+      sont prouvés (SHA pins, rulesets, checks et environnements protégés)
 - [ ] CI GitHub verte sur le SHA exact à publier, sur `main`
 - [ ] commit et message de publication relus
 - [ ] tag de version créé sur ce SHA (`v1.0.0-rc.N` puis `v1.0.0`)
+- [ ] workflow `Release` lancé explicitement depuis `main` avec ce tag dans
+      l'entrée `tag` (jamais depuis la ref du tag)
+- [ ] en cas d'échec après création de la draft de réservation, ne pas supprimer
+      la draft ni réutiliser le tag : diagnostiquer puis publier une nouvelle
+      version
 - [ ] le workflow `Release` a construit et poussé les images GHCR sans échec
 - [ ] la release GitHub référence les deux digests d'images immuables
 - [ ] déploiement effectué par image de registry épinglée par digest

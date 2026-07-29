@@ -1,4 +1,4 @@
-FROM node:24.18.0-alpine3.23 AS builder
+FROM node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436 AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-FROM nginx:1.30.4-alpine3.24 AS production
+FROM nginx:1.30.4-alpine3.24@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46 AS production
 
 ARG BUILD_SHA=unknown
 LABEL org.opencontainers.image.revision=$BUILD_SHA \

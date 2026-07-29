@@ -36,14 +36,15 @@ case "$COMPOSE_PROJECT_NAME" in
 esac
 
 # Composition entièrement jetable. Le faux service `backend` réutilise l'image
-# PostgreSQL déjà nécessaire au test ; il ne contient ni code Sentinel ni
-# connexion à la base et ne sert qu'à observer les arrêts/redémarrages.
+# PostgreSQL déjà nécessaire au test, épinglée au même digest OCI que la CI ; il
+# ne contient ni code Sentinel ni connexion à la base et ne sert qu'à observer
+# les arrêts/redémarrages.
 WORKDIR="$(mktemp -d)"
 TEST_COMPOSE_FILE="$WORKDIR/docker-compose.test.yml"
 cat > "$TEST_COMPOSE_FILE" <<'YAML'
 services:
   postgres:
-    image: postgres:15.18-alpine3.23
+    image: postgres:15.18-alpine3.23@sha256:3889f6e66267065437b17a404058a6220d9080c73b701edd225770f8b2d6a52c
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -52,7 +53,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-    image: postgres:15.18-alpine3.23
+    image: postgres:15.18-alpine3.23@sha256:3889f6e66267065437b17a404058a6220d9080c73b701edd225770f8b2d6a52c
     command: ['tail', '-f', '/dev/null']
 
 volumes:
