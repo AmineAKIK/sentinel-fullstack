@@ -40,6 +40,15 @@ describe('buildAnalyticsParams', () => {
   it('omits absent custom dates and all-value filters', () => {
     expect(buildAnalyticsParams('custom', '', '', 'all', 'all')).toEqual({});
   });
+
+  it('builds an explicit 90-day rolling interval for "lifetime" (RC5)', () => {
+    const expectedStart = new Date('2026-07-16T10:30:00.000Z');
+    expectedStart.setDate(expectedStart.getDate() - 90);
+    expect(buildAnalyticsParams('lifetime', '', '', 'all', 'all')).toEqual({
+      start: expectedStart.toISOString(),
+      end: '2026-07-16T10:30:00.000Z',
+    });
+  });
 });
 
 describe('dayStartIso / dayEndIso (réutilisés par le filtre période du Journal, ANA-03)', () => {
