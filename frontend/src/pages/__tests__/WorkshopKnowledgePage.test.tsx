@@ -1,8 +1,9 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import WorkshopKnowledgePage from '../WorkshopKnowledgePage';
+import { MutationFeedbackProvider } from '../../components/ui/MutationFeedback';
 import { useKnowledgeData } from '../../hooks/useKnowledgeData';
 import type { WorkshopIncident } from '../../types/workshop';
 
@@ -61,7 +62,9 @@ function renderKnowledgePage(overrides: Partial<ReturnType<typeof useKnowledgeDa
   vi.mocked(useKnowledgeData).mockReturnValue(baseKnowledgeData(overrides) as never);
   return render(
     <MemoryRouter>
-      <WorkshopKnowledgePage />
+      <MutationFeedbackProvider>
+        <WorkshopKnowledgePage />
+      </MutationFeedbackProvider>
     </MemoryRouter>
   );
 }
@@ -275,5 +278,59 @@ describe('WorkshopKnowledgePage — fiche détaillée responsive (RC5-6)', () =>
     const detail = document.querySelector('.kb-detail') as HTMLElement;
     expect(within(detail).getByText(longDiagnostic)).toBeInTheDocument();
     expect(within(detail).getByText(longSolution)).toBeInTheDocument();
+  });
+});
+
+describe('WorkshopKnowledgePage — copie du lien', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function renderSelectedIncident() {
+    const incident = baseIncident({ id: 10 });
+    return renderKnowledgePage({
+      incidents: [incident],
+      selectedId: '10',
+      selectedIncident: incident,
+      relatedIncidents: [],
+    });
+  }
+
+  it('annonce globalement un rejet du presse-papiers sans faux succès local', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('permission denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    renderSelectedIncident();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copier le lien' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Action impossible');
+    expect(alert).toHaveTextContent('Impossible de copier le lien');
+    expect(screen.getByRole('button', { name: 'Copier le lien' })).toBeInTheDocument();
+  });
+
+  it('annule le timer de succès local lorsque la page est démontée', async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const { unmount } = renderSelectedIncident();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copier le lien' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Lien copié !' })).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

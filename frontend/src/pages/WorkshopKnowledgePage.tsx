@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
+import { useMutationFeedback } from '../components/ui/MutationFeedback';
 import Skeleton from '../components/ui/Skeleton';
 import WorkshopNavBar from '../components/WorkshopNavBar';
 import WorkshopFilterCard from '../components/WorkshopFilterCard';
@@ -213,6 +214,9 @@ export default function WorkshopKnowledgePage() {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const detailRef = useRef<HTMLDivElement>(null);
+  const copyResetTimerRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
+  const { notifyError } = useMutationFeedback();
 
   const {
     incidents,
@@ -239,6 +243,17 @@ export default function WorkshopKnowledgePage() {
     selectIncident: selectIncidentData,
     clearFilters,
   } = useKnowledgeData();
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+        copyResetTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Chips de filtres actifs
   const filterChips: FilterChip[] = [
@@ -275,10 +290,28 @@ export default function WorkshopKnowledgePage() {
 
   function copyLink(): void {
     const url = `${window.location.origin}${window.location.pathname}?incident=${selectedId}`;
-    void navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    void Promise.resolve()
+      .then(() => navigator.clipboard.writeText(url))
+      .then(
+        () => {
+          if (!mountedRef.current) return;
+          if (copyResetTimerRef.current !== null) {
+            window.clearTimeout(copyResetTimerRef.current);
+          }
+          setCopied(true);
+          copyResetTimerRef.current = window.setTimeout(() => {
+            copyResetTimerRef.current = null;
+            setCopied(false);
+          }, 2000);
+        },
+        () => {
+          if (!mountedRef.current) return;
+          notifyError(
+            'Impossible de copier le lien. Vérifiez les permissions du navigateur et réessayez.',
+            'copy-knowledge-link'
+          );
+        }
+      );
   }
 
   return (
