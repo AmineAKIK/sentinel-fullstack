@@ -357,7 +357,7 @@ export default function WorkshopJournalPage() {
               ) : historyEvents.length === 0 ? (
                 <EmptyState>Aucune action.</EmptyState>
               ) : (
-                historyEvents.map((event) => {
+                sortedEvents.map((event) => {
                   const detail = formatEventDetail(event);
                   return (
                     <div key={event.id} className="history-journal-card">
