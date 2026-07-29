@@ -312,22 +312,39 @@ appliqué et sa justification par principe.
 
 ### 5.3 Schéma d'enchaînement des maquettes
 
-**[À COMPLÉTER]** — dessiner (Figma ou draw.io) les 3 flux de navigation à partir du texte suivant,
-qu'aucun outil ne génère automatiquement :
+Les trois flux sont déterminés par les routes et leurs gardes React :
 
-**Flux Board** : `/login` → clic bloc Board → `/board` (saisie code local) → board grand écran
-(lecture seule, aucune session requise, pas de retour vers un espace authentifié).
+```mermaid
+flowchart LR
+    P[Portail /login]
+    P --> B[/board]
+    B --> BS{Session autorisée}
+    BS -->|Code Board valide| BV[Board en lecture seule]
+    BS -->|Session Workshop valide| BV
 
-**Flux Admin** : `/login` → clic bloc Administration → `/admin/login` → authentification →
-`/admin/accueil` (dashboard référentiel) → navigation vers `/admin/users`, `/admin/users/:id`,
-`/admin/lines`, `/admin/audit` (garde `AdminRoute` sur toutes ces routes) → déconnexion retour
-`/login`.
+    P --> AL[/admin/login]
+    AL --> AA[Authentification Administration]
+    AA --> AH[/admin/accueil]
+    AH --> AU[Comptes]
+    AH --> AR[Lignes]
+    AH --> AJ[Audits et paramètres]
 
-**Flux Workshop** : `/login` → clic bloc Workshop → `/workshop/login` → authentification par badge
-(2 chemins : premier accès avec code de configuration temporaire, ou connexion standard par mot de
-passe) → `/workshop/dashboard` → navigation vers `/workshop/pilotage`, `/workshop/history`,
-`/workshop/journal` (garde de rôle supplémentaire : réservé RESPONSABLE), `/workshop/knowledge`,
-`/workshop/support` (garde `WorkshopRoute` commune, garde de rôle additionnelle sur Journal).
+    P --> WL[/workshop/login]
+    WL --> WA{Authentification par badge}
+    WA -->|Premier accès| WS[Code temporaire et nouveau mot de passe]
+    WA -->|Accès courant| WP[Mot de passe]
+    WS --> WD[/workshop/dashboard]
+    WP --> WD
+    WD --> WPI[Pilotage]
+    WD --> WH[Historique]
+    WD --> WK[Connaissance et support]
+    WD --> WJ[Journal RESPONSABLE]
+```
+
+Le Board exige donc soit une session locale créée par un code valide, soit une
+session Workshop valide. Les routes Administration utilisent `AdminRoute`; les
+routes Atelier utilisent `WorkshopRoute`, avec une garde RESPONSABLE
+supplémentaire pour le Journal.
 
 ---
 
@@ -339,115 +356,63 @@ PostgreSQL 15, SQL brut sans ORM. Les données de Sentinel sont fortement relati
 liés à des lignes, des machines, des utilisateurs, des événements) ; le SQL paramétré donne un
 contrôle total sur les requêtes, en particulier pour les requêtes analytiques du module Pilotage
 (agrégations, percentiles, tendances journalières) qu'un ORM classique exprimerait plus
-difficilement. Toutes les requêtes utilisent des paramètres liés (`$1, $2, ...`), ce qui élimine
-structurellement le risque d'injection SQL — argumenté en détail au chapitre 10 (Sécurité).
+difficilement. Les valeurs issues des requêtes utilisent des paramètres liés
+(`$1`, `$2`, ...`) ; les rares fragments structurels dynamiques proviennent de
+listes internes contrôlées. Ce contrat est argumenté au chapitre 10 (Sécurité).
 
 ### 6.2 Modèle conceptuel de données (MCD)
 
-**[À COMPLÉTER]** — le code Mermaid ci-dessous est prêt à coller dans un éditeur (mermaid.live,
-dbdiagram.io en adaptant la syntaxe, ou l'extension Mermaid de VS Code) pour obtenir un export image
-à insérer ici. Voir aussi `docs/dossier-projet/schemas-mermaid.md` pour la version consolidée de
-tous les diagrammes du dossier.
+Le MCD comporte quatorze tables applicatives. La table technique
+`schema_migrations` est présentée séparément dans le MPD. Le diagramme ci-dessous
+résume les relations ; les attributs et nullabilités ainsi que les principales
+contraintes sont maintenus dans `docs/dossier-projet/schemas-mermaid.md`. Cette
+source est vérifiée contre les migrations `001` à `050`.
 
 ```mermaid
 erDiagram
-    ADMIN_ACCOUNTS ||--o{ ACCOUNT_AUDIT_EVENTS : "trace"
-    ADMIN_ACCOUNTS ||--o{ LINE_AUDIT_EVENTS : "trace"
-    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENTS : "declare"
-    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENTS : "prend en charge"
-    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_EVENTS : "agit"
-    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_FOLLOWERS : "suit"
-    SENTINEL_USERS ||--o{ ACCOUNT_AUDIT_EVENTS : "cible"
-    PRODUCTION_LINES ||--o{ WORKSHOP_INCIDENTS : "concerne"
-    PRODUCTION_LINES ||--o{ LINE_AUDIT_EVENTS : "cible"
-    WORKSHOP_INCIDENTS ||--o{ WORKSHOP_INCIDENT_EVENTS : "genere"
-    WORKSHOP_INCIDENTS ||--o{ WORKSHOP_INCIDENT_FOLLOWERS : "est suivi par"
-    WORKSHOP_INCIDENT_EVENTS ||--o| WORKSHOP_ARBITRATION_CONSULTATIONS : "consulte"
+    ADMIN_ACCOUNTS o|--o{ ACCOUNT_AUDIT_EVENTS : "effectue"
+    ADMIN_ACCOUNTS o|--o{ LINE_AUDIT_EVENTS : "effectue"
+    ADMIN_ACCOUNTS o|--o{ ADMIN_SYSTEM_AUDIT_EVENTS : "effectue"
+    ADMIN_ACCOUNTS o|--o{ WORKSHOP_INCIDENT_EVENTS : "agit comme admin"
 
-    ADMIN_ACCOUNTS {
-        int id PK
-        string username
-        string password_hash
-    }
-    SENTINEL_USERS {
-        int id PK
-        string first_name
-        string last_name
-        string badge_number
-        string role
-        boolean is_active
-        boolean is_deleted
-    }
-    PRODUCTION_LINES {
-        int id PK
-        string line_number
-        jsonb machine_sequence
-        boolean is_active
-    }
-    WORKSHOP_INCIDENTS {
-        int id PK
-        int user_id FK
-        int line_id FK
-        string machine_id
-        string state
-        string status
-        boolean is_taken
-        int taken_by_user_id FK
-        boolean is_priority
-        text diagnostic
-        text intervention_note
-    }
-    WORKSHOP_INCIDENT_EVENTS {
-        int id PK
-        int incident_id FK
-        int actor_user_id FK
-        string event_type
-        jsonb payload
-    }
-    WORKSHOP_INCIDENT_FOLLOWERS {
-        int id PK
-        int incident_id FK
-        int user_id FK
-    }
-    WORKSHOP_ARBITRATION_CONSULTATIONS {
-        int request_event_id PK
-        int incident_id FK
-        string request_type
-        int consulted_by_user_id FK
-    }
-    ACCOUNT_AUDIT_EVENTS {
-        int id PK
-        int target_user_id FK
-        int admin_id FK
-        string event_type
-        jsonb changes
-    }
-    LINE_AUDIT_EVENTS {
-        int id PK
-        int target_line_id FK
-        int admin_id FK
-        string event_type
-        jsonb changes
-    }
+    SENTINEL_USERS ||--o{ PASSWORD_RESET_REQUESTS : "demande"
+    SENTINEL_USERS o|--o{ ACCOUNT_AUDIT_EVENTS : "est cible de"
+    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENTS : "declare"
+    SENTINEL_USERS o|--o{ WORKSHOP_INCIDENTS : "prend en charge"
+    SENTINEL_USERS o|--o{ WORKSHOP_INCIDENT_EVENTS : "agit"
+    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_FOLLOWERS : "suit"
+    SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CONSULTATIONS : "consulte"
+    SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CASES : "demande"
+    SENTINEL_USERS o|--o{ WORKSHOP_ARBITRATION_CASES : "consulte"
+    SENTINEL_USERS o|--o{ WORKSHOP_ARBITRATION_CASES : "decide"
+
+    PRODUCTION_LINES ||--o{ WORKSHOP_INCIDENTS : "concerne"
+    PRODUCTION_LINES o|--o{ LINE_AUDIT_EVENTS : "est cible de"
+    PRODUCTION_LINES ||--o{ PRODUCTION_LINE_MACHINES : "normalise"
+
+    WORKSHOP_INCIDENTS ||--o{ WORKSHOP_INCIDENT_EVENTS : "produit"
+    WORKSHOP_INCIDENTS ||--o{ WORKSHOP_INCIDENT_FOLLOWERS : "est suivi par"
+    WORKSHOP_INCIDENTS ||--o{ WORKSHOP_ARBITRATION_CONSULTATIONS : "porte"
+    WORKSHOP_INCIDENTS ||--o{ WORKSHOP_ARBITRATION_CASES : "porte"
+    WORKSHOP_INCIDENT_EVENTS ||--o| WORKSHOP_ARBITRATION_CONSULTATIONS : "demande consultee"
+    WORKSHOP_INCIDENT_EVENTS o|--o| WORKSHOP_ARBITRATION_CASES : "ouvre"
+    WORKSHOP_INCIDENT_EVENTS o|--o| NOTIFICATION_OUTBOX : "notifie"
+    PASSWORD_RESET_REQUESTS o|--o| NOTIFICATION_OUTBOX : "notifie"
 ```
 
 ### 6.3 Justification du choix JSONB
 
-Six colonnes JSONB servent trois usages documentaires locaux dans un schéma
+Neuf colonnes JSONB servent quatre usages documentaires locaux dans un schéma
 relationnel :
 
-**`production_lines.machine_sequence`** — une ligne de production contient une séquence de machines
-hétérogènes : une machine peut avoir un seul robot ou deux robots (montage double-tête), chacun avec
-un nombre de têtes différent. Modéliser ceci en tables relationnelles strictes exigerait soit une
-table de jointure complexe avec des colonnes nullable selon le type de robot, soit deux tables
-distinctes reliées par un discriminant — pour une structure qui est lue et réécrite comme un tout à
-chaque modification de ligne (jamais interrogée machine par machine en SQL), et validée entièrement
-côté application par un schéma Zod à discrimination de type (`SingleRobotMachine` |
-`DoubleRobotMachine`). Le document JSONB capture exactement cette structure imbriquée sans
-sur-normaliser une donnée qui n'a pas besoin d'être interrogée relationnellement.
+**`production_lines.machine_sequence` et `production_line_machines.payload`** —
+la première conserve l'agrégat ordonné d'une ligne ; la seconde est sa projection
+normalisée, maintenue par trigger et validée par les fonctions SQL de la migration
+`043`.
 
-**`workshop_incidents.edit_request`** — une proposition de correction structurée
-est conservée jusqu'à son arbitrage avec ses snapshots avant/demandé.
+**`workshop_incidents.edit_request` et `workshop_arbitration_cases.payload`** —
+une proposition de correction structurée et son cas d'arbitrage conservent les
+snapshots avant/demandé.
 
 **Les payloads d'audit** — `workshop_incident_events.payload`,
 `account_audit_events.changes`, `line_audit_events.changes` et
@@ -458,17 +423,21 @@ motif, champs modifiés). Une colonne JSONB générique évite de créer une col
 possible ou une table par type d'événement, tout en gardant chaque événement interrogeable
 (`payload->>'reason'`) si un besoin d'analyse futur l'exige.
 
-Dans les trois usages, JSONB reste un choix local et documenté, pas une fuite de modélisation : le
+**`notification_outbox.delivered_recipients`** — une carte canal → destinataires
+déjà servis empêche de rejouer une livraison confirmée lors d'une reprise
+partielle.
+
+Dans les quatre usages, JSONB reste un choix local et documenté, pas une fuite de modélisation : le
 reste du schéma est strictement relationnel, avec clés étrangères et contraintes
 d'intégrité explicites (voir §6.5).
 
 ### 6.4 Modèle logique / physique de données (MLD/MPD)
 
-Quatorze tables applicatives et une table technique. **[À COMPLÉTER]** —
-exporter le schéma physique complet en image depuis
-`docs/dossier-projet/schemas-mermaid.md` (diagramme de classes Mermaid en notation MPD) ou
-directement depuis un outil de rétro-ingénierie PostgreSQL si vous préférez partir de la base réelle
-(`pg_dump --schema-only` puis import dans un outil comme dbdiagram.io / SchemaSpy).
+Le MPD versionné compte quatorze tables applicatives et la table technique
+`schema_migrations`. Sa source Mermaid complète se trouve dans
+`docs/dossier-projet/schemas-mermaid.md` ; elle énumère les types, clés,
+nullabilités et principales contraintes des migrations `001` à `050`. Un export
+SVG peut être produit pour la mise en page sans modifier cette source.
 
 Dictionnaire de données des tables centrales :
 
@@ -483,7 +452,7 @@ Dictionnaire de données des tables centrales :
 | `state` | VARCHAR | CHECK ∈ {SKIPEE_PAR_MACHINE, SKIPEE_PAR_CONDUCTEUR, DEGRADEE, INDISPONIBLE} |
 | `status` | VARCHAR | CHECK ∈ {OPEN, PENDING, CLOSED, CANCELED, INVALIDATED}, défaut OPEN |
 | `is_taken`, `taken_by_user_id`, `taken_at` | BOOLEAN, INTEGER, TIMESTAMPTZ | prise en charge, cohérence imposée par `chk_taken_consistency` |
-| `waiting_reason`, `diagnostic`, `intervention_note`, `responsible_comment` | TEXT | motif de mise en attente séparé du vrai diagnostic de maintenance ; textes métier obligatoires selon la transition |
+| `waiting_reason`, `diagnostic`, `intervention_note`, `responsible_comment` | TEXT | `waiting_reason` requis par `SET_PENDING`, `intervention_note` requise par `CLOSE` ; `diagnostic` est historique, facultatif et en lecture seule dans l'API courante |
 | `edit_request` | JSONB | demande de correction en attente, CHECK de forme (`chk_edit_request_shape`) |
 
 Contrainte notable : `idx_unique_active_incident_per_machine`, un index unique partiel garantissant
@@ -491,16 +460,16 @@ qu'une même position machine (ligne, machine, robot, tête) ne peut avoir qu'un
 (`OPEN` ou `PENDING`) à la fois — empêche la déclaration en doublon au niveau base de données, pas
 seulement au niveau applicatif.
 
-**`workshop_incident_events`** (audit trail immuable) — une ligne par action significative sur un
-incident (créé, pris, mis en attente, clôturé, priorité changée...), avec l'identité de l'acteur
-capturée au moment de l'action (jamais recalculée après coup, y compris si le compte de l'acteur est
-ensuite anonymisé — voir chapitre RGPD, §9.5).
+**`workshop_incident_events`** (journal append-only par convention applicative) —
+une ligne par action significative sur un incident, avec un acteur Atelier,
+Administration ou système et ses snapshots. Aucune immuabilité PostgreSQL
+absolue n'est revendiquée.
 
 ### 6.5 Script de création
 
 Le schéma complet est versionné dans `backend/migrations/`, 50 fichiers SQL numérotés séquentiellement,
 chacun appliqué une seule fois et enregistré dans une table `schema_migrations`. Extrait représentatif
-(migration `017_enforce_taken_consistency.sql`, qui durcit une invariant métier a posteriori) :
+(migration `017_enforce_taken_consistency.sql`, qui durcit un invariant métier a posteriori) :
 
 ```sql
 ALTER TABLE workshop_incidents
@@ -520,7 +489,7 @@ ALTER TABLE workshop_incidents
 
 ## 7. Diagrammes UML
 
-**[À COMPLÉTER]** — code Mermaid prêt à exporter, consolidé dans
+Les sources Mermaid prêtes à exporter sont consolidées dans
 `docs/dossier-projet/schemas-mermaid.md`. Trois diagrammes couvrent le cœur métier :
 
 1. **Diagramme de cas d'utilisation** — 3 rôles atelier (Opérateur, Maintenance, Responsable) + 1
@@ -623,19 +592,39 @@ différentes selon le rôle connecté).
 
 ### 9.1 Composants métier — la matrice de permissions
 
-`backend/src/modules/workshop/workshop.policy.ts` est la source de vérité unique des permissions du
-module atelier — aucune autre partie du backend ne décide qui peut faire quoi. Chaque action est un
-cas d'un `switch` explicite, avec le raisonnement métier documenté en commentaire à même le code :
+`backend/src/modules/workshop/workshop.policy.ts` est la source de vérité serveur
+des actions incident énumérées par `canPerform`. La création est ouverte aux
+trois rôles Atelier authentifiés ; le suivi explicite est contrôlé séparément par
+les services `followIncidentService` et `unfollowIncidentService`.
+
+| Action | OPERATOR | MAINTENANCE | RESPONSABLE |
+|---|:---:|:---:|:---:|
+| Créer un incident | oui | oui | oui |
+| Demander/retirer la correction de sa déclaration active | oui | non | non |
+| Demander/retirer l'annulation de sa déclaration non prise | oui | non | non |
+| Modifier un actif non pris | non | oui | oui |
+| Modifier un actif pris | non | affecté uniquement | oui |
+| Prendre/transférer un incident `OPEN` | non | oui | non |
+| Mettre en attente, reprendre ou clôturer | non | oui | non |
+| Annuler un actif non pris | non | oui | oui |
+| Annuler un incident `PENDING` | non | non | oui |
+| Arbitrer une correction ou une annulation | non | non | oui |
+| Définir priorité/consigne, invalider une clôture | non | non | oui |
+| Activer ou retirer son suivi | non | non | oui |
+
+Les conditions fines d'appartenance, de statut, de prise et d'arbitrage ouvert
+restent appliquées à chaque ligne. Un suivi ne peut être activé que sur un
+incident actif ; son retrait reste possible après passage à un statut terminal.
+Par exemple, l'annulation directe refuse également tout arbitrage incompatible :
 
 ```typescript
 case 'CANCEL':
-  // PENDING incidents can be cancelled by RESPONSABLE (not MAINTENANCE) since
-  // the technician has already engaged — a supervisor override is required.
   if (incident.status === 'PENDING') {
-    return workshopRole === 'RESPONSABLE';
+    return workshopRole === 'RESPONSABLE' && !hasPendingArbitration(incident);
   }
   return (
     isActiveIncident(incident) &&
+    !hasPendingArbitration(incident) &&
     !incident.is_taken &&
     (workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE')
   );
@@ -648,10 +637,9 @@ d'atteindre la base de données, quel que soit ce que l'interface affichait.
 
 ### 9.2 Composants métier — un service avec transaction
 
-`followIncidentService` illustre le pattern transactionnel appliqué à toutes les mutations du
-domaine : lecture avec verrou, vérification métier, écriture et journalisation d'audit dans la même
-transaction, pour éliminer toute fenêtre de concurrence entre la lecture de l'état et son
-écriture :
+`followIncidentService` illustre le pattern transactionnel des mutations du
+domaine : lecture avec verrou, vérification métier, écriture et, seulement en cas
+de changement, journalisation d'audit dans la même transaction :
 
 ```typescript
 export async function followIncidentService(
@@ -667,8 +655,20 @@ export async function followIncidentService(
     if (current.status === 'CLOSED' || current.status === 'CANCELED' || current.status === 'INVALIDATED') {
       return { kind: 'forbidden' as const };
     }
-    await workshopRepository.followIncidentData(incidentId, actorUserId, client);
-    await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client);
+    const changed = await workshopRepository.followIncidentData(
+      incidentId,
+      actorUserId,
+      client
+    );
+    if (changed) {
+      await logIncidentEvent(
+        incidentId,
+        actorUserId,
+        'INCIDENT_FOLLOWED',
+        {},
+        client
+      );
+    }
     return { kind: 'ok' as const };
   });
 
@@ -685,9 +685,16 @@ fonctions (`followIncidentService`, `unfollowIncidentService`) lisaient l'état 
 d'écrire dans une transaction séparée — fenêtre de course réelle avec plusieurs responsables actifs
 simultanément — alignées ensuite sur le pattern déjà utilisé partout ailleurs dans le module.
 
+Le suivi est un opt-in : seul cet appel explicite à
+`followIncidentData` l'active. La création, la priorité, la consigne et les
+décisions d'arbitrage n'ajoutent aucun follower.
+
 ### 9.3 Composants d'accès aux données
 
-La couche `repository` est la seule à parler SQL. Toutes les requêtes sont paramétrées :
+Les repositories concentrent le SQL métier. Des composants transversaux
+d'authentification, de notification et de journalisation interrogent aussi
+PostgreSQL directement. Les valeurs externes sont liées comme paramètres ; les
+fragments structurels éventuels proviennent de listes internes contrôlées :
 
 ```typescript
 export async function getIncidentById(
@@ -794,16 +801,19 @@ Chaque mesure ci-dessous est vérifiable directement dans le code cité.
 |---|---|
 | A01 — Contrôle d'accès défaillant | Matrice de permissions à deux niveaux (`workshop.policy.ts` source de vérité serveur, miroir frontend cosmétique) ; chaque action revalidée côté serveur indépendamment de l'affichage |
 | A02 — Défaillances cryptographiques | bcrypt pour tous les mots de passe, JWT signé, secrets ≥ 24 caractères imposés en production (le serveur refuse de démarrer sinon) |
-| A03 — Injection | SQL exclusivement paramétré (`$1, $2, ...`), aucune concaténation de chaîne dans une requête ; validation Zod systématique en entrée |
+| A03 — Injection | Valeurs SQL liées (`$1`, `$2`, ...`), fragments structurels limités à des choix internes contrôlés et validation Zod en entrée |
 | A04 — Conception non sécurisée | Contraintes d'intégrité au niveau base de données en plus de la validation applicative (ex. `chk_taken_consistency`) — la donnée reste cohérente même en cas de bug applicatif |
 | A05 — Mauvaise configuration de sécurité | Headers de sécurité systématiques (CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HSTS en production) ; configuration de production validée au démarrage (`assertProductionConfig`) |
 | A07 — Erreurs d'identification | Rate limiting sur le login (10 échecs / 5 minutes par IP + identité), verrouillage de session admin après 3 échecs de vérification de mot de passe |
-| A08 — Intégrité des données | Audit trail immuable (`workshop_incident_events`), acteur capturé au moment de l'action, jamais recalculé après coup |
+| A08 — Intégrité des données | Événements ajoutés en append-only par les services, acteur et snapshots capturés au moment de l'action ; aucune immutabilité PostgreSQL absolue revendiquée |
 | A09 — Carences de journalisation | Chaque action métier significative génère un événement d'audit horodaté et attribué |
 
 ### 10.3 Flux d'authentification (JWT + cookie)
 
-**[À COMPLÉTER]** — export du schéma Mermaid ci-dessous (voir `schemas-mermaid.md`) :
+Le flux simplifié ci-dessous est complété par les séquences Administration,
+Workshop et Board de `docs/dossier-projet/schemas-mermaid.md`. La séquence Board
+y documente le hash bcrypt courant, la compatibilité SHA-256 avec mise à niveau
+automatique et la durée `0` sans expiration automatique.
 
 ```mermaid
 sequenceDiagram
@@ -899,8 +909,9 @@ L'identifiant technique est conservé afin de préserver l'intégrité référen
 Cette suppression ne réécrit pas l'ensemble du passé. Depuis les migrations 025 à 028, les
 incidents et événements d'audit figent certaines informations professionnelles au moment de
 l'action : nom, prénom, rôle et, selon l'enregistrement, numéro de badge. Ces snapshots permettent
-de conserver un journal factuel et immuable ; ils peuvent donc rester visibles après la suppression
-du compte opérationnel. Leur accès est restreint aux rôles habilités.
+de conserver un journal factuel ajouté en append-only par les services ; ils
+peuvent donc rester visibles après la suppression du compte opérationnel. Leur
+accès est restreint aux rôles habilités.
 
 Sentinel n'applique actuellement aucun délai automatique de purge à ces historiques. Il appartient
 à l'entreprise responsable de traitement de définir et documenter une politique de conservation
@@ -953,8 +964,8 @@ réelle (Express + PostgreSQL), données et réponses ci-dessous reprises telles
 | 6. Clôture | `PATCH /incidents/1` `{"status":"CLOSED","interventionNote":"..."}` | Statut `CLOSED` | `{"status":"CLOSED", ...}` ✅ |
 | 7. Audit trail | `GET /incidents/1/events` | Un événement par transition, dans l'ordre | `CREATED → TAKEN → SET_PENDING → RESUMED → CLOSED` ✅ |
 
-**Analyse des écarts** : aucun. Chaque transition produit l'état attendu et son événement d'audit
-immuable.
+**Analyse des écarts** : aucun. Chaque transition produit l'état attendu et son
+événement d'audit ; l'application n'expose aucune mutation de ces événements.
 
 ### Scénario — Permissions refusées (403)
 
@@ -981,18 +992,21 @@ côté utilisateur.
 
 ### 13.1 Stratégie
 
-Deux suites de tests indépendantes, l'une par workspace :
+La stratégie combine trois niveaux, sans figer dans le texte des totaux qui
+doivent être recalculés pour chaque candidat :
 
-- **Backend (Jest + ts-jest)** : tests unitaires et d'intégration contre une base PostgreSQL réelle
-  (pas de mock de base de données pour les tests de repository) — 250 tests, couvrant la
-  configuration, le domaine métier, les modules `accounts`, `lines`, `workshop`,
-  `workshopCredentials`, et les utilitaires partagés.
-- **Frontend (Vitest + Testing Library)** : tests de composants et de hooks en environnement
-  `jsdom` — 312 tests, couvrant les utilitaires, les composants et les pages.
+- **backend unitaire** : Jest et `ts-jest`, avec repositories simulés lorsque le
+  test cible le SQL ou le mapping ;
+- **intégration PostgreSQL** : parcours critiques contre une base PostgreSQL
+  réelle, migrations comprises ;
+- **frontend et navigateur** : Vitest/Testing Library en `jsdom`, puis Playwright
+  sur Chromium pour les interactions réelles.
 
-Les deux suites tournent automatiquement à chaque push et pull request via GitHub Actions,
-accompagnées du lint et du build TypeScript des deux côtés — un changement qui casse un test ou
-introduit une erreur de lint est visible avant merge, pas découvert en production.
+Le workflow `.github/workflows/ci.yml` définit exactement six jobs :
+`Backend / Quality`, `Frontend / Quality`, `Backend / PostgreSQL integration`,
+`Browser / Critical journeys`, `Containers / Production contract` et
+`Ops / Backup and restore drill`. Les totaux de tests destinés au dossier sont
+dérivés des rapports verts par `scripts/collectDossierFacts.py`.
 
 ### 13.2 Exemple de test représentatif
 
@@ -1015,7 +1029,10 @@ it('refuse de suivre un incident terminé', async () => {
 
 ## 14. Déploiement
 
-Sentinel est déployé en production sur un VPS Linux, domaine dédié `sentinel.akiksystems.fr`.
+La documentation de déploiement vise un VPS Linux et le domaine
+`sentinel.akiksystems.fr`. L'état RC5 réellement servi, sa topologie et ses
+digests restent des preuves externes ; ils ne sont pas affirmés à partir du seul
+dépôt.
 
 ### 14.1 Architecture de déploiement
 
@@ -1033,10 +1050,16 @@ Backend    Frontend
 PostgreSQL (Docker)
 ```
 
-Quatre services Docker Compose : PostgreSQL, backend, frontend, et un reverse proxy applicatif
-(Caddy dans le dépôt, activable seul ou derrière le Nginx déjà présent sur l'hôte selon le contexte
-d'hébergement). Seul le service frontal expose des ports sur l'hôte ; base de données et backend
-restent internes au réseau Docker.
+Deux topologies cibles sont documentées et ne doivent pas être combinées :
+
+- mode autonome à quatre services : PostgreSQL, backend, frontend et Caddy,
+  seul Caddy publiant les ports 80/443 ;
+- mode avec Nginx hôte : Caddy est désactivé, PostgreSQL reste interne, et le
+  backend comme le frontend sont liés en loopback via
+  `SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`.
+
+Le choix et l'état réel du VPS restent à constater ; voir
+`docs/rc5-decision-dossiers.md`.
 
 ### 14.2 Sécurisation du démarrage
 
@@ -1086,7 +1109,8 @@ sensible quand elle est sincère plutôt que formatée.
 
 - Intégration progressive avec les outils de maintenance existants (GMAO), machine par machine, une
   fois la fiabilité de chaque intégration démontrée individuellement (cf. arbitrage MVP, §2.4).
-- Extension de la couverture de tests end-to-end (Playwright) aux parcours complets multi-rôles.
+- Les parcours Playwright multi-rôles existent déjà ; la preuve encore attendue
+  porte sur une recette multi-rôle de la RC5 réellement déployée et ses captures.
 - Mesure réelle des indicateurs d'adoption définis dans le cadrage conceptuel initial (couverture
   déclarative, délai médian de prise en charge, part des cas actifs sans attente justifiée) si
   Sentinel venait à être utilisé en conditions réelles.

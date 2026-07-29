@@ -25,26 +25,28 @@ COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.
 
 Toutes les commandes opérationnelles ci-dessous utilisent `"${COMPOSE[@]}"`.
 
-### État de validation RC4 avant déploiement
+### État de validation attendu pour RC5 avant déploiement
 
-Le 28 juillet 2026, le candidat local a passé les contrôles suivants, sans accès
-au VPS ni publication d'image :
+Avant tout déploiement de la RC5, exécuter et archiver sur son SHA exact les
+contrôles locaux suivants, sans les confondre avec une preuve du VPS ni avec une
+publication d'image :
 
 - les trois compositions Docker et les huit invariants de topologie ;
 - builds production backend/frontend, utilisateurs `node`/`nginx`, labels OCI
   `revision`, runtime backend minimal, `nginx -t` read-only et favicon ;
-- préflight registry-only : `19/19`, dont digest réel et rejet d'une image d'un
-  autre SHA, avec nettoyage intégral ;
-- parsing d'environnement : `14/14`, bcrypt runtime byte-identique ;
-- sauvegarde/restauration PostgreSQL jetable : `11/11`, RTO local mesuré à
-  `5 s`, checksum, verrou, rejet de schéma et isolation ;
+- préflight registry-only, dont digest réel et rejet d'une image d'un autre SHA,
+  avec nettoyage intégral ;
+- parsing d'environnement et bcrypt runtime byte-identique ;
+- sauvegarde/restauration PostgreSQL jetable, avec RTO consigné, checksum,
+  verrou, validation exacte du ledger, rejet de schéma et isolation ;
 - Nginx 1.18.0 : héritage, barrière, valeurs publiques simulées et modèle hôte
   conformes ;
 - ShellCheck de tous les scripts suivis.
 
-Ces résultats prouvent le contrat local, pas l'état de l'instance publique. Les
-contrôles VPS, `/api/health`, SMTP réel, en-têtes HTTPS publics et captures RC4
-restent conditionnés à une autorisation de déploiement séparée.
+Une fois verts sur le SHA RC5, ces résultats prouvent le contrat local, pas
+l'état de l'instance publique. Les contrôles VPS, `/api/health`, SMTP réel,
+en-têtes HTTPS publics et captures RC5 restent conditionnés à une autorisation
+de déploiement séparée.
 
 ## 1. Contrôles rapides
 
@@ -111,8 +113,8 @@ son chemin. L'exemple ci-dessous emploie
 
 ```bash
 SENTINEL_NGINX_TARGET=/etc/nginx/sites-available/sentinel
-SENTINEL_NGINX_BACKUP=/etc/nginx/sites-available/sentinel.before-rc4
-SENTINEL_NGINX_STAGE=/etc/nginx/sites-available/.sentinel.rc4.new
+SENTINEL_NGINX_BACKUP=/etc/nginx/sites-available/sentinel.before-rc5
+SENTINEL_NGINX_STAGE=/etc/nginx/sites-available/.sentinel.rc5.new
 
 # 1. sauvegarde atomique, conservée jusqu'à validation complète
 sudo install -m 0600 "$SENTINEL_NGINX_TARGET" "${SENTINEL_NGINX_BACKUP}.tmp"
@@ -137,7 +139,7 @@ la sauvegarde par une seconde bascule atomique, revalider, puis recharger :
 
 ```bash
 SENTINEL_NGINX_TARGET=/etc/nginx/sites-available/sentinel
-SENTINEL_NGINX_BACKUP=/etc/nginx/sites-available/sentinel.before-rc4
+SENTINEL_NGINX_BACKUP=/etc/nginx/sites-available/sentinel.before-rc5
 SENTINEL_NGINX_ROLLBACK=/etc/nginx/sites-available/.sentinel.rollback
 
 sudo install -m 0644 "$SENTINEL_NGINX_BACKUP" "$SENTINEL_NGINX_ROLLBACK"
@@ -261,10 +263,11 @@ explicite de `--allow-unverified`, qui journalise un avertissement audité :
 ```
 
 Pour confirmer, saisir exactement le nom de base affiché. Le script importe dans
-une base temporaire, contrôle le schéma (quinze tables), le ledger de migrations
-et des colonnes témoins, arrête le backend, bascule les bases puis redémarre le
-service. En cas d'échec avant la fin de la bascule, son trap tente de restaurer
-le nom de la base initiale.
+une base temporaire, contrôle le schéma (quinze tables), puis exige que le
+ledger corresponde exactement aux migrations canoniques du checkout — noms,
+ordre et checksums — avant d'arrêter le backend et de basculer les bases. En cas
+d'échec avant la fin de la bascule, son trap tente de restaurer le nom de la
+base initiale.
 
 Après restauration :
 

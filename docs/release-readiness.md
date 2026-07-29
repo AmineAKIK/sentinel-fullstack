@@ -1,15 +1,30 @@
 # Préparation de la release Sentinel v1.0.0
 
-**Statut : NO-GO**
+**Statut historique du registre initial : NO-GO**
 
-**Branche de stabilisation :** `release/v1.0.0-readiness`
+**Branche historique de stabilisation :** `release/v1.0.0-readiness`
 
-**Baseline :** `182e7808c0fae1d57d290e10092fedc054736db1` (`main`, 19 juillet 2026)
+**Baseline historique :** `182e7808c0fae1d57d290e10092fedc054736db1`
+(`main`, 19 juillet 2026)
 
 Ce document est la source de pilotage de la stabilisation `v1.0.0`. Il relie
 chaque constat connu à une décision, un lot, une preuve de correction et un état.
 La [checklist de publication](release-checklist.md) reste la porte de sortie
 opérationnelle ; le présent registre détermine si ses préconditions sont réunies.
+
+### Mise à jour documentaire RC5
+
+**Statut RC5 : BLOCKED**, en attente des cinq décisions explicites consignées
+dans [rc5-decision-dossiers.md](rc5-decision-dossiers.md) : React Router,
+workflow de publication, protection CSRF same-site, vérité opérationnelle et
+vulnérabilités des dépendances de développement.
+
+La narration des lots, SHA et runs antérieurs est conservée comme historique
+daté. Pour le candidat RC5 courant, les faits structurels dérivés du dépôt sont
+`50` migrations (`001..050`), `15` tables physiques (`14` applicatives et
+`schema_migrations`) et `6` jobs CI. Les anciens totaux de tests RC4 ne sont pas
+réattribués à RC5 : ils doivent être régénérés depuis des rapports verts du SHA
+audité.
 
 ## 1. Règles de pilotage
 
@@ -17,7 +32,8 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 - un lot ne mélange pas correction métier, refonte esthétique et maintenance sans
   rapport direct ;
 - chaque correction est livrée avec ses tests comportementaux et sa documentation ;
-- les migrations `001` à `045` sont immuables ; toute évolution commence à `046` ;
+- les migrations publiées `001` à `050` sont immuables ; RC5 n'ajoute aucune
+  migration `051` ;
 - un constat passe à `VERIFIED` seulement après revue du diff, tests requis et CI
   verte sur le commit qui le corrige ;
 - un résultat local ne remplace pas une preuve PostgreSQL, navigateur ou VPS quand
@@ -178,7 +194,7 @@ commit audité au démarrage de cette branche.
 | --- | --- | ---: | --- | --- | --- |
 | `OPS-01` | P1 | 9 | Restore n'acquiert pas le verrou utilisé par backup. | Test d'exclusion mutuelle. | VERIFIED |
 | `OPS-02` | P1 | 9 | Restore accepte un dump sans checksum. | Refus par défaut, exception explicite auditée. | VERIFIED |
-| `OPS-03` | P1 | 9 | Validation restore limitée à trois tables. | Ledger, checksums et données témoins contrôlés. | VERIFIED |
+| `OPS-03` | P1 | 9 + A RC5 | Validation restore historiquement limitée à trois tables, puis au seul caractère non nul du ledger. | Après le lot A RC5 : égalité exacte avec `001..050` (noms, ordre, checksums) et rejets testés avant mutation pour ledger tronqué, migration absente/supplémentaire, ordre falsifié ou checksum modifié. | VERIFIED |
 | `OPS-04` | EXT | 9 | Aucun exercice réel avec RTO et copie chiffrée prouvés. | Rapport daté sans données de production. | BLOCKED_EXTERNAL |
 | `REL-01` | P0 | 12 | Aucun tag de release immuable. | Tag signé/protégé et release GitHub sur le SHA final. | OPEN |
 | `REL-02` | P0 | 12 | VPS différent du candidat audité. | `/api/health.version` égale le SHA du tag. | OPEN |
@@ -194,9 +210,9 @@ commit audité au démarrage de cette branche.
 | `TEST-03` | P1 | 10 | E2E limités aux machines et arbitrages mobiles. | Auth, cycle complet, rôles, Board, Pilotage et Admin couverts. | VERIFIED |
 | `TEST-04` | P1 | 10 | Courses, outbox, analytics, support et restauration absents de l'intégration réelle. | Suites PostgreSQL et exercices dédiés, isolés et répétables. | VERIFIED |
 | `TEST-05` | P2 | 10 | Avertissements jsdom/React et absence de volumétrie. | Sorties propres et scénario de charge documenté. | VERIFIED |
-| `DOC-01` | P0 | 11 | Ancien dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | RC4 : 15 tables, 50 migrations, 1 297 tests, 6 jobs et 57 E2E dérivés par le collecteur. | VERIFIED_LOCAL_RC4 |
-| `DOC-02` | P1 | 11 | `rebuildDossier.py` conservait des faits volatils en dur. | Générateur paramétré pour tables, migrations, jobs et quatre familles de tests. | VERIFIED_LOCAL_RC4 |
-| `DOC-03` | P1 | 11 | Sources suivies avec marqueurs incomplets et anciens SHA. | Scan interdit sans résultat. | OPEN |
+| `DOC-01` | P0 | 11 + G RC5 | Ancien dossier : 12 tables, 38 migrations, 579 tests, 4 jobs et 2 E2E. | RC5 : 15 tables, 50 migrations et 6 jobs dérivés du dépôt ; les totaux de tests restent paramétrés et ne sont publiés qu'avec leurs rapports verts. | VERIFIED_LOCAL_RC5 |
+| `DOC-02` | P1 | 11 + G RC5 | `rebuildDossier.py` conservait des faits volatils en dur. | Le générateur dérive les faits techniques, mais sa chaîne source/assets et les données externes ou personnelles restent à décider ou fournir. | OPEN |
+| `DOC-03` | P1 | 11 + G RC5 | Sources suivies avec marqueurs techniques incomplets et anciens candidats. | Les faits déterminables par le dépôt sont resynchronisés ; les marqueurs personnels, de capture et de preuve externe restent volontairement ouverts. | OPEN |
 | `DOC-04` | P1 | 11 | Source/assets par défaut du générateur absents du dépôt. | Chaîne reproductible ou dépendances explicitement externes sans faux défaut. | OPEN |
 | `DOC-05` | P0 | 11 | Calcul de Fermi et fourchette 200–290 non entièrement dérivés. | Formules, source et sensibilité recalculables. | OPEN |
 | `DOC-06` | EXT | 11 | Volume du dossier dépend des consignes exactes du centre. | Corps/annexes mesurés contre la règle écrite. | BLOCKED_EXTERNAL |
@@ -377,11 +393,11 @@ inversement). La restauration refuse par défaut tout dump sans `.sha256`
 associé, avec un message de refus explicite ; `--allow-unverified` permet de
 passer outre en journalisant un avertissement audité. La validation du schéma
 avant bascule est passée de trois tables à la structure complète (quinze
-tables), plus la cohérence du ledger `schema_migrations` (aucun `checksum` ni
-`applied_at` NULL) et de colonnes témoins sur les tables les plus critiques —
-un dump hors schéma Sentinel et un dump au ledger tronqué ont chacun été
-produits et rejetés avant toute tentative de bascule, sans jamais toucher la
-base réelle. Un bug a été corrigé pendant la vérification : la requête de
+tables), plus le contrôle que le ledger `schema_migrations` ne contient aucun
+`checksum` ni `applied_at` NULL et celui de colonnes témoins sur les tables les
+plus critiques. À ce stade historique, le test produisait et rejetait un dump
+hors schéma Sentinel, mais ne prouvait pas encore l'égalité exhaustive du ledger.
+Un bug a été corrigé pendant la vérification : la requête de
 validation plantait avec une erreur SQL brute (au lieu du message `[restore]`
 attendu) quand une table centrale manquait, parce que `count(*)` sur une table
 absente échoue avant que PostgreSQL n'évalue le reste du `AND` — la validation
@@ -393,6 +409,13 @@ reads.sql` → `..._consultations.sql`, cf. l'alias dans `migrate.ts`), jamais u
 table du schéma actuel — sans le rejeu réel des 48 migrations en conditions
 Docker, cette erreur serait passée inaperçue et aurait fait échouer toute
 restauration légitime en production.
+
+**Après le lot A de RC5**, le comportement testé est plus strict :
+`restore.sh` construit le ledger attendu depuis les migrations canoniques
+`001..050`, puis compare exactement noms, ordre et checksums avant toute mutation
+de la base de destination. `test-backup-restore.sh` fabrique et exige le rejet
+d'un ledger tronqué, d'une migration `025` absente, d'une migration `051`
+supplémentaire, d'un ordre falsifié et d'un checksum modifié.
 
 **Lot 10, en cours : `TEST-01` et `TEST-05` clos.** Les 78 occurrences du
 warning jsdom `Not implemented: Window's scrollTo()` (déclenché par `Modal`
@@ -505,12 +528,15 @@ dossier jury, en promouvant le même commit et les mêmes images, ou via un
 `rc.2` si une correction versionnée s'avère nécessaire.
 
 Outillage du dossier : `scripts/collectDossierFacts.py` dérive automatiquement
-chaque fait chiffré depuis le dépôt. Sur le candidat code RC4
+chaque fait chiffré depuis le dépôt. Lors de l'audit RC4, sur le candidat code
 `2c5207ef4ac13ddf7413863f49df1d59fe4e0f1b`, après indexation des quatre
 documents jury, il a établi 534 fichiers suivis,
 50 migrations, 15 tables, 6 jobs et 1 297 tests disjoints
 (`511 + 146 + 583 + 57`). `rebuildDossier.py` reçoit désormais ces valeurs en
-arguments au lieu de conserver tables, migrations, jobs ou E2E en dur.
+arguments au lieu de conserver tables, migrations, jobs ou E2E en dur. Pour
+RC5, le collecteur confirme les trois faits structurels `50 / 15 / 6`; les
+totaux de tests doivent être recalculés avec les rapports du SHA RC5 et non
+recopiés depuis cette preuve RC4.
 
 ## 6. Contrôles de chaque lot
 

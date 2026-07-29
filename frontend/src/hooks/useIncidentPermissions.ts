@@ -5,7 +5,7 @@ import { isIncidentResolved } from '../components/IncidentBadges';
 
 /**
  * Dérive toutes les permissions et groupes d'actions utiles à l'affichage
- * du dossier incident, à partir des 13 vérifications canPerform. Centralise
+ * du dossier incident, à partir des 14 vérifications canPerform. Centralise
  * ce qui était calculé en série dans IncidentDetailPanel.
  */
 export function useIncidentPermissions(

@@ -8,7 +8,7 @@ et protégées par les contraintes PostgreSQL.
 | Statut | Nature | Description |
 | --- | --- | --- |
 | `OPEN` | actif | incident à prendre ou en cours de traitement |
-| `PENDING` | actif | traitement suspendu avec diagnostic |
+| `PENDING` | actif | traitement suspendu avec un motif de mise en attente |
 | `CLOSED` | terminal | intervention clôturée avec une note |
 | `CANCELED` | terminal | déclaration annulée, conservée dans l'historique |
 | `INVALIDATED` | terminal | clôture invalidée par un responsable |
@@ -27,7 +27,7 @@ stateDiagram-v2
     [*] --> OPEN_NON_PRIS: CREATE
     OPEN_NON_PRIS --> OPEN_PRIS: TAKE
     OPEN_PRIS --> OPEN_PRIS: TAKE par un autre technicien
-    OPEN_PRIS --> PENDING: SET_PENDING + diagnostic
+    OPEN_PRIS --> PENDING: SET_PENDING + motif
     PENDING --> OPEN_PRIS: RESUME
     OPEN_PRIS --> CLOSED: CLOSE + intervention
     OPEN_NON_PRIS --> CANCELED: CANCEL ou APPROVE_CANCEL
@@ -46,7 +46,8 @@ la décision ambiguë.
 - données : ligne, machine, robot, tête, état et produit, avec commentaire
   optionnel ;
 - effets : statut `OPEN`, non pris, snapshot du déclarant et événement `CREATED` ;
-- un responsable créateur est automatiquement abonné au suivi ;
+- la création n'ajoute aucun suivi ; un responsable active volontairement le
+  suivi avec l'étoile ;
 - intégrité : une seule anomalie active par emplacement machine.
 
 ### `TAKE`
@@ -62,8 +63,13 @@ la décision ambiguë.
 
 - acteur : `MAINTENANCE` ;
 - condition : incident `OPEN`, pris, sans arbitrage ouvert ;
-- donnée requise : diagnostic présent ou fourni par l'action ;
-- effet : statut `PENDING`, affectation conservée.
+- donnée requise : motif de mise en attente non vide ;
+- effet : statut `PENDING`, affectation conservée et motif courant enregistré
+  dans `waiting_reason`.
+
+`diagnostic` demeure une colonne historique en lecture seule pour d'anciennes
+données : aucune action de production actuelle ne l'écrit. `SET_PENDING` ne
+l'exige pas et ne le modifie pas.
 
 La policy autorise un technicien de maintenance remplaçant à suspendre un
 incident déjà pris. Pour matérialiser aussi le transfert d'affectation, il doit
@@ -181,7 +187,7 @@ Les états décrivent l'anomalie, indépendamment du statut de traitement :
 1. un incident terminal ne redevient jamais actif ;
 2. un incident `PENDING` est toujours pris ;
 3. une clôture exige une note d'intervention ;
-4. une mise en attente exige un diagnostic ;
+4. une mise en attente exige un motif distinct du champ historique `diagnostic` ;
 5. une demande opérateur concerne uniquement sa propre déclaration ;
 6. un seul cas d'arbitrage ouvert existe par incident ;
 7. toute mutation réussie écrit son acteur et son contexte historique ;

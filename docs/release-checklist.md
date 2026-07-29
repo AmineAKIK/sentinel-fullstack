@@ -3,9 +3,11 @@
 Une publication est autorisée uniquement lorsque chaque contrôle applicable est
 coché et rattaché au commit candidat.
 
-La stabilisation `v1.0.0` est pilotée dans
-[release-readiness-rc4.md](release-readiness-rc4.md). Aucun candidat ne peut recevoir un
-`GO` tant qu'un constat `P0` ou `P1` de ce registre n'est pas `VERIFIED`.
+La stabilisation `v1.0.0` est pilotée dans le registre courant
+[release-readiness.md](release-readiness.md). Le registre
+[release-readiness-rc4.md](release-readiness-rc4.md) reste une preuve historique
+de la RC4. Aucun candidat ne peut recevoir un `GO` tant qu'un constat `P0` ou
+`P1` du registre courant n'est pas `VERIFIED`.
 
 ## 1. Dépôt
 
@@ -126,8 +128,9 @@ npm run test:e2e
 - [ ] healthchecks backend, frontend et PostgreSQL passent
 - [ ] les logs sont bornés par rotation
 - [ ] ShellCheck valide tous les scripts shell suivis
-- [ ] les deux advisories React Router modérées restent rattachées à l'issue `#29`
-      sans migration React Router 7 ni `npm audit fix --force`
+- [ ] les trois advisories React Router modérées sont traitées selon la décision
+      RC5 explicite consignée dans `docs/rc5-decision-dossiers.md`, sans
+      `npm audit fix --force`
 
 ## 8. Recette manuelle
 

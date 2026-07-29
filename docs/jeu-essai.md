@@ -106,7 +106,7 @@ Viewport 393 x 851 :
 
 Sources : `backend/src/integration/__tests__/`.
 
-Chaque suite utilise ses propres préfixes, applique les 46 migrations et nettoie
+Chaque suite utilise ses propres préfixes, applique les 50 migrations et nettoie
 uniquement ses fixtures.
 
 ### Authentification

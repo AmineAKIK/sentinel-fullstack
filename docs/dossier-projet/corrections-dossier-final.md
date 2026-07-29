@@ -1,6 +1,6 @@
 # Corrections finales prêtes à intégrer au dossier DWWM
 
-> État du dépôt vérifié le 28 juillet 2026 sur le candidat RC4. Ce document ne remplace pas le dossier : il regroupe
+> État du dépôt vérifié le 28 juillet 2026 puis resynchronisé avec le candidat RC5. Ce document ne remplace pas le dossier : il regroupe
 > les textes corrigés à copier dans le DOCX. Les formulations ci-dessous séparent volontairement
 > les faits démontrés par le dépôt, les résultats datés et les éléments personnels que seul l'auteur
 > peut confirmer. Ne supprimer ces réserves qu'après avoir produit la preuve correspondante.
@@ -23,12 +23,11 @@ Date de dépôt : conserver `09/07/2026` uniquement si cette date reste la date 
 - 14 tables applicatives PostgreSQL, auxquelles s'ajoute la table technique
   `schema_migrations` ;
 - 50 migrations SQL numérotées ;
-- 1 297 tests disjoints réellement verts : 511 tests unitaires backend, 146 tests
-  d'intégration PostgreSQL, 583 tests frontend et 57 scénarios Chromium ;
-- 18 fichiers de scénarios Playwright ;
 - 6 jobs GitHub Actions : qualité backend, qualité frontend, intégration
   PostgreSQL, parcours navigateur, contrat des conteneurs et exercice
-  sauvegarde/restauration.
+  sauvegarde/restauration ;
+- totaux de tests RC5 à injecter depuis les quatre rapports verts acceptés par
+  `scripts/collectDossierFacts.py`, jamais depuis une valeur recopiée.
 
 Les seuils de couverture Jest (`backend/jest.config.ts`, `coverageThreshold`) portent sur un
 périmètre configuré explicitement via `collectCoverageFrom` — utilitaires, domaine et services
@@ -36,12 +35,12 @@ métier jugés critiques — pas sur l'ensemble du code backend. Toute mention d
 couverture dans le dossier doit préciser « sur le périmètre critique configuré », jamais présenter
 le chiffre comme une couverture globale de l'application.
 
-Ne plus afficher « 562 tests », « 579 tests », « 250 backend », « 312 frontend »,
-« 38 migrations », « 2 E2E » ou « 4 jobs CI » : ces chiffres ne correspondent
-plus au checkout audité. Le 28 juillet 2026, les quatre familles ont été
-exécutées localement avec succès, PostgreSQL et Chromium compris. Une capture
-de la CI distante verte sur le SHA finalement poussé reste nécessaire avant
-d'attribuer ces six jobs à la version publiée.
+Les totaux `511 + 146 + 583 + 57 = 1 297` appartiennent à la preuve RC4 datée du
+28 juillet 2026. Ne pas les attribuer à RC5 sans nouveaux rapports verts.
+De même, ne plus afficher « 562 tests », « 579 tests », « 250 backend »,
+« 312 frontend », « 38 migrations », « 2 E2E » ou « 4 jobs CI ». Une capture de
+la CI distante verte sur le SHA finalement poussé reste nécessaire avant
+d'attribuer les six jobs à la version publiée.
 
 **Sources** : `backend/migrations/`, `backend/jest.config.ts`,
 `backend/src/integration/__tests__/`, `frontend/src/**/__tests__/`,
@@ -103,9 +102,9 @@ peut ajouter son volume réel, sans le reconstituer a posteriori.
 | Donnée incohérente ou doublon actif | Historique inexploitable | contraintes `CHECK`, clés étrangères et index unique partiel | Les structures JSONB restent principalement validées par l'application |
 | Réponse réseau ancienne après une nouvelle recherche | Résultats sans rapport avec le filtre visible | debounce de 250 ms et `AbortController` | L'annulation intervient au changement de valeur débouncée ou de filtre, pas à chaque frappe brute |
 | Secret ou origine de démonstration en production | Compromission de session | `assertProductionConfig`, cookies sécurisés et variables de release | `TRUST_PROXY` absent ne bloque pas le démarrage : il produit un avertissement |
-| Conflit de ports sur le VPS existant | Indisponibilité d'un autre service | override de production, Caddy désactivé, ports backend/frontend liés à `127.0.0.1` | L'override doit être maintenu hors du fichier Compose générique |
-| Perte de la base | Perte d'incidents et d'audit | volume PostgreSQL, scripts `backup.sh` et `restore.sh`, exercice jetable `11/11` avec RTO local de 5 s | La copie hors site, la restauration périodique et le RTO du VPS restent à vérifier en exploitation |
-| Advisories React Router 6 | Redirection ambiguë ou vulnérabilité SSR non applicable au mode SPA | Audit production au seuil high, liens internes contrôlés, aucune hydratation SSR | Deux advisories modérées restent suivies dans l'issue `#29` ; la migration React Router 7 est hors RC4 |
+| Conflit de ports dans une topologie avec proxy hôte | Indisponibilité d'un autre service | override cible, Caddy désactivé, ports backend/frontend paramétrés et liés à `127.0.0.1` | La topologie réellement retenue et les valeurs de ports du VPS restent une décision externe |
+| Perte de la base | Perte d'incidents et d'audit | volume PostgreSQL, scripts `backup.sh` et `restore.sh` ; preuve RC5 jetable `21/21`, ledger exact `001..050`, variantes rejetées avant mutation et RTO local de 24 s | La copie hors site, la restauration périodique et le RTO du VPS restent à vérifier en exploitation |
+| Advisories React Router 6 | Redirection ambiguë ou vulnérabilité SSR selon le mode utilisé | Audit runtime au seuil high, liens internes contrôlés et preuve dynamique du mode déclaratif | Trois advisories React Router modérées restent à traiter selon la décision consignée dans `docs/rc5-decision-dossiers.md` ; aucune option RC5 n'est choisie ici |
 | Conservation excessive de données personnelles | Non-conformité RGPD | suppression du compte opérationnel et pseudonymisation | aucune purge automatique des snapshots et journaux n'est implémentée |
 
 **Sources** : historique Git, `INCIDENT_LIFECYCLE.md`, `backend/migrations/017_enforce_taken_consistency.sql`,
@@ -131,11 +130,13 @@ Le `docker-compose.yml` fournit un mode autonome à quatre services : PostgreSQL
 Nginx et Caddy. Dans ce mode générique, seul Caddy publie les ports 80/443 ; les trois autres
 services restent sur le réseau Docker `internal`.
 
-Le VPS documenté utilise une topologie différente parce qu'un Nginx existe déjà sur l'hôte. Un
-`docker-compose.override.yml` de production désactive Caddy, publie le backend uniquement sur
-`127.0.0.1:3001` et le frontend uniquement sur `127.0.0.1:8080`, puis Nginx termine HTTPS et route
-`/api/*` vers le backend et le reste vers le frontend. PostgreSQL n'est jamais publié sur l'hôte.
-Il ne faut donc pas écrire que Caddy assure le TLS de la production actuellement documentée.
+Une seconde topologie cible prévoit un Nginx sur l'hôte. L'override de production
+désactive alors Caddy, lie le backend et le frontend en loopback via
+`SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`, puis Nginx termine
+HTTPS et route `/api/*` vers le backend et le reste vers le frontend. PostgreSQL
+n'est jamais publié sur l'hôte. Le dépôt ne permet pas de déterminer laquelle
+des deux topologies est réellement active sur le VPS ; cette décision reste
+ouverte dans `docs/rc5-decision-dossiers.md`.
 
 ### 14 — Déploiement et exploitation
 
@@ -145,19 +146,31 @@ qualité frontend, intégration PostgreSQL, parcours Chromium, contrat des
 conteneurs et exercice sauvegarde/restauration. Aucun job ne se connecte au VPS
 ni ne déploie la branche `main`.
 
-Le déploiement VPS décrit dans `docs/deploiement-vps.md` est manuel : récupération du dépôt,
-création du `.env`, application de l'override, construction des images puis `docker compose up -d`.
-Au démarrage, le backend exécute les migrations non encore enregistrées dans `schema_migrations`,
-puis initialise le compte administrateur si nécessaire. Les healthchecks ordonnent le démarrage
-PostgreSQL → backend → frontend.
+La procédure publique documentée est manuelle et sans build sur le VPS :
+récupération du contrat de release, création du `.env`, sélection d'images du
+registre par digest, application de l'override puis `docker compose up -d`. Au
+démarrage, le backend vérifie le ledger et applique les migrations non encore
+enregistrées dans `schema_migrations`, puis initialise le compte administrateur
+si nécessaire. Les healthchecks ordonnent le démarrage PostgreSQL → backend →
+frontend. L'exécution réelle de cette procédure et les digests actifs restent
+des preuves externes.
 
 La persistance repose sur le volume `sentinel_data`. Les scripts `scripts/backup.sh` et
 `scripts/restore.sh` fournissent respectivement un `pg_dump` compressé avec rétention et une
 restauration contrôlée. Le runbook documente sauvegarde avant mise à jour, contrôle `/api/health`,
-retour au commit précédent et restauration si nécessaire. Le 28 juillet 2026,
-l'exercice sur un projet PostgreSQL jetable a réussi `11/11` avec un RTO local
-mesuré à 5 s. Cette preuve locale ne remplace ni une copie hors site ni une
-restauration autorisée sur l'infrastructure cible.
+retour au commit précédent et restauration si nécessaire.
+
+Deux preuves locales doivent rester distinguées :
+
+- preuve RC4 du 28 juillet 2026 : `11/11`, RTO local de 5 s ;
+- preuve RC5 Lot A : `21/21`, RTO local de 24 s, ledger exact `001..050`
+  et variantes tronquée, absente, supplémentaire, réordonnée ou altérée
+  rejetées avant toute mutation. Log
+  `/tmp/sentinel-rc5-lot-a-green-root-final.log`, SHA-256
+  `aff198aa59b12067e304cee179fcd1049cfa5b28693ff84c273fce8bbb438c8d`.
+
+Ces preuves jetables ne remplacent ni une copie hors site ni une restauration
+autorisée sur l'infrastructure cible.
 
 **Sources** : `docker-compose.yml`, `Caddyfile`, `frontend/nginx.conf`,
 `docs/deploiement-vps.md`, `.github/workflows/ci.yml`, `backend/src/server.ts`,
@@ -252,21 +265,24 @@ Le schéma précédent oubliait plusieurs tables ajoutées par le durcissement :
 
 ```mermaid
 erDiagram
-  ADMIN_ACCOUNTS ||--o{ ACCOUNT_AUDIT_EVENTS : "effectue"
-  ADMIN_ACCOUNTS ||--o{ LINE_AUDIT_EVENTS : "effectue"
-  ADMIN_ACCOUNTS ||--o{ ADMIN_SYSTEM_AUDIT_EVENTS : "effectue"
+  ADMIN_ACCOUNTS o|--o{ ACCOUNT_AUDIT_EVENTS : "effectue"
+  ADMIN_ACCOUNTS o|--o{ LINE_AUDIT_EVENTS : "effectue"
+  ADMIN_ACCOUNTS o|--o{ ADMIN_SYSTEM_AUDIT_EVENTS : "effectue"
+  ADMIN_ACCOUNTS o|--o{ WORKSHOP_INCIDENT_EVENTS : "agit comme admin"
 
   SENTINEL_USERS ||--o{ PASSWORD_RESET_REQUESTS : "demande"
-  SENTINEL_USERS ||--o{ ACCOUNT_AUDIT_EVENTS : "est cible de"
+  SENTINEL_USERS o|--o{ ACCOUNT_AUDIT_EVENTS : "est cible de"
   SENTINEL_USERS ||--o{ WORKSHOP_INCIDENTS : "declare"
-  SENTINEL_USERS ||--o{ WORKSHOP_INCIDENTS : "prend en charge"
-  SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_EVENTS : "agit"
+  SENTINEL_USERS o|--o{ WORKSHOP_INCIDENTS : "prend en charge"
+  SENTINEL_USERS o|--o{ WORKSHOP_INCIDENT_EVENTS : "agit"
   SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_FOLLOWERS : "suit"
   SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CONSULTATIONS : "consulte"
-  SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CASES : "demande ou décide"
+  SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CASES : "demande"
+  SENTINEL_USERS o|--o{ WORKSHOP_ARBITRATION_CASES : "consulte"
+  SENTINEL_USERS o|--o{ WORKSHOP_ARBITRATION_CASES : "décide"
 
   PRODUCTION_LINES ||--o{ WORKSHOP_INCIDENTS : "concerne"
-  PRODUCTION_LINES ||--o{ LINE_AUDIT_EVENTS : "est cible de"
+  PRODUCTION_LINES o|--o{ LINE_AUDIT_EVENTS : "est cible de"
   PRODUCTION_LINES ||--o{ PRODUCTION_LINE_MACHINES : "normalise"
 
   WORKSHOP_INCIDENTS ||--o{ WORKSHOP_INCIDENT_EVENTS : "produit"
@@ -274,12 +290,13 @@ erDiagram
   WORKSHOP_INCIDENTS ||--o{ WORKSHOP_ARBITRATION_CONSULTATIONS : "porte"
   WORKSHOP_INCIDENTS ||--o{ WORKSHOP_ARBITRATION_CASES : "porte"
   WORKSHOP_INCIDENT_EVENTS ||--o| WORKSHOP_ARBITRATION_CONSULTATIONS : "demande consultee"
-  WORKSHOP_INCIDENT_EVENTS ||--o| WORKSHOP_ARBITRATION_CASES : "ouvre"
-  WORKSHOP_INCIDENT_EVENTS ||--o| NOTIFICATION_OUTBOX : "notifie"
-  PASSWORD_RESET_REQUESTS ||--o| NOTIFICATION_OUTBOX : "notifie"
+  WORKSHOP_INCIDENT_EVENTS o|--o| WORKSHOP_ARBITRATION_CASES : "ouvre"
+  WORKSHOP_INCIDENT_EVENTS o|--o| NOTIFICATION_OUTBOX : "notifie"
+  PASSWORD_RESET_REQUESTS o|--o| NOTIFICATION_OUTBOX : "notifie"
 
   ADMIN_ACCOUNTS {
     int id PK
+    smallint singleton_key UK
     varchar username UK
     varchar password_hash
     varchar email
@@ -312,12 +329,17 @@ erDiagram
     int taken_by_user_id FK
     varchar status
     varchar state
+    text waiting_reason
+    text diagnostic
     jsonb edit_request
   }
   WORKSHOP_INCIDENT_EVENTS {
     int id PK
     int incident_id FK
     int actor_user_id FK
+    int actor_admin_id FK
+    varchar actor_kind
+    varchar actor_display_name
     varchar event_type
     jsonb payload
   }
@@ -341,6 +363,12 @@ erDiagram
     varchar status
     jsonb payload
     text reason
+    int requested_by_user_id FK
+    int consulted_by_user_id FK
+    int decided_by_user_id FK
+    timestamptz requested_at
+    timestamptz consulted_at
+    timestamptz decided_at
   }
   ACCOUNT_AUDIT_EVENTS {
     int id PK
@@ -373,6 +401,9 @@ erDiagram
     int password_reset_request_id FK
     varchar status
     int attempt_count
+    jsonb delivered_recipients
+    timestamptz created_at
+    timestamptz updated_at
   }
 ```
 
@@ -382,21 +413,22 @@ principales suivent les clés étrangères réelles des migrations. La table tec
 
 ### 6.3 — JSONB, formulation complète
 
-Sentinel possède six colonnes JSONB, regroupées en trois usages :
+Sentinel possède neuf colonnes JSONB, regroupées en quatre usages :
 
-1. `production_lines.machine_sequence` stocke l'agrégat de configuration d'une ligne : ordre des
-   machines, robot simple ou double et nombre de têtes. Cette structure est lue et remplacée comme
-   un tout ; l'application la valide avant écriture. Une modélisation entièrement normalisée en
-   tables `machines`, `robots` et `heads` aurait aussi été possible. Le compromis JSONB réduit le
-   nombre de jointures et simplifie la réorganisation, au prix de contraintes référentielles moins
-   fortes à l'intérieur du document.
-2. `workshop_incidents.edit_request` conserve une proposition de correction structurée avant son
-   approbation. Une contrainte `chk_edit_request_shape` impose un objet contenant au moins un champ
-   métier connu.
+1. `production_lines.machine_sequence` stocke l'agrégat de configuration d'une
+   ligne et `production_line_machines.payload` sa projection normalisée, maintenue
+   par trigger et validée par les fonctions SQL de la migration 043.
+2. `workshop_incidents.edit_request` et
+   `workshop_arbitration_cases.payload` conservent la correction proposée et son
+   cas normalisé. Une contrainte `chk_edit_request_shape` impose un objet contenant
+   au moins un champ métier connu.
 3. `workshop_incident_events.payload`, `account_audit_events.changes`,
    `line_audit_events.changes` et `admin_system_audit_events.changes` portent des détails variables
    selon le type d'événement. Les colonnes relationnelles conservent l'identité, la cible, le type
    et l'horodatage ; JSONB ne contient que le contexte hétérogène.
+4. `notification_outbox.delivered_recipients` conserve, par canal, les
+   destinataires déjà servis afin qu'une reprise partielle ne les livre pas deux
+   fois.
 
 Il ne faut donc plus écrire « deux usages de JSONB » ni laisser entendre que le reste des tables ne
 contient aucun document. JSONB est un choix local dans PostgreSQL, pas une seconde base de données.
@@ -404,7 +436,8 @@ contient aucun document. JSONB est un choix local dans PostgreSQL, pas une secon
 ### 6.4 — MPD et dictionnaire
 
 Le MPD doit présenter les quatorze tables applicatives ci-dessus, leurs types PostgreSQL, PK, FK,
-contraintes et index, puis signaler séparément `schema_migrations(filename, applied_at)`. Pour
+contraintes et index, puis signaler séparément
+`schema_migrations(filename, checksum, applied_at)`. Pour
 `workshop_incidents`, faire apparaître au minimum :
 
 - les statuts `OPEN`, `PENDING`, `CLOSED`, `CANCELED`, `INVALIDATED` ;
@@ -423,8 +456,8 @@ idempotentes au niveau du moteur parce qu'un fichier déjà enregistré n'est pa
 signifie pas que chaque instruction SQL serait réversible. La procédure de retour arrière repose
 sur une sauvegarde et une restauration, pas sur des fichiers `down` absents du projet.
 
-**Sources** : `backend/migrations/001_create_admin_accounts.sql` à
-`050_enforce_single_active_arbitration_heads.sql`, `backend/src/db/migrate.ts`,
+**Sources** : migrations `001` à `050` dans `backend/migrations/`,
+`backend/src/db/migrate.ts`,
 `backend/src/modules/workshop/workshop.repository.analytics.ts`.
 
 ---
@@ -433,12 +466,15 @@ sur une sauvegarde et une restauration, pas sur des fichiers `down` absents du p
 
 ### 7.1 — Cas d'utilisation
 
-**Texte** : le diagramme distingue quatre acteurs. L'Opérateur déclare un incident et peut demander
-la correction ou l'annulation de sa propre déclaration. La Maintenance prend, suspend, reprend et
-clôture les incidents selon leur état. Le Responsable arbitre les demandes, définit la priorité,
-ajoute une consigne, suit un incident et accède au Journal. L'Administrateur gère les comptes, les
-lignes, les paramètres et les journaux de référentiel. Board est une consultation collective en
-lecture seule, protégée par une session dédiée.
+**Texte** : le diagramme distingue quatre acteurs. L'Opérateur déclare un incident,
+peut demander la correction ou l'annulation de sa propre déclaration, puis
+retirer chacune de ces demandes avant décision. La Maintenance prend, met en
+attente avec un motif, reprend et clôture les incidents selon leur état. Le
+Responsable arbitre les demandes, définit la priorité, ajoute une consigne,
+active explicitement un suivi et accède au Journal. L'Administrateur gère les
+comptes, les lignes, les paramètres et les journaux de référentiel. Board est
+une consultation collective en lecture seule, protégée par une session Board
+ou Workshop valide.
 
 **Légende** : *Figure 7.1 — Cas d'utilisation Sentinel par rôle. Le diagramme représente les
 capacités métier ; les règles détaillées selon le statut de l'incident sont portées par la matrice
@@ -501,8 +537,9 @@ avant `CLOSE`.*
 
 **Légende** : *Figure 7.3 — Automate d'état d'un incident. `OPEN` possède deux situations métier,
 non pris et pris. `PENDING` exige une prise en charge et un motif de mise en attente ;
-`diagnostic` reste réservé au vrai diagnostic de maintenance et `CLOSED` exige une note
-d'intervention ; `CANCELED` et `INVALIDATED` restent conservés dans l'historique.*
+`diagnostic` reste une colonne historique en lecture seule qu'aucune action courante
+n'écrit, et `CLOSED` exige une note d'intervention ; `CANCELED` et `INVALIDATED`
+restent conservés dans l'historique.*
 
 **Sources** : `INCIDENT_LIFECYCLE.md`, `backend/src/domain/constants.ts`,
 `backend/src/modules/workshop/workshop.policy.ts`,
@@ -540,9 +577,9 @@ masquée quand le détail est ouvert et le panneau occupe toute la largeur de la
 
 ### 8.2 — Interfaces dynamiques
 
-`useIncidentPermissions` dérive treize permissions directes du dossier incident. Deux capacités
+`useIncidentPermissions` dérive quatorze permissions directes du dossier incident. Deux capacités
 d'arbitrage supplémentaires combinent les actions d'approbation et de rejet des demandes de
-correction ou d'annulation. Il est donc plus exact d'écrire « treize permissions directes,
+correction ou d'annulation. Il est donc plus exact d'écrire « quatorze permissions directes,
 complétées par deux capacités d'arbitrage » que « treize vérifications au total ». Le composant
 `IncidentDetailPanel` transforme ces booléens en groupes d'actions visibles. Cette logique
 d'affichage ne constitue pas une protection : chaque mutation est contrôlée côté serveur.
@@ -585,8 +622,9 @@ masquer un bouton, mais seule la vérification serveur autorise l'écriture.
 
 Les écritures du domaine Workshop sont réparties entre `workshop.service.edit.ts` et
 `workshop.service.mutations.ts`. `followIncidentService` illustre une transaction atomique : contrôle
-du rôle, `BEGIN`, lecture de l'incident avec verrou, contrôle de son état, écriture du suivi,
-insertion de l'événement puis `COMMIT`. En cas d'exception, `withTransaction` exécute `ROLLBACK`.
+du rôle, `BEGIN`, lecture de l'incident avec verrou, contrôle de son état, écriture idempotente du
+suivi, insertion de l'événement uniquement si la relation a changé, puis `COMMIT`. En cas
+d'exception, `withTransaction` exécute `ROLLBACK`.
 Le `FOR UPDATE` de `getIncidentById` protège la ligne uniquement lorsqu'un `PoolClient`
 transactionnel lui est transmis ; hors transaction explicite, le verrou serait libéré à la fin de
 la requête.
@@ -660,7 +698,7 @@ requêtes par IP et par 15 minutes par défaut, hors `/api/health`.
 | A03 — Injection | validation Zod, paramètres SQL, listes blanches pour les variantes de requêtes |
 | A04 — Conception non sécurisée | cycle d'état explicite, transactions, contraintes SQL et audit trail |
 | A05 — Mauvaise configuration | `assertProductionConfig`, CORS à origine unique, CSP, `X-Frame-Options`, `nosniff`, HSTS en production |
-| A06 — Composants vulnérables ou obsolètes | `npm audit --audit-level=high` dans les jobs backend/frontend et Dependabot hebdomadaire |
+| A06 — Composants vulnérables ou obsolètes | `npm audit --omit=dev --audit-level=high` dans les jobs backend/frontend pour le runtime, Dependabot hebdomadaire et audits complets de développement analysés séparément |
 | A07 — Identification et authentification | rate limiting, messages génériques, versions de session révocables et code temporaire expirant |
 | A08 — Intégrité logicielle et des données | lockfiles utilisés par `npm ci`, migrations versionnées, contraintes et événements écrits en mode append-only par les services |
 | A09 — Journalisation et surveillance | Pino, redaction des cookies/Authorization, healthcheck DB et journaux métier/admin horodatés |
@@ -697,16 +735,24 @@ avant l'expiration.*
 
 ### 10.4 — Veille sécurité fondée sur des preuves du dépôt
 
-> Dans ce projet, ma veille vérifiable repose d'abord sur des contrôles automatisés. Dependabot
-> surveille chaque lundi les dépendances npm du backend et du frontend. Sur les pushes vers `main`
-> ou `refactor/**` et les pull requests vers `main`, GitHub Actions exécute
-> `npm audit --audit-level=high` après une installation reproductible
-> par `npm ci`. Je complète ces alertes par des audits ciblés du code : suppression d'une fuite
-> d'énumération à la connexion (`e998463`), ajout du rate limiting global (`296fffe`) et durcissement
-> du traitement des e-mails professionnels (`dc7133e`). Une alerte n'est pas corrigée en mettant à
-> jour aveuglément : je vérifie le chemin affecté, j'exécute lint/build/tests et je contrôle la CI
-> avant intégration. Le dépôt prouve cette pratique automatisée ; je ne revendique pas ici une
-> consultation régulière de CERT-FR, de l'ANSSI ou d'une newsletter que je ne peux pas documenter.
+Dependabot surveille chaque lundi les dépendances npm du backend et du frontend.
+Sur les pushes vers `main`, `refactor/**` ou `release/**`, ainsi que sur les pull
+requests vers `main`, GitHub Actions installe avec `npm ci` puis exécute
+`npm audit --omit=dev --audit-level=high`. Ce contrôle porte sur le runtime ; les
+audits complets de développement restent analysés séparément et signalent
+actuellement des vulnérabilités high issues de `brace-expansion`. Trois
+advisories React Router modérées sont documentées avec leurs chemins et options
+dans `docs/rc5-decision-dossiers.md`.
+
+Le dépôt conserve aussi des corrections de sécurité ciblées : suppression d'une
+fuite d'énumération à la connexion (`e998463`), ajout du rate limiting global
+(`296fffe`) et durcissement du traitement des e-mails professionnels
+(`dc7133e`).
+
+**[À COMPLÉTER — personnel]** L'auteur doit décrire uniquement sa veille
+réellement pratiquée : sources consultées, fréquence et exemple personnel
+vérifiable. Le dépôt ne prouve pas à lui seul une consultation régulière de
+CERT-FR, de l'ANSSI ou d'une newsletter.
 
 **Sources** : `backend/src/auth/`, `backend/src/middlewares/adminAuth.ts`,
 `backend/src/middlewares/workshopAuth.ts`, `backend/src/modules/board/board.auth.ts`,
@@ -726,7 +772,8 @@ il traite un nom d'utilisateur et éventuellement une adresse e-mail. Les demand
 réinitialisation conservent l'identifiant utilisateur, le badge et les dates de demande/traitement.
 
 Les incidents et journaux enregistrent aussi les données nécessaires à la traçabilité : déclarant,
-technicien, acteur d'une action, rôle, horodatage, ligne, machine, diagnostic, note d'intervention,
+technicien, acteur d'une action, rôle, horodatage, ligne, machine, éventuel diagnostic
+historique en lecture seule, note d'intervention,
 consigne et motif d'arbitrage. Les logs HTTP peuvent contenir des métadonnées techniques telles que
 l'adresse IP, la route, le statut et l'agent utilisateur ; les cookies et l'en-tête Authorization
 sont expurgés par la configuration Pino. Aucune donnée biométrique, photo, géolocalisation ou donnée
@@ -842,24 +889,28 @@ comme celles du build final.
 
 ## 13. Tests
 
-### 13.1 — Stratégie et chiffres actuels
+### 13.1 — Stratégie et comptage reproductible
 
-Le backend utilise Jest avec deux projets. Le projet `unit` contient 511 tests
-et emploie des mocks pour isoler services, policies, validations et
-repositories. Le projet `integration` contient 146 tests répartis dans 21 suites,
-exécutés contre PostgreSQL réel et jetable. Le frontend contient 583 tests
-Vitest/Testing Library en `jsdom`. Les 18 fichiers Playwright portent 57
-scénarios Chromium couvrant les espaces public, Admin, Atelier et Board,
-l'accessibilité, le responsive, les mutations et les parcours métier. Ils sont
-exécutés par le job CI `Browser / Critical journeys`.
+Le backend utilise deux projets Jest : `unit` isole services, policies,
+validations et repositories ; `integration` exécute les parcours concernés
+contre PostgreSQL réel et jetable. Le frontend associe Vitest/Testing Library
+en `jsdom` et Playwright sur Chromium pour les espaces public, Admin, Atelier et
+Board, l'accessibilité, le responsive, les mutations et les parcours métier.
 
-Le 28 juillet 2026, les commandes suivantes ont été exécutées dans le checkout
-audité :
+Les nombres de fichiers et de tests ne sont pas un contrat stable. Le collecteur
+les accepte seulement à partir de rapports unitaires, PostgreSQL, frontend et
+Playwright entièrement verts ; il refuse tout test ignoré, inattendu ou flaky.
+Le workflow courant conserve exactement six jobs.
+
+À titre historique, le 28 juillet 2026, la preuve RC4 comportait :
 
 - `cd backend && npm test` : 48 suites, 511 tests passants ;
 - PostgreSQL jetable : 21 suites, 146 tests passants, nettoyage complet ;
 - `cd frontend && npm test` : 58 fichiers, 583 tests passants ;
 - Chromium sur PostgreSQL jetable : 57 scénarios passants.
+
+Pour RC5, remplacer ce bloc historique par les sorties du SHA audité après leur
+collecte, sans recopier ces totaux.
 
 Les six jobs CI reproduisent ces familles et ajoutent audits, builds, contrat
 des images, préflight registry-only et restauration. Ajouter une capture GitHub
@@ -879,34 +930,12 @@ Présenter au maximum trois preuves lisibles :
 
 ---
 
-## 15. Bilan personnel proposé
+## 15. Bilan personnel
 
-> Ce passage est une proposition rédigée à partir du parcours visible dans Git. L'auteur doit le
-> relire et ne conserver que ce qui correspond réellement à son expérience personnelle.
-
-Sentinel m'a appris à transformer une observation de terrain en règles explicites, puis à faire
-traverser ces règles dans toute une application : maquette, interface, API, service, base de données,
-tests et exploitation. La partie la plus formatrice n'a pas été l'ajout d'écrans, mais le travail de
-cohérence : rendre un cycle d'incident compréhensible pour trois rôles tout en garantissant côté
-serveur qu'aucune transition interdite ne puisse être imposée par le client.
-
-Les audits successifs m'ont aussi montré qu'un projet fonctionnel n'est pas encore un projet
-fiable. J'ai dû corriger des fenêtres de concurrence, compléter l'audit trail, séparer Historique et
-Journal, uniformiser les résultats de service, améliorer l'accessibilité et documenter le retour
-arrière. Cette démarche m'a fait progresser dans la lecture critique de mon propre code : chercher
-les hypothèses implicites, puis les transformer en contraintes, tests ou procédures vérifiables.
-
-Si je recommençais, je formaliserais plus tôt le modèle de données, l'automate d'état et la matrice
-de permissions. J'ajouterais dès le début des parcours end-to-end multi-rôles et une politique de
-conservation RGPD, au lieu de les traiter principalement pendant le durcissement final. Je
-distinguerais aussi dès la première version le Compose autonome et la topologie réelle du VPS pour
-éviter toute ambiguïté de documentation.
-
-Le projet reste volontairement limité : il ne pilote aucune machine, n'intègre pas encore de GMAO
-et ne mesure pas une adoption industrielle réelle. La prochaine étape pertinente n'est pas
-d'ajouter des fonctions au hasard, mais d'éprouver Sentinel avec des utilisateurs, de mesurer les
-délais et la qualité des déclarations, d'exercer périodiquement la restauration des sauvegardes et de
-prioriser les évolutions à partir de ces résultats.
+**[À COMPLÉTER — entièrement personnel]** L'auteur doit rédiger son propre
+bilan : apprentissages, difficultés les plus formatrices, choix qui seraient
+revus et lien personnel avec le besoin industriel. Aucun texte à la première
+personne ne peut être déduit honnêtement de l'historique Git.
 
 ---
 
@@ -936,7 +965,9 @@ restauration sur le VPS ne doit pas être inventée et reste conditionnée à un
 
 ## Contrôle final avant export du DOCX
 
-- Supprimer toutes les mentions `À COMPLÉTER`, les instructions internes et la note de méthode.
+- Résoudre chaque marqueur `À COMPLÉTER` avec une preuve réelle ou le conserver
+  explicitement ; ne jamais le supprimer en inventant une donnée personnelle,
+  une capture ou un état externe.
 - Générer un vrai sommaire Word à partir des styles Titre 1/2/3, puis mettre à jour tous les champs.
 - Recalculer les pages de la matrice des compétences et les renvois de figures.
 - Numéroter chaque figure et chaque tableau ; placer la légende sous le visuel et citer sa source.

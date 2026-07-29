@@ -37,7 +37,7 @@ sentinel/
     workflows/ci.yml         pipeline de qualité
     dependabot.yml           mises à jour automatisées
   backend/
-    migrations/              001 à 046, SQL append-only
+    migrations/              001 à 050, SQL append-only
     scripts/                 seeds et audit structurel
     src/
       auth/                  JWT, cookies, bcrypt et payloads
@@ -176,7 +176,7 @@ nouvelle migration.
 
 ### 6.2 Évolution du schéma
 
-Le dépôt comprend 46 migrations :
+Le dépôt comprend 50 migrations :
 
 - 001-006 : admin, utilisateurs, audit initial, lignes et mots de passe ;
 - 007-019 : incidents, workflow, événements, intégrité et followers ;
@@ -187,7 +187,11 @@ Le dépôt comprend 46 migrations :
 - 042-043 : projection normalisée et validation des machines ;
 - 044 : normalisation/unicité des badges actifs ;
 - 045 : outbox durable ;
-- 046 : namespaces des identifiants opérationnels.
+- 046 : namespaces des identifiants opérationnels ;
+- 047 : états terminaux observables de l'outbox ;
+- 048 : destinataires déjà livrés pour la reprise idempotente de l'outbox ;
+- 049 : durée Board `0`, sans expiration automatique mais toujours révocable ;
+- 050 : motif de mise en attente séparé du diagnostic.
 
 ### 6.3 Modèle principal
 
@@ -538,10 +542,12 @@ peuvent jamais s'exécuter en même temps. La restauration refuse par défaut to
 dump sans checksum SHA-256 associé — `--allow-unverified` force le passage avec
 un avertissement audité en sortie d'erreur. Elle importe ensuite dans une base
 temporaire, valide la présence des quinze tables du schéma, la cohérence du
-ledger `schema_migrations` (aucun checksum ni horodatage manquant) et quelques
-colonnes témoins, avant d'arrêter brièvement le backend et d'échanger les noms
-de base. Un trap nettoie la base temporaire et tente le retour arrière si la
-bascule est incomplète.
+ledger `schema_migrations` puis son égalité exacte avec les fichiers canoniques
+du checkout (noms, ordre et checksums), avant d'arrêter brièvement le backend et
+d'échanger les noms de base. Le test RC5 couvre les variantes tronquée, absente,
+supplémentaire, désordonnée et au checksum modifié avant toute mutation de la
+destination. Un trap nettoie la base temporaire et tente le retour arrière si
+la bascule est incomplète.
 
 ## 17. Limites connues et extensions
 
