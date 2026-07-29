@@ -97,8 +97,7 @@ function incidentOrder(selector: string): string[] {
   expect(container).not.toBeNull();
   return Array.from(
     (container as HTMLElement).querySelectorAll<HTMLButtonElement>('button.inline-link-button')
-  )
-    .map((button) => button.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+  ).map((button) => button.textContent?.replace(/\s+/g, ' ').trim() ?? '');
 }
 
 function expectDesktopAndMobileOrder(expected: string[]): void {
