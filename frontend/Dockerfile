@@ -15,7 +15,8 @@ RUN npm run build
 FROM nginx:1.30.4-alpine3.24 AS production
 
 ARG BUILD_SHA=unknown
-LABEL org.opencontainers.image.revision=$BUILD_SHA
+LABEL org.opencontainers.image.revision=$BUILD_SHA \
+      org.opencontainers.image.title=sentinel-frontend
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf

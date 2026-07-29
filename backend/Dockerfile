@@ -17,7 +17,8 @@ WORKDIR /app
 
 ARG BUILD_SHA=unknown
 ENV BUILD_SHA=$BUILD_SHA
-LABEL org.opencontainers.image.revision=$BUILD_SHA
+LABEL org.opencontainers.image.revision=$BUILD_SHA \
+      org.opencontainers.image.title=sentinel-backend
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
