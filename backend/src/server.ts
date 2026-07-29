@@ -29,6 +29,7 @@ import { boardRouter } from './modules/board/board.auth';
 import { FIELD_LIMITS } from './domain/constants';
 import { startNotificationOutboxWorker } from './modules/notifications/notificationOutbox.worker';
 import { apiErrorHandler, apiNotFoundHandler } from './middlewares/apiErrors';
+import { createCsrfProtection } from './middlewares/csrfProtection';
 
 const app = express();
 app.disable('x-powered-by');
@@ -52,6 +53,7 @@ app.use(
 app.use(pinoHttp(httpLoggingOptions(logger)));
 
 app.use(securityHeaders);
+app.use('/api', createCsrfProtection(CLIENT_ORIGIN));
 app.use(express.json({ limit: '50kb' }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 

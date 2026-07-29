@@ -9,6 +9,10 @@ import type { IncomingMessage } from 'http';
 export const HTTP_LOG_REDACT_PATHS = [
   'req.headers.cookie',
   'req.headers.authorization',
+  // Origin peut être forgé et Referer peut contenir une query sensible. La
+  // garde CSRF ne journalise jamais leurs valeurs et le logger les masque aussi.
+  'req.headers.origin',
+  'req.headers.referer',
   'res.headers["set-cookie"]',
 ] as const;
 

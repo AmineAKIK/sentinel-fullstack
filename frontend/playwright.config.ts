@@ -39,5 +39,13 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
     },
+    {
+      // Origine sœur locale, dédiée à la preuve navigateur CSRF. Elle sert le
+      // même frontend mais n'est jamais autorisée par CLIENT_ORIGIN.
+      command: 'npm run dev -- --host 127.0.0.1 --port 5175 --strictPort',
+      url: 'http://127.0.0.1:5175',
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
   ],
 });

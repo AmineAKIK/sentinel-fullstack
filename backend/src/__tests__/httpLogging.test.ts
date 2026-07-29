@@ -15,6 +15,8 @@ const FAKE_JWT = 'HEADER.PAYLOAD.SIGNATURE-fake-jwt-value';
 const FAKE_SIGNED_COOKIE = `sentinel_board_token=s%3A${FAKE_JWT}.fakeSig; Path=/; HttpOnly`;
 const FAKE_REQUEST_COOKIE = 'sentinel_workshop_token=inbound-fake-value';
 const FAKE_AUTHORIZATION = 'Bearer inbound-fake-bearer';
+const FAKE_ORIGIN = 'https://inbound-fake-origin-token.example.test';
+const FAKE_REFERER = 'https://sentinel.example.test/form?token=inbound-fake-referer-token';
 
 async function captureRequestLog(): Promise<string> {
   const chunks: string[] = [];
@@ -37,7 +39,12 @@ async function captureRequestLog(): Promise<string> {
       {
         port,
         path: '/api/board/session',
-        headers: { cookie: FAKE_REQUEST_COOKIE, authorization: FAKE_AUTHORIZATION },
+        headers: {
+          cookie: FAKE_REQUEST_COOKIE,
+          authorization: FAKE_AUTHORIZATION,
+          origin: FAKE_ORIGIN,
+          referer: FAKE_REFERER,
+        },
       },
       (res) => {
         res.on('data', () => undefined);
@@ -66,11 +73,15 @@ describe('journalisation HTTP — aucun secret ne fuit (P0 rc.2)', () => {
     // Les secrets entrants restent masqués (non-régression).
     expect(output).not.toContain('inbound-fake-value');
     expect(output).not.toContain('inbound-fake-bearer');
+    expect(output).not.toContain('inbound-fake-origin-token');
+    expect(output).not.toContain('inbound-fake-referer-token');
 
     // Les redactions sont visibles là où un secret existait.
     const parsed = JSON.parse(output.trim().split('\n').pop() as string);
     expect(parsed.req.headers.cookie).toBe('[Redacted]');
     expect(parsed.req.headers.authorization).toBe('[Redacted]');
+    expect(parsed.req.headers.origin).toBe('[Redacted]');
+    expect(parsed.req.headers.referer).toBe('[Redacted]');
     expect(parsed.res.headers['set-cookie']).toBe('[Redacted]');
   });
 
