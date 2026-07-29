@@ -3,10 +3,11 @@
 État des constats : 29 juillet 2026.
 
 Ce document contient **cinq** dossiers, conformément aux cinq sujets énumérés
-dans le contrat RC5, malgré la mention finale « quatre dossiers ». Il sépare les
-faits reproductibles, les informations externes manquantes et les options qui
-exigent une décision. Il ne vaut ni décision, ni waiver, ni autorisation de
-publication ou de déploiement.
+dans le contrat RC5, malgré la mention finale « quatre dossiers ». Les sections
+1 à 5 conservent intégralement l'état pré-décision : faits reproductibles,
+informations externes manquantes et options alors ouvertes. La section 6
+enregistre les décisions ensuite données et leur exécution. Elle ne vaut ni
+waiver, ni autorisation de publication ou de déploiement.
 
 ## Périmètre et preuves conservées
 
@@ -696,12 +697,209 @@ n'est mis à jour et aucun waiver n'est créé ici.
 Tant que ces décisions ne sont pas prises et prouvées, ce dossier ne permet pas
 un verdict de publication.
 
+## 6. Décisions appliquées depuis le HEAD RC5
+
+Les mentions « décision ouverte » des sections 1 à 5 sont conservées comme
+photographie historique. Le registre ci-dessous est l'état courant et ne
+réécrit aucune option rejetée.
+
+| ID | Décision donnée | Résultat local | État de sortie |
+| --- | --- | --- | --- |
+| R | **R1**, React Router exactement `7.18.2`, Declarative Mode conservé | migration et non-régressions locales vertes | `IMPLEMENTED`, mais publication `BLOCKED` par une advisory high distincte |
+| P | **P2**, RC et stable uniquement à la tête exacte de `main` | workflow, garde et dry-run locaux verts | `IMPLEMENTED_LOCAL`, `BLOCKED_EXTERNAL` |
+| C | **C1 + C3**, égalité d'origine stricte et refus sans en-têtes | middleware central, inventaire et vrai Chromium verts | `VERIFIED_LOCAL` |
+| D | **D2**, parents compatibles uniquement, sans waiver ni override forcé | aucune combinaison parente compatible trouvée | `BLOCKED_UPSTREAM`, aucun commit |
+| O | aucune décision opérationnelle autorisée | aucun accès VPS, DNS, Nginx ou Compose distant | `PENDING_AUTHORIZATION` |
+
+### 6.1 R = R1
+
+La migration est portée par :
+
+```text
+25a7ca37bc8ddf8f3eefb580b406fa154d1045e6
+  fix(security): migrate React Router to patched v7
+  parent 3fd8856a773e20cd56b304989a26704d6a1a8f0c
+
+9896551efdf739d973c5d0cc0984d118ce92134d
+  fix(frontend): handle async router navigation
+  parent 25a7ca37bc8ddf8f3eefb580b406fa154d1045e6
+```
+
+`react-router-dom@7.18.2` résout un unique `react-router@7.18.2`; aucune v6 ni
+duplication ne subsiste. Les deux future flags v6 ont été retirés. L'application
+reste en Declarative Mode : aucun RouterProvider de production, loader/action,
+SSR, RSC ou Framework Mode n'a été introduit. Les tests permanents couvrent
+antislashs, double slash, schémas et caractères de contrôle, paramètres de
+redirection, `Link`, `Navigate`, `NavLink`, `useNavigate`, routes internes,
+paramètres et historique.
+
+Preuve ciblée : le test de sécurité échoue avant correction (`9` échecs,
+`17` succès), puis passe après correction (`50/50`) :
+
+```text
+/tmp/sentinel-rc5-r1-router-red-valid.log
+sha256 8adc1ee63a1b812de27a423c98377db1d7978e0b85138ed60f7c3d66a3158b47
+
+/tmp/sentinel-rc5-r1-router-green-final.log
+sha256 168bbd5f844e073d3f7ae8be8f34bc4c9765e843afda523fbed0f1d7dd8166a8
+```
+
+Les trois advisories qui ont motivé R1 ne sont plus présentes. L'audit courant
+révèle toutefois une quatrième advisory, distincte et high,
+[`GHSA-qwww-vcr4-c8h2`](https://github.com/advisories/GHSA-qwww-vcr4-c8h2) :
+elle couvre `react-router >=7.12.0 <8.3.0`, donc la version imposée `7.18.2`.
+L'avis précise que seuls les chemins instables RSC sont concernés; Sentinel
+n'utilise pas ces APIs. Cette absence de la surface RSC n'est pas transformée
+en waiver : l'audit runtime frontend reste en échec (`2 high`) et le job
+`Frontend / Quality` ne peut donc pas être vert tant qu'une nouvelle décision
+Router compatible avec ce contrat exact n'est pas donnée.
+
+### 6.2 P = P2
+
+Le commit local est :
+
+```text
+ef9dca2f9eaad36b429af18ad45b2952c58207a0
+  fix(release): publish only verified main commits
+  parent c864ac3a3481e16c0f707d611deebd545725d0ee
+```
+
+Le workflow est déclenché manuellement depuis `main`, classe strictement une RC
+ou une stable, puis exige :
+
+```text
+TAG_SHA == checkout HEAD == refs/remotes/origin/main
+```
+
+Il sélectionne par `head_sha` un run `push` de `ci.yml` sur `main`, refuse toute
+preuve paginée ou tronquée et exige les six jobs nommés, terminés et réussis sur
+ce même SHA. La validation ne possède aucune permission d'écriture et aucun
+secret de publication. Après approbation de l'environnement `prerelease` ou
+`production`, le garde complet est rejoué avant la réservation d'une draft,
+l'authentification GHCR et tout push. Les publications sont sérialisées sans
+annulation; actions, outils et images sont épinglés par SHA ou digest; les deux
+images reçoivent provenance maximale, SBOM SPDX et attestations; les notes
+portent SHA et digests. Aucun tag n'est créé, déplacé ou réutilisé.
+
+Tests permanents :
+
+```text
+politique                    10/10
+collecteur/dry-run réel       1/1
+contrat statique workflow     8/8
+```
+
+Les réglages distants indispensables sont détaillés dans
+[`github-release-protection-checklist.md`](github-release-protection-checklist.md).
+L'état lu sans mutation ne comporte ni environnement, ni ruleset, ni protection
+de `main`; les Actions autorisent tout et n'imposent pas les SHA complets. La
+publication reste donc `BLOCKED_EXTERNAL`. Cette réserve est renforcée par
+l'historique Git : un tag placé sur un ancien commit peut encore charger
+l'ancienne version de `release.yml`; seule la combinaison des règles distantes
+documentées peut neutraliser ce chemin sans réécrire l'historique interdit.
+Enfin, l'audit Router high décrit en 6.1 empêche actuellement d'obtenir les six
+jobs verts exigés par P2.
+
+### 6.3 C = C1 + C3
+
+Le commit local est :
+
+```text
+c864ac3a3481e16c0f707d611deebd545725d0ee
+  fix(security): enforce same-origin mutation requests
+  parent 9896551efdf739d973c5d0cc0984d118ce92134d
+```
+
+Un middleware placé avant parsing des corps, cookies et routes protège toutes
+les méthodes non sûres sous `/api`. Un `Origin` présent a priorité et doit être
+unique, bien formé et strictement égal à `CLIENT_ORIGIN`; à défaut, un unique
+`Referer` doit parser vers la même origine. L'absence des deux est toujours
+refusée. `same-site` n'accorde aucun droit, `cross-site` est refusé,
+`same-origin` reste soumis aux contrôles précédents et `none` est tranché par
+Origin/Referer. Les méthodes sûres et `OPTIONS` restent lisibles. Les logs ne
+contiennent aucun cookie, token ou payload.
+
+L'inventaire permanent exerce les audiences Admin, Atelier et Board, les
+méthodes POST/PUT/PATCH/DELETE et 32 routes réelles. Le navigateur réel utilise
+deux origines locales (`127.0.0.1:5174` et `127.0.0.1:5175`) : un formulaire
+simple depuis l'origine sœur reçoit `403` sans preflight et sans détruire la
+session, tandis que les mutations légitimes continuent de passer.
+
+Une revue a en outre identifié le cas de deux lignes `Referer`. La reproduction
+intermédiaire, qui lisait seulement `req.headers`, acceptait à tort
+`Referer` autorisé suivi d'un `Referer` hostile (`204`). La correction inspecte
+`rawHeaders`, refuse toute multiplicité et le même test permanent passe :
+
+```text
+backend rouge                    22 échecs / 43 succès
+Chromium rouge                   403 attendu, 200 reçu
+backend vert                     71/71
+Chromium ciblé vert               1/1
+double Referer rouge             204 reçu, 403 attendu
+double Referer vert               1/1
+```
+
+### 6.4 D = D2
+
+Les essais ont été réalisés hors du worktree candidat. Aucune tentative n'a été
+conservée, aucun lockfile n'a été modifié et aucun commit artificiel n'existe.
+
+| Périmètre | Parents essayés | Résultat |
+| --- | --- | --- |
+| backend | `jest@30.4.2`, `ts-jest@29.4.12`, `eslint@10.8.0` | `brace-expansion@2.1.3` reste via Jest/glob et `1.1.17` via ts-jest/test-exclude |
+| frontend | `eslint@9.39.5`, `eslint@10.8.0`, `eslint-plugin-jsx-a11y@6.10.2` | `brace-expansion@1.1.17` reste; ESLint 10 et jsx-a11y 6.10.2 sont incompatibles par peer dependency |
+
+Il n'existe pas de Jest 31 ni d'eslint-plugin-jsx-a11y 7 publié dans les
+combinaisons officiellement compatibles testées. Le graphe courant conserve
+donc `1.1.16` et `2.1.2`, tous deux dans la plage `<=5.0.7` de
+`GHSA-mh99-v99m-4gvg`. L'audit runtime backend reste nul; les audits complets
+remontent `20 high` backend et `8 high` frontend (Brace plus Router). Aucun
+`npm audit fix --force`, downgrade, override inter-majeure, suppression d'outil
+ou waiver n'a été utilisé. Verdict D2 : `BLOCKED_UPSTREAM`.
+
+### 6.5 O et validation locale
+
+O reste `PENDING_AUTHORIZATION`. Aucun accès VPS, DNS, Nginx, Caddy ou Compose
+distant n'a été tenté; les contradictions de la section 4 restent ouvertes.
+
+La validation locale du code courant donne :
+
+| Niveau | Résultat |
+| --- | --- |
+| backend unitaire + couverture | `604/604`, 51 suites |
+| fiabilité backend | `17/17` |
+| PostgreSQL jetable | `165/165`, 22 suites |
+| frontend + couverture | `754/754`, 71 fichiers |
+| Chromium complet sur trois bases fraîches | `156/156` × 3 |
+| axe | inclus et vert dans les trois passages |
+| audit runtime backend | `0` vulnérabilité |
+| audit runtime frontend | `2 high`, Router RSC — bloquant |
+| audits complets | backend `20 high`; frontend `8 high` |
+
+Le premier passage Chromium global a révélé une course de focus après échec de
+déconnexion (`155/156`). Le test permanent exigeait déjà la restauration exacte
+sur le bouton. La correction attend la fin réelle de l'état pending avant de
+refocaliser; preuve ciblée `2/2`, frontend `754/754`, puis trois passages
+`156/156`. Elle est isolée dans :
+
+```text
+81a74173e715043a6d3520276caac184333c2981
+  fix(frontend): restore focus after failed logout
+  parent ef9dca2f9eaad36b429af18ad45b2952c58207a0
+```
+
+Malgré les preuves fonctionnelles vertes, le verdict de publication RC5 reste
+`BLOCKED` : contradiction Router `7.18.2`/audit high, D2 sans combinaison
+parente disponible, protections GitHub externes absentes et dossier O non
+autorisé.
+
 ## Sources officielles consultées le 29 juillet 2026
 
 - GitHub Advisory Database :
   [`GHSA-wrjc-x8rr-h8h6`](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6),
   [`GHSA-337j-9hxr-rhxg`](https://github.com/advisories/GHSA-337j-9hxr-rhxg),
   [`GHSA-jjmj-jmhj-qwj2`](https://github.com/advisories/GHSA-jjmj-jmhj-qwj2),
+  [`GHSA-qwww-vcr4-c8h2`](https://github.com/advisories/GHSA-qwww-vcr4-c8h2),
   [`GHSA-mh99-v99m-4gvg`](https://github.com/advisories/GHSA-mh99-v99m-4gvg).
 - React Router :
   [versions et modes](https://reactrouter.com/home),

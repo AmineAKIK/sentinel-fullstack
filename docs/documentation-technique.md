@@ -82,7 +82,7 @@ sentinel/
 ### Frontend
 
 - React 18 ;
-- React Router 6 ;
+- React Router 7.18.2 en Declarative Mode ;
 - Vite 8 ;
 - TypeScript strict ;
 - Vitest + Testing Library ;

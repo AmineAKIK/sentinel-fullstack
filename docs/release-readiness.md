@@ -14,17 +14,30 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 
 ### Mise à jour documentaire RC5
 
-**Statut RC5 : BLOCKED**, en attente des cinq décisions explicites consignées
-dans [rc5-decision-dossiers.md](rc5-decision-dossiers.md) : React Router,
-workflow de publication, protection CSRF same-site, vérité opérationnelle et
-vulnérabilités des dépendances de développement.
+**Statut RC5 : BLOCKED.** Les décisions R1, P2, C1+C3 et D2 sont désormais
+enregistrées dans la section 6 de
+[rc5-decision-dossiers.md](rc5-decision-dossiers.md). R1, P2 et C1+C3 sont
+implémentées localement; D2 est `BLOCKED_UPSTREAM`; O reste
+`PENDING_AUTHORIZATION`.
+
+Les blocages exacts sont :
+
+- `react-router@7.18.2`, version exacte imposée par R1, est dans la plage high de
+  `GHSA-qwww-vcr4-c8h2`; Sentinel n'utilise pas RSC, mais aucun waiver n'est
+  créé et l'audit runtime frontend échoue;
+- aucune combinaison parente Jest/ts-jest/ESLint/jsx-a11y officiellement
+  compatible n'élimine les anciennes chaînes `brace-expansion`;
+- les environnements et rulesets GitHub indispensables à P2 ne sont pas
+  configurés ou prouvés; l'historique du workflow de tag impose ce verrou;
+- aucune lecture de la topologie publique O n'a été autorisée.
 
 La narration des lots, SHA et runs antérieurs est conservée comme historique
 daté. Pour le candidat RC5 courant, les faits structurels dérivés du dépôt sont
 `50` migrations (`001..050`), `15` tables physiques (`14` applicatives et
-`schema_migrations`) et `6` jobs CI. Les anciens totaux de tests RC4 ne sont pas
-réattribués à RC5 : ils doivent être régénérés depuis des rapports verts du SHA
-audité.
+`schema_migrations`) et `6` jobs CI. Les preuves locales courantes sont
+`604` tests backend, `165` PostgreSQL, `754` frontend et `156` Chromium
+(`156/156` sur trois bases fraîches, axe inclus). Ces nombres ne ferment ni
+l'audit frontend, ni les preuves GitHub/VPS externes.
 
 ## 1. Règles de pilotage
 
