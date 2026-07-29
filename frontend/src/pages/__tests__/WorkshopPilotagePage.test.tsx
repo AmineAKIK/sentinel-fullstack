@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import WorkshopPilotagePage from '../WorkshopPilotagePage';
 import { usePilotageData } from '../../hooks/usePilotageData';
@@ -163,6 +164,40 @@ describe('WorkshopPilotagePage — KPI "Incidents actifs" (RC5)', () => {
 });
 
 describe('WorkshopPilotagePage — filtres et cohérence des totaux (RC5)', () => {
+  it.each([
+    {
+      interaction: 'la suppression de la puce Période',
+      accessibleName: 'Retirer le filtre Période: 30 derniers jours',
+    },
+    {
+      interaction: 'le bouton Effacer les filtres',
+      accessibleName: 'Effacer les filtres',
+    },
+  ])(
+    '$interaction restaure le preset 7 jours sans écraser les deux dates recalculées',
+    async ({ accessibleName }) => {
+      const user = userEvent.setup();
+      const setPeriod = vi.fn();
+      const setCustomStart = vi.fn();
+      const setCustomEnd = vi.fn();
+      renderPilotagePage({
+        period: '30d',
+        customStart: '2026-06-30',
+        customEnd: '2026-07-29',
+        setPeriod,
+        setCustomStart,
+        setCustomEnd,
+      });
+
+      await user.click(screen.getByRole('button', { name: accessibleName }));
+
+      expect(setPeriod).toHaveBeenCalledOnce();
+      expect(setPeriod).toHaveBeenCalledWith('7d');
+      expect(setCustomStart).not.toHaveBeenCalled();
+      expect(setCustomEnd).not.toHaveBeenCalled();
+    }
+  );
+
   it('déclenche un changement réel de filtre Ligne', () => {
     const setLineFilter = vi.fn();
     renderPilotagePage({ lines: [mockLine({ id: 5, line_number: '317' })], setLineFilter });

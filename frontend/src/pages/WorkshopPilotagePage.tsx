@@ -100,8 +100,6 @@ export default function WorkshopPilotagePage() {
             label: `Période: ${PERIOD_LABELS[period]}`,
             onRemove: () => {
               setPeriod('7d');
-              setCustomStart('');
-              setCustomEnd('');
             },
           },
         ]
@@ -118,8 +116,6 @@ export default function WorkshopPilotagePage() {
 
   function clearFilters() {
     setPeriod('7d');
-    setCustomStart('');
-    setCustomEnd('');
     setLineFilter('all');
     setMachineFilter('all');
   }
