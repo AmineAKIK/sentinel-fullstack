@@ -10,6 +10,12 @@ function formatAge(iso: string): string {
   return `${Math.floor(hours / 24)} j`;
 }
 
+const TONE_LABEL: Record<'stable' | 'watch' | 'tension', string> = {
+  stable: 'Stable',
+  watch: 'À surveiller',
+  tension: 'Sous tension',
+};
+
 interface LineHeatmapProps {
   lineStatuses: LineStatus[];
   onOpenLine: (lineId: number) => void;
@@ -48,31 +54,38 @@ export default function LineHeatmap({ lineStatuses, onOpenLine }: LineHeatmapPro
               type="button"
               className={`pilotage-heatmap-row pilotage-heatmap-row-${ls.tone}`}
               onClick={() => onOpenLine(ls.line.id)}
+              aria-label={`Ligne ${ls.line.line_number}, ${TONE_LABEL[ls.tone]}, ${ls.incidents.length} incident${ls.incidents.length > 1 ? 's' : ''} actif${ls.incidents.length > 1 ? 's' : ''}, ${ls.urgentNotTaken} urgent${ls.urgentNotTaken > 1 ? 's' : ''} non pris, ${ls.notTaken} sans technicien, ${oldest ? `plus ancien : ${formatAge(oldest.created_at)}` : 'aucun incident'}`}
             >
               <span className="pilotage-heatmap-state" aria-hidden="true">
                 <span className={`pilotage-status-dot pilotage-status-dot-${ls.tone}`} />
               </span>
-              <span className="pilotage-heatmap-linename">{ls.line.line_number}</span>
+              <span className="pilotage-heatmap-linename" aria-hidden="true">
+                {ls.line.line_number}
+              </span>
               <span
                 data-label="Act."
+                aria-hidden="true"
                 className={`pilotage-heatmap-cell${ls.incidents.length > 0 ? ' pilotage-heatmap-cell-active' : ''}`}
               >
                 {ls.incidents.length}
               </span>
               <span
                 data-label="Urg."
+                aria-hidden="true"
                 className={`pilotage-heatmap-cell${ls.urgentNotTaken > 0 ? ' pilotage-heatmap-cell-critical' : ''}`}
               >
                 {ls.urgentNotTaken > 0 ? ls.urgentNotTaken : '—'}
               </span>
               <span
                 data-label="S.tech"
+                aria-hidden="true"
                 className={`pilotage-heatmap-cell${ls.notTaken > 0 ? ' pilotage-heatmap-cell-warn' : ''}`}
               >
                 {ls.notTaken > 0 ? ls.notTaken : '—'}
               </span>
               <span
                 data-label="Âge"
+                aria-hidden="true"
                 className={`pilotage-heatmap-cell${
                   oldest && isOlderThanDays(oldest.created_at, 7)
                     ? ' pilotage-heatmap-cell-critical'

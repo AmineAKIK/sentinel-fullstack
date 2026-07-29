@@ -124,9 +124,9 @@
 }
 
 .pilotage-hero-stat-body {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 
 .pilotage-hero-stat-value {
@@ -134,17 +134,23 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--color-text);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .pilotage-hero-stat-value-critical {
   color: var(--attention-critical-text);
 }
 
+/* Le sparkline est toujours empilé SOUS le chiffre (jamais côte à côte) afin
+   qu'il ne puisse jamais partager la largeur disponible avec la valeur et la
+   forcer à casser sur plusieurs lignes. Largeur responsive au conteneur, la
+   hauteur et le viewBox du tracé restant fixes pour ne pas déformer la
+   série. */
 .pilotage-sparkline {
   display: block;
-  flex-shrink: 0;
-  margin-bottom: var(--space-1);
+  width: 100%;
+  max-width: 96px;
+  height: 22px;
   opacity: 0.85;
 }
 
@@ -734,17 +740,25 @@
   display: flex;
   gap: 6px;
   align-items: flex-end;
-  min-width: max-content;
+  justify-content: center;
+  width: 100%;
+  min-width: 100%;
   padding-bottom: var(--space-1);
 }
 
+/* Chaque colonne s'étire pour occuper la largeur disponible tant qu'il y a
+   peu de jours (flex-grow plafonné pour éviter qu'une seule colonne devienne
+   une barre disproportionnée), et le conteneur centre le groupe au lieu de
+   le laisser tassé à gauche. Au-delà d'une trentaine de colonnes, la largeur
+   minimale de 32px fait naturellement dépasser .pilotage-trend-scroll, qui
+   prend le relais avec un défilement horizontal interne. */
 .pilotage-trend-col {
   display: grid;
   align-items: end;
   gap: var(--space-1);
-  flex: 1 0 32px;
+  flex: 1 1 32px;
   min-width: 32px;
-  max-width: 64px;
+  max-width: 96px;
 }
 
 .pilotage-trend-col-bars {
@@ -792,10 +806,6 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   text-align: center;
-}
-
-.pilotage-trend-mobile-list {
-  display: none;
 }
 
 /* ── Shared balance colors ────────────────────────────────────── */
