@@ -55,6 +55,7 @@ describe('AdminPasswordConfirmModal', () => {
       rejectVerification(
         new ApiResponseError('REAUTHENTICATION_FAILED', 'Mot de passe incorrect.', 401)
       );
+      await Promise.resolve();
     });
 
     expect(await screen.findByText('Mot de passe incorrect.')).toBeVisible();
