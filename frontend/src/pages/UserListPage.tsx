@@ -183,11 +183,6 @@ export default function UserListPage() {
     return order === 'asc' ? 'Tri ascendant' : 'Tri descendant';
   }
 
-  function _headerSortIndicator(field: UserSortField): string {
-    if (sort !== field) return '↕';
-    return order === 'asc' ? '↑' : '↓';
-  }
-
   function headerAriaSort(field: UserSortField): 'ascending' | 'descending' | 'none' {
     if (sort !== field) return 'none';
     return order === 'asc' ? 'ascending' : 'descending';
@@ -385,16 +380,22 @@ export default function UserListPage() {
           }
         >
           <div className="form-group">
-            <label className="form-label">Role</label>
+            <label className="form-label" htmlFor="user-role-filter">
+              Rôle
+            </label>
             <SelectField
+              id="user-role-filter"
               value={draftRole}
               onChange={(value) => setDraftRole(value as Role | '')}
               options={[{ value: '', label: 'Tous' }, ...ASSIGNABLE_ROLES]}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Statut</label>
+            <label className="form-label" htmlFor="user-status-filter">
+              Statut
+            </label>
             <SelectField
+              id="user-status-filter"
               value={draftStatus}
               onChange={(value) => setDraftStatus(value as 'all' | 'active' | 'inactive')}
               options={[
@@ -405,8 +406,11 @@ export default function UserListPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Trier par</label>
+            <label className="form-label" htmlFor="user-sort-filter">
+              Trier par
+            </label>
             <SelectField
+              id="user-sort-filter"
               value={draftSortValue}
               onChange={setDraftSortValue}
               options={[

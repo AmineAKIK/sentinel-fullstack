@@ -85,3 +85,22 @@ describe('LinesPage — sémantique de tableau (lot 8, A11Y-02)', () => {
     );
   });
 });
+
+describe('LinesPage — noms accessibles des filtres', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(['Statut', 'Trier par'])(
+    'expose le nom accessible « %s » dans la modale de filtres',
+    async (name) => {
+      vi.mocked(listLines).mockResolvedValue([line(1, '117')]);
+      renderPage();
+
+      await waitFor(() => expect(screen.getAllByText('117').length).toBeGreaterThan(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Filtrer' }));
+
+      expect(screen.getByRole('combobox', { name })).toBeInTheDocument();
+    }
+  );
+});

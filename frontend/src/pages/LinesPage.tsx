@@ -382,8 +382,11 @@ export default function LinesPage() {
           }
         >
           <div className="form-group">
-            <label className="form-label">Statut</label>
+            <label className="form-label" htmlFor="line-status-filter">
+              Statut
+            </label>
             <SelectField
+              id="line-status-filter"
               value={draftStatus}
               onChange={(value) => setDraftStatus(value as 'all' | 'active' | 'inactive')}
               options={[
@@ -394,8 +397,11 @@ export default function LinesPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Trier par</label>
+            <label className="form-label" htmlFor="line-sort-filter">
+              Trier par
+            </label>
             <SelectField
+              id="line-sort-filter"
               value={draftSortValue}
               onChange={setDraftSortValue}
               options={[

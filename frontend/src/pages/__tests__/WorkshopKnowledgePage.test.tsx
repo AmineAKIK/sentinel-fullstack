@@ -114,6 +114,26 @@ describe('WorkshopKnowledgePage — pagination par curseur (lot 7C, LIST-02)', (
   });
 });
 
+describe('WorkshopKnowledgePage — sélection perceptible', () => {
+  it('expose la fiche active autrement que par sa couleur', () => {
+    const selected = baseIncident({ id: 10, line_number: '999' });
+    const other = baseIncident({ id: 11, line_number: '998' });
+    renderKnowledgePage({
+      incidents: [selected, other],
+      selectedId: '10',
+      selectedIncident: selected,
+    });
+
+    expect(screen.getByRole('button', { name: /Ligne 999 · E2E-MCH-1/ })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: /Ligne 998 · E2E-MCH-1/ })).not.toHaveAttribute(
+      'aria-current'
+    );
+  });
+});
+
 // ── Fiche détaillée : cardinalité des cas similaires et contenus longs (RC5-6) ──
 function baseIncident(overrides: Partial<WorkshopIncident> = {}): WorkshopIncident {
   return {

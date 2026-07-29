@@ -13,9 +13,9 @@ function baseData(overrides: Partial<UserFormData> = {}): UserFormData {
   };
 }
 
-function renderForm(overrides: Partial<UserFormData> = {}) {
+function renderForm(overrides: Partial<UserFormData> = {}, badgeError?: string) {
   const onChange = vi.fn();
-  render(<UserForm data={baseData(overrides)} onChange={onChange} />);
+  render(<UserForm data={baseData(overrides)} onChange={onChange} badgeError={badgeError} />);
   return { onChange };
 }
 
@@ -92,5 +92,18 @@ describe('UserForm — rôles attribuables (RC5-8)', () => {
 
     expect(screen.queryByRole('option', { name: 'Administrateur' })).toBeNull();
     expect(screen.getByRole('option', { name: 'Opérateur' })).toBeDefined();
+  });
+});
+
+describe('UserForm — erreur de badge accessible', () => {
+  it('relie explicitement le message au champ invalide', () => {
+    renderForm({}, 'Ce numéro de badge est déjà utilisé.');
+
+    const badge = screen.getByRole('textbox', { name: 'Numéro de badge *' });
+    const error = screen.getByText('Ce numéro de badge est déjà utilisé.');
+
+    expect(badge).toHaveAttribute('aria-invalid', 'true');
+    expect(error).toHaveAttribute('id');
+    expect(badge.getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id);
   });
 });

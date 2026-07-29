@@ -50,7 +50,12 @@ type KnowledgeCardProps = {
 function KnowledgeCard({ incident, active, onClick }: KnowledgeCardProps) {
   const preview = incident.intervention_note || incident.diagnostic || incident.comment;
   return (
-    <button type="button" className={`kb-card${active ? ' kb-card-active' : ''}`} onClick={onClick}>
+    <button
+      type="button"
+      className={`kb-card${active ? ' kb-card-active' : ''}`}
+      aria-current={active ? 'true' : undefined}
+      onClick={onClick}
+    >
       <div className="kb-card-top">
         <span className={`kb-state-badge ${stateToneClass(incident.state)}`}>
           {formatStateLabel(incident.state)}

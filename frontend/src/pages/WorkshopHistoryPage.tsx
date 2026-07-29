@@ -163,6 +163,7 @@ export default function WorkshopHistoryPage() {
                         ref={String(inc.id) === selectedId ? activeItemRef : undefined}
                         type="button"
                         className={`history-incident-item${String(inc.id) === selectedId ? ' active' : ''}`}
+                        aria-current={String(inc.id) === selectedId ? 'true' : undefined}
                         onClick={() => selectIncident(inc.id)}
                       >
                         <span className="history-incident-title">

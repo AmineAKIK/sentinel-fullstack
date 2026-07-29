@@ -672,8 +672,11 @@ export default function WorkshopBoardPage() {
                 <p>Scénario prédéfini ou configuration manuelle.</p>
               </div>
               <div className="form-group">
-                <label className="form-label">Type d'écran</label>
+                <label className="form-label" htmlFor="board-screen-preset">
+                  Type d'écran
+                </label>
                 <SelectField
+                  id="board-screen-preset"
                   value={draftSettings.preset}
                   onChange={(value) =>
                     setDraftSettings(applyPreset(value as BoardPreset, draftSettings))
@@ -703,13 +706,16 @@ export default function WorkshopBoardPage() {
                 <div>
                   <label
                     className="form-label"
+                    htmlFor="board-view-duration"
                     style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}
                   >
                     <span>Vitesse de rotation</span>
                     <strong>{draftSettings.viewDurationSec} s</strong>
                   </label>
                   <input
+                    id="board-view-duration"
                     type="range"
+                    aria-label="Vitesse de rotation"
                     min={5}
                     max={60}
                     step={5}
@@ -733,8 +739,11 @@ export default function WorkshopBoardPage() {
                   </div>
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Incidents par page</label>
+                  <label className="form-label" htmlFor="board-rows-per-page">
+                    Incidents par page
+                  </label>
                   <SelectField
+                    id="board-rows-per-page"
                     value={String(draftSettings.rowsPerPage)}
                     onChange={(v) => updateDraftSettings({ rowsPerPage: Number(v) })}
                     options={[

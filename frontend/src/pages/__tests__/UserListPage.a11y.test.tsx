@@ -100,11 +100,7 @@ describe('UserListPage — filtre de rôle (RC5-8)', () => {
     await waitFor(() => expect(screen.getAllByText('Dupont').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole('button', { name: 'Filtrer' }));
-    // Le combobox Role n'a pas de nom accessible (label non associé, hors du
-    // scope de ce lot) : ciblé par sa position, premier combobox du modal
-    // (le champ Role précède Statut et Trier par dans le DOM).
-    const roleCombobox = document.querySelectorAll('.modal-body .select-trigger')[0];
-    expect(roleCombobox).toBeDefined();
+    const roleCombobox = screen.getByRole('combobox', { name: 'Rôle' });
     fireEvent.click(roleCombobox);
 
     expect(screen.getByRole('option', { name: 'Tous' })).toBeDefined();
@@ -114,4 +110,17 @@ describe('UserListPage — filtre de rôle (RC5-8)', () => {
     expect(screen.queryByRole('option', { name: 'Administrateur' })).toBeNull();
     expect(screen.queryByRole('option', { name: 'Système' })).toBeNull();
   });
+
+  it.each(['Rôle', 'Statut', 'Trier par'])(
+    'expose le nom accessible « %s » dans la modale de filtres',
+    async (name) => {
+      vi.mocked(listAccounts).mockResolvedValue([user(1)]);
+      renderPage();
+
+      await waitFor(() => expect(screen.getAllByText('Dupont').length).toBeGreaterThan(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Filtrer' }));
+
+      expect(screen.getByRole('combobox', { name })).toBeInTheDocument();
+    }
+  );
 });

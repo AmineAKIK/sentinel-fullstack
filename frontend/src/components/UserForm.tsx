@@ -81,8 +81,14 @@ export default function UserForm({
           disabled={disabled}
           placeholder="0001"
           maxLength={FIELD_LIMITS.BADGE}
+          aria-invalid={Boolean(badgeError) || undefined}
+          aria-describedby={badgeError ? 'badge-number-error' : undefined}
         />
-        {badgeError && <div className="field-error">{badgeError}</div>}
+        {badgeError && (
+          <div id="badge-number-error" className="field-error">
+            {badgeError}
+          </div>
+        )}
       </div>
       <div className="form-group">
         <label className="form-label" htmlFor="email">
