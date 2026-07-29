@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { listWorkshopHistoryEvents, listWorkshopLines } from '../../api/workshop';
@@ -95,16 +95,15 @@ let resolveHistoryEvents: (page: JournalPage) => void;
 function incidentOrder(selector: string): string[] {
   const container = document.querySelector<HTMLElement>(selector);
   expect(container).not.toBeNull();
-  return within(container as HTMLElement)
-    .getAllByRole('button', { name: /^Ligne / })
+  return Array.from(
+    (container as HTMLElement).querySelectorAll<HTMLButtonElement>('button.inline-link-button')
+  )
     .map((button) => button.textContent?.replace(/\s+/g, ' ').trim() ?? '');
 }
 
-async function expectDesktopAndMobileOrder(expected: string[]): Promise<void> {
-  await waitFor(() => {
-    expect(incidentOrder('.history-journal-table')).toEqual(expected);
-    expect(incidentOrder('.history-journal-cards')).toEqual(expected);
-  });
+function expectDesktopAndMobileOrder(expected: string[]): void {
+  expect(incidentOrder('.history-journal-table')).toEqual(expected);
+  expect(incidentOrder('.history-journal-cards')).toEqual(expected);
 }
 
 function sortHeader(label: string): HTMLElement {
@@ -127,7 +126,7 @@ async function renderJournal(): Promise<void> {
     await historyEventsResponse;
   });
 
-  await expectDesktopAndMobileOrder([
+  expectDesktopAndMobileOrder([
     INCIDENT_LABELS.newest,
     INCIDENT_LABELS.middle,
     INCIDENT_LABELS.oldest,
@@ -169,11 +168,11 @@ describe('WorkshopJournalPage — parité du tri tableau/cartes mobiles', () => 
 
       await user.click(button);
       expect(sortHeader(label)).toHaveAttribute('aria-sort', 'ascending');
-      await expectDesktopAndMobileOrder(ascendingOrder);
+      expectDesktopAndMobileOrder(ascendingOrder);
 
       await user.click(button);
       expect(sortHeader(label)).toHaveAttribute('aria-sort', 'descending');
-      await expectDesktopAndMobileOrder(descendingOrder);
+      expectDesktopAndMobileOrder(descendingOrder);
     }
   );
 
@@ -184,7 +183,7 @@ describe('WorkshopJournalPage — parité du tri tableau/cartes mobiles', () => 
 
     await user.click(button);
     expect(sortHeader('Date')).toHaveAttribute('aria-sort', 'ascending');
-    await expectDesktopAndMobileOrder([
+    expectDesktopAndMobileOrder([
       INCIDENT_LABELS.oldest,
       INCIDENT_LABELS.middle,
       INCIDENT_LABELS.newest,
@@ -192,7 +191,7 @@ describe('WorkshopJournalPage — parité du tri tableau/cartes mobiles', () => 
 
     await user.click(button);
     expect(sortHeader('Date')).toHaveAttribute('aria-sort', 'descending');
-    await expectDesktopAndMobileOrder([
+    expectDesktopAndMobileOrder([
       INCIDENT_LABELS.newest,
       INCIDENT_LABELS.middle,
       INCIDENT_LABELS.oldest,
