@@ -587,9 +587,11 @@
 .board-incident-top {
   grid-column: 1 / -1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: 4px var(--space-3);
+  min-width: 0;
 }
 
 .board-incident-top > strong {
@@ -597,12 +599,14 @@
   font-size: 19px;
   line-height: 1.1;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .board-incident-top-status {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 7px;
   min-width: 0;
 }
@@ -620,7 +624,7 @@
 }
 
 .board-incident-state {
-  max-width: 190px;
+  flex-shrink: 0;
   line-height: 1.2;
   text-align: right;
   overflow-wrap: anywhere;
