@@ -8,6 +8,19 @@ const DEEPSEEK_MODEL = 'deepseek-chat';
 const DEFAULT_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 1_000_000;
 
+class SupportResponseTooLargeError extends Error {
+  constructor() {
+    super('DeepSeek response too large');
+  }
+}
+
+class SupportAbortError extends Error {
+  constructor() {
+    super('DeepSeek request aborted');
+    this.name = 'AbortError';
+  }
+}
+
 const deepSeekResponseSchema = z.object({
   choices: z
     .array(
@@ -23,6 +36,76 @@ function supportTimeoutMs(): number {
   return Number.isInteger(parsed) && parsed >= 1_000 && parsed <= 30_000
     ? parsed
     : DEFAULT_TIMEOUT_MS;
+}
+
+async function cancelBody(body: ReadableStream<Uint8Array> | null): Promise<void> {
+  if (!body) return;
+  await body.cancel().catch(() => undefined);
+}
+
+async function readWithAbort(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal
+): Promise<{ done: boolean; value?: Uint8Array }> {
+  if (signal.aborted) throw new SupportAbortError();
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(new SupportAbortError());
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    void reader.read().then(
+      (result) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error instanceof Error ? error : new Error('DeepSeek response stream failed'));
+      }
+    );
+  });
+}
+
+async function readBoundedBody(
+  response: Response,
+  abortController: AbortController
+): Promise<string> {
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await readWithAbort(reader, abortController.signal);
+      if (done) break;
+      if (!value) continue;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        abortController.abort();
+        await reader.cancel().catch(() => undefined);
+        throw new SupportResponseTooLargeError();
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof SupportResponseTooLargeError) throw error;
+
+    await reader.cancel().catch(() => undefined);
+    if (abortController.signal.aborted) throw new SupportAbortError();
+
+    abortController.abort();
+    throw Object.assign(new Error('DeepSeek response stream failed'), { cause: error });
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks, totalBytes).toString('utf8');
 }
 
 // Loaded once at startup — never re-read from DB or any live source
@@ -98,53 +181,61 @@ export async function askSupport(
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), supportTimeoutMs());
   timeout.unref();
-  let response: Response;
   try {
-    response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        messages,
-        max_tokens: 768,
-        temperature: 0.3,
-      }),
-      signal: abortController.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(DEEPSEEK_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: DEEPSEEK_MODEL,
+          messages,
+          max_tokens: 768,
+          temperature: 0.3,
+        }),
+        signal: abortController.signal,
+      });
+    } catch (error) {
+      if (abortController.signal.aborted) throw new SupportAbortError();
+      logger.error(
+        { errorName: error instanceof Error ? error.name : 'UnknownError' },
+        'DeepSeek API request failed'
+      );
+      throw Object.assign(new Error('DeepSeek API request failed'), { cause: error });
+    }
+
+    if (!response.ok) {
+      abortController.abort();
+      await cancelBody(response.body);
+      logger.error({ status: response.status }, 'DeepSeek API error');
+      throw new Error('DeepSeek API error');
+    }
+
+    const responseLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
+    if (Number.isFinite(responseLength) && responseLength > MAX_RESPONSE_BYTES) {
+      abortController.abort();
+      await cancelBody(response.body);
+      throw new SupportResponseTooLargeError();
+    }
+
+    const rawBody = await readBoundedBody(response, abortController);
+
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(rawBody);
+    } catch {
+      throw new Error('DeepSeek response is not valid JSON');
+    }
+    const parsed = deepSeekResponseSchema.safeParse(decoded);
+    if (!parsed.success) throw new Error('DeepSeek response schema is invalid');
+
+    const reply = parsed.data.choices[0].message.content.trim();
+    if (!reply) throw new Error('DeepSeek response is empty');
+    return { reply };
   } finally {
     clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    await response.body?.cancel().catch(() => undefined);
-    logger.error({ status: response.status }, 'DeepSeek API error');
-    throw new Error('DeepSeek API error');
-  }
-
-  const responseLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
-  if (Number.isFinite(responseLength) && responseLength > MAX_RESPONSE_BYTES) {
-    await response.body?.cancel().catch(() => undefined);
-    throw new Error('DeepSeek response too large');
-  }
-
-  const rawBody = await response.text();
-  if (Buffer.byteLength(rawBody, 'utf8') > MAX_RESPONSE_BYTES) {
-    throw new Error('DeepSeek response too large');
-  }
-
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(rawBody);
-  } catch {
-    throw new Error('DeepSeek response is not valid JSON');
-  }
-  const parsed = deepSeekResponseSchema.safeParse(decoded);
-  if (!parsed.success) throw new Error('DeepSeek response schema is invalid');
-
-  const reply = parsed.data.choices[0].message.content.trim();
-  if (!reply) throw new Error('DeepSeek response is empty');
-  return { reply };
 }
