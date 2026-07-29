@@ -19,14 +19,14 @@ enregistrées dans les sections 6 et 7 de
 [rc5-decision-dossiers.md](rc5-decision-dossiers.md). R1, P2 et C1+C3 sont
 implémentées localement. D2 reste factuellement `BLOCKED_UPSTREAM`, mais ses
 alertes, avec l'alerte Router restante de R1, disposent désormais d'un
-traitement explicite, automatique et expirant au 31 août 2026; O reste
-`PENDING_AUTHORIZATION`.
+traitement explicite, automatique et expirant au 31 août 2026. L'observation
+publique O confirme le bord Nginx de la topologie B; l'intérieur du VPS n'est
+pas affirmé sans accès SSH nominatif.
 
 Les blocages exacts sont :
 
 - les environnements et rulesets GitHub indispensables à P2 ne sont pas
   configurés ou prouvés; l'historique du workflow de tag impose ce verrou;
-- aucune lecture de la topologie publique O n'a été autorisée;
 - les preuves de dossier, de recette et de publication encore marquées
   `OPEN`/`BLOCKED_EXTERNAL` restent à produire sur le candidat final;
 - la CI distante doit encore confirmer les six jobs sur le SHA final avec le
@@ -50,6 +50,13 @@ daté. Pour le candidat RC5 courant, les faits structurels dérivés du dépôt 
 (`156/156` sur trois bases fraîches, axe inclus). Le garde de dépendances passe
 ses `15/15` tests et les quatre audits JSON réels dans leurs portées exactes.
 Ces nombres ne ferment ni la CI distante, ni les preuves GitHub/VPS externes.
+
+La lecture publique non mutative du 30 juillet 2026 donne DNS A
+`79.137.34.84`, Nginx sur 80/443, redirection HTTPS, TLS/HSTS et en-têtes
+conformes, puis `/api/health` HTTP 200 sur le SHA RC4
+`da97e5222e0978d9e4af08afe70a08d49a80f4de`. Elle tranche la topologie publique
+B et aligne README, guide VPS et runbook. Elle ne prouve ni l'état interne
+Compose/conteneurs/digests/binds/`nginx -T`, ni un déploiement RC5.
 
 ## 1. Règles de pilotage
 

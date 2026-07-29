@@ -5,6 +5,14 @@ déployée en **topologie B** : images de registry épinglées par digest, derri
 le **Nginx hôte** du VPS (Caddy ne démarre pas). La topologie A (distribution
 autonome avec Caddy intégré) est décrite en [annexe](#annexe--topologie-a-caddy-autonome).
 
+Une observation publique strictement en lecture seule, le 30 juillet 2026, a
+confirmé ce choix au bord : DNS A `79.137.34.84`, redirection HTTP vers HTTPS,
+`Server: nginx` sur 80/443, certificat valide pour le domaine, HSTS et en-têtes
+attendus. `/api/health` répond encore avec le SHA RC4
+`da97e5222e0978d9e4af08afe70a08d49a80f4de`; aucune RC5 n'a été déployée.
+Faute d'accès SSH nominatif, cette lecture ne remplace pas les contrôles
+internes des fichiers Compose, conteneurs, images/digests, binds et `nginx -T`.
+
 Deux principes non négociables pour l'instance publique :
 
 - **Images immuables par digest, jamais de reconstruction locale.** Le VPS

@@ -17,7 +17,8 @@ réunit trois points d'entrée dans un même portail :
 - Frontend : React 18, TypeScript, Vite 8, React Router, Vitest et Playwright
 - Backend : Node.js 24, Express, TypeScript, Jest et Zod
 - Données : PostgreSQL 15, SQL paramétré et migrations versionnées
-- Production : Docker Compose, Nginx non-root et Caddy avec TLS automatique
+- Production : Docker Compose et Nginx non-root, avec Caddy intégré en
+  topologie autonome ou Nginx hôte sur l'instance publique
 - Sessions : JWT signés en cookies HTTP-only, séparés par audience
 
 ## Démarrage local
@@ -51,10 +52,15 @@ production.
 
 ## Déploiement Docker
 
-Le Compose racine décrit la topologie de production. Seul Caddy publie les ports
-`80` et `443`; PostgreSQL, l'API et Nginx restent sur des réseaux internes.
-L'instance publique utilise la variante documentée avec Nginx hôte : Caddy y est
-désactivé et seuls deux ports loopback sont publiés.
+Le Compose racine décrit la **topologie A autonome**. Seul Caddy publie les
+ports `80` et `443`; PostgreSQL, l'API et Nginx restent sur des réseaux
+internes. La commande ci-dessous sert à cette distribution autonome ou à une
+validation locale, pas à l'instance publique.
+
+L'instance publique utilise la **topologie B** avec Nginx hôte : Caddy y est
+désactivé, les deux services applicatifs sont liés au loopback, et les images
+de registry sont déployées par digest avec les trois fichiers Compose du
+runbook. Elle n'est jamais reconstruite avec la commande `--build` ci-dessous.
 
 ```bash
 cp .env.release.example .env

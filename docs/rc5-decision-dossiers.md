@@ -539,6 +539,9 @@ clients et sous-domaines. Aucune protection n'est déployée ici.
 
 ## 4. Vérité opérationnelle
 
+Cette section conserve l'état du dossier avant l'autorisation de lecture. Le
+résultat courant de l'observation est enregistré en section 6.5.
+
 Le dépôt encode deux topologies valides :
 
 - **A** : Compose racine, Caddy intégré, ports hôte 80/443;
@@ -709,7 +712,7 @@ réécrit aucune option rejetée.
 | P | **P2**, RC et stable uniquement à la tête exacte de `main` | workflow, garde et dry-run locaux verts | `IMPLEMENTED_LOCAL`, `BLOCKED_EXTERNAL` |
 | C | **C1 + C3**, égalité d'origine stricte et refus sans en-têtes | middleware central, inventaire et vrai Chromium verts | `VERIFIED_LOCAL` |
 | D | **D2**, parents compatibles uniquement, sans waiver ni override forcé | aucune combinaison parente compatible trouvée | `BLOCKED_UPSTREAM`, aucun commit |
-| O | aucune décision opérationnelle autorisée | aucun accès VPS, DNS, Nginx ou Compose distant | `PENDING_AUTHORIZATION` |
+| O | lecture VPS/DNS strictement non mutative autorisée | bord public Nginx, DNS/TLS/headers/health observés; intérieur sans SSH non affirmé | `VERIFIED_PUBLIC_EDGE_B` |
 
 ### 6.1 R = R1
 
@@ -859,8 +862,30 @@ ou waiver n'a été utilisé. Verdict D2 : `BLOCKED_UPSTREAM`.
 
 ### 6.5 O et validation locale
 
-O reste `PENDING_AUTHORIZATION`. Aucun accès VPS, DNS, Nginx, Caddy ou Compose
-distant n'a été tenté; les contradictions de la section 4 restent ouvertes.
+La lecture publique du 30 juillet 2026 tranche factuellement le choix au bord
+en faveur de la **topologie B** :
+
+- `sentinel.akiksystems.fr` résout en A vers `79.137.34.84`, sans AAAA ni CNAME;
+- 80 et 443 répondent `Server: nginx`, avec redirection HTTP 301 vers HTTPS;
+- le certificat Let's Encrypt couvre exactement le domaine et reste valide du
+  20 juin au 18 septembre 2026;
+- HSTS, CSP, `X-Content-Type-Options`, `X-Frame-Options`, Referrer Policy et
+  Permissions Policy sont présents; la barrière Nginx interne n'est pas émise;
+- `/`, `/login` et `/api/health` répondent HTTP 200; la santé expose
+  `status=ok`, `db=ok` et
+  `version=da97e5222e0978d9e4af08afe70a08d49a80f4de`.
+
+Ce SHA est celui de la RC4 encore publique. Aucun déploiement RC5 ni changement
+VPS/DNS n'a été effectué. Le frontal Nginx observé exclut la topologie A avec
+Caddy intégré propriétaire de 80/443 et confirme que le runbook B est la source
+normative publique.
+
+La limite est explicite : aucun hôte/utilisateur/clé SSH nominatif n'était
+disponible. Les fichiers Compose réellement actifs, conteneurs,
+images/digests, binds loopback, version Nginx et configuration `nginx -T`
+internes ne sont donc pas affirmés par cette observation publique. Ils restent
+des contrôles de recette de déploiement, pas une contradiction sur le choix du
+frontal.
 
 La validation locale du code courant donne :
 
