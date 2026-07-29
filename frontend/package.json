@@ -27,7 +27,7 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.3"
+    "react-router-dom": "7.18.2"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

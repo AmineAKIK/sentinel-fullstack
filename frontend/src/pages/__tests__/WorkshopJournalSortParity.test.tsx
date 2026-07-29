@@ -111,10 +111,7 @@ function sortHeader(label: string): HTMLElement {
 
 async function renderJournal(): Promise<void> {
   render(
-    <MemoryRouter
-      initialEntries={['/workshop/journal']}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
+    <MemoryRouter initialEntries={['/workshop/journal']}>
       <WorkshopJournalPage />
     </MemoryRouter>
   );

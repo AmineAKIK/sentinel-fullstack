@@ -46,10 +46,7 @@ describe('WorkshopBoardPage — focus après échec de déconnexion', () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter
-        initialEntries={['/board?screen=ecran-focus']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <MemoryRouter initialEntries={['/board?screen=ecran-focus']}>
         <MutationFeedbackProvider>
           <WorkshopBoardPage />
         </MutationFeedbackProvider>
