@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CreateIncidentModal from './CreateIncidentModal';
 import DeleteRequestModal from './DeleteRequestModal';
@@ -251,12 +251,24 @@ export default function IncidentDetailPanel({
   const [actionError, setActionError] = useState('');
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const responsibleInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const mutation = useMutationRunner();
 
   useEffect(() => {
     setResponsibleDraft(incident.responsible_comment ?? '');
     setActionError('');
   }, [incident.id, incident.responsible_comment]);
+
+  // Changement de dossier affiché (ouverture, flèches précédent/suivant,
+  // navigation ?incident=, historique navigateur) : le composant n'est jamais
+  // démonté entre deux incidents (pas de `key` par id côté parent), donc le
+  // navigateur conserve nativement le scrollTop du corps interne d'un dossier
+  // à l'autre. On le réinitialise explicitement ici, avant la peinture, pour
+  // que le nouveau dossier s'ouvre toujours sur ses informations principales.
+  // Un refetch/mutation du MÊME incident (même id) ne déclenche pas ce reset.
+  useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [incident.id]);
 
   // Ouverture / navigation du dossier : on déplace le focus sur le titre du
   // panneau pour qu'un utilisateur au clavier entre bien dans le dossier
@@ -383,7 +395,11 @@ export default function IncidentDetailPanel({
         </div>
       </div>
 
-      <div className="incident-detail-content" aria-busy={mutation.pending || undefined}>
+      <div
+        className="incident-detail-content"
+        aria-busy={mutation.pending || undefined}
+        ref={contentRef}
+      >
         {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
         <section className="incident-summary-strip" aria-label="Synthèse de l'incident">
           <SummaryItem label="État">

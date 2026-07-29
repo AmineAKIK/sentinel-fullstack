@@ -517,3 +517,234 @@ describe('IncidentDetailPanel – sémantique visuelle de l’urgence (RC5)', ()
     );
   });
 });
+
+describe('IncidentDetailPanel — reset du scroll interne à la sélection (RC5)', () => {
+  function getScrollableContent(): HTMLElement {
+    const el = document.querySelector('.incident-detail-content');
+    if (!el) throw new Error('.incident-detail-content introuvable');
+    return el as HTMLElement;
+  }
+
+  function simulateScrolled(el: HTMLElement, value: number): void {
+    Object.defineProperty(el, 'scrollTop', { value, writable: true, configurable: true });
+  }
+
+  it('scrollTop = 0 au montage initial', () => {
+    renderPanel({ incident: mockIncident({ id: 1 }) });
+    expect(getScrollableContent().scrollTop).toBe(0);
+  });
+
+  it('remet scrollTop à 0 quand incident.id change (re-render, pas de démontage)', () => {
+    const { rerender } = renderPanel({ incident: mockIncident({ id: 1 }) });
+    const content = getScrollableContent();
+    simulateScrolled(content, 240);
+    expect(content.scrollTop).toBe(240);
+
+    rerender(
+      <MemoryRouter>
+        <MutationFeedbackProvider>
+          <IncidentDetailPanel
+            incident={mockIncident({ id: 2, line_number: '200' })}
+            lines={[]}
+            modal={mockModal()}
+            userRole="RESPONSABLE"
+            userId={1}
+            isResponsable
+            onBack={vi.fn()}
+            onToggleFollow={vi.fn(resolvedVoid)}
+            onToggleUrgent={vi.fn(resolvedVoid)}
+            onConfirmTakeCharge={vi.fn(resolvedVoid)}
+            onRequestDelete={vi.fn(resolvedVoid)}
+            onSetPending={vi.fn(resolvedVoid)}
+            onResumeIncident={vi.fn(resolvedVoid)}
+            onCloseIncident={vi.fn(resolvedVoid)}
+            onInvalidateIncident={vi.fn(resolvedVoid)}
+            onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+            onEditSuccess={vi.fn()}
+            onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+            patchIncident={vi.fn(() => Promise.resolve(mockIncident({ id: 2 })))}
+          />
+        </MutationFeedbackProvider>
+      </MemoryRouter>
+    );
+
+    expect(getScrollableContent().scrollTop).toBe(0);
+  });
+
+  it('conserve la position de scroll quand seul le contenu du même incident change (refetch/mutation)', () => {
+    const incident = mockIncident({ id: 1, is_priority: false });
+    const { rerender } = renderPanel({ incident });
+    const content = getScrollableContent();
+    simulateScrolled(content, 180);
+
+    rerender(
+      <MemoryRouter>
+        <MutationFeedbackProvider>
+          <IncidentDetailPanel
+            incident={{ ...incident, is_priority: true, updated_at: '2026-06-28T11:00:00.000Z' }}
+            lines={[]}
+            modal={mockModal()}
+            userRole="RESPONSABLE"
+            userId={1}
+            isResponsable
+            onBack={vi.fn()}
+            onToggleFollow={vi.fn(resolvedVoid)}
+            onToggleUrgent={vi.fn(resolvedVoid)}
+            onConfirmTakeCharge={vi.fn(resolvedVoid)}
+            onRequestDelete={vi.fn(resolvedVoid)}
+            onSetPending={vi.fn(resolvedVoid)}
+            onResumeIncident={vi.fn(resolvedVoid)}
+            onCloseIncident={vi.fn(resolvedVoid)}
+            onInvalidateIncident={vi.fn(resolvedVoid)}
+            onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+            onEditSuccess={vi.fn()}
+            onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+            patchIncident={vi.fn(() => Promise.resolve(incident))}
+          />
+        </MutationFeedbackProvider>
+      </MemoryRouter>
+    );
+
+    expect(getScrollableContent().scrollTop).toBe(180);
+  });
+
+  it('remet scrollTop à 0 lors de la fermeture puis réouverture (démontage/remontage)', () => {
+    const { unmount } = renderPanel({ incident: mockIncident({ id: 1 }) });
+    const firstContent = getScrollableContent();
+    simulateScrolled(firstContent, 300);
+    unmount();
+
+    renderPanel({ incident: mockIncident({ id: 1 }) });
+    expect(getScrollableContent().scrollTop).toBe(0);
+  });
+
+  it("remet scrollTop à 0 lors de la navigation précédent/suivant (même mécanisme que le changement d'id)", () => {
+    const { rerender } = renderPanel({ incident: mockIncident({ id: 5 }) });
+    const content = getScrollableContent();
+    simulateScrolled(content, 500);
+
+    rerender(
+      <MemoryRouter>
+        <MutationFeedbackProvider>
+          <IncidentDetailPanel
+            incident={mockIncident({ id: 4, line_number: '050' })}
+            lines={[]}
+            modal={mockModal()}
+            userRole="RESPONSABLE"
+            userId={1}
+            isResponsable
+            navigation={{ index: 0, total: 2, onPrev: vi.fn(), onNext: vi.fn() }}
+            onBack={vi.fn()}
+            onToggleFollow={vi.fn(resolvedVoid)}
+            onToggleUrgent={vi.fn(resolvedVoid)}
+            onConfirmTakeCharge={vi.fn(resolvedVoid)}
+            onRequestDelete={vi.fn(resolvedVoid)}
+            onSetPending={vi.fn(resolvedVoid)}
+            onResumeIncident={vi.fn(resolvedVoid)}
+            onCloseIncident={vi.fn(resolvedVoid)}
+            onInvalidateIncident={vi.fn(resolvedVoid)}
+            onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+            onEditSuccess={vi.fn()}
+            onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+            patchIncident={vi.fn(() => Promise.resolve(mockIncident({ id: 4 })))}
+          />
+        </MutationFeedbackProvider>
+      </MemoryRouter>
+    );
+
+    expect(getScrollableContent().scrollTop).toBe(0);
+  });
+
+  it("n'invoque jamais window.scrollBy, window.scrollTo ou Element.scrollIntoView sur la page", () => {
+    // jsdom n'implémente ni scrollBy ni scrollIntoView nativement : on les
+    // définit avant de les espionner, uniquement pour ce test.
+    if (typeof window.scrollBy !== 'function') {
+      window.scrollBy = () => {};
+    }
+    if (typeof HTMLElement.prototype.scrollIntoView !== 'function') {
+      HTMLElement.prototype.scrollIntoView = () => {};
+    }
+    const scrollBySpy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const scrollIntoViewSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+
+    const { rerender } = renderPanel({ incident: mockIncident({ id: 1 }) });
+    rerender(
+      <MemoryRouter>
+        <MutationFeedbackProvider>
+          <IncidentDetailPanel
+            incident={mockIncident({ id: 2 })}
+            lines={[]}
+            modal={mockModal()}
+            userRole="RESPONSABLE"
+            userId={1}
+            isResponsable
+            onBack={vi.fn()}
+            onToggleFollow={vi.fn(resolvedVoid)}
+            onToggleUrgent={vi.fn(resolvedVoid)}
+            onConfirmTakeCharge={vi.fn(resolvedVoid)}
+            onRequestDelete={vi.fn(resolvedVoid)}
+            onSetPending={vi.fn(resolvedVoid)}
+            onResumeIncident={vi.fn(resolvedVoid)}
+            onCloseIncident={vi.fn(resolvedVoid)}
+            onInvalidateIncident={vi.fn(resolvedVoid)}
+            onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+            onEditSuccess={vi.fn()}
+            onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+            patchIncident={vi.fn(() => Promise.resolve(mockIncident({ id: 2 })))}
+          />
+        </MutationFeedbackProvider>
+      </MemoryRouter>
+    );
+
+    expect(scrollBySpy).not.toHaveBeenCalled();
+    expect(scrollToSpy).not.toHaveBeenCalled();
+    // scrollIntoView reste utilisé ailleurs dans l'app (hors de ce composant) ;
+    // ici on vérifie seulement qu'aucun appel n'a été déclenché par ce reset.
+    expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+
+    scrollBySpy.mockRestore();
+    scrollToSpy.mockRestore();
+    scrollIntoViewSpy.mockRestore();
+  });
+
+  it('ne vole pas le focus au-delà du comportement existant (le titre reste la seule cible focus)', () => {
+    const { rerender } = renderPanel({ incident: mockIncident({ id: 1 }) });
+    rerender(
+      <MemoryRouter>
+        <MutationFeedbackProvider>
+          <IncidentDetailPanel
+            incident={mockIncident({ id: 2 })}
+            lines={[]}
+            modal={mockModal()}
+            userRole="RESPONSABLE"
+            userId={1}
+            isResponsable
+            onBack={vi.fn()}
+            onToggleFollow={vi.fn(resolvedVoid)}
+            onToggleUrgent={vi.fn(resolvedVoid)}
+            onConfirmTakeCharge={vi.fn(resolvedVoid)}
+            onRequestDelete={vi.fn(resolvedVoid)}
+            onSetPending={vi.fn(resolvedVoid)}
+            onResumeIncident={vi.fn(resolvedVoid)}
+            onCloseIncident={vi.fn(resolvedVoid)}
+            onInvalidateIncident={vi.fn(resolvedVoid)}
+            onMaintenanceDeleteConfirm={vi.fn(resolvedVoid)}
+            onEditSuccess={vi.fn()}
+            onDeleteCommentConfirm={vi.fn(resolvedVoid)}
+            patchIncident={vi.fn(() => Promise.resolve(mockIncident({ id: 2 })))}
+          />
+        </MutationFeedbackProvider>
+      </MemoryRouter>
+    );
+
+    expect(document.activeElement).toBe(document.querySelector('.incident-detail-title'));
+  });
+
+  it('démontage sans effet tardif (aucune erreur si un re-render était en vol)', () => {
+    const { unmount } = renderPanel({ incident: mockIncident({ id: 1 }) });
+    expect(() => unmount()).not.toThrow();
+  });
+});
