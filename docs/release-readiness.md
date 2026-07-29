@@ -14,7 +14,7 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 
 ### Mise à jour documentaire RC5
 
-**Statut RC5 : BLOCKED.** Les décisions R1, P2, C1+C3 et D2 sont désormais
+**Statut RC5 : BLOCKED_EXTERNAL.** Les décisions R1, P2, C1+C3 et D2 sont désormais
 enregistrées dans les sections 6 et 7 de
 [rc5-decision-dossiers.md](rc5-decision-dossiers.md). R1, P2 et C1+C3 sont
 implémentées localement. D2 reste factuellement `BLOCKED_UPSTREAM`, mais ses
@@ -23,14 +23,18 @@ traitement explicite, automatique et expirant au 31 août 2026. L'observation
 publique O confirme le bord Nginx de la topologie B; l'intérieur du VPS n'est
 pas affirmé sans accès SSH nominatif.
 
-Les blocages exacts sont :
+Le blocage de cette fermeture express a une cause externe unique : le dépôt ne
+possède ni reviewer réellement indépendant de l'initiateur, ni identité
+technique dédiée à la création contrôlée des tags. Les environnements protégés
+ne peuvent donc pas être configurés honnêtement. Aucun environnement factice
+n'a été créé et la création de tous les tags `v*` reste verrouillée.
 
-- les environnements et rulesets GitHub indispensables à P2 ne sont pas
-  configurés ou prouvés; l'historique du workflow de tag impose ce verrou;
-- les preuves de dossier, de recette et de publication encore marquées
-  `OPEN`/`BLOCKED_EXTERNAL` restent à produire sur le candidat final;
-- la CI distante doit encore confirmer les six jobs sur le SHA final avec le
-  nouveau garde.
+Les autres protections disponibles sont appliquées et relues : Actions
+GitHub-owned + `docker/*`, SHA complets obligatoires, ruleset `main` avec les
+six checks, deux rulesets `v*` sans bypass et immutabilité des nouvelles
+releases. La CI distante, la publication et les preuves de recette restent des
+étapes séparément autorisées; leur absence n'est pas transformée en défaut du
+candidat local.
 
 Les constats dépendances ne sont pas effacés : Router `7.18.2` reste dans la
 plage de `GHSA-qwww-vcr4-c8h2` et les anciennes chaînes Brace restent dans

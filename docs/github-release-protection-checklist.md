@@ -2,10 +2,12 @@
 
 Ce document décrit les réglages **distants** nécessaires à
 `.github/workflows/release.yml`. Ils ne sont pas créés par le workflow et leur
-configuration exige une autorisation GitHub séparée. Tant qu'ils ne sont pas
-tous prouvés, la publication RC5 reste bloquée même si les tests locaux du
-workflow sont verts. L'état distant observé ci-dessous ne satisfait pas ces
-prérequis : **aucune publication RC5 n'est donc autorisée à ce stade**.
+configuration exige une autorisation GitHub séparée. Les capacités disponibles
+ont été appliquées et relues le 30 juillet 2026. La publication RC5 reste
+cependant bloquée : le dépôt ne possède qu'un administrateur, donc aucun
+reviewer réellement indépendant, et aucune identité technique dédiée n'est
+provisionnée pour créer les tags. Aucun environnement incomplet n'a été créé et
+la création de tout tag `v*` reste verrouillée.
 
 La politique locale reste l'autorité sur la syntaxe des tags :
 
@@ -18,35 +20,52 @@ Dans les deux cas, le commit pelé du tag doit être la tête exacte de `main` e
 les six jobs CI doivent appartenir au même run `push` sur `main`, avec
 `headSha == TAG_SHA`, `status == completed` et `conclusion == success`.
 
-## 1. État distant observé en lecture seule
+## 1. État distant appliqué et vérifié
 
-Lecture effectuée le 29 juillet 2026 sur
-`AmineAKIK/sentinel-fullstack`, sans mutation :
+Écart lu, mutation minimale autorisée puis relecture effectués le 30 juillet
+2026 sur `AmineAKIK/sentinel-fullstack` :
 
-| Réglage | Valeur observée | État P2 |
+| Réglage | Avant | Après vérifié | État P2 |
+| --- | --- | --- | --- |
+| visibilité / branche par défaut | public / `main` | inchangé | conforme |
+| Actions autorisées | `all` | `selected`, GitHub-owned + `docker/*` | conforme |
+| actions épinglées par SHA obligatoire | `false` | `true` | conforme |
+| permissions du token / approbation PR | `read` / `false` | inchangé | conforme |
+| ruleset `main` | aucun | actif, ID `20004078`, sans bypass | conforme |
+| ruleset création `v*` | aucun | actif, ID `20004127`, sans bypass | verrou fermé faute d'identité dédiée |
+| ruleset immutabilité `v*` | aucun | actif, ID `20004113`, sans bypass | conforme |
+| releases immuables | désactivées | activées pour les nouvelles releases | conforme |
+| environnements | aucun | aucun | bloqué : reviewer indépendant absent |
+| collaborateurs | `AmineAKIK` seul, admin | inchangé, aucune invitation | cause externe |
+| packages GHCR | non lisible avec le token courant | API `403`, scope `read:packages` absent | contrôle externe restant |
+| attestations RC4 | non relues | aucune pour les deux digests RC4 (`404`) | à produire lors d'une publication autorisée |
+
+Les trois rulesets ciblent exactement `refs/heads/main` ou `refs/tags/v*`.
+`origin/main`, les tags RC1 à RC4, les releases, PR et runs sont restés
+inchangés pendant cette configuration. Aucune branche, PR, release, image ou
+tag n'a été créé.
+
+État historique lu le 29 juillet 2026 avant autorisation :
+
+| Réglage | Valeur observée | Écart alors ouvert |
 | --- | --- | --- |
-| visibilité | public | compatible avec reviewers et attestations |
-| branche par défaut | `main` | conforme |
 | Actions autorisées | `all` | à restreindre |
 | actions épinglées par SHA obligatoire | `false` | à activer |
-| permissions par défaut du token | `read` | conforme |
-| Actions autorisées à approuver les PR | `false` | conforme |
 | environnements | aucun | `prerelease` et `production` à créer |
 | rulesets | aucun | protections `main` et tags à créer |
-| protection historique de `main` | absente (`HTTP 404`) | à créer |
-| releases immuables | non prouvé | à activer |
+| releases immuables | désactivées | à activer |
 
 ## 2. Settings → Actions → General
 
-- [ ] conserver `Default workflow permissions: Read repository contents and
+- [x] conserver `Default workflow permissions: Read repository contents and
       packages permissions`;
-- [ ] conserver `Allow GitHub Actions to create and approve pull requests`
+- [x] conserver `Allow GitHub Actions to create and approve pull requests`
       désactivé;
-- [ ] activer `Require actions to be pinned to a full-length commit SHA`;
-- [ ] choisir `Allow select actions and reusable workflows`;
-- [ ] autoriser les actions GitHub officielles (`actions/*`) et explicitement
+- [x] activer `Require actions to be pinned to a full-length commit SHA`;
+- [x] choisir `Allow select actions and reusable workflows`;
+- [x] autoriser les actions GitHub officielles (`actions/*`) et explicitement
       `docker/*`; ne pas autoriser globalement tous les auteurs Marketplace;
-- [ ] vérifier qu'aucune politique d'organisation/entreprise plus large ne
+- [x] vérifier qu'aucune politique d'organisation/entreprise plus large ne
       réactive les références par tag.
 
 Cette politique ne doit être activée qu'après intégration des SHA complets dans
@@ -57,13 +76,13 @@ Cette politique ne doit être activée qu'après intégration des SHA complets d
 Créer un ruleset de branche actif ciblant exactement `refs/heads/main`, sans
 bypass permanent :
 
-- [ ] bloquer les suppressions et les force-push;
-- [ ] exiger une pull request avant fusion;
-- [ ] exiger la résolution des conversations et invalider les approbations
+- [x] bloquer les suppressions et les force-push;
+- [x] exiger une pull request avant fusion;
+- [x] exiger la résolution des conversations et invalider les approbations
       devenues obsolètes;
-- [ ] exiger au moins une approbation indépendante;
-- [ ] exiger une branche à jour avant fusion;
-- [ ] rattacher à l'application GitHub Actions les six checks exacts :
+- [x] exiger au moins une approbation distincte du dernier pusher;
+- [x] exiger une branche à jour avant fusion;
+- [x] rattacher à l'application GitHub Actions les six checks exacts :
 
   1. `Backend / Quality`;
   2. `Frontend / Quality`;
@@ -83,18 +102,22 @@ donc le créateur autorisé d'obtenir aussi le droit de déplacer/supprimer.
 
 Ruleset A — création contrôlée :
 
-- [ ] activer uniquement `Restrict creations`;
+- [x] activer uniquement `Restrict creations`;
 - [ ] n'accorder le bypass qu'à l'identité dédiée (GitHub App ou acteur
       technique) chargée de créer un tag après avoir vérifié que sa cible est
       la tête exacte de `main`;
-- [ ] ne donner aucun bypass aux administrateurs ordinaires.
+- [x] ne donner aucun bypass aux administrateurs ordinaires.
+
+L'identité dédiée n'existe pas encore. Le ruleset reste donc volontairement
+sans bypass : aucun tag de version ne peut être créé tant que cette identité
+n'est pas provisionnée et relue.
 
 Ruleset B — immutabilité, sans aucun bypass :
 
-- [ ] activer `Restrict updates`;
-- [ ] activer `Restrict deletions`;
-- [ ] bloquer tout force-push de tag;
-- [ ] ne définir aucun acteur de bypass.
+- [x] activer `Restrict updates`;
+- [x] activer `Restrict deletions`;
+- [x] bloquer tout force-push de tag;
+- [x] ne définir aucun acteur de bypass.
 
 La création d'un nouveau tag reste une opération explicitement autorisée,
 séparée et réservée à cette identité de confiance. Le workflow de publication
@@ -148,11 +171,16 @@ l'auto-création silencieuse par GitHub d'un environnement non protégé. Si auc
 reviewer réellement indépendant n'est disponible, la protection n'est pas
 simulée : la publication reste bloquée.
 
+Le 30 juillet 2026, le seul collaborateur est `AmineAKIK` avec le rôle
+administrateur, sans invitation en attente. Créer les environnements avec ce
+seul compte simulerait une approbation indépendante impossible; ils ont donc
+été laissés absents, conformément au comportement fail-closed du garde.
+
 ## 6. Releases et packages
 
-- [ ] dans `Settings → General → Releases`, activer
+- [x] dans `Settings → General → Releases`, activer
       `Enable release immutability`;
-- [ ] vérifier que cette politique s'applique aux nouvelles releases;
+- [x] vérifier que cette politique s'applique aux nouvelles releases;
 - [ ] conserver les packages GHCR `backend` et `frontend` rattachés à ce dépôt;
 - [ ] leur accorder l'accès en écriture uniquement au `GITHUB_TOKEN` de ce
       dépôt;
@@ -196,12 +224,12 @@ autorisé.
 
 ## 8. Attestations
 
-- [ ] confirmer que les Artifact Attestations GitHub sont disponibles pour le
+- [x] confirmer que les Artifact Attestations GitHub sont disponibles pour le
       dépôt public;
-- [ ] conserver par job uniquement `id-token: write` et
+- [x] conserver par job uniquement `id-token: write` et
       `attestations: write` avec `contents: write`/`packages: write` nécessaires
       à la publication;
-- [ ] conserver `create-storage-record: false` sur les quatre attestations :
+- [x] conserver `create-storage-record: false` sur les quatre attestations :
       P2 atteste les images dans GHCR et n'accorde pas la permission
       `artifact-metadata: write` non nécessaire;
 - [ ] vérifier après une publication autorisée les attestations de provenance
@@ -222,16 +250,18 @@ gh api repos/AmineAKIK/sentinel-fullstack/rulesets
 gh api repos/AmineAKIK/sentinel-fullstack/branches/main/protection
 ```
 
-Preuves attendues :
+Preuves relues :
 
 - `sha_pinning_required == true`;
 - `allowed_actions == "selected"`;
 - `default_workflow_permissions == "read"`;
 - `can_approve_pull_request_reviews == false`;
-- reviewers, `prevent_self_review`, bypass désactivé et unique policy
-  `main`/`branch` présents sur les deux environnements;
 - ruleset `main` et les deux rulesets agrégés `refs/tags/v*` actifs;
 - les six checks de `main` exigés sous leurs noms exacts.
+
+Preuve bloquante absente : reviewers, `prevent_self_review`, bypass désactivé
+et unique policy `main`/`branch` sur les deux environnements. Elle ne peut pas
+être produite tant qu'un reviewer indépendant n'est pas provisionné.
 
 Enfin, effectuer un dry-run local sans token :
 

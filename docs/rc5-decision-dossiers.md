@@ -708,10 +708,10 @@ réécrit aucune option rejetée.
 
 | ID | Décision donnée | Résultat local | État de sortie |
 | --- | --- | --- | --- |
-| R | **R1**, React Router exactement `7.18.2`, Declarative Mode conservé | migration et non-régressions locales vertes | `IMPLEMENTED`, mais publication `BLOCKED` par une advisory high distincte |
-| P | **P2**, RC et stable uniquement à la tête exacte de `main` | workflow, garde et dry-run locaux verts | `IMPLEMENTED_LOCAL`, `BLOCKED_EXTERNAL` |
+| R | **R1**, React Router exactement `7.18.2`, Declarative Mode conservé | migration/non-régressions vertes; surface RSC absente et gardée | `EXCEPTION_BOUNDED_2026-08-31` |
+| P | **P2**, RC et stable uniquement à la tête exacte de `main` | workflow/gardes verts; Actions, `main`, tags et releases protégés; environnements absents faute d'identités | `BLOCKED_EXTERNAL_IDENTITIES` |
 | C | **C1 + C3**, égalité d'origine stricte et refus sans en-têtes | middleware central, inventaire et vrai Chromium verts | `VERIFIED_LOCAL` |
-| D | **D2**, parents compatibles uniquement, sans waiver ni override forcé | aucune combinaison parente compatible trouvée | `BLOCKED_UPSTREAM`, aucun commit |
+| D | **D2**, parents compatibles uniquement, sans waiver ni override forcé | aucune combinaison parente compatible; chemins dev exacts et runtime absent | `EXCEPTION_BOUNDED_2026-08-31` |
 | O | lecture VPS/DNS strictement non mutative autorisée | bord public Nginx, DNS/TLS/headers/health observés; intérieur sans SSH non affirmé | `VERIFIED_PUBLIC_EDGE_B` |
 
 ### 6.1 R = R1
@@ -794,14 +794,37 @@ contrat statique workflow     8/8
 
 Les réglages distants indispensables sont détaillés dans
 [`github-release-protection-checklist.md`](github-release-protection-checklist.md).
-L'état lu sans mutation ne comporte ni environnement, ni ruleset, ni protection
-de `main`; les Actions autorisent tout et n'imposent pas les SHA complets. La
-publication reste donc `BLOCKED_EXTERNAL`. Cette réserve est renforcée par
-l'historique Git : un tag placé sur un ancien commit peut encore charger
-l'ancienne version de `release.yml`; seule la combinaison des règles distantes
-documentées peut neutraliser ce chemin sans réécrire l'historique interdit.
-Enfin, l'audit Router high décrit en 6.1 empêche actuellement d'obtenir les six
-jobs verts exigés par P2.
+Le 30 juillet 2026, chaque écart disponible a été appliqué puis relu :
+
+- Actions limitées aux actions GitHub et `docker/*`, avec SHA complet
+  obligatoire; token par défaut en lecture et approbation PR par Actions
+  toujours désactivée;
+- ruleset `main` actif `20004078`, sans bypass, merge commit uniquement,
+  approbation distincte du dernier pusher, conversations résolues, branche à
+  jour et six checks GitHub Actions exacts;
+- ruleset de création `v*` actif `20004127`, sans bypass, donc création
+  entièrement verrouillée en attendant l'identité dédiée;
+- ruleset d'immutabilité `v*` actif `20004113`, sans bypass, bloquant mise à
+  jour et suppression;
+- immutabilité activée pour toute nouvelle release.
+
+Un seul compte reste collaborateur : `AmineAKIK`, administrateur, sans
+invitation en attente. Il n'existe donc ni reviewer réellement indépendant ni
+identité technique dédiée de création des tags. Les environnements
+`prerelease`/`production` n'ont pas été créés avec une protection fictive. P2
+reste `BLOCKED_EXTERNAL` pour cette seule cause d'identités de gouvernance
+indispensables absentes.
+
+Le token de contrôle ne possède pas `read:packages`; l'API Packages répond
+`403`, et aucune règle GHCR n'est prétendue relue. Les deux digests RC4 n'ont
+pas d'attestation enregistrée (`404`); les quatre attestations RC5 restent un
+effet de la future publication autorisée, pas une preuve locale.
+
+L'historique Git reste neutralisé en mode fail-closed : un ancien workflow de
+tag ne peut plus être déclenché puisqu'aucun tag `v*` ne peut actuellement être
+créé. Les exceptions bornées de la section 7 permettent désormais aux audits
+Quality d'accepter exactement les deux GHSA constatées sans masquer une
+troisième alerte.
 
 ### 6.3 C = C1 + C3
 
@@ -913,10 +936,10 @@ refocaliser; preuve ciblée `2/2`, frontend `754/754`, puis trois passages
   parent ef9dca2f9eaad36b429af18ad45b2952c58207a0
 ```
 
-Malgré les preuves fonctionnelles vertes, le verdict de publication RC5 reste
-`BLOCKED` : contradiction Router `7.18.2`/audit high, D2 sans combinaison
-parente disponible, protections GitHub externes absentes et dossier O non
-autorisé.
+Après la fermeture bornée de la section 7 et l'observation O ci-dessus, le
+verdict reste `BLOCKED_EXTERNAL` pour la seule cause détaillée en 6.2 :
+identités de gouvernance indispensables absentes pour les environnements
+protégés et la création contrôlée des tags.
 
 ## 7. Fermeture bornée des alertes de dépendances
 
@@ -970,9 +993,11 @@ Brace sont corrigés. D2 doit être rejoué à chaque lockfile et la politique d
 être retirée dès qu'une version parente compatible est disponible. L'échéance,
 une nouvelle surface ou toute nouvelle GHSA fait échouer la CI.
 
-Le verdict global ne devient pas `GO` par cette seule décision : les protections
-GitHub exigées par P2, la vérité opérationnelle O et les autres preuves externes
-restent gouvernées par leurs portes et autorisations propres.
+Le verdict global ne devient pas `GO` par cette seule décision : P2 reste
+bloqué par l'absence des identités de gouvernance nécessaires aux environnements
+et à la création contrôlée des tags. La vérité opérationnelle publique O est
+traitée en section 6.5; les effets de publication restent gouvernés par une
+autorisation séparée.
 
 ## Sources officielles consultées le 29 juillet 2026
 
