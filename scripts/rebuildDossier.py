@@ -675,7 +675,7 @@ def rebuild(args: argparse.Namespace) -> None:
     )
     architecture_replacements = {
         "—  Conteneurisation de la distribution autonome": "— Distribution autonome : Docker Compose orchestre PostgreSQL, le backend, le frontend servi par Nginx et Caddy. Dans cette variante, Caddy constitue le point d'entrée HTTPS de l'application.",
-        "—  Instance publique de démonstration": "— Instance publique de démonstration : le VPS exécute trois conteneurs — PostgreSQL, backend et frontend. Un Nginx installé sur l'hôte assure HTTPS et relaie les requêtes vers les ports liés uniquement à 127.0.0.1 ; Caddy est désactivé sur cette instance.",
+        "—  Instance publique de démonstration": "— Instance publique de démonstration : l'observation publique du 30 juillet 2026 prouve un frontal Nginx sur 80/443 et le SHA RC4 encore servi. Sans accès SSH nominatif, les fichiers Compose, conteneurs, binds, images et digests internes ne sont pas affirmés ; le runbook avec Nginx hôte reste le contrat normatif du prochain déploiement.",
         "—  Reverse proxy et exposition réseau": "— Exposition réseau : la topologie dépend du mode de déploiement. Caddy est le proxy de la distribution autonome ; Nginx hôte remplit ce rôle sur l'instance publique. PostgreSQL n'est jamais exposé publiquement.",
         "—  Front-end  en production": "— Frontend : Vite réalise le build statique ; Nginx sert les fichiers compilés et redirige les routes de la SPA vers index.html.",
         "—  Environnement de production": "— Hébergement : sentinel.akiksystems.fr est une instance publique de démonstration sur VPS Linux. Elle prouve le déploiement technique mais ne constitue pas un déploiement dans une usine ni une validation par l'entreprise observée.",
@@ -972,7 +972,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
             "Des corrections versionnées illustrent ce contrôle : les commits 99606b8 et dd17b81 ont ajouté la revalidation des sessions et l'exigence du mot de passe administrateur avant certaines révocations. L'audit final du dossier a ensuite conduit à incrémenter session_version lors d'une réinitialisation de mot de passe ou d'un changement d'activation, afin qu'un ancien JWT ne puisse pas redevenir valable.",
         ),
         make_paragraph(
-            "Au 29 juillet 2026, les audits de production backend et frontend passent `npm audit --omit=dev --audit-level=high`. Les audits complets signalent encore des vulnérabilités high de développement issues de brace-expansion, et trois advisories React Router modérées restent ouvertes dans le dossier de décision RC5. Cette situation est datée et doit être revérifiée avant chaque livraison.",
+            "Au 30 juillet 2026, les audits sont évalués par une politique fermée : `GHSA-qwww-vcr4-c8h2` est bornée à la surface Router RSC absente et `GHSA-mh99-v99m-4gvg` aux chaînes Brace dev-only absentes du runtime et des images. Toute autre advisory high/critical, dérive de surface ou expiration après le 31 août 2026 fait échouer la garde.",
         ),
         make_paragraph(
             "[À COMPLÉTER — personnel] Décrire uniquement la veille réellement pratiquée par l'auteur : sources consultées, fréquence et exemple personnel vérifiable."
@@ -1132,12 +1132,12 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     replace_paragraph(
         body,
         "Sentinel est déployé en production sur un VPS",
-        "La documentation prévoit une instance publique de démonstration sur un VPS Linux à l'adresse sentinel.akiksystems.fr. L'état RC5 réellement servi, sa topologie et ses digests restent des preuves externes à relever après autorisation ; le dépôt seul ne permet pas de les affirmer.",
+        "La documentation prévoit une instance publique de démonstration sur un VPS Linux à l'adresse sentinel.akiksystems.fr. La lecture publique du 30 juillet 2026 observe un frontal Nginx et la santé du SHA RC4 encore servi ; l'état interne Compose/conteneurs/binds/digests et tout déploiement RC5 restent externes sans accès SSH nominatif.",
     )
     replace_paragraph(
         body,
         "Quatre services Docker Compose",
-        "Deux topologies cibles sont documentées et ne doivent pas être mélangées : le mode autonome comporte PostgreSQL, backend, frontend/Nginx et Caddy ; le mode avec Nginx hôte désactive Caddy et lie backend et frontend en loopback via les ports `SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`. La topologie réellement active sur le VPS reste à constater séparément.",
+        "Deux topologies cibles sont documentées et ne doivent pas être mélangées : le mode autonome comporte PostgreSQL, backend, frontend/Nginx et Caddy ; le mode avec Nginx hôte désactive Caddy et lie backend et frontend en loopback via les ports `SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`. Le frontal public observé correspond à la topologie B au bord ; son état interne reste à constater séparément.",
     )
     deploy_heading = find_body_element(body, "14.3 — CI/CD et migrations", exact=True)
     set_paragraph_text(first_paragraph(deploy_heading), "14.3 — Intégration continue, migrations et sauvegardes")

@@ -57,10 +57,13 @@ ports `80` et `443`; PostgreSQL, l'API et Nginx restent sur des réseaux
 internes. La commande ci-dessous sert à cette distribution autonome ou à une
 validation locale, pas à l'instance publique.
 
-L'instance publique utilise la **topologie B** avec Nginx hôte : Caddy y est
-désactivé, les deux services applicatifs sont liés au loopback, et les images
-de registry sont déployées par digest avec les trois fichiers Compose du
-runbook. Elle n'est jamais reconstruite avec la commande `--build` ci-dessous.
+L'observation publique du 30 juillet 2026 prouve un frontal Nginx sur les ports
+80/443, ce qui exclut la topologie A avec Caddy propriétaire de ces ports et
+rend la **topologie B** cohérente avec le bord exposé. Sans accès SSH nominatif,
+elle ne prouve toutefois ni les fichiers Compose actifs, ni les binds loopback,
+ni les images et digests internes. Le runbook B reste le contrat normatif du
+prochain déploiement public : trois fichiers Compose, images par digest et
+aucune reconstruction avec la commande `--build` ci-dessous.
 
 ```bash
 cp .env.release.example .env

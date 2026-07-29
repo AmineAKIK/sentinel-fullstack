@@ -128,8 +128,9 @@ npm run test:e2e
 - [ ] healthchecks backend, frontend et PostgreSQL passent
 - [ ] les logs sont bornés par rotation
 - [ ] ShellCheck valide tous les scripts shell suivis
-- [ ] les trois advisories React Router modérées sont traitées selon la décision
-      RC5 explicite consignée dans `docs/rc5-decision-dossiers.md`, sans
+- [ ] les deux seules exceptions upstream high, `GHSA-qwww-vcr4-c8h2` pour la
+      surface Router RSC absente et `GHSA-mh99-v99m-4gvg` pour l'outillage
+      Brace dev-only, satisfont la garde RC5 bornée au 31 août 2026, sans
       `npm audit fix --force`
 
 ## 8. Recette manuelle

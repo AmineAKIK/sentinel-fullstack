@@ -101,10 +101,10 @@ peut ajouter son volume réel, sans le reconstituer a posteriori.
 | Écritures concurrentes sur un incident | Perte de mise à jour ou audit incohérent | Transactions et `SELECT ... FOR UPDATE` pour les mutations sensibles | La preuve dépend des chemins appelant bien le repository avec le client transactionnel |
 | Donnée incohérente ou doublon actif | Historique inexploitable | contraintes `CHECK`, clés étrangères et index unique partiel | Les structures JSONB restent principalement validées par l'application |
 | Réponse réseau ancienne après une nouvelle recherche | Résultats sans rapport avec le filtre visible | debounce de 250 ms et `AbortController` | L'annulation intervient au changement de valeur débouncée ou de filtre, pas à chaque frappe brute |
-| Secret ou origine de démonstration en production | Compromission de session | `assertProductionConfig`, cookies sécurisés et variables de release | `TRUST_PROXY` absent ne bloque pas le démarrage : il produit un avertissement |
-| Conflit de ports dans une topologie avec proxy hôte | Indisponibilité d'un autre service | override cible, Caddy désactivé, ports backend/frontend paramétrés et liés à `127.0.0.1` | La topologie réellement retenue et les valeurs de ports du VPS restent une décision externe |
+| Secret ou origine de démonstration en production | Compromission de session | `assertProductionConfig`, cookies sécurisés et variables de release | `TRUST_PROXY=true` est exigé en production ; l'égalité du contrat `CLIENT_ORIGIN` entre préflight et middleware reste contrôlée séparément |
+| Conflit de ports dans une topologie avec proxy hôte | Indisponibilité d'un autre service | override cible, Caddy désactivé, ports backend/frontend paramétrés et liés à `127.0.0.1` | Le frontal Nginx est observé publiquement ; les fichiers Compose, binds et valeurs de ports internes restent à constater avec un accès SSH nominatif |
 | Perte de la base | Perte d'incidents et d'audit | volume PostgreSQL, scripts `backup.sh` et `restore.sh` ; preuve RC5 jetable `21/21`, ledger exact `001..050`, variantes rejetées avant mutation et RTO local de 24 s | La copie hors site, la restauration périodique et le RTO du VPS restent à vérifier en exploitation |
-| Advisories React Router 6 | Redirection ambiguë ou vulnérabilité SSR selon le mode utilisé | Audit runtime au seuil high, liens internes contrôlés et preuve dynamique du mode déclaratif | Trois advisories React Router modérées restent à traiter selon la décision consignée dans `docs/rc5-decision-dossiers.md` ; aucune option RC5 n'est choisie ici |
+| Exceptions upstream Router et Brace | Surface RSC vulnérable ou outil de développement affecté | Router `7.18.2` en mode déclaratif sans RSC ; Brace absent du runtime et des images ; politique et garde automatiques | Deux exceptions high exactement bornées, `GHSA-qwww-vcr4-c8h2` et `GHSA-mh99-v99m-4gvg`, expirent le 31 août 2026 et se referment au moindre écart |
 | Conservation excessive de données personnelles | Non-conformité RGPD | suppression du compte opérationnel et pseudonymisation | aucune purge automatique des snapshots et journaux n'est implémentée |
 
 **Sources** : historique Git, `INCIDENT_LIFECYCLE.md`, `backend/migrations/017_enforce_taken_consistency.sql`,
@@ -134,9 +134,10 @@ Une seconde topologie cible prévoit un Nginx sur l'hôte. L'override de product
 désactive alors Caddy, lie le backend et le frontend en loopback via
 `SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`, puis Nginx termine
 HTTPS et route `/api/*` vers le backend et le reste vers le frontend. PostgreSQL
-n'est jamais publié sur l'hôte. Le dépôt ne permet pas de déterminer laquelle
-des deux topologies est réellement active sur le VPS ; cette décision reste
-ouverte dans `docs/rc5-decision-dossiers.md`.
+n'est jamais publié sur l'hôte selon ce contrat. L'observation publique tranche
+la topologie B au bord Nginx ; sans accès SSH nominatif, elle ne prouve pas
+l'état interne Compose/Caddy, les binds, images, digests ou valeurs de ports.
+Cette limite est consignée dans `docs/rc5-decision-dossiers.md`.
 
 ### 14 — Déploiement et exploitation
 
@@ -682,7 +683,7 @@ par `is_deleted`, retire les credentials et fait échouer la vérification en ba
 Les mots de passe sont hachés avec bcrypt : coût 10 pour Workshop et 12 pour Admin. Le premier
 accès Workshop utilise un code aléatoire de 10 caractères dans un alphabet sans caractères
 ambigus. Le code est normalisé puis haché par bcrypt ; son expiration est configurable et vaut
-24 heures par défaut. Le mot de passe Workshop contient au moins 6 caractères, celui d'Admin au
+24 heures par défaut. Le mot de passe Workshop contient au moins 10 caractères, celui d'Admin au
 moins 12, et les deux sont bornés à 128 caractères.
 
 Le limiteur de connexion compte les échecs par IP et identité sur une fenêtre de 5 minutes ; le
@@ -739,10 +740,11 @@ Dependabot surveille chaque lundi les dépendances npm du backend et du frontend
 Sur les pushes vers `main`, `refactor/**` ou `release/**`, ainsi que sur les pull
 requests vers `main`, GitHub Actions installe avec `npm ci` puis exécute
 `npm audit --omit=dev --audit-level=high`. Ce contrôle porte sur le runtime ; les
-audits complets de développement restent analysés séparément et signalent
-actuellement des vulnérabilités high issues de `brace-expansion`. Trois
-advisories React Router modérées sont documentées avec leurs chemins et options
-dans `docs/rc5-decision-dossiers.md`.
+audits complets de développement restent analysés séparément. La politique RC5
+borne exactement `GHSA-qwww-vcr4-c8h2` à la surface Router RSC absente et
+`GHSA-mh99-v99m-4gvg` aux chaînes Brace dev-only absentes du runtime et des
+images. Leurs chemins, gardes automatiques et échéance au 31 août 2026 sont
+documentés dans `docs/rc5-decision-dossiers.md`.
 
 Le dépôt conserve aussi des corrections de sécurité ciblées : suppression d'une
 fuite d'énumération à la connexion (`e998463`), ajout du rate limiting global

@@ -186,7 +186,7 @@ commit si besoin de rafraîchir la mémoire.
   et pull request vers `main`
 - **Suivi de tâches** : feuille de route personnelle en Markdown (phases, priorités, critères de
   validation par tâche)
-- **Environnement de développement** : VS Code, Node.js 20, Docker Compose pour l'environnement
+- **Environnement de développement** : VS Code, Node.js 24.18.0, Docker Compose pour l'environnement
   local complet (PostgreSQL, backend, frontend, reverse proxy)
 
 ### 3.4 Environnement humain
@@ -227,7 +227,7 @@ Sentinel est une application full-stack organisée en monorepo à deux workspace
 
 | Choix | Alternative écartée | Pourquoi |
 |---|---|---|
-| Node.js 20 + Express + TypeScript | NestJS, Fastify | Contrôle direct de chaque couche, pas de convention imposée à apprendre, adapté à la taille du projet |
+| Node.js 24.18.0 + Express + TypeScript | NestJS, Fastify | Contrôle direct de chaque couche, pas de convention imposée à apprendre, adapté à la taille du projet |
 | SQL brut (`pg`, requêtes paramétrées) | ORM (Prisma, TypeORM) | Contrôle total des requêtes, en particulier pour les requêtes analytiques complexes du module Pilotage ; élimine une couche d'abstraction sans bénéfice mesurable à cette échelle |
 | Zod | Joi, validation manuelle | Schémas déclaratifs typés, partagés entre validation d'entrée et types TypeScript |
 | JWT en cookie HTTP-only | JWT en `localStorage` | Protection native contre le vol de token par XSS — un script injecté ne peut pas lire un cookie `httpOnly` |
@@ -241,12 +241,12 @@ Sentinel est une application full-stack organisée en monorepo à deux workspace
 | React 18 + TypeScript + Vite | Next.js | Application 100 % client (SPA), pas de besoin de rendu serveur ; Vite offre un temps de démarrage et de rebuild nettement plus rapide en développement |
 | `fetch` natif | Axios | Pas de dépendance supplémentaire pour un besoin simple (base URL, cookies, gestion d'erreur centralisée dans un seul wrapper) |
 | CSS en tokens (variables custom properties), pas de framework | Tailwind, Bootstrap | Contrôle total de la grammaire visuelle (une doctrine de design a été rédigée en amont, `docs/doctrine-ux.md`), pas de classes utilitaires à mémoriser, cohérence garantie par les tokens plutôt que par convention |
-| React Router 6 | — | Standard du marché pour le routage SPA |
+| React Router 7.18.2 | — | Standard du marché pour le routage SPA, conservé en mode déclaratif |
 
 ### 4.4 Infrastructure et déploiement
 
-- **Conteneurisation** : Docker Compose, 4 services — PostgreSQL, backend, frontend (servi par
-  Nginx), reverse proxy Caddy (seul service exposant des ports sur l'hôte, TLS automatique)
+- **Conteneurisation** : Docker Compose avec deux distributions documentées — autonome à quatre
+  services avec Caddy, ou proxy Nginx hôte avec Caddy désactivé et services applicatifs en loopback
 - **Environnement de production** : VPS Linux, domaine dédié (`sentinel.akiksystems.fr`)
 - **CI/CD** : GitHub Actions, déclenché sur chaque push/pull request vers `main`
 - **Base de données** : PostgreSQL 15, migrations appliquées automatiquement au démarrage du
@@ -1030,9 +1030,10 @@ it('refuse de suivre un incident terminé', async () => {
 ## 14. Déploiement
 
 La documentation de déploiement vise un VPS Linux et le domaine
-`sentinel.akiksystems.fr`. L'état RC5 réellement servi, sa topologie et ses
-digests restent des preuves externes ; ils ne sont pas affirmés à partir du seul
-dépôt.
+`sentinel.akiksystems.fr`. La lecture publique du 30 juillet 2026 observe un
+frontal Nginx et la santé du SHA RC4 encore servi. L'état interne
+Compose/conteneurs/binds/digests et tout déploiement RC5 restent des preuves
+externes qui ne sont pas affirmées sans accès SSH nominatif.
 
 ### 14.1 Architecture de déploiement
 
@@ -1058,8 +1059,8 @@ Deux topologies cibles sont documentées et ne doivent pas être combinées :
   backend comme le frontend sont liés en loopback via
   `SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`.
 
-Le choix et l'état réel du VPS restent à constater ; voir
-`docs/rc5-decision-dossiers.md`.
+Le frontal public tranche en faveur de la topologie B au bord. Son état interne
+reste à constater ; voir `docs/rc5-decision-dossiers.md`.
 
 ### 14.2 Sécurisation du démarrage
 
