@@ -1072,6 +1072,43 @@ tbody tr:hover .row-action-button,
   .modal-footer .btn {
     flex: 1 1 140px;
   }
+
+  /* Base de connaissance — fiche détaillée (RC5). .kb-meta-item porte déjà
+     min-width:0 (knowledge.css) ; ici on réduit le nombre de colonnes pour
+     que chaque valeur reste lisible sans être écrasée. */
+  .kb-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kb-meta-item {
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .kb-meta-item:last-child {
+    border-bottom: none;
+  }
+
+  /* Fiches similaires : le libellé ligne/machine et la date ne doivent plus
+     être non-cassables — ils peuvent revenir à la ligne sous le badge/résumé
+     plutôt que forcer la largeur de la carte entière. */
+  .kb-related-where,
+  .kb-related-date {
+    white-space: normal;
+  }
+  .kb-related-preview {
+    flex-basis: 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* Actions : empilées pleine largeur, hauteur tactile confortable. */
+  .kb-actions {
+    justify-content: stretch;
+  }
+  .kb-actions .btn {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
 }
 
 .detail-field {
