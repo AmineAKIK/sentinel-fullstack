@@ -11,7 +11,7 @@ import Spinner from '../components/ui/Spinner';
 import { listAccounts } from '../api/accounts';
 import { SentinelUser, Role, SortOrder } from '../types';
 import { formatDate } from '../utils/date';
-import { formatRoleLabel, ROLE_LABELS } from '../utils/labels';
+import { ASSIGNABLE_ROLES, formatRoleLabel, ROLE_LABELS } from '../utils/labels';
 import { makeSortCodec } from '../utils/sortCodec';
 import { UserSortField, compareUsers } from '../utils/userSort';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -389,10 +389,7 @@ export default function UserListPage() {
             <SelectField
               value={draftRole}
               onChange={(value) => setDraftRole(value as Role | '')}
-              options={[
-                { value: '', label: 'Tous' },
-                ...Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label })),
-              ]}
+              options={[{ value: '', label: 'Tous' }, ...ASSIGNABLE_ROLES]}
             />
           </div>
           <div className="form-group">

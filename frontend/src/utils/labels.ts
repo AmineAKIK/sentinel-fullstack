@@ -10,6 +10,24 @@ export function formatRoleLabel(role: string | null | undefined): string {
   return role ? (ROLE_LABELS[role] ?? 'Utilisateur') : 'Utilisateur';
 }
 
+/**
+ * Rôles humains attribuables via le formulaire standard de création ou de
+ * modification d'un utilisateur atelier. Source de vérité unique pour ces
+ * surfaces — distincte de ROLE_LABELS (dictionnaire d'affichage général qui
+ * inclut aussi ADMIN/SYSTEM pour d'éventuels contextes de lecture). Le
+ * backend applique la même restriction via WORKSHOP_ROLES
+ * (backend/src/domain/constants.ts) : administrateur et système ne doivent
+ * jamais être proposés ni acceptés par ce flux.
+ */
+export const ASSIGNABLE_ROLES: {
+  value: 'OPERATOR' | 'MAINTENANCE' | 'RESPONSABLE';
+  label: string;
+}[] = [
+  { value: 'OPERATOR', label: ROLE_LABELS.OPERATOR },
+  { value: 'MAINTENANCE', label: ROLE_LABELS.MAINTENANCE },
+  { value: 'RESPONSABLE', label: ROLE_LABELS.RESPONSABLE },
+];
+
 export const STATUS_LABELS: Record<string, string> = {
   OPEN: 'Ouvert',
   PENDING: 'En attente',
