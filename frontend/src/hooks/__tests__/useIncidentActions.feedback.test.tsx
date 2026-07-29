@@ -79,9 +79,11 @@ function Harness({ modal }: { modal: ModalStateApi }) {
 function MutationMatrixHarness({
   modal,
   selectedIncident = baseIncident,
+  isMaintenance = false,
 }: {
   modal: ModalStateApi;
   selectedIncident?: WorkshopIncident;
+  isMaintenance?: boolean;
 }) {
   const actions = useIncidentActions({
     selectedIncident,
@@ -90,8 +92,8 @@ function MutationMatrixHarness({
     setIncidents: vi.fn(),
     refreshMetrics: () => Promise.resolve(),
     modal,
-    isMaintenance: false,
-    userRole: 'RESPONSABLE',
+    isMaintenance,
+    userRole: isMaintenance ? 'MAINTENANCE' : 'RESPONSABLE',
   });
   return (
     <>
@@ -259,6 +261,28 @@ describe('useIncidentActions — retour d’action global (lot 1 RC3)', () => {
       decisionReason: 'Incident confirmé',
     });
   });
+
+  it.each(['Appliquer correction', 'Refuser correction'])(
+    'affiche le libellé français exact quand Maintenance tente « %s » après prise en charge',
+    (buttonName) => {
+      const takenIncident = { ...baseIncident, is_taken: true } as WorkshopIncident;
+      const modal = makeModal();
+      (modal.state as { reviewIncident: WorkshopIncident | null }).reviewIncident = takenIncident;
+      render(
+        <MutationFeedbackProvider>
+          <MutationMatrixHarness modal={modal} selectedIncident={takenIncident} isMaintenance />
+        </MutationFeedbackProvider>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: buttonName }));
+
+      expect(modal.setReviewError).toHaveBeenCalledWith(
+        'Modification interdite après prise en charge.'
+      );
+      expect(updateWorkshopIncident).not.toHaveBeenCalled();
+      expect(modal.closeReview).not.toHaveBeenCalled();
+    }
+  );
 
   it('branche les retraits urgence/suivi actif et le retrait confirmé d’un suivi résolu', async () => {
     const activeFollowed = {
