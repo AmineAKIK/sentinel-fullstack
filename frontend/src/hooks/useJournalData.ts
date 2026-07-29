@@ -165,6 +165,15 @@ export function useJournalData() {
     setSearchParams(withWorkshopUrlFilter(searchParams, 'end', value, ''));
   }
 
+  function clearPeriodFilter(): void {
+    setStartFilter('');
+    setEndFilter('');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('start');
+    nextParams.delete('end');
+    setSearchParams(nextParams);
+  }
+
   function clearFilters(): void {
     setQuery('');
     setStatusFilter('all');
@@ -240,6 +249,7 @@ export function useJournalData() {
     updateLineFilter,
     updateStartFilter,
     updateEndFilter,
+    clearPeriodFilter,
     clearFilters,
     handleSort,
   };

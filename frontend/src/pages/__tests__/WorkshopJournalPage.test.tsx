@@ -57,6 +57,7 @@ function baseJournalData(overrides: Partial<ReturnType<typeof useJournalData>> =
     updateLineFilter: vi.fn(),
     updateStartFilter: vi.fn(),
     updateEndFilter: vi.fn(),
+    clearPeriodFilter: vi.fn(),
     clearFilters: vi.fn(),
     handleSort: vi.fn(),
     ...overrides,
@@ -101,21 +102,18 @@ describe('WorkshopJournalPage — filtre période (lot 6, ANA-03)', () => {
   });
 
   it('affiche un chip de période retirable qui efface les deux bornes', () => {
-    const updateStartFilter = vi.fn();
-    const updateEndFilter = vi.fn();
+    const clearPeriodFilter = vi.fn();
     renderJournalPage({
       startFilter: '2026-03-01',
       endFilter: '2026-03-31',
-      updateStartFilter,
-      updateEndFilter,
+      clearPeriodFilter,
     });
 
     expect(screen.getByText(/Période : 2026-03-01 → 2026-03-31/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(/Retirer le filtre Période/i));
 
-    expect(updateStartFilter).toHaveBeenCalledWith('');
-    expect(updateEndFilter).toHaveBeenCalledWith('');
+    expect(clearPeriodFilter).toHaveBeenCalledOnce();
   });
 });
 

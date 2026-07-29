@@ -83,6 +83,7 @@ export default function WorkshopJournalPage() {
     updateLineFilter,
     updateStartFilter,
     updateEndFilter,
+    clearPeriodFilter,
     clearFilters,
     handleSort,
   } = useJournalData();
@@ -118,10 +119,7 @@ export default function WorkshopJournalPage() {
           {
             key: 'period',
             label: `Période : ${startFilter || '…'} → ${endFilter || '…'}`,
-            onRemove: () => {
-              updateStartFilter('');
-              updateEndFilter('');
-            },
+            onRemove: clearPeriodFilter,
           },
         ]
       : []),
