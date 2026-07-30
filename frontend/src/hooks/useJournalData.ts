@@ -29,6 +29,7 @@ export function useJournalData() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
   const loadMoreControllerRef = useRef<AbortController | null>(null);
+  const requestGenerationRef = useRef(0);
 
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const debouncedQuery = useDebouncedValue(query);
@@ -96,6 +97,14 @@ export function useJournalData() {
     // Un changement de filtre repart de la première page : le curseur d'une
     // page précédente n'a plus de sens sous un nouveau périmètre de données.
     loadMoreControllerRef.current?.abort();
+    loadMoreControllerRef.current = null;
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+    setHistoryEvents([]);
+    setNextCursor(null);
+    setLoadingMore(false);
+    setError('');
+
     if (startFilter && endFilter && startFilter > endFilter) {
       setHistoryEventsLoading(false);
       setPeriodError('La date de début doit être antérieure à la date de fin.');
@@ -105,43 +114,64 @@ export function useJournalData() {
 
     const controller = new AbortController();
     setHistoryEventsLoading(true);
-    setError('');
     void listWorkshopHistoryEvents(buildIncidentWorkspaceParams(baseParams), controller.signal)
       .then((page) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || requestGeneration !== requestGenerationRef.current) return;
         setHistoryEvents(page.items);
         setNextCursor(page.nextCursor);
       })
       .catch(() => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || requestGeneration !== requestGenerationRef.current) return;
         setError('Impossible de charger le journal atelier.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setHistoryEventsLoading(false);
+        if (!controller.signal.aborted && requestGeneration === requestGenerationRef.current) {
+          setHistoryEventsLoading(false);
+        }
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      loadMoreControllerRef.current?.abort();
+      loadMoreControllerRef.current = null;
+    };
   }, [baseParams, startFilter, endFilter]);
 
   const loadMore = useCallback((): void => {
     if (!nextCursor || loadingMore) return;
     const controller = new AbortController();
+    const requestGeneration = requestGenerationRef.current;
     loadMoreControllerRef.current = controller;
     setLoadingMore(true);
+    setError('');
     void listWorkshopHistoryEvents(
       buildIncidentWorkspaceParams({ ...baseParams, cursor: nextCursor }),
       controller.signal
     )
       .then((page) => {
-        if (controller.signal.aborted) return;
+        if (
+          controller.signal.aborted ||
+          requestGeneration !== requestGenerationRef.current ||
+          loadMoreControllerRef.current !== controller
+        )
+          return;
         setHistoryEvents((current) => [...current, ...page.items]);
         setNextCursor(page.nextCursor);
       })
       .catch(() => {
-        if (controller.signal.aborted) return;
+        if (
+          controller.signal.aborted ||
+          requestGeneration !== requestGenerationRef.current ||
+          loadMoreControllerRef.current !== controller
+        )
+          return;
         setError('Impossible de charger la suite du journal atelier.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoadingMore(false);
+        if (loadMoreControllerRef.current !== controller) return;
+        loadMoreControllerRef.current = null;
+        if (!controller.signal.aborted && requestGeneration === requestGenerationRef.current) {
+          setLoadingMore(false);
+        }
       });
   }, [baseParams, nextCursor, loadingMore]);
 
