@@ -184,6 +184,24 @@ class ReleaseWorkflowTests(unittest.TestCase):
             RELEASE,
         )
 
+    def test_release_uses_default_home_docker_config_for_login_and_attestations(
+        self,
+    ) -> None:
+        _, publish = RELEASE.split("\n  publish:\n", maxsplit=1)
+        install_start = publish.index("- name: Install the digest-pinned Buildx CLI")
+        install_end = publish.index(
+            "- name: Create a builder with digest-pinned BuildKit", install_start
+        )
+        install = publish[install_start:install_end]
+
+        self.assertIn('"$HOME/.docker/cli-plugins/docker-buildx"', install)
+        self.assertNotIn("DOCKER_CONFIG", publish)
+        self.assertNotIn("$GITHUB_ENV", install)
+        self.assertLess(
+            publish.index("docker/login-action@"),
+            publish.index("actions/attest@"),
+        )
+
     def test_digest_pinned_buildx_and_buildkit_execute_for_real(self) -> None:
         buildx_images = re.findall(
             r"(?m)^\s*BUILDX_IMAGE:\s*"
@@ -235,11 +253,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
         builder_name = f"sentinel-buildx-proof-{uuid.uuid4().hex[:12]}"
         buildx_container = ""
         with tempfile.TemporaryDirectory(prefix="sentinel-buildx-proof-") as temp:
-            docker_config = Path(temp) / "docker-config"
-            plugin = docker_config / "cli-plugins" / "docker-buildx"
+            test_home = Path(temp) / "home"
+            plugin = test_home / ".docker" / "cli-plugins" / "docker-buildx"
             plugin.parent.mkdir(parents=True)
             environment = os.environ.copy()
-            environment["DOCKER_CONFIG"] = str(docker_config)
+            environment["HOME"] = str(test_home)
+            environment.pop("DOCKER_CONFIG", None)
+            self.assertNotIn("DOCKER_CONFIG", environment)
 
             try:
                 created = run(
@@ -286,6 +306,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
                     ["docker", "buildx", "rm", builder_name],
                     cwd=REPOSITORY_ROOT,
                     env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                subprocess.run(
+                    ["docker", "rm", "-f", f"buildx_buildkit_{builder_name}0"],
+                    cwd=REPOSITORY_ROOT,
                     text=True,
                     capture_output=True,
                     check=False,
