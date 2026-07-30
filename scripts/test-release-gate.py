@@ -113,19 +113,7 @@ class ReleaseGateDryRunTests(unittest.TestCase):
                             raise SystemExit(1)
                         print(json.dumps({{
                             "name": "prerelease",
-                            "protection_rules": [
-                                {{
-                                    "type": "required_reviewers",
-                                    "prevent_self_review": True,
-                                    "reviewers": [
-                                        {{
-                                            "type": "User",
-                                            "reviewer": {{"login": "independent-reviewer"}}
-                                        }}
-                                    ]
-                                }},
-                                {{"type": "branch_policy"}}
-                            ],
+                            "protection_rules": [{{"type": "branch_policy"}}],
                             "deployment_branch_policy": {{
                                 "protected_branches": False,
                                 "custom_branch_policies": True

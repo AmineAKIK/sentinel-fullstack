@@ -55,10 +55,17 @@ dédiée aux tags a été créé par l'agent pendant l'audit; le propriétaire n
 l'avait pas configuré manuellement. Cette simulation de gouvernance ne décrit
 plus le dépôt actif et n'est plus une condition de fusion de la PR RC5.
 
-Les environnements de publication restent absents et le workflow conserve son
-garde fail-closed. Cette porte de publication, puis les preuves réelles VPS,
-déploiement et recette, restent distinctes de la clôture technique locale et
-du profil de protection de `main`.
+Le tag immuable `v1.0.0-rc.5` a été créé sur le merge
+`df89baaa113ff3d37c70bb0608d939a1ac6c88b1`. Le run Release `30544330857`
+s'est arrêté dans le garde en lecture seule parce que `prerelease` était
+absent; le job de publication a été `skipped`, sans release, image, attestation
+ni déploiement.
+
+Le hotfix RC6 conserve l'exigence d'un environnement obligatoire mais aligne
+son contrat sur le propriétaire unique : `prerelease`, zéro reviewer, zéro
+secret et une unique policy de branche `main`. Cette frontière de publication,
+puis les preuves réelles VPS, déploiement et recette, restent distinctes de la
+clôture technique locale et du profil de protection de `main`.
 
 #### 2. GO global `v1.0.0` en production
 
@@ -249,7 +256,7 @@ commit audité au démarrage de cette branche.
 | `OPS-02` | P1 | 9 | Restore accepte un dump sans checksum. | Refus par défaut, exception explicite auditée. | VERIFIED |
 | `OPS-03` | P1 | 9 + A RC5 | Validation restore historiquement limitée à trois tables, puis au seul caractère non nul du ledger. | Après le lot A RC5 : égalité exacte avec `001..050` (noms, ordre, checksums) et rejets testés avant mutation pour ledger tronqué, migration absente/supplémentaire, ordre falsifié ou checksum modifié. | VERIFIED |
 | `OPS-04` | EXT | 9 | Aucun exercice réel avec RTO et copie chiffrée prouvés. | Rapport daté sans données de production. | BLOCKED_EXTERNAL |
-| `REL-01` | P0 | 12 | Aucun tag de release immuable. | Tag signé/protégé et release GitHub sur le SHA final. | OPEN |
+| `REL-01` | P0 | 12 | Le tag RC5 est immuable mais sa tentative s'est arrêtée avant release; le tag final `v1.0.0` reste absent. | Tag signé/protégé et release GitHub sur le SHA final. | OPEN |
 | `REL-02` | P0 | 12 | VPS différent du candidat audité. | `/api/health.version` égale le SHA du tag. | OPEN |
 | `REL-03` | P1 | 12 | Headers et anciens bundles attestent un déploiement antérieur. | Recette HTTPS et digests d'images consignés. | OPEN |
 | `REL-04` | EXT | 12 | SMTP, navigateurs cibles et rollback non recettés sur le candidat. | Procès-verbal de recette daté. | BLOCKED_EXTERNAL |

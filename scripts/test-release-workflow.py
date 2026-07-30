@@ -54,7 +54,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("secrets.", publish)
         self.assertEqual(RELEASE.count("scripts/verify-release-candidate.sh"), 2)
         self.assertLess(
-            publish.index("Revalidate the candidate after protected-environment approval"),
+            publish.index(
+                "Revalidate the candidate inside the protected release environment"
+            ),
             publish.index("Reserve the release tag before any registry side effect"),
         )
         self.assertLess(

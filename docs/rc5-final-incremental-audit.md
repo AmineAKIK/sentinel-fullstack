@@ -353,3 +353,22 @@ rectification, la branche RC5 est poussée et la PR #31 ouverte sous le profil
 propriétaire unique, sans approbation indépendante requise. Aucun bypass, tag,
 release, publication d'image, déploiement, SSH, DNS ou changement VPS n'a été
 effectué.
+
+## 7. Tentative de publication RC5 et profil RC6
+
+Après cette photographie, la PR #31 a été fusionnée par le merge commit
+`df89baaa113ff3d37c70bb0608d939a1ac6c88b1`, puis le tag annoté et immuable
+`v1.0.0-rc.5` a été créé sur ce SHA. L'unique run Release déclenché pour RC5,
+`30544330857`, a refusé le candidat parce que l'environnement `prerelease`
+était absent. Le job `Build, attest and publish` a été `skipped`; aucune
+release, image, attestation, opération VPS ou déploiement n'a commencé.
+
+Le hotfix RC6 ne retire pas la frontière d'environnement. Il exige un
+environnement réel nommé exactement `prerelease`, sans règle
+`required_reviewers`, sans secret et limité par une unique policy à la branche
+`main`. Le garde continue de refuser un environnement absent ou mal nommé et
+toute autre politique de branche. Ce profil mono-mainteneur ne constitue
+toujours pas un `GO v1.0.0` ni une preuve de déploiement.
+
+Le registre `577/577` reste l'artefact historique de l'audit RC5; ce hotfix
+ciblé ne prétend ni le rejouer ni recertifier les fichiers hors de ce delta.

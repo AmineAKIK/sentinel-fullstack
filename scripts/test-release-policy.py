@@ -49,19 +49,7 @@ def successful_ci() -> dict[str, object]:
 def protected_environment(name: str) -> dict[str, object]:
     return {
         "name": name,
-        "protection_rules": [
-            {
-                "type": "required_reviewers",
-                "prevent_self_review": True,
-                "reviewers": [
-                    {
-                        "type": "User",
-                        "reviewer": {"login": "independent-reviewer"},
-                    }
-                ],
-            },
-            {"type": "branch_policy"},
-        ],
+        "protection_rules": [{"type": "branch_policy"}],
         "deployment_branch_policy": {
             "protected_branches": False,
             "custom_branch_policies": True,
@@ -278,6 +266,15 @@ class ReleasePolicyTests(unittest.TestCase):
             "release tag already has a GitHub release",
         )
 
+    def test_accepts_prerelease_environment_without_required_reviewers(self) -> None:
+        environment = protected_environment("prerelease")
+        environment["protection_rules"] = [{"type": "branch_policy"}]
+
+        result = self.run_policy(tag="v1.0.0-rc.6", environment=environment)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["environment"], "prerelease")
+
     def test_refuses_absent_or_unprotected_release_environments(self) -> None:
         self.assert_refused(
             self.run_policy(environment=None),
@@ -288,15 +285,26 @@ class ReleasePolicyTests(unittest.TestCase):
         environment["protection_rules"] = []
         self.assert_refused(
             self.run_policy(environment=environment),
-            "required_reviewers",
+            "branch_policy",
         )
 
         environment = protected_environment("prerelease")
-        reviewer_rule = environment["protection_rules"][0]
-        reviewer_rule["prevent_self_review"] = False
+        environment["protection_rules"].insert(
+            0,
+            {
+                "type": "required_reviewers",
+                "prevent_self_review": True,
+                "reviewers": [{"type": "User", "reviewer": {"login": "fake"}}],
+            },
+        )
         self.assert_refused(
             self.run_policy(environment=environment),
-            "prevent self-review",
+            "must not define required_reviewers",
+        )
+
+        self.assert_refused(
+            self.run_policy(environment=protected_environment("production")),
+            "name differs from the classified release",
         )
 
         self.assert_refused(
@@ -348,7 +356,7 @@ class ReleasePolicyTests(unittest.TestCase):
             [
                 "main head equality",
                 "six successful checks on TAG_SHA",
-                "protected environment with reviewer and exact main branch policy",
+                "protected environment without reviewers and exact main branch policy",
                 "backend and frontend immutable digests",
                 "SPDX SBOMs",
                 "image provenance attestations",

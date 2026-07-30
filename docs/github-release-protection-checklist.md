@@ -20,6 +20,12 @@ historique; l'immutabilité des tags créés reste active. Aucun environnement
 incomplet n'a été créé. Aucun `GO v1.0.0` n'est accordé avant les preuves
 réelles de publication, VPS, déploiement et recette.
 
+Le tag immuable `v1.0.0-rc.5` a ensuite été créé sur
+`df89baaa113ff3d37c70bb0608d939a1ac6c88b1`. L'unique tentative de publication
+RC5, run `30544330857`, s'est arrêtée dans le garde en lecture seule parce que
+l'environnement `prerelease` était absent. Le job de publication a été
+`skipped` : aucune release, image, attestation ou opération VPS n'a commencé.
+
 La politique locale reste l'autorité sur la syntaxe des tags :
 
 ```regex
@@ -46,15 +52,17 @@ les six jobs CI doivent appartenir au même run `push` sur `main`, avec
 | ruleset création `v*` | **désactivé**, ID `20004127`, objet conservé | preuve de la simulation |
 | ruleset immutabilité `v*` | actif, ID `20004113`, sans bypass | mises à jour et suppressions interdites |
 | releases immuables | activées pour les nouvelles releases | actif |
-| environnements | aucun | aucune protection fictive déclarée |
+| environnement `prerelease` | absent lors de la tentative RC5; profil RC6 défini en section 5 | mono-mainteneur, sans reviewer |
 | collaborateurs | `AmineAKIK` seul, admin, aucune invitation | profil réel |
 | packages GHCR | API `403`, scope `read:packages` absent | contrôle externe restant |
 | attestations RC4 | aucune pour les deux digests RC4 (`404`) | à produire lors d'une publication autorisée |
 
 Les trois objets ruleset sont conservés et ciblent exactement
 `refs/heads/main` ou `refs/tags/v*`; seuls `20004078` et `20004113` sont actifs.
-La rectification n'a créé aucun tag, release, package ou déploiement et n'a pas
-modifié `main`. La PR #31 est restée le mécanisme d'intégration.
+Lors de cette rectification antérieure, aucun tag, release, package ou
+déploiement n'avait été créé et `main` n'avait pas été modifié. La PR #31 a
+ensuite intégré RC5; le tag RC5 et sa tentative arrêtée sont consignés
+ci-dessus.
 
 État historique lu le 29 juillet 2026 avant autorisation :
 
@@ -162,48 +170,32 @@ depuis le commit taggé. Le passage à `workflow_dispatch`, la validation strict
 de la cible et l'immutabilité active protègent le nouveau chemin de
 publication. Ils ne constituent pas, à eux seuls, un `GO v1.0.0`.
 
-## 5. Environnements de publication non configurés
+## 5. Environnement `prerelease` mono-mainteneur
 
-Les exigences ci-dessous décrivent le design fail-closed du workflow de
-publication; elles ne constituent ni le profil actif de `main`, ni un réglage
-que le propriétaire aurait appliqué. Aucun environnement GitHub n'est
-actuellement déclaré et aucune approbation indépendante n'est requise pour
-fusionner la PR #31.
+Le contrat RC6 conserve l'obligation d'une frontière GitHub Environment réelle
+sans simuler de reviewer. Après intégration du hotfix et CI verte sur `main`, l'environnement
+`prerelease` doit être créé et relu avec exactement ce profil :
 
-Créer deux environnements, sans secret statique :
+- [ ] nom exact `prerelease`;
+- [ ] zéro règle `required_reviewers`;
+- [ ] zéro secret d'environnement;
+- [ ] `protected_branches: false`;
+- [ ] `custom_branch_policies: true`;
+- [ ] une unique deployment branch policy `{name: "main", type: "branch"}`.
 
-### `prerelease`
+GitHub évalue cette policy contre le `GITHUB_REF` du run. Le dispatch autorisé
+a obligatoirement `refs/heads/main`; l'environnement autorise donc exactement
+la branche `main`, jamais le tag fourni en entrée.
 
-- [ ] ajouter au moins un reviewer indépendant de l'initiateur;
-- [ ] activer `Prevent self-review`;
-- [ ] désactiver `Allow administrators to bypass configured protection rules`;
-- [ ] sélectionner uniquement la branche de déploiement `main`;
-- [ ] ne stocker aucun token GHCR ou GitHub dans les secrets d'environnement.
+Le garde lit l'environnement et ses policies avant de planifier le job de
+publication. Il refuse toujours un environnement absent, un nom différent de
+la classification, toute règle reviewer fictive, une configuration de branche
+large ou toute policy différente de l'unique branche `main`. Le job `publish`
+reste lié à l'environnement et rejoue le garde complet à l'intérieur de cette
+frontière avant réservation de release, authentification GHCR ou push d'image.
 
-### `production`
-
-- [ ] ajouter au moins un reviewer indépendant de l'initiateur;
-- [ ] activer `Prevent self-review`;
-- [ ] désactiver `Allow administrators to bypass configured protection rules`;
-- [ ] sélectionner uniquement la branche de déploiement `main`;
-- [ ] ne stocker aucun token GHCR ou GitHub dans les secrets d'environnement.
-
-GitHub évalue la règle de déploiement contre le `GITHUB_REF` du run. Le run
-manuel autorisé a obligatoirement `refs/heads/main`; les deux environnements
-doivent donc autoriser exactement la branche `main`, et non le tag fourni en
-entrée. La séparation RC/stable et le choix de l'environnement sont imposés par
-`scripts/release_policy.py`, puis revérifiés après l'approbation. Le garde lit
-aussi l'environnement et ses policies avant de planifier le job protégé; il
-refuse un environnement absent, sans reviewer, sans prévention de
-l'auto-review ou sans l'unique policy `main` de type `branch`. Cela évite
-l'auto-création silencieuse par GitHub d'un environnement non protégé. Si aucun
-reviewer réellement indépendant n'est disponible, la protection n'est pas
-simulée : la publication reste bloquée.
-
-Le 30 juillet 2026, le seul collaborateur est `AmineAKIK` avec le rôle
-administrateur, sans invitation en attente. Créer les environnements avec ce
-seul compte simulerait une approbation indépendante impossible; ils ont donc
-été laissés absents, conformément au comportement fail-closed du garde.
+L'environnement `production` et le `GO v1.0.0` stable restent hors du hotfix
+RC6. Aucun réglage `prerelease` ne vaut preuve de déploiement ou de recette VPS.
 
 ## 6. Releases et packages
 
@@ -220,14 +212,14 @@ seul compte simulerait une approbation indépendante impossible; ils ont donc
 - [ ] publier les packages avec la visibilité explicitement retenue par
       l'exploitant.
 
-Après le second garde et l'approbation protégée, le workflow crée une draft
-minimale **avant** toute authentification registre : cette réservation atomique
-brûle le tag de publication. Il pousse ensuite les images, attache les deux
-SBOM SPDX sans `--clobber`, renseigne les notes, puis publie la draft. Toute
-panne après réservation laisse la draft en place; aucun rerun ni écrasement
-d'image n'est autorisé avec ce tag, et la reprise exige une nouvelle version.
-Après publication immuable, le tag Git, les assets et le nom de release ne
-peuvent plus être réutilisés.
+Après le second garde dans l'environnement applicable, le workflow crée une
+draft minimale **avant** toute authentification registre : cette réservation
+atomique brûle le tag de publication. Il pousse ensuite les images, attache les
+deux SBOM SPDX sans `--clobber`, renseigne les notes, puis publie la draft.
+Toute panne après réservation laisse la draft en place; aucun rerun ni
+écrasement d'image n'est autorisé avec ce tag, et la reprise exige une nouvelle
+version. Après publication immuable, le tag Git, les assets et le nom de
+release ne peuvent plus être réutilisés.
 
 ## 7. Épinglage vérifié des outils et images
 
@@ -291,9 +283,11 @@ Preuves relues :
 - ruleset `Sentinel version tag immutability` ID `20004113` actif, sans bypass;
 - les six checks de `main` exigés sous leurs noms exacts.
 
-Aucune preuve n'affirme que les environnements de publication sont configurés.
-Leur éventuelle création et leur politique feront l'objet d'une décision
-séparée. Le `GO v1.0.0` demeure `NO-GO` tant que publication, VPS, déploiement,
+La tentative RC5 prouve que `prerelease` était absent et que la publication
+s'est arrêtée avant tout effet de publication. Pour RC6, la création et la
+relecture du profil exact de la section 5 sont obligatoires avant le nouveau
+tag et le dispatch.
+Le `GO v1.0.0` demeure `NO-GO` tant que publication, VPS, déploiement,
 health/version et recette ne sont pas réellement prouvés.
 
 Enfin, effectuer un dry-run local sans token :
@@ -308,8 +302,8 @@ Le test du collecteur exécute le vrai script shell et le vrai moteur avec des
 doubles locaux de `git` et `gh`; il prouve l'absence de token, réseau,
 authentification registre et commande de publication. La matrice couvre tags
 valides/invalides, branche release, ancien commit de `main`, mauvais SHA, check
-absent/non vert, environnement absent/non protégé et mauvais pattern. Le plan
-de build/SBOM/attestation est vérifié structurellement, mais ce dry-run ne
-prétend pas publier ni attester une image : ces effets exigent le job protégé
-et un GO séparé. Il ne remplace pas non plus l'autorisation requise pour créer
-les réglages distants.
+absent/non vert, environnement absent ou mal nommé, reviewer fictif et policy
+différente de l'unique branche `main`. Le plan de build/SBOM/attestation est
+vérifié structurellement, mais ce dry-run ne prétend pas publier ni attester
+une image : ces effets exigent le job protégé et un GO séparé. Il ne remplace
+pas non plus l'autorisation requise pour créer les réglages distants.

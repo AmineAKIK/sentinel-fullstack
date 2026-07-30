@@ -171,17 +171,11 @@ def validate_environment(
         for rule in protection_rules
         if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
     ]
-    if len(reviewer_rules) != 1:
+    if reviewer_rules:
         refuse(
-            "protected environment must have exactly one required_reviewers rule: "
+            "protected environment must not define required_reviewers: "
             f"{expected_name}"
         )
-    reviewer_rule = reviewer_rules[0]
-    reviewers = reviewer_rule.get("reviewers")
-    if not isinstance(reviewers, list) or not reviewers:
-        refuse(f"protected environment must require at least one reviewer: {expected_name}")
-    if reviewer_rule.get("prevent_self_review") is not True:
-        refuse(f"protected environment must prevent self-review: {expected_name}")
 
     branch_rules = [
         rule
@@ -424,7 +418,7 @@ def run(arguments: argparse.Namespace) -> dict[str, Any] | int:
             "planned_evidence": [
                 "main head equality",
                 "six successful checks on TAG_SHA",
-                "protected environment with reviewer and exact main branch policy",
+                "protected environment without reviewers and exact main branch policy",
                 "backend and frontend immutable digests",
                 "SPDX SBOMs",
                 "image provenance attestations",

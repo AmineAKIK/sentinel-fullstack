@@ -161,7 +161,8 @@ npm run test:e2e
 
 - [ ] les réglages distants de
       [github-release-protection-checklist.md](github-release-protection-checklist.md)
-      sont prouvés (SHA pins, rulesets, checks et environnements protégés)
+      sont prouvés (SHA pins, rulesets, checks et environnement applicable
+      conforme au profil mono-mainteneur, limité à `main`)
 - [ ] CI GitHub verte sur le SHA exact à publier, sur `main`
 - [ ] commit et message de publication relus
 - [ ] tag de version créé sur ce SHA (`v1.0.0-rc.N` puis `v1.0.0`)
