@@ -30,8 +30,8 @@ describe('inventaire des destinations React Router', () => {
   const productionConsumers = routerConsumers.filter(([path]) => !isTestFile(path));
 
   it('conserve l’inventaire explicite des consommateurs sans migration de mode', () => {
-    // 52 importeurs au HEAD de départ, plus le test d'interaction permanent R1.
-    expect(routerConsumers).toHaveLength(53);
+    // 52 importeurs au HEAD de départ, plus les tests permanents R1 et RC5-AUD-05.
+    expect(routerConsumers).toHaveLength(54);
     expect(productionConsumers).toHaveLength(32);
   });
 
