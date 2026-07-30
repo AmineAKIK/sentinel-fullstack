@@ -76,9 +76,9 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
-      # Environment approval can remain pending while main advances. Repeat the
-      # complete read-only gate after approval and before registry login.
-      - name: Revalidate the candidate after protected-environment approval
+      # The environment boundary remains mandatory. Repeat the complete
+      # read-only gate inside it and before registry login.
+      - name: Revalidate the candidate inside the protected release environment
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.validate.outputs.tag }}

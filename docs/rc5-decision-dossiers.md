@@ -217,7 +217,7 @@ dossier ne choisit pas et ne crée pas de waiver.
 
 ## 2. Workflow de publication
 
-### 2.1 État prouvé du workflow actuel
+### 2.1 État prouvé du workflow avant P2
 
 `.github/workflows/release.yml` :
 
@@ -709,7 +709,7 @@ réécrit aucune option rejetée.
 | ID | Décision donnée | Résultat local | État de sortie |
 | --- | --- | --- | --- |
 | R | **R1**, React Router exactement `7.18.2`, Declarative Mode conservé | migration/non-régressions vertes; surface RSC absente et gardée | `EXCEPTION_BOUNDED_2026-08-31` |
-| P | **P2**, RC et stable uniquement à la tête exacte de `main`, avec profil GitHub propriétaire unique rectifié | workflow/gardes verts; `main` protégé par PR et six checks sans approbation fictive; création de tag permise puis immutabilité active; environnements de publication absents | `BLOCKED_EXTERNAL_PUBLICATION` |
+| P | **P2**, RC et stable uniquement à la tête exacte de `main`, avec profil GitHub propriétaire unique rectifié | RC5 arrêté avant publication faute d'environnement; RC6 exige le profil `prerelease`, zéro reviewer et l'unique policy `main` | `BLOCKED_EXTERNAL_PUBLICATION` |
 | C | **C1 + C3**, égalité d'origine stricte et refus sans en-têtes | middleware central, inventaire et vrai Chromium verts | `VERIFIED_LOCAL` |
 | D | **D2**, parents compatibles uniquement, sans waiver ni override forcé | aucune combinaison parente compatible; chemins dev exacts et runtime absent | `EXCEPTION_BOUNDED_2026-08-31` |
 | O | lecture VPS/DNS strictement non mutative autorisée | bord public Nginx, DNS/TLS/headers/health observés; intérieur sans SSH non affirmé | `VERIFIED_PUBLIC_EDGE_B` |
@@ -777,12 +777,13 @@ TAG_SHA == checkout HEAD == refs/remotes/origin/main
 Il sélectionne par `head_sha` un run `push` de `ci.yml` sur `main`, refuse toute
 preuve paginée ou tronquée et exige les six jobs nommés, terminés et réussis sur
 ce même SHA. La validation ne possède aucune permission d'écriture et aucun
-secret de publication. Après approbation de l'environnement `prerelease` ou
+secret de publication. À l'intérieur de l'environnement `prerelease` ou
 `production`, le garde complet est rejoué avant la réservation d'une draft,
 l'authentification GHCR et tout push. Les publications sont sérialisées sans
 annulation; actions, outils et images sont épinglés par SHA ou digest; les deux
 images reçoivent provenance maximale, SBOM SPDX et attestations; les notes
-portent SHA et digests. Aucun tag n'est créé, déplacé ou réutilisé.
+portent SHA et digests. Aucun tag n'est créé, déplacé ou réutilisé par le
+workflow.
 
 Tests permanents :
 
@@ -815,10 +816,11 @@ Un seul compte reste collaborateur : `AmineAKIK`, administrateur, sans
 invitation en attente. Il n'existe ni reviewer réellement indépendant ni
 identité technique dédiée de création des tags, mais le profil actif
 propriétaire unique ne simule plus leur présence et ne les exige plus pour
-fusionner ou créer un nouveau tag. Les environnements
-`prerelease`/`production` n'ont pas été créés avec une protection fictive. La
-publication reste fermée tant que son environnement, le VPS, le déploiement et
-la recette ne sont pas réellement prouvés.
+fusionner ou créer un nouveau tag. La tentative RC5 a confirmé le refus
+fail-closed en l'absence de `prerelease`, avant tout job de publication. Le
+profil RC6 exige un environnement réel `prerelease`, zéro reviewer, zéro secret
+et une unique policy `main`. La publication, le VPS, le déploiement et la
+recette restent à prouver.
 
 Le token de contrôle ne possède pas `read:packages`; l'API Packages répond
 `403`, et aucune règle GHCR n'est prétendue relue. Les deux digests RC4 n'ont
@@ -1058,6 +1060,22 @@ et permet au propriétaire de créer ultérieurement un nouveau tag `v*`, qui
 devient ensuite immuable. Il ne prouve aucune publication, image, installation
 VPS, valeur `health.version` ni recette. Le `GO v1.0.0` reste donc `NO-GO`
 jusqu'à la validation réelle de ces portes.
+
+### 8.2 Tentative RC5 et hotfix de politique RC6
+
+La PR #31 a ensuite été fusionnée au SHA
+`df89baaa113ff3d37c70bb0608d939a1ac6c88b1`. Le tag annoté immuable
+`v1.0.0-rc.5` pointe sur ce merge. Le run Release `30544330857` s'est arrêté
+dans le garde en lecture seule parce que l'environnement `prerelease` était
+absent; le job de build/publication a été `skipped`. Aucune release, image,
+attestation ou opération VPS n'a commencé.
+
+Le hotfix RC6 adapte uniquement le contrat d'environnement au dépôt
+mono-mainteneur : zéro règle `required_reviewers`, mais nom exact
+`prerelease`, frontière d'environnement obligatoire et unique deployment
+branch policy `main`. Un environnement absent, mal nommé ou ouvert à une autre
+branche reste refusé. Cette correction ne vaut ni déploiement ni
+`GO v1.0.0`.
 
 ## Sources officielles consultées le 29 juillet 2026
 
