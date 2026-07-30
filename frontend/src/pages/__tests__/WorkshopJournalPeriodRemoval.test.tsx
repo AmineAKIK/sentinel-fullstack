@@ -50,8 +50,8 @@ describe('WorkshopJournalPage — suppression de la période', () => {
     );
     render(<RouterProvider router={router} />);
 
-    expect(screen.getByLabelText('Depuis le')).toHaveValue('2026-03-01');
-    expect(screen.getByLabelText("Jusqu'au")).toHaveValue('2026-03-31');
+    expect(screen.getByLabelText('Début')).toHaveValue('2026-03-01');
+    expect(screen.getByLabelText('Fin')).toHaveValue('2026-03-31');
     const periodChip = screen.getByRole('button', {
       name: /Retirer le filtre Période : 2026-03-01 → 2026-03-31/i,
     });
@@ -63,8 +63,8 @@ describe('WorkshopJournalPage — suppression de la période', () => {
       expect(params.get('status')).toBe('OPEN');
       expect(params.has('start')).toBe(false);
       expect(params.has('end')).toBe(false);
-      expect(screen.getByLabelText('Depuis le')).toHaveValue('');
-      expect(screen.getByLabelText("Jusqu'au")).toHaveValue('');
+      expect(screen.getByLabelText('Début')).toHaveValue('');
+      expect(screen.getByLabelText('Fin')).toHaveValue('');
       expect(screen.queryByRole('button', { name: /Retirer le filtre Période/i })).toBeNull();
     });
   });

@@ -110,8 +110,14 @@ export default function AdminPasswordConfirmModal({
           disabled={loading}
           autoComplete="current-password"
           maxLength={MAX_PASSWORD_BYTES}
+          aria-invalid={passwordError ? true : undefined}
+          aria-describedby={passwordError ? 'admin-password-error' : undefined}
         />
-        {passwordError && <div className="field-error">{passwordError}</div>}
+        {passwordError && (
+          <div id="admin-password-error" className="field-error" role="alert">
+            {passwordError}
+          </div>
+        )}
       </div>
     </ConfirmModal>
   );

@@ -71,10 +71,10 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
 
     await goToJournal(page);
     const journalStartHeight = await page
-      .getByLabel('Depuis le')
+      .getByLabel('Début')
       .evaluate((el) => el.getBoundingClientRect().height);
     const journalEndHeight = await page
-      .getByLabel("Jusqu'au")
+      .getByLabel('Fin')
       .evaluate((el) => el.getBoundingClientRect().height);
 
     expect(Math.abs(journalStartHeight - pilotageDateHeight)).toBeLessThanOrEqual(1);
@@ -83,8 +83,8 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
 
   test('les champs date portent la classe canonique form-input', async ({ page }) => {
     await goToJournal(page);
-    const startClass = await page.getByLabel('Depuis le').getAttribute('class');
-    const endClass = await page.getByLabel("Jusqu'au").getAttribute('class');
+    const startClass = await page.getByLabel('Début').getAttribute('class');
+    const endClass = await page.getByLabel('Fin').getAttribute('class');
     expect(startClass ?? '').toMatch(/\bform-input\b/);
     expect(endClass ?? '').toMatch(/\bform-input\b/);
   });
@@ -106,14 +106,14 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
     expect(countBefore).toBeTruthy();
 
     const farFuture = '2099-01-01';
-    await page.getByLabel('Depuis le').fill(farFuture);
+    await page.getByLabel('Début').fill(farFuture);
     await expect(page.locator('.history-event-count')).toContainText('0 action');
   });
 
   test('Début > Fin affiche une erreur locale sans requête incohérente', async ({ page }) => {
     await goToJournal(page);
-    await page.getByLabel('Depuis le').fill('2026-03-10');
-    await page.getByLabel("Jusqu'au").fill('2026-03-01');
+    await page.getByLabel('Début').fill('2026-03-10');
+    await page.getByLabel('Fin').fill('2026-03-01');
 
     await expect(page.getByRole('alert')).toContainText(
       'La date de début doit être antérieure à la date de fin.'
@@ -123,14 +123,14 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
   test('Effacer les filtres réinitialise le type d’action et les deux dates', async ({ page }) => {
     await goToJournal(page);
     await page.getByLabel("Filtrer par type d'action").selectOption('INCIDENT_CLOSED');
-    await page.getByLabel('Depuis le').fill('2026-03-01');
-    await page.getByLabel("Jusqu'au").fill('2026-03-31');
+    await page.getByLabel('Début').fill('2026-03-01');
+    await page.getByLabel('Fin').fill('2026-03-31');
 
     await page.getByRole('button', { name: 'Effacer les filtres' }).click();
 
     await expect(page.getByLabel("Filtrer par type d'action")).toHaveValue('all');
-    await expect(page.getByLabel('Depuis le')).toHaveValue('');
-    await expect(page.getByLabel("Jusqu'au")).toHaveValue('');
+    await expect(page.getByLabel('Début')).toHaveValue('');
+    await expect(page.getByLabel('Fin')).toHaveValue('');
   });
 
   for (const viewport of [
@@ -152,7 +152,7 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
       // Même hauteur tactile que le reste de l'application (.form-input,
       // partagée avec Pilotage) : pas de réduction sous ce plancher commun.
       const startHeight = await page
-        .getByLabel('Depuis le')
+        .getByLabel('Début')
         .evaluate((el) => el.getBoundingClientRect().height);
       expect(startHeight).toBeGreaterThanOrEqual(40);
     });
@@ -160,7 +160,7 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
 
   test('focus clavier visible sur le champ Début', async ({ page }) => {
     await goToJournal(page);
-    const start = page.getByLabel('Depuis le');
+    const start = page.getByLabel('Début');
     for (let index = 0; index < 80; index += 1) {
       if (await start.evaluate((el) => el === document.activeElement)) break;
       await page.keyboard.press('Tab');
@@ -174,7 +174,7 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
     page,
   }) => {
     await goToJournal(page);
-    const start = page.getByLabel('Depuis le');
+    const start = page.getByLabel('Début');
     await start.click();
     await start.fill('2026-05-15');
     await expect(start).toHaveValue('2026-05-15');
@@ -194,6 +194,39 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
 });
 
 test.describe('Journal — contrats terminaux RC5', () => {
+  test('RC5-AUD-06 — Début et Fin gardent leur nom visible, le focus clavier et un état axe vert', async ({
+    page,
+  }) => {
+    await goToJournal(page);
+    const start = page.getByLabel('Début');
+    const end = page.getByLabel('Fin');
+    await expect(start).toHaveAccessibleName('Début');
+    await expect(end).toHaveAccessibleName('Fin');
+
+    for (let index = 0; index < 80; index += 1) {
+      if (await start.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(start).toBeFocused();
+    expect(await start.evaluate((element) => window.getComputedStyle(element).boxShadow)).not.toBe(
+      'none'
+    );
+    await page.keyboard.press('Tab');
+    await expect(end).toBeFocused();
+    expect(await end.evaluate((element) => window.getComputedStyle(element).boxShadow)).not.toBe(
+      'none'
+    );
+
+    const results = await new AxeBuilder({ page })
+      .include('.history-event-filter')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    const blocking = results.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical'
+    );
+    expect(blocking, JSON.stringify(blocking, null, 2)).toEqual([]);
+  });
+
   test('RC5-AUD-02 — une suite annulée ne bloque ni ne remplace le résultat du nouveau filtre', async ({
     page,
   }) => {

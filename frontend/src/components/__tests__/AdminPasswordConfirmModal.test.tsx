@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiResponseError } from '../../api/client';
 import { verifyAdminPassword } from '../../api/adminSecurity';
@@ -22,7 +23,8 @@ describe('AdminPasswordConfirmModal', () => {
     vi.restoreAllMocks();
   });
 
-  it('restaure le focus après une réauthentification refusée et la fin du pending', async () => {
+  it('associe l’erreur au champ et restaure son focus après un refus activé au clavier', async () => {
+    const user = userEvent.setup();
     let rejectVerification: (reason: unknown) => void = () => undefined;
     vi.mocked(verifyAdminPassword).mockImplementation(
       () =>
@@ -47,8 +49,10 @@ describe('AdminPasswordConfirmModal', () => {
     );
 
     const password = screen.getByLabelText('Mot de passe administrateur');
-    fireEvent.change(password, { target: { value: 'mot-de-passe-incorrect' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Révoquer' }));
+    await user.type(password, 'mot-de-passe-incorrect');
+    const confirm = screen.getByRole('button', { name: 'Révoquer' });
+    confirm.focus();
+    await user.keyboard('{Enter}');
     await waitFor(() => expect(password).toBeDisabled());
 
     await act(async () => {
@@ -58,8 +62,14 @@ describe('AdminPasswordConfirmModal', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByText('Mot de passe incorrect.')).toBeVisible();
+    const passwordError = await screen.findByText('Mot de passe incorrect.');
+    expect(passwordError).toBeVisible();
+    expect(passwordError).toHaveAttribute('role', 'alert');
+    expect(passwordError).toHaveAttribute('id', 'admin-password-error');
     await waitFor(() => expect(password).toBeEnabled());
+    expect(password).toHaveAttribute('aria-invalid', 'true');
+    expect(password).toHaveAttribute('aria-describedby', 'admin-password-error');
+    expect(password).toHaveAccessibleDescription('Mot de passe incorrect.');
     expect(password).toHaveFocus();
   });
 });

@@ -161,7 +161,7 @@ test("l'écran Admin refuse le namespace numérique sans ouvrir de session Ateli
   expect((await context.cookies()).some((cookie) => cookie.name === WORKSHOP_COOKIE)).toBe(false);
 });
 
-test('les endpoints Board et Atelier détaillés exigent une session valide', async ({
+test('RC5-AUD-01 — les endpoints Board et Atelier détaillés exigent une session valide', async ({
   page,
   context,
 }) => {

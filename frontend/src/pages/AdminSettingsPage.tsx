@@ -1080,6 +1080,7 @@ export default function AdminSettingsPage() {
                       </label>
                       {appSettingsDraftValue('board_session_ttl_hours') === 0 ? (
                         <input
+                          id="boardSessionTtl"
                           className="form-input"
                           type="text"
                           value=""

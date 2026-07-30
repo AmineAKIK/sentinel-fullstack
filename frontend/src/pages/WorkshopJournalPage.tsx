@@ -218,7 +218,6 @@ export default function WorkshopJournalPage() {
                     id="journal-date-start"
                     type="date"
                     className="form-input"
-                    aria-label="Depuis le"
                     value={startFilter}
                     onChange={(e) => updateStartFilter(e.target.value)}
                     aria-describedby={periodError ? 'journal-period-error' : undefined}
@@ -232,7 +231,6 @@ export default function WorkshopJournalPage() {
                     id="journal-date-end"
                     type="date"
                     className="form-input"
-                    aria-label="Jusqu'au"
                     value={endFilter}
                     onChange={(e) => updateEndFilter(e.target.value)}
                     aria-describedby={periodError ? 'journal-period-error' : undefined}
