@@ -240,10 +240,12 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(3));
 
     expect(continuationSignal?.aborted).toBe(true);
-    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[2][0]).toMatchObject({
+    const filteredRequestParams = vi.mocked(listWorkshopHistoryEvents).mock.calls[2]?.[0];
+    expect(filteredRequestParams).toBeDefined();
+    expect(filteredRequestParams).toMatchObject({
       eventType: 'INCIDENT_CLOSED',
     });
-    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[2][0].cursor).toBeUndefined();
+    expect(filteredRequestParams?.cursor).toBeUndefined();
     expect(result.current.historyEvents).toEqual([]);
     expect(result.current.hasMore).toBe(false);
     expect(result.current.loadingMore).toBe(false);
@@ -568,8 +570,9 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     expect(router.state.historyAction).toBe('REPLACE');
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalled());
     for (const [params] of vi.mocked(listWorkshopHistoryEvents).mock.calls) {
-      expect(params.start).toBeUndefined();
-      expect(params.end).toBeUndefined();
+      expect(params).toBeDefined();
+      expect(params?.start).toBeUndefined();
+      expect(params?.end).toBeUndefined();
     }
   });
 
@@ -601,7 +604,8 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     );
     expect(router.state.historyAction).toBe('REPLACE');
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalled());
-    const lastParams = vi.mocked(listWorkshopHistoryEvents).mock.calls.at(-1)?.[0];
+    const calls = vi.mocked(listWorkshopHistoryEvents).mock.calls;
+    const lastParams = calls[calls.length - 1]?.[0];
     expect(lastParams?.start).toBeUndefined();
     expect(lastParams?.end).toBe('2026-01-31T22:59:59.999Z');
   });
@@ -639,8 +643,9 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     );
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalled());
     for (const [params] of vi.mocked(listWorkshopHistoryEvents).mock.calls) {
-      expect(params.start).toBeUndefined();
-      expect(params.end).toBeUndefined();
+      expect(params).toBeDefined();
+      expect(params?.start).toBeUndefined();
+      expect(params?.end).toBeUndefined();
     }
   });
 
@@ -725,8 +730,9 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
       )
     );
     for (const [params] of vi.mocked(listWorkshopHistoryEvents).mock.calls) {
-      expect(params.start?.includes('2026-03') ?? false).toBe(false);
-      expect(params.end?.includes('2026-03') ?? false).toBe(false);
+      expect(params).toBeDefined();
+      expect(params?.start?.includes('2026-03') ?? false).toBe(false);
+      expect(params?.end?.includes('2026-03') ?? false).toBe(false);
     }
   });
 
@@ -810,7 +816,9 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     });
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(2));
     expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('|false|true');
-    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[1][0]).toMatchObject({
+    const backRequestParams = vi.mocked(listWorkshopHistoryEvents).mock.calls[1]?.[0];
+    expect(backRequestParams).toBeDefined();
+    expect(backRequestParams).toMatchObject({
       q: 'avant',
       status: 'OPEN',
       lineId: 1,
@@ -820,14 +828,16 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
       start: '2025-12-31T23:00:00.000Z',
       end: '2026-01-02T22:59:59.999Z',
     });
-    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[1][0].cursor).toBeUndefined();
+    expect(backRequestParams?.cursor).toBeUndefined();
 
     await act(async () => {
       await router.navigate(1);
     });
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(3));
     expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('|false|true');
-    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[2][0]).toMatchObject({
+    const forwardRequestParams = vi.mocked(listWorkshopHistoryEvents).mock.calls[2]?.[0];
+    expect(forwardRequestParams).toBeDefined();
+    expect(forwardRequestParams).toMatchObject({
       q: 'apres',
       status: 'CLOSED',
       lineId: 2,
@@ -837,7 +847,7 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
       start: '2026-01-31T23:00:00.000Z',
       end: '2026-02-02T22:59:59.999Z',
     });
-    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[2][0].cursor).toBeUndefined();
+    expect(forwardRequestParams?.cursor).toBeUndefined();
 
     await act(async () => {
       afterPage.resolve({

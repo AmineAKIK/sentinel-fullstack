@@ -81,9 +81,10 @@ describe('AdminSettingsPage — durée de session Board accessible', () => {
     const visibleLabel = screen.getByText('Durée de session — Board atelier', {
       selector: 'label',
     });
-    expect(visibleLabel).toHaveAttribute('for', 'boardSessionTtl');
+    const labelTargetId = visibleLabel.getAttribute('for');
+    expect(labelTargetId).toBe('boardSessionTtl');
 
-    const ttlInput = document.getElementById(visibleLabel.htmlFor);
+    const ttlInput = labelTargetId ? document.getElementById(labelTargetId) : null;
     expect(ttlInput).toBeInstanceOf(HTMLInputElement);
     expect(screen.getByRole('textbox', { name: 'Durée de session — Board atelier' })).toBe(
       ttlInput
