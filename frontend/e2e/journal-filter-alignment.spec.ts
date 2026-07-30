@@ -23,6 +23,27 @@ async function goToPilotage(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Pilotage atelier' })).toBeVisible();
 }
 
+function journalEvent(id: number, machineId: string, eventType = 'INCIDENT_TAKEN') {
+  return {
+    id,
+    incident_id: id,
+    event_type: eventType,
+    payload: null,
+    created_at: `2026-03-${String(id).padStart(2, '0')}T10:00:00.000Z`,
+    line_id: id,
+    line_number: '901',
+    machine_id: machineId,
+    robot_label: `R-${id}`,
+    head_number: 1,
+    current_state: 'DEGRADEE',
+    current_status: 'OPEN',
+    first_name: 'Eden',
+    last_name: 'AKIK',
+    role: 'RESPONSABLE',
+    badge_number: 'RE-01',
+  };
+}
+
 test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', () => {
   test('la hauteur du select "Toutes les actions" ne s’écarte pas de plus de 1px du select Pilotage', async ({
     page,
@@ -169,5 +190,163 @@ test.describe('Journal — alignement visuel des filtres sur Pilotage (RC5)', ()
       (v) => v.impact === 'serious' || v.impact === 'critical'
     );
     expect(blocking, JSON.stringify(blocking, null, 2)).toEqual([]);
+  });
+});
+
+test.describe('Journal — contrats terminaux RC5', () => {
+  test('RC5-AUD-02 — une suite annulée ne bloque ni ne remplace le résultat du nouveau filtre', async ({
+    page,
+  }) => {
+    await loginAsResponsable(page);
+
+    let markContinuationStarted!: () => void;
+    const continuationStarted = new Promise<void>((resolve) => {
+      markContinuationStarted = resolve;
+    });
+    let releaseContinuation!: () => void;
+    const continuationGate = new Promise<void>((resolve) => {
+      releaseContinuation = resolve;
+    });
+    let markContinuationSettled!: () => void;
+    const continuationSettled = new Promise<void>((resolve) => {
+      markContinuationSettled = resolve;
+    });
+    const requestedUrls: URL[] = [];
+
+    await page.route('**/api/workshop/history/events**', async (route) => {
+      const url = new URL(route.request().url());
+      requestedUrls.push(url);
+      const cursor = url.searchParams.get('cursor');
+      const eventType = url.searchParams.get('eventType');
+
+      if (cursor === 'cursor-old-page-2') {
+        markContinuationStarted();
+        await continuationGate;
+        try {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              items: [journalEvent(9, 'RC5-STALE')],
+              nextCursor: null,
+            }),
+          });
+        } catch {
+          // L'abort navigateur attendu peut fermer la route avant son déblocage.
+        } finally {
+          markContinuationSettled();
+        }
+        return;
+      }
+
+      if (eventType === 'INCIDENT_CLOSED') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            items: [journalEvent(2, 'RC5-NEW', 'INCIDENT_CLOSED')],
+            nextCursor: 'cursor-new-page-2',
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [journalEvent(1, 'RC5-OLD')],
+          nextCursor: 'cursor-old-page-2',
+        }),
+      });
+    });
+
+    await page.goto('/workshop/journal');
+    await expect(page.getByRole('heading', { name: 'Journal atelier' })).toBeVisible();
+    await expect(page.locator('.history-journal-table')).toContainText('RC5-OLD');
+
+    await page.getByRole('button', { name: 'Charger la suite' }).click();
+    await continuationStarted;
+    await page.locator('#journal-event-filter').selectOption('INCIDENT_CLOSED');
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe('INCIDENT_CLOSED');
+    await expect(page.locator('.history-journal-table')).toContainText('RC5-NEW');
+    await expect(page.locator('.history-journal-table')).not.toContainText('RC5-OLD');
+    await expect(page.locator('.history-journal-table')).not.toContainText('RC5-STALE');
+    await expect(page.getByRole('button', { name: 'Charger la suite' })).toBeEnabled();
+    expect(
+      requestedUrls.some(
+        (url) =>
+          url.searchParams.get('eventType') === 'INCIDENT_CLOSED' && !url.searchParams.has('cursor')
+      )
+    ).toBe(true);
+
+    releaseContinuation();
+    await continuationSettled;
+    await expect(page.locator('.history-journal-table')).toContainText('RC5-NEW');
+    await expect(page.locator('.history-journal-table')).not.toContainText('RC5-STALE');
+  });
+
+  test('RC5-AUD-03 — les URL hostiles, répétées ou inversées sont remplacées sans requête invalide', async ({
+    page,
+  }) => {
+    await loginAsResponsable(page);
+    const pageErrors: Error[] = [];
+    const eventRequests: URL[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error));
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.pathname === '/api/workshop/history/events') eventRequests.push(url);
+    });
+
+    const canonicalRepeated = '/workshop/journal?q=hostile&status=CLOSED&end=2026-01-31';
+    await page.goto(
+      '/workshop/journal?q=hostile&status=CLOSED&start=2026-01-01&start=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&end=2026-01-31'
+    );
+    await expect(page.getByRole('heading', { name: 'Journal atelier' })).toBeVisible();
+    await expect
+      .poll(() => new URL(page.url()).pathname + new URL(page.url()).search)
+      .toBe(canonicalRepeated);
+    await expect(page.locator('#journal-date-start')).toHaveValue('');
+    await expect(page.locator('#journal-date-end')).toHaveValue('2026-01-31');
+    await expect(page.locator('.history-event-count')).not.toContainText('Chargement');
+
+    const canonicalInverted = '/workshop/journal?q=inversee&status=OPEN';
+    await page.goto('/workshop/journal?q=inversee&status=OPEN&start=2026-03-10&end=2026-03-01');
+    await expect(page.getByRole('heading', { name: 'Journal atelier' })).toBeVisible();
+    await expect
+      .poll(() => new URL(page.url()).pathname + new URL(page.url()).search)
+      .toBe(canonicalInverted);
+    await expect(page.locator('#journal-date-start')).toHaveValue('');
+    await expect(page.locator('#journal-date-end')).toHaveValue('');
+    await expect(page.locator('.history-event-count')).not.toContainText('Chargement');
+
+    await page.goBack();
+    await expect
+      .poll(() => new URL(page.url()).pathname + new URL(page.url()).search)
+      .toBe(canonicalRepeated);
+    await page.goForward();
+    await expect
+      .poll(() => new URL(page.url()).pathname + new URL(page.url()).search)
+      .toBe(canonicalInverted);
+
+    expect(pageErrors).toEqual([]);
+    expect(eventRequests.length).toBeGreaterThan(0);
+    for (const requestUrl of eventRequests) {
+      const startValues = requestUrl.searchParams.getAll('start');
+      const endValues = requestUrl.searchParams.getAll('end');
+      expect(startValues.length).toBeLessThanOrEqual(1);
+      expect(endValues.length).toBeLessThanOrEqual(1);
+      if (startValues[0]) expect(Number.isNaN(Date.parse(startValues[0]))).toBe(false);
+      if (endValues[0]) expect(Number.isNaN(Date.parse(endValues[0]))).toBe(false);
+      if (startValues[0] && endValues[0]) {
+        expect(Date.parse(startValues[0])).toBeLessThanOrEqual(Date.parse(endValues[0]));
+      }
+    }
+    expect(
+      eventRequests.some(
+        (requestUrl) => requestUrl.searchParams.get('end') === '2026-01-31T22:59:59.999Z'
+      )
+    ).toBe(true);
   });
 });

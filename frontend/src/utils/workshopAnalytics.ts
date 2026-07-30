@@ -1,17 +1,39 @@
 import { AnalyticsParams } from '../api/workshop';
 import { HistoryPeriod } from './workshopHistory';
 
+const CANONICAL_CIVIL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Valide un jour civil sans le confier au constructeur Date, qui normalise
+ * silencieusement les dates impossibles (par exemple le 31 février).
+ */
+export function isCanonicalCivilDate(dateInput: string): boolean {
+  const match = CANONICAL_CIVIL_DATE.exec(dateInput);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
+}
+
 /**
  * Borne de début de journée locale en ISO 8601. Une date seule (`YYYY-MM-DD`)
  * serait interprétée en UTC par le moteur JS : l'heure explicite sans fuseau
  * conserve le jour civil choisi dans le navigateur.
  */
-export function dayStartIso(dateInput: string): string {
+export function dayStartIso(dateInput: string): string | undefined {
+  if (!isCanonicalCivilDate(dateInput)) return undefined;
   return new Date(`${dateInput}T00:00:00.000`).toISOString();
 }
 
 /** Borne de fin de journée (23:59:59.999, horloge locale) en ISO 8601. */
-export function dayEndIso(dateInput: string): string {
+export function dayEndIso(dateInput: string): string | undefined {
+  if (!isCanonicalCivilDate(dateInput)) return undefined;
   return new Date(`${dateInput}T23:59:59.999`).toISOString();
 }
 
@@ -71,8 +93,12 @@ export function buildAnalyticsParams(
     params.end = endDate.toISOString();
   }
   if (period === 'custom') {
-    if (customStart) params.start = dayStartIso(customStart);
-    if (customEnd) params.end = dayEndIso(customEnd);
+    const start = dayStartIso(customStart);
+    const end = dayEndIso(customEnd);
+    if (!(start && end && customStart > customEnd)) {
+      if (start) params.start = start;
+      if (end) params.end = end;
+    }
   }
   if (lineFilter !== 'all') params.lineId = Number(lineFilter);
   if (machineFilter !== 'all') params.machineId = machineFilter;

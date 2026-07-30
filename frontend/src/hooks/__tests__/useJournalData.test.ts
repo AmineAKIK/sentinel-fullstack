@@ -71,6 +71,29 @@ function JournalNavigationHarness() {
   );
 }
 
+function JournalDateDraftHarness() {
+  const journal = useJournalData();
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(
+      'button',
+      { type: 'button', onClick: () => journal.updateStartFilter('2026-03-10') },
+      'Définir le début'
+    ),
+    React.createElement(
+      'button',
+      { type: 'button', onClick: () => journal.updateEndFilter('2026-03-01') },
+      'Définir la fin inversée'
+    ),
+    React.createElement(
+      'output',
+      { 'aria-label': 'brouillon période Journal' },
+      [journal.startFilter, journal.endFilter, journal.periodError].join('|')
+    )
+  );
+}
+
 describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -418,6 +441,209 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     } finally {
       unmount();
       vi.unstubAllEnvs();
+    }
+  });
+
+  it.each([
+    { label: 'un format libre', rawValue: 'invalid' },
+    { label: 'un 29 février non bissextile', rawValue: '2026-02-29' },
+    { label: 'un jour impossible', rawValue: '2026-02-31' },
+    { label: 'le mois 00', rawValue: '2026-00-10' },
+    { label: 'le mois 13', rawValue: '2026-13-10' },
+    { label: 'le jour 00', rawValue: '2026-01-00' },
+    { label: 'une valeur vide', rawValue: '' },
+    { label: 'une valeur hostile encodée', rawValue: '%3Cscript%3Ealert%281%29%3C%2Fscript%3E' },
+  ])('nettoie avec replace $label sans requête portant la borne invalide', async ({ rawValue }) => {
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalNavigationHarness),
+        },
+      ],
+      {
+        initialEntries: [`/workshop/journal?q=conserve&status=OPEN&start=${rawValue}`],
+      }
+    );
+
+    render(React.createElement(RouterProvider, { router }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'conserve|OPEN|all|all|all|all||'
+      )
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        '/workshop/journal?q=conserve&status=OPEN'
+      )
+    );
+    expect(router.state.historyAction).toBe('REPLACE');
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalled());
+    for (const [params] of vi.mocked(listWorkshopHistoryEvents).mock.calls) {
+      expect(params.start).toBeUndefined();
+      expect(params.end).toBeUndefined();
+    }
+  });
+
+  it('rejette un paramètre date répété, conserve les autres paramètres et la borne saine', async () => {
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalNavigationHarness),
+        },
+      ],
+      {
+        initialEntries: [
+          '/workshop/journal?q=conserve&status=OPEN&start=2026-01-01&start=2026-01-02&end=2026-01-31',
+        ],
+      }
+    );
+
+    render(React.createElement(RouterProvider, { router }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        '/workshop/journal?q=conserve&status=OPEN&end=2026-01-31'
+      )
+    );
+    expect(router.state.historyAction).toBe('REPLACE');
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalled());
+    const lastParams = vi.mocked(listWorkshopHistoryEvents).mock.calls.at(-1)?.[0];
+    expect(lastParams?.start).toBeUndefined();
+    expect(lastParams?.end).toBe('2026-01-31T22:59:59.999Z');
+  });
+
+  it('supprime les deux bornes d’une URL externe inversée sans perdre les autres filtres', async () => {
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalNavigationHarness),
+        },
+      ],
+      {
+        initialEntries: [
+          '/workshop/journal?q=conserve&status=OPEN&start=2026-03-10&end=2026-03-01',
+        ],
+      }
+    );
+
+    render(React.createElement(RouterProvider, { router }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        '/workshop/journal?q=conserve&status=OPEN'
+      )
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'conserve|OPEN|all|all|all|all||'
+      )
+    );
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalled());
+    for (const [params] of vi.mocked(listWorkshopHistoryEvents).mock.calls) {
+      expect(params.start).toBeUndefined();
+      expect(params.end).toBeUndefined();
+    }
+  });
+
+  it('préserve le brouillon inversé et son erreur sans écrire de paire invalide dans l’URL', async () => {
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalDateDraftHarness),
+        },
+      ],
+      {
+        initialEntries: ['/workshop/journal?q=conserve&status=OPEN'],
+      }
+    );
+    render(React.createElement(RouterProvider, { router }));
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(1));
+
+    act(() => screen.getByRole('button', { name: 'Définir le début' }).click());
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(2));
+    act(() => screen.getByRole('button', { name: 'Définir la fin inversée' }).click());
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('brouillon période Journal')).toHaveTextContent(
+        '2026-03-10|2026-03-01|La date de début doit être antérieure à la date de fin.'
+      )
+    );
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('q')).toBe('conserve');
+    expect(params.get('status')).toBe('OPEN');
+    expect(params.get('start')).toBe('2026-03-10');
+    expect(params.has('end')).toBe(false);
+    expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('remplace l’entrée URL invalide sans polluer la navigation retour puis avance', async () => {
+    vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    const before = '/workshop/journal?q=avant&start=2026-01-01&end=2026-01-02';
+    const canonicalAfter = '/workshop/journal?q=apres&status=CLOSED';
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalNavigationHarness),
+        },
+      ],
+      {
+        initialEntries: [before, '/workshop/journal?q=apres&status=CLOSED&start=2026-02-31'],
+        initialIndex: 1,
+      }
+    );
+    render(React.createElement(RouterProvider, { router }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(canonicalAfter)
+    );
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(router.state.location.pathname + router.state.location.search).toBe(before);
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'avant|all|all|all|all|all|2026-01-01|2026-01-02'
+      )
+    );
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    expect(router.state.location.pathname + router.state.location.search).toBe(canonicalAfter);
+    await waitFor(() =>
+      expect(screen.getByLabelText('filtres Journal')).toHaveTextContent(
+        'apres|CLOSED|all|all|all|all||'
+      )
+    );
+    for (const [params] of vi.mocked(listWorkshopHistoryEvents).mock.calls) {
+      expect(params.start?.includes('2026-03') ?? false).toBe(false);
+      expect(params.end?.includes('2026-03') ?? false).toBe(false);
     }
   });
 

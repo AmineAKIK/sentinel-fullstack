@@ -8,7 +8,7 @@ import {
   withWorkshopLineFilter,
   withWorkshopUrlFilter,
 } from '../utils/workshopFilters';
-import { dayEndIso, dayStartIso } from '../utils/workshopAnalytics';
+import { dayEndIso, dayStartIso, isCanonicalCivilDate } from '../utils/workshopAnalytics';
 import { readHistoryStatusFilter, HistoryStatusFilter } from './useHistoryData';
 import { useDebouncedValue } from './useDebouncedValue';
 
@@ -19,8 +19,39 @@ export type SortDir = 'asc' | 'desc';
 // une pagination par curseur (lot 7).
 const JOURNAL_EVENTS_PAGE_SIZE = 80;
 
+type CanonicalJournalDates = {
+  start: string;
+  end: string;
+  params: URLSearchParams;
+  changed: boolean;
+};
+
+function canonicalizeJournalDates(searchParams: URLSearchParams): CanonicalJournalDates {
+  const params = new URLSearchParams(searchParams);
+  const startValues = searchParams.getAll('start');
+  const endValues = searchParams.getAll('end');
+  let start =
+    startValues.length === 1 && isCanonicalCivilDate(startValues[0]) ? startValues[0] : '';
+  let end = endValues.length === 1 && isCanonicalCivilDate(endValues[0]) ? endValues[0] : '';
+
+  if (start && end && start > end) {
+    start = '';
+    end = '';
+  }
+  if (!start) params.delete('start');
+  if (!end) params.delete('end');
+
+  return {
+    start,
+    end,
+    params,
+    changed: params.toString() !== searchParams.toString(),
+  };
+}
+
 export function useJournalData() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const canonicalDates = useMemo(() => canonicalizeJournalDates(searchParams), [searchParams]);
 
   const [lines, setLines] = useState<ProductionLine[]>([]);
   const [historyEvents, setHistoryEvents] = useState<WorkshopHistoryEvent[]>([]);
@@ -40,8 +71,8 @@ export function useJournalData() {
   const [machineFilter, setMachineFilter] = useState(searchParams.get('machine') ?? 'all');
   const [stateFilter, setStateFilter] = useState(searchParams.get('state') ?? 'all');
   const [eventTypeFilter, setEventTypeFilter] = useState(searchParams.get('event') ?? 'all');
-  const [startFilter, setStartFilter] = useState(searchParams.get('start') ?? '');
-  const [endFilter, setEndFilter] = useState(searchParams.get('end') ?? '');
+  const [startFilter, setStartFilter] = useState(canonicalDates.start);
+  const [endFilter, setEndFilter] = useState(canonicalDates.end);
   const [periodError, setPeriodError] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -53,9 +84,12 @@ export function useJournalData() {
     setMachineFilter(searchParams.get('machine') ?? 'all');
     setStateFilter(searchParams.get('state') ?? 'all');
     setEventTypeFilter(searchParams.get('event') ?? 'all');
-    setStartFilter(searchParams.get('start') ?? '');
-    setEndFilter(searchParams.get('end') ?? '');
-  }, [searchParams]);
+    setStartFilter(canonicalDates.start);
+    setEndFilter(canonicalDates.end);
+    if (canonicalDates.changed) {
+      setSearchParams(canonicalDates.params, { replace: true });
+    }
+  }, [canonicalDates, searchParams, setSearchParams]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -187,12 +221,28 @@ export function useJournalData() {
 
   function updateStartFilter(value: string): void {
     setStartFilter(value);
-    setSearchParams(withWorkshopUrlFilter(searchParams, 'start', value, ''));
+    if ((value && !isCanonicalCivilDate(value)) || (value && endFilter && value > endFilter)) {
+      return;
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    if (value) nextParams.set('start', value);
+    else nextParams.delete('start');
+    if (endFilter) nextParams.set('end', endFilter);
+    else nextParams.delete('end');
+    setSearchParams(nextParams);
   }
 
   function updateEndFilter(value: string): void {
     setEndFilter(value);
-    setSearchParams(withWorkshopUrlFilter(searchParams, 'end', value, ''));
+    if ((value && !isCanonicalCivilDate(value)) || (startFilter && value && startFilter > value)) {
+      return;
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    if (startFilter) nextParams.set('start', startFilter);
+    else nextParams.delete('start');
+    if (value) nextParams.set('end', value);
+    else nextParams.delete('end');
+    setSearchParams(nextParams);
   }
 
   function clearPeriodFilter(): void {
