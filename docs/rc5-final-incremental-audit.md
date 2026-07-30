@@ -2,7 +2,7 @@
 
 **Date :** 30 juillet 2026
 
-**Verdict de l'audit technique local RC5 :** `BLOCKED_EXTERNAL`
+**Verdict de release après clôture technique locale RC5 :** `BLOCKED_EXTERNAL`
 
 Les six constats P1 locaux `RC5-AUD-01..06` sont corrigés et disposent chacun
 d'un cycle rouge→vert permanent ciblant le comportement constaté. Après le
@@ -16,11 +16,13 @@ assertions Journal dépendantes du fuseau du runner. Cette preuve tardive n'est
 pas réécrite comme un succès initial; le correctif de portabilité, sans
 changement runtime, est consigné ci-dessous avec son cycle rouge→vert.
 
-Le premier prérequis externe pour engager l'étape de publication contrôlée est
-organisationnel : le dépôt ne possède ni reviewer indépendant de l'initiateur,
-ni identité technique dédiée à la création contrôlée des tags. Ces deux
-identités ne peuvent pas être remplacées honnêtement par un administrateur
-unique.
+Le profil GitHub strict initial — reviewer indépendant obligatoire sur `main`
+et identité technique nécessaire pour contourner l'interdiction de création
+des tags — a été créé par l'agent pendant l'audit. Le propriétaire ne l'avait
+pas configuré manuellement. Cette simulation a ensuite été remplacée par un
+profil honnête de propriétaire unique : PR et six checks restent obligatoires,
+mais aucune approbation fictive n'est requise; la création d'un nouveau tag est
+possible et son immutabilité reste protégée.
 
 Ce verdict clôt uniquement l'audit technique local RC5 et ne vaut pas
 `GO v1.0.0` en production. Le GO global reste `NO-GO` tant que les portes
@@ -37,8 +39,8 @@ le dépôt suivi comporte maintenant `577` chemins.
 
 | Provenance terminale | Fichiers | Traitement |
 | --- | ---: | --- |
-| byte-identiques à `1a145816b5230bc49e348a25a78730297bb14973` | `545` | héritage du registre validé par identité de hash |
-| modifiés ou ajoutés pendant la correction terminale, documentation finale comprise | `32` | diff, appels directs et tests relus |
+| byte-identiques à `1a145816b5230bc49e348a25a78730297bb14973` | `544` | héritage du registre validé par identité de hash |
+| modifiés ou ajoutés pendant la correction terminale et la rectification GitHub, documentation finale comprise | `33` | diff, appels directs et tests relus |
 | **total courant** | **`577/577`** | **`100 %`** |
 
 Le registre exhaustif est
@@ -306,18 +308,23 @@ Les protections disponibles ont été appliquées et relues :
 
 - Actions limitées aux actions GitHub et à `docker/*`, SHA complets obligatoires;
 - token de workflow en lecture seule, sans approbation de PR;
-- ruleset `main` actif, sans bypass, merge commit seul, une approbation
-  indépendante, dernier push approuvé, conversations résolues, six checks
-  stricts, suppression et force-push interdits;
-- création, modification et suppression des tags `v*` verrouillées sans bypass;
+- ruleset `main` ID `20004078` actif, sans bypass, PR obligatoire, merge commit
+  seul, `required_approving_review_count: 0`,
+  `require_last_push_approval: false`, conversations résolues, six checks
+  stricts, suppression et non-fast-forward interdits;
+- ruleset historique de création des tags ID `20004127` désactivé et conservé
+  comme preuve de la simulation;
+- ruleset d'immutabilité des tags ID `20004113` actif et inchangé, sans bypass,
+  interdisant modification et suppression des tags `v*`;
 - nouvelles releases immuables.
 
 Le dépôt n'a qu'un collaborateur, son propriétaire administrateur. Aucun
-reviewer indépendant ni identité technique dédiée aux tags n'existe; les
-environnements `prerelease` et `production` n'ont donc pas été créés avec une
-protection fictive. Le token de contrôle n'autorise pas la lecture des réglages
-GHCR (`403`), et les attestations interrogées pour les deux digests RC4 sont
-absentes (`404`).
+reviewer indépendant ni identité technique dédiée aux tags n'existe, et le
+profil actif n'en simule plus. Les environnements `prerelease` et `production`
+n'ont pas été créés avec une protection fictive; leur garde fail-closed reste
+une porte de publication séparée. Le token de contrôle n'autorise pas la
+lecture des réglages GHCR (`403`), et les attestations interrogées pour les
+deux digests RC4 sont absentes (`404`).
 
 La lecture publique non mutative observe DNS A `79.137.34.84`, Nginx sur
 80/443, HTTP 301 vers HTTPS, TLS/HSTS et en-têtes attendus, puis
@@ -328,12 +335,12 @@ Compose/conteneurs/images/digests/binds/`nginx -T`.
 
 ## 6. Arrêt et portée du verdict
 
-Le verdict local est `BLOCKED_EXTERNAL`. Les six P1 locaux sont `FIXED` et
-aucune anomalie P1 locale bloquante connue ne reste ouverte; les trois P2 déjà
-documentés restent non bloquants. La prochaine décision organisationnelle
-requise pour franchir la première étape de publication doit fournir
-simultanément un reviewer réellement indépendant et une identité technique
-dédiée aux tags.
+La clôture technique locale est terminée; le verdict de release reste
+`BLOCKED_EXTERNAL`. Les six P1 locaux sont `FIXED` et aucune anomalie P1 locale
+bloquante connue ne reste ouverte; les trois P2 déjà documentés restent non
+bloquants. Le profil propriétaire unique permet l'intégration par PR sans
+approbation simulée, dès lors que les six checks et la résolution des
+conversations sont satisfaits.
 
 Le `GO v1.0.0` global reste distinct et `NO-GO` : `OPS-04`, `REL-01..04`,
 `DOC-02..06` et `GOV-01`, ainsi que les preuves effectives de publication,
@@ -341,7 +348,8 @@ déploiement et recette associées, conservent leur état courant. Ces portes ne
 constituent pas des défauts locaux du code RC5 et aucune n'est déclarée
 `VERIFIED` sans sa preuve.
 
-Aucun compte ou environnement fictif n'a été créé. La branche RC5 a été poussée
-et la PR #31 ouverte pour obtenir les checks et l'approbation indépendante
-requise. Aucun merge, bypass, tag, release, publication d'image, déploiement,
-SSH, DNS ou changement VPS n'a été effectué.
+Aucun compte ou environnement fictif n'a été créé. Au moment de cette
+rectification, la branche RC5 est poussée et la PR #31 ouverte sous le profil
+propriétaire unique, sans approbation indépendante requise. Aucun bypass, tag,
+release, publication d'image, déploiement, SSH, DNS ou changement VPS n'a été
+effectué.

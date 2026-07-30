@@ -16,10 +16,11 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 
 #### 1. Clôture technique locale RC5
 
-**Verdict de l'audit local : BLOCKED_EXTERNAL.** Les six constats terminaux
-`RC5-AUD-01..06` sont désormais corrigés avec tests permanents rouges→verts et
-risque résiduel local `NONE` pour chacun de ces six P1. Aucune autre anomalie
-P1 locale bloquante n'est connue dans le périmètre audité. Le registre
+**Verdict de release après clôture locale : BLOCKED_EXTERNAL.** Les six constats
+terminaux `RC5-AUD-01..06` sont désormais corrigés avec tests permanents
+rouges→verts et risque résiduel local `NONE` pour chacun de ces six P1. Aucune
+autre anomalie P1 locale bloquante n'est connue dans le périmètre audité. Le
+registre
 terminal couvre [`577/577`](rc5-final-audit-register.tsv) chemins.
 
 Les preuves terminales sont : backend `626/626`, PostgreSQL `165/165` hérité
@@ -36,17 +37,28 @@ défaut local ouvert tant que la garde reste verte. Router `7.18.2` est utilisé
 en mode déclaratif React 18 sans RSC; Brace reste limité aux chaînes de
 développement et absent du runtime.
 
-Les protections GitHub déjà appliquées restent celles documentées dans
-[rc5-decision-dossiers.md](rc5-decision-dossiers.md) : Actions limitées,
-SHA complets, ruleset `main` avec six checks, tags `v*` verrouillés et releases
-immuables. Aucune opération distante supplémentaire n'a été faite pendant la
-correction terminale.
+Le profil GitHub actif correspond désormais au propriétaire unique :
 
-Le premier prérequis externe pour engager l'étape de publication contrôlée est
-la fourniture d'un reviewer indépendant et d'une identité technique dédiée aux
-tags. Cette décision organisationnelle ne peut pas être résolue localement avec
-l'administrateur actuel; aucun compte, reviewer, environnement ou identité
-fictive n'a été créé.
+- Actions limitées et références d'actions par SHA complet;
+- ruleset `main` actif sans bypass, passage par PR, conversations résolues,
+  six checks stricts, merge commit seul, suppression et non-fast-forward
+  interdits;
+- `required_approving_review_count: 0` et
+  `require_last_push_approval: false`;
+- ruleset historique `Sentinel version tag creation` ID `20004127` désactivé
+  et conservé comme preuve;
+- ruleset `Sentinel version tag immutability` ID `20004113` actif, sans bypass,
+  interdisant modification et suppression d'un tag `v*` créé.
+
+Le profil initial exigeant un reviewer indépendant et une identité technique
+dédiée aux tags a été créé par l'agent pendant l'audit; le propriétaire ne
+l'avait pas configuré manuellement. Cette simulation de gouvernance ne décrit
+plus le dépôt actif et n'est plus une condition de fusion de la PR RC5.
+
+Les environnements de publication restent absents et le workflow conserve son
+garde fail-closed. Cette porte de publication, puis les preuves réelles VPS,
+déploiement et recette, restent distinctes de la clôture technique locale et
+du profil de protection de `main`.
 
 #### 2. GO global `v1.0.0` en production
 

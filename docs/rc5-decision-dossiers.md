@@ -709,7 +709,7 @@ réécrit aucune option rejetée.
 | ID | Décision donnée | Résultat local | État de sortie |
 | --- | --- | --- | --- |
 | R | **R1**, React Router exactement `7.18.2`, Declarative Mode conservé | migration/non-régressions vertes; surface RSC absente et gardée | `EXCEPTION_BOUNDED_2026-08-31` |
-| P | **P2**, RC et stable uniquement à la tête exacte de `main` | workflow/gardes verts; Actions, `main`, tags et releases protégés; environnements absents faute d'identités | `BLOCKED_EXTERNAL_IDENTITIES` |
+| P | **P2**, RC et stable uniquement à la tête exacte de `main`, avec profil GitHub propriétaire unique rectifié | workflow/gardes verts; `main` protégé par PR et six checks sans approbation fictive; création de tag permise puis immutabilité active; environnements de publication absents | `BLOCKED_EXTERNAL_PUBLICATION` |
 | C | **C1 + C3**, égalité d'origine stricte et refus sans en-têtes | middleware central, inventaire et vrai Chromium verts | `VERIFIED_LOCAL` |
 | D | **D2**, parents compatibles uniquement, sans waiver ni override forcé | aucune combinaison parente compatible; chemins dev exacts et runtime absent | `EXCEPTION_BOUNDED_2026-08-31` |
 | O | lecture VPS/DNS strictement non mutative autorisée | bord public Nginx, DNS/TLS/headers/health observés; intérieur sans SSH non affirmé | `VERIFIED_PUBLIC_EDGE_B` |
@@ -794,37 +794,43 @@ contrat statique workflow     8/8
 
 Les réglages distants indispensables sont détaillés dans
 [`github-release-protection-checklist.md`](github-release-protection-checklist.md).
-Le 30 juillet 2026, chaque écart disponible a été appliqué puis relu :
+Le 30 juillet 2026, l'agent d'audit a appliqué puis relu un profil strict
+simulé; le propriétaire n'avait créé ni configuré manuellement ces rulesets.
+La rectification ultérieure adopte le profil actif suivant :
 
 - Actions limitées aux actions GitHub et `docker/*`, avec SHA complet
   obligatoire; token par défaut en lecture et approbation PR par Actions
   toujours désactivée;
 - ruleset `main` actif `20004078`, sans bypass, merge commit uniquement,
-  approbation distincte du dernier pusher, conversations résolues, branche à
-  jour et six checks GitHub Actions exacts;
-- ruleset de création `v*` actif `20004127`, sans bypass, donc création
-  entièrement verrouillée en attendant l'identité dédiée;
+  passage obligatoire par PR, zéro approbation, aucune approbation du dernier
+  push, conversations résolues, branche à jour et six checks GitHub Actions
+  exacts;
+- ruleset historique de création `v*` `20004127` désactivé et conservé comme
+  export de la simulation;
 - ruleset d'immutabilité `v*` actif `20004113`, sans bypass, bloquant mise à
   jour et suppression;
 - immutabilité activée pour toute nouvelle release.
 
 Un seul compte reste collaborateur : `AmineAKIK`, administrateur, sans
-invitation en attente. Il n'existe donc ni reviewer réellement indépendant ni
-identité technique dédiée de création des tags. Les environnements
-`prerelease`/`production` n'ont pas été créés avec une protection fictive. P2
-reste `BLOCKED_EXTERNAL` pour cette seule cause d'identités de gouvernance
-indispensables absentes.
+invitation en attente. Il n'existe ni reviewer réellement indépendant ni
+identité technique dédiée de création des tags, mais le profil actif
+propriétaire unique ne simule plus leur présence et ne les exige plus pour
+fusionner ou créer un nouveau tag. Les environnements
+`prerelease`/`production` n'ont pas été créés avec une protection fictive. La
+publication reste fermée tant que son environnement, le VPS, le déploiement et
+la recette ne sont pas réellement prouvés.
 
 Le token de contrôle ne possède pas `read:packages`; l'API Packages répond
 `403`, et aucune règle GHCR n'est prétendue relue. Les deux digests RC4 n'ont
 pas d'attestation enregistrée (`404`); les quatre attestations RC5 restent un
 effet de la future publication autorisée, pas une preuve locale.
 
-L'historique Git reste neutralisé en mode fail-closed : un ancien workflow de
-tag ne peut plus être déclenché puisqu'aucun tag `v*` ne peut actuellement être
-créé. Les exceptions bornées de la section 7 permettent désormais aux audits
-Quality d'accepter exactement les deux GHSA constatées sans masquer une
-troisième alerte.
+Le profil strict simulé neutralisait l'historique en interdisant toute création
+de tag `v*`. Dans le profil actif, le propriétaire peut créer un nouveau tag,
+puis le ruleset d'immutabilité interdit sa modification ou sa suppression. Le
+workflow courant reste déclenché manuellement et vérifie la cible exacte. Les
+exceptions bornées de la section 7 permettent aux audits Quality d'accepter
+exactement les deux GHSA constatées sans masquer une troisième alerte.
 
 ### 6.3 C = C1 + C3
 
@@ -938,8 +944,9 @@ refocaliser; preuve ciblée `2/2`, frontend `754/754`, puis trois passages
 
 À ce point chronologique, avant l'audit incrémental final de la section 8, le
 verdict était `BLOCKED_EXTERNAL` pour la cause détaillée en 6.2 : identités de
-gouvernance indispensables absentes pour les environnements protégés et la
-création contrôlée des tags.
+gouvernance réputées indispensables par le profil strict simulé pour les
+environnements protégés et la création contrôlée des tags. La rectification de
+la section 8 distingue cette photographie historique du profil actif.
 
 ## 7. Fermeture bornée des alertes de dépendances
 
@@ -993,13 +1000,14 @@ Brace sont corrigés. D2 doit être rejoué à chaque lockfile et la politique d
 être retirée dès qu'une version parente compatible est disponible. L'échéance,
 une nouvelle surface ou toute nouvelle GHSA fait échouer la CI.
 
-Le verdict global ne devient pas `GO` par cette seule décision : P2 reste
-bloqué par l'absence des identités de gouvernance nécessaires aux environnements
-et à la création contrôlée des tags. La vérité opérationnelle publique O est
+Le verdict global ne devient pas `GO` par cette seule décision. Le profil
+strict simulé liait P2 à des identités de gouvernance absentes; le profil actif
+propriétaire unique retire cette simulation pour `main` et la création des
+tags, sans fournir pour autant les preuves d'environnement de publication, de
+VPS, de déploiement ou de recette. La vérité opérationnelle publique O est
 traitée en section 6.5; les effets de publication restent gouvernés par une
 autorisation séparée. L'audit incrémental de la section 8 avait ajouté six P1
-locaux au blocage; la correction terminale les ferme et rétablit le verdict
-`BLOCKED_EXTERNAL` fondé sur les seules identités manquantes.
+locaux; la correction terminale les ferme localement.
 
 ## 8. Audit final incrémental
 
@@ -1027,11 +1035,29 @@ Journal cinq passages et E2E `6/6 ×3`. Les suites globales donnent backend
 axe. Le préflight réel reconstruit les images locales et passe `26/26`; les
 audits réels et la politique des deux exceptions passent également.
 
-Le verdict local est `BLOCKED_EXTERNAL`. Sa seule cause est l'absence conjointe
-d'un reviewer indépendant et d'une identité technique dédiée aux tags, décision
-organisationnelle impossible à résoudre avec un seul administrateur. Aucun
-compte fictif n'a été créé et aucune opération distante ou de publication n'a
-été réalisée.
+La clôture technique locale est terminée et le verdict de release reste
+`BLOCKED_EXTERNAL`. Aucun compte fictif n'a été créé : le profil initial avec
+reviewer indépendant et identité technique de tag était une simulation
+appliquée par l'agent d'audit, pas une configuration manuelle du propriétaire.
+
+### 8.1 Rectification du profil GitHub propriétaire unique
+
+L'état distant actif relu est :
+
+- `Sentinel main protection` ID `20004078` : `active`, sans bypass, PR
+  obligatoire, six checks stricts, conversations résolues, merge commit seul,
+  `required_approving_review_count: 0` et
+  `require_last_push_approval: false`;
+- `Sentinel version tag creation` ID `20004127` : `disabled`, objet et export
+  historique conservés comme preuve de la simulation;
+- `Sentinel version tag immutability` ID `20004113` : `active` et inchangé,
+  sans bypass, avec interdiction de modification et de suppression.
+
+Ce profil permet l'intégration de RC5 par la PR protégée sans reviewer fictif
+et permet au propriétaire de créer ultérieurement un nouveau tag `v*`, qui
+devient ensuite immuable. Il ne prouve aucune publication, image, installation
+VPS, valeur `health.version` ni recette. Le `GO v1.0.0` reste donc `NO-GO`
+jusqu'à la validation réelle de ces portes.
 
 ## Sources officielles consultées le 29 juillet 2026
 
