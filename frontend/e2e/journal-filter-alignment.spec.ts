@@ -343,10 +343,11 @@ test.describe('Journal — contrats terminaux RC5', () => {
         expect(Date.parse(startValues[0])).toBeLessThanOrEqual(Date.parse(endValues[0]));
       }
     }
+    const expectedEndIso = await page.evaluate(() =>
+      new Date('2026-01-31T23:59:59.999').toISOString()
+    );
     expect(
-      eventRequests.some(
-        (requestUrl) => requestUrl.searchParams.get('end') === '2026-01-31T22:59:59.999Z'
-      )
+      eventRequests.some((requestUrl) => requestUrl.searchParams.get('end') === expectedEndIso)
     ).toBe(true);
   });
 });
