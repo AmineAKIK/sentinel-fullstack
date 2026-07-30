@@ -5,6 +5,8 @@ import { listWorkshopHistoryEvents, listWorkshopLines } from '../../api/workshop
 import { WorkshopHistoryEvent } from '../../types';
 import { useJournalData } from '../useJournalData';
 
+const WORKSHOP_BUSINESS_TIME_ZONE = 'Europe/Paris';
+
 vi.mock('../../api/workshop', () => ({
   listWorkshopHistoryEvents: vi.fn(),
   listWorkshopLines: vi.fn(),
@@ -133,6 +135,10 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listWorkshopLines).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('charge la première page et expose hasMore/nextCursor via le résultat', async () => {
@@ -496,7 +502,7 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
   });
 
   it('transmet au Journal les bornes locales inclusives de l’URL en hiver Europe/Paris', async () => {
-    vi.stubEnv('TZ', 'Europe/Paris');
+    vi.stubEnv('TZ', WORKSHOP_BUSINESS_TIME_ZONE);
     vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -577,6 +583,7 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
   });
 
   it('rejette un paramètre date répété, conserve les autres paramètres et la borne saine', async () => {
+    vi.stubEnv('TZ', WORKSHOP_BUSINESS_TIME_ZONE);
     vi.mocked(listWorkshopHistoryEvents).mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -784,6 +791,7 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
   });
 
   it('resynchronise requête, curseur et résultats lors d’un retour/avance concurrent', async () => {
+    vi.stubEnv('TZ', WORKSHOP_BUSINESS_TIME_ZONE);
     const beforePage = deferred<JournalPage>();
     const afterPage = deferred<JournalPage>();
     vi.mocked(listWorkshopHistoryEvents)
