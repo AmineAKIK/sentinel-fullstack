@@ -26,6 +26,10 @@ type CanonicalJournalDates = {
   changed: boolean;
 };
 
+type JournalResultScope = {
+  request: string;
+};
+
 function canonicalizeJournalDates(searchParams: URLSearchParams): CanonicalJournalDates {
   const params = new URLSearchParams(searchParams);
   const startValues = searchParams.getAll('start');
@@ -59,6 +63,7 @@ export function useJournalData() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [loadedResultScope, setLoadedResultScope] = useState<JournalResultScope | null>(null);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
 
@@ -94,7 +99,9 @@ export function useJournalData() {
   useEffect(() => {
     const controller = new AbortController();
     void listWorkshopLines(controller.signal)
-      .then(setLines)
+      .then((nextLines) => {
+        if (!controller.signal.aborted) setLines(nextLines);
+      })
       .catch(() => {
         if (!controller.signal.aborted) {
           setError('Impossible de charger les référentiels atelier.');
@@ -126,6 +133,7 @@ export function useJournalData() {
       endFilter,
     ]
   );
+  const requestScopeKey = useMemo(() => JSON.stringify(baseParams), [baseParams]);
 
   useEffect(() => {
     // Un changement de filtre repart de la première page : le curseur d'une
@@ -134,11 +142,17 @@ export function useJournalData() {
     loadMoreControllerRef.current = null;
     const requestGeneration = requestGenerationRef.current + 1;
     requestGenerationRef.current = requestGeneration;
+    const resultScope = { request: requestScopeKey };
     setHistoryEvents([]);
     setNextCursor(null);
     setLoadingMore(false);
     setError('');
 
+    if (query !== debouncedQuery) {
+      setHistoryEventsLoading(true);
+      setPeriodError('');
+      return undefined;
+    }
     if (startFilter && endFilter && startFilter > endFilter) {
       setHistoryEventsLoading(false);
       setPeriodError('La date de début doit être antérieure à la date de fin.');
@@ -153,9 +167,11 @@ export function useJournalData() {
         if (controller.signal.aborted || requestGeneration !== requestGenerationRef.current) return;
         setHistoryEvents(page.items);
         setNextCursor(page.nextCursor);
+        setLoadedResultScope(resultScope);
       })
       .catch(() => {
         if (controller.signal.aborted || requestGeneration !== requestGenerationRef.current) return;
+        setLoadedResultScope(resultScope);
         setError('Impossible de charger le journal atelier.');
       })
       .finally(() => {
@@ -168,10 +184,22 @@ export function useJournalData() {
       loadMoreControllerRef.current?.abort();
       loadMoreControllerRef.current = null;
     };
-  }, [baseParams, startFilter, endFilter]);
+  }, [baseParams, requestScopeKey, query, debouncedQuery, startFilter, endFilter]);
+
+  const urlFiltersMatch =
+    (canonicalDates.params.get('q') ?? '') === query &&
+    readHistoryStatusFilter(canonicalDates.params.get('status')) === statusFilter &&
+    (canonicalDates.params.get('line') ?? 'all') === lineFilter &&
+    (canonicalDates.params.get('machine') ?? 'all') === machineFilter &&
+    (canonicalDates.params.get('state') ?? 'all') === stateFilter &&
+    (canonicalDates.params.get('event') ?? 'all') === eventTypeFilter &&
+    canonicalDates.start === startFilter &&
+    canonicalDates.end === endFilter;
+  const resultsAreCurrent =
+    loadedResultScope?.request === requestScopeKey && query === debouncedQuery && urlFiltersMatch;
 
   const loadMore = useCallback((): void => {
-    if (!nextCursor || loadingMore) return;
+    if (!resultsAreCurrent || !nextCursor || loadingMore) return;
     const controller = new AbortController();
     const requestGeneration = requestGenerationRef.current;
     loadMoreControllerRef.current = controller;
@@ -207,7 +235,7 @@ export function useJournalData() {
           setLoadingMore(false);
         }
       });
-  }, [baseParams, nextCursor, loadingMore]);
+  }, [baseParams, nextCursor, loadingMore, resultsAreCurrent]);
 
   function updateSearchFilter(name: string, value: string, fallback = 'all'): void {
     setSearchParams(withWorkshopUrlFilter(searchParams, name, value, fallback));
@@ -275,8 +303,17 @@ export function useJournalData() {
     }
   }
 
+  const visibleHistoryEvents = useMemo(
+    () => (resultsAreCurrent ? historyEvents : []),
+    [historyEvents, resultsAreCurrent]
+  );
+  const visibleLoadingMore = resultsAreCurrent ? loadingMore : false;
+  const hasInvalidPeriod = Boolean(startFilter && endFilter && startFilter > endFilter);
+  const visibleHistoryEventsLoading =
+    !hasInvalidPeriod && (historyEventsLoading || !resultsAreCurrent);
+
   const sortedEvents = useMemo(() => {
-    const copy = [...historyEvents];
+    const copy = [...visibleHistoryEvents];
     const dir = sortDir === 'asc' ? 1 : -1;
     copy.sort((a, b) => {
       switch (sortCol) {
@@ -298,15 +335,15 @@ export function useJournalData() {
       }
     });
     return copy;
-  }, [historyEvents, sortCol, sortDir]);
+  }, [visibleHistoryEvents, sortCol, sortDir]);
 
   return {
     lines,
-    historyEvents,
+    historyEvents: visibleHistoryEvents,
     sortedEvents,
-    historyEventsLoading,
-    loadingMore,
-    hasMore: nextCursor !== null,
+    historyEventsLoading: visibleHistoryEventsLoading,
+    loadingMore: visibleLoadingMore,
+    hasMore: resultsAreCurrent && nextCursor !== null,
     loadMore,
     error,
     query,

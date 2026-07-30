@@ -56,18 +56,53 @@ function deferred<T>(): Deferred<T> {
 function JournalNavigationHarness() {
   const journal = useJournalData();
   return React.createElement(
-    'output',
-    { 'aria-label': 'filtres Journal' },
-    [
-      journal.query,
-      journal.statusFilter,
-      journal.lineFilter,
-      journal.machineFilter,
-      journal.stateFilter,
-      journal.eventTypeFilter,
-      journal.startFilter,
-      journal.endFilter,
-    ].join('|')
+    React.Fragment,
+    null,
+    React.createElement(
+      'output',
+      { 'aria-label': 'filtres Journal' },
+      [
+        journal.query,
+        journal.statusFilter,
+        journal.lineFilter,
+        journal.machineFilter,
+        journal.stateFilter,
+        journal.eventTypeFilter,
+        journal.startFilter,
+        journal.endFilter,
+      ].join('|')
+    ),
+    React.createElement(
+      'output',
+      { 'aria-label': 'résultats Journal' },
+      [
+        journal.historyEvents.map(({ id }) => id).join(','),
+        String(journal.hasMore),
+        String(journal.historyEventsLoading),
+      ].join('|')
+    )
+  );
+}
+
+function JournalFilterPaintHarness({ snapshots }: { snapshots: number[][] }) {
+  const journal = useJournalData();
+
+  React.useLayoutEffect(() => {
+    if (journal.eventTypeFilter === 'INCIDENT_CLOSED') {
+      snapshots.push(journal.historyEvents.map(({ id }) => id));
+    }
+  }, [journal.eventTypeFilter, journal.historyEvents, snapshots]);
+
+  return React.createElement(
+    'button',
+    {
+      type: 'button',
+      onClick: () => {
+        journal.setEventTypeFilter('INCIDENT_CLOSED');
+        journal.updateSearchFilter('event', 'INCIDENT_CLOSED');
+      },
+    },
+    'Filtrer les clôtures'
   );
 }
 
@@ -168,7 +203,10 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
       items: [event(2, '2026-03-05T10:00:00.000Z')],
       nextCursor: null,
     });
-    act(() => result.current.setEventTypeFilter('INCIDENT_CLOSED'));
+    act(() => {
+      result.current.setEventTypeFilter('INCIDENT_CLOSED');
+      result.current.updateSearchFilter('event', 'INCIDENT_CLOSED');
+    });
     await waitFor(() => expect(result.current.historyEventsLoading).toBe(false));
     await waitFor(() => expect(result.current.historyEvents.map((e) => e.id)).toEqual([2]));
   });
@@ -195,7 +233,10 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     act(() => result.current.loadMore());
     await waitFor(() => expect(result.current.loadingMore).toBe(true));
 
-    act(() => result.current.setEventTypeFilter('INCIDENT_CLOSED'));
+    act(() => {
+      result.current.setEventTypeFilter('INCIDENT_CLOSED');
+      result.current.updateSearchFilter('event', 'INCIDENT_CLOSED');
+    });
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(3));
 
     expect(continuationSignal?.aborted).toBe(true);
@@ -251,9 +292,15 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     const { result } = renderHook(() => useJournalData(), { wrapper });
     await waitFor(() => expect(result.current.historyEventsLoading).toBe(false));
 
-    act(() => result.current.setEventTypeFilter('INCIDENT_CLOSED'));
+    act(() => {
+      result.current.setEventTypeFilter('INCIDENT_CLOSED');
+      result.current.updateSearchFilter('event', 'INCIDENT_CLOSED');
+    });
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(2));
-    act(() => result.current.setEventTypeFilter('INCIDENT_CREATED'));
+    act(() => {
+      result.current.setEventTypeFilter('INCIDENT_CREATED');
+      result.current.updateSearchFilter('event', 'INCIDENT_CREATED');
+    });
     await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(3));
 
     expect(firstFilterSignal?.aborted).toBe(true);
@@ -276,6 +323,39 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
     });
     expect(result.current.historyEvents.map(({ id }) => id)).toEqual([3]);
     expect(result.current.error).toBe('');
+  });
+
+  it('ne présente jamais les anciennes lignes dans le rendu du nouveau filtre réel', async () => {
+    const filteredPage = deferred<JournalPage>();
+    const layoutSnapshots: number[][] = [];
+    vi.mocked(listWorkshopHistoryEvents)
+      .mockResolvedValueOnce({
+        items: [event(1, '2026-03-02T10:00:00.000Z')],
+        nextCursor: 'cursor-old-page-2',
+      })
+      .mockImplementationOnce(() => filteredPage.promise);
+
+    render(
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(JournalFilterPaintHarness, { snapshots: layoutSnapshots })
+      )
+    );
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(layoutSnapshots).toEqual([]));
+
+    act(() => screen.getByRole('button', { name: 'Filtrer les clôtures' }).click());
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(2));
+
+    try {
+      expect(layoutSnapshots[0]).toEqual([]);
+    } finally {
+      await act(async () => {
+        filteredPage.resolve({ items: [], nextCursor: null });
+        await filteredPage.promise;
+      });
+    }
   });
 
   it.each([
@@ -306,7 +386,10 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
       await waitFor(() => expect(result.current.historyEvents.map(({ id }) => id)).toEqual([1, 2]));
       expect(result.current.hasMore).toBe(true);
 
-      act(() => result.current.setEventTypeFilter('INCIDENT_CLOSED'));
+      act(() => {
+        result.current.setEventTypeFilter('INCIDENT_CLOSED');
+        result.current.updateSearchFilter('event', 'INCIDENT_CLOSED');
+      });
       await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(3));
 
       expect(result.current.historyEvents).toEqual([]);
@@ -692,5 +775,88 @@ describe('useJournalData — pagination par curseur (lot 7, LIST-03)', () => {
         'apres|CLOSED|2|M-2|INDISPONIBLE|INCIDENT_CLOSED|2026-02-01|2026-02-02'
       )
     );
+  });
+
+  it('resynchronise requête, curseur et résultats lors d’un retour/avance concurrent', async () => {
+    const beforePage = deferred<JournalPage>();
+    const afterPage = deferred<JournalPage>();
+    vi.mocked(listWorkshopHistoryEvents)
+      .mockResolvedValueOnce({
+        items: [event(20, '2026-02-02T10:00:00.000Z')],
+        nextCursor: 'cursor-after',
+      })
+      .mockImplementationOnce(() => beforePage.promise)
+      .mockImplementationOnce(() => afterPage.promise);
+    const before =
+      '/workshop/journal?q=avant&status=OPEN&line=1&machine=M-1&state=DEGRADEE&event=INCIDENT_TAKEN&start=2026-01-01&end=2026-01-02';
+    const after =
+      '/workshop/journal?q=apres&status=CLOSED&line=2&machine=M-2&state=INDISPONIBLE&event=INCIDENT_CLOSED&start=2026-02-01&end=2026-02-02';
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/journal',
+          element: React.createElement(JournalNavigationHarness),
+        },
+      ],
+      { initialEntries: [before, after], initialIndex: 1 }
+    );
+    render(React.createElement(RouterProvider, { router }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('20|true|false')
+    );
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('|false|true');
+    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[1][0]).toMatchObject({
+      q: 'avant',
+      status: 'OPEN',
+      lineId: 1,
+      machineId: 'M-1',
+      state: 'DEGRADEE',
+      eventType: 'INCIDENT_TAKEN',
+      start: '2025-12-31T23:00:00.000Z',
+      end: '2026-01-02T22:59:59.999Z',
+    });
+    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[1][0].cursor).toBeUndefined();
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(listWorkshopHistoryEvents).toHaveBeenCalledTimes(3));
+    expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('|false|true');
+    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[2][0]).toMatchObject({
+      q: 'apres',
+      status: 'CLOSED',
+      lineId: 2,
+      machineId: 'M-2',
+      state: 'INDISPONIBLE',
+      eventType: 'INCIDENT_CLOSED',
+      start: '2026-01-31T23:00:00.000Z',
+      end: '2026-02-02T22:59:59.999Z',
+    });
+    expect(vi.mocked(listWorkshopHistoryEvents).mock.calls[2][0].cursor).toBeUndefined();
+
+    await act(async () => {
+      afterPage.resolve({
+        items: [event(30, '2026-02-03T10:00:00.000Z')],
+        nextCursor: null,
+      });
+      await afterPage.promise;
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('30|false|false')
+    );
+
+    await act(async () => {
+      beforePage.resolve({
+        items: [event(10, '2026-01-03T10:00:00.000Z')],
+        nextCursor: 'cursor-stale',
+      });
+      await beforePage.promise;
+    });
+    expect(screen.getByLabelText('résultats Journal')).toHaveTextContent('30|false|false');
   });
 });
