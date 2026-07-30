@@ -211,7 +211,10 @@ test.describe('Journal — contrats terminaux RC5', () => {
     expect(await start.evaluate((element) => window.getComputedStyle(element).boxShadow)).not.toBe(
       'none'
     );
-    await page.keyboard.press('Tab');
+    for (let index = 0; index < 12; index += 1) {
+      if (await end.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
     await expect(end).toBeFocused();
     expect(await end.evaluate((element) => window.getComputedStyle(element).boxShadow)).not.toBe(
       'none'

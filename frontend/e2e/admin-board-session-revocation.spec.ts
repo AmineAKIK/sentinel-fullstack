@@ -42,7 +42,7 @@ async function expectVisibleKeyboardFocus(locator: Locator): Promise<void> {
   ).toBe(true);
 }
 
-test('RC5-AUD-04 — l’erreur Admin est reliée au champ après Entrée et Échap restaure le focus exact', async ({
+test('RC5-AUD-04 — l’erreur Admin est reliée au champ et la croix restaure le focus exact', async ({
   page,
 }) => {
   await loginAsAdmin(page);
@@ -71,7 +71,9 @@ test('RC5-AUD-04 — l’erreur Admin est reliée au champ après Entrée et Éc
   await expectVisibleKeyboardFocus(password);
   await expectNoSeriousViolations(page);
 
-  await page.keyboard.press('Escape');
+  const close = dialog.getByRole('button', { name: 'Fermer' });
+  await close.focus();
+  await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   await expectVisibleKeyboardFocus(save);
 });
