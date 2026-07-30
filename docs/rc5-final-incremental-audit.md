@@ -5,8 +5,16 @@
 **Verdict de l'audit technique local RC5 :** `BLOCKED_EXTERNAL`
 
 Les six constats P1 locaux `RC5-AUD-01..06` sont corrigés et disposent chacun
-d'un cycle rouge→vert permanent ciblant le comportement constaté. La revue
-terminale du delta ne relève aucun risque résiduel local non documenté.
+d'un cycle rouge→vert permanent ciblant le comportement constaté. Après le
+correctif post-audit décrit ci-dessous, la revue du delta courant ne relève
+aucun risque résiduel local non documenté.
+
+Le HEAD initial de clôture
+`2590502995b45304a5ff9a3c81fdbd6bf594bfbb` n'était toutefois pas vert en CI
+distante : les événements `push` et `pull_request` de la PR #31 ont révélé deux
+assertions Journal dépendantes du fuseau du runner. Cette preuve tardive n'est
+pas réécrite comme un succès initial; le correctif de portabilité, sans
+changement runtime, est consigné ci-dessous avec son cycle rouge→vert.
 
 Le premier prérequis externe pour engager l'étape de publication contrôlée est
 organisationnel : le dépôt ne possède ni reviewer indépendant de l'initiateur,
@@ -86,8 +94,60 @@ répertoire ignoré `backend/dist` appartenant à `nobody:nogroup`; cet artefact
 généré a été supprimé, puis build, couverture et fiabilité ont passé. Les deux
 premiers passages frontend ont exposé des erreurs de typage dans les nouvelles
 preuves, puis l'inventaire permanent Router passé factuellement de `53` à `54`;
-les tests ont été corrigés sans relaxation et la suite globale finale est
-entièrement verte.
+les tests ont été corrigés sans relaxation et la suite globale locale de
+clôture était entièrement verte. Cette preuve locale n'anticipe pas la CI UTC
+décrite ci-dessous.
+
+<a id="post-audit-ci-timezone-journal"></a>
+
+### Correctif post-audit CI : portabilité du Journal
+
+Sur le SHA `2590502995b45304a5ff9a3c81fdbd6bf594bfbb`, le job requis
+`Frontend / Quality` a échoué à l'étape `npm run test:coverage` dans les deux
+événements attendus :
+
+- run `push`
+  [`30535000014`](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/30535000014);
+- run `pull_request`
+  [`30535133010`](https://github.com/AmineAKIK/sentinel-fullstack/actions/runs/30535133010).
+
+Les deux logs donnent la même sortie : `1` fichier en échec sur `72`, `2` tests
+en échec et `785` succès sur `787`, tous deux dans
+`frontend/src/hooks/__tests__/useJournalData.test.ts` :
+
+- `rejette un paramètre date répété, conserve les autres paramètres et la borne saine`
+  attendait `2026-01-31T22:59:59.999Z` et recevait
+  `2026-01-31T23:59:59.999Z`;
+- `resynchronise requête, curseur et résultats lors d'un retour/avance concurrent`
+  attendait les bornes `2025-12-31T23:00:00.000Z` et
+  `2026-01-02T22:59:59.999Z`, mais recevait
+  `2026-01-01T00:00:00.000Z` et `2026-01-02T23:59:59.999Z`.
+
+La cause est un défaut de la preuve, pas du comportement runtime :
+`dayStartIso()` et `dayEndIso()` convertissent volontairement le jour civil
+dans le fuseau local du navigateur, tandis que ces deux scénarios affirmaient
+le contrat métier Europe/Paris sans fixer explicitement ce fuseau. Le runner
+GitHub UTC produisait donc des instants décalés d'une heure; les validations
+locales antérieures exécutées sous Europe/Paris avaient masqué cette dépendance.
+
+Avant correction, la commande
+`TZ=UTC npm test -- src/hooks/__tests__/useJournalData.test.ts` reproduit
+exactement les deux écarts avec `2` échecs et `26` succès, tandis que la même
+commande sous `TZ=Europe/Paris` passe `28/28`. Le commit
+`5224de989fac3593d3a08fc3376d1159bd11483f` déclare
+`Europe/Paris` comme fuseau métier explicite uniquement dans les scénarios
+concernés et restaure l'environnement après chaque test. Aucune attente ISO
+n'est supprimée, relâchée ou recalculée circulairement; aucun retry, changement
+runtime ou changement global du fuseau de la suite n'est introduit.
+
+Après correction, le test ciblé passe `28/28` sous `TZ=UTC` et
+`TZ=Europe/Paris` avec les mêmes attentes métier. Sous UTC, la suite frontend
+complète et sa couverture passent chacune `787/787`; la couverture reste à
+`90,38 %` statements, `83,75 %` branches, `92,36 %` fonctions et `92,63 %`
+lignes. Build/typecheck, ESLint, Prettier et `git diff --check` passent
+également. La revalidation distante du HEAD documentaire final doit être
+établie par les nouveaux checks de la PR #31 et n'est pas anticipée dans ce
+document versionné. Les anciens runs n'ont pas été relancés.
 
 ## 3. Exceptions de dépendances
 
@@ -281,6 +341,7 @@ déploiement et recette associées, conservent leur état courant. Ces portes ne
 constituent pas des défauts locaux du code RC5 et aucune n'est déclarée
 `VERIFIED` sans sa preuve.
 
-Aucun compte ou environnement fictif n'a été créé. Aucun push, PR, merge, tag,
-release, publication d'image, déploiement, SSH, DNS ou changement VPS n'a été
-effectué.
+Aucun compte ou environnement fictif n'a été créé. La branche RC5 a été poussée
+et la PR #31 ouverte pour obtenir les checks et l'approbation indépendante
+requise. Aucun merge, bypass, tag, release, publication d'image, déploiement,
+SSH, DNS ou changement VPS n'a été effectué.
