@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 
@@ -53,28 +57,19 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("attestations: write", publish)
         self.assertNotIn("secrets.", publish)
         self.assertEqual(RELEASE.count("scripts/verify-release-candidate.sh"), 2)
-        self.assertLess(
-            publish.index(
-                "Revalidate the candidate inside the protected release environment"
-            ),
-            publish.index("Reserve the release tag before any registry side effect"),
+        ordered_fragments = (
+            "Revalidate the candidate inside the protected release environment",
+            'docker create --entrypoint /buildx "$BUILDX_IMAGE" version',
+            "docker buildx create",
+            "docker buildx inspect --bootstrap",
+            "Reserve the release before registry authentication and publication",
+            "docker/login-action@",
+            "Build and push backend with maximal provenance",
+            "gh release upload",
+            "--draft=false",
         )
-        self.assertLess(
-            publish.index("Reserve the release tag before any registry side effect"),
-            publish.index("docker/login-action@"),
-        )
-        self.assertLess(
-            publish.index("docker/login-action@"),
-            publish.index("Build and push backend with maximal provenance"),
-        )
-        self.assertLess(
-            publish.index("Build and push backend with maximal provenance"),
-            publish.index("gh release upload"),
-        )
-        self.assertLess(
-            publish.index("gh release upload"),
-            publish.index("--draft=false"),
-        )
+        positions = [publish.index(fragment) for fragment in ordered_fragments]
+        self.assertEqual(positions, sorted(positions))
 
     def test_dispatch_runs_only_from_main_then_strictly_classifies_the_tag(self) -> None:
         self.assertIn("workflow_dispatch:", RELEASE)
@@ -175,13 +170,134 @@ class ReleaseWorkflowTests(unittest.TestCase):
                     self.assertRegex(line, rf"@{SHA256}(?:\s+AS\s+\w+)?$")
 
         self.assertNotIn("docker/setup-buildx-action@", RELEASE)
-        self.assertIn("docker create \"$BUILDX_IMAGE\"", RELEASE)
+        self.assertEqual(
+            RELEASE.count(
+                'docker create --entrypoint /buildx "$BUILDX_IMAGE" version'
+            ),
+            1,
+        )
+        self.assertNotIn('docker create "$BUILDX_IMAGE"', RELEASE)
         self.assertIn("docker buildx create", RELEASE)
         self.assertIn(
             "github.com/docker/buildx v0.35.0 "
             "a319e5b15052cf6557ceb666eb8ff6e32380b782",
             RELEASE,
         )
+
+    def test_digest_pinned_buildx_and_buildkit_execute_for_real(self) -> None:
+        buildx_images = re.findall(
+            r"(?m)^\s*BUILDX_IMAGE:\s*"
+            r"(docker/buildx-bin:[^@\s]+@sha256:[0-9a-f]{64})\s*$",
+            RELEASE,
+        )
+        buildkit_images = re.findall(
+            r"--driver-opt\s+image="
+            r"(moby/buildkit:[^@\s]+@sha256:[0-9a-f]{64})",
+            RELEASE,
+        )
+        expected_versions = re.findall(
+            r"(?m)^\s*\|\s*grep\s+-F\s+'"
+            r"(github\.com/docker/buildx v[0-9]+\.[0-9]+\.[0-9]+ [0-9a-f]{40})"
+            r"'\s*$",
+            RELEASE,
+        )
+        self.assertEqual(len(buildx_images), 1)
+        self.assertEqual(len(buildkit_images), 1)
+        self.assertEqual(len(expected_versions), 1)
+
+        buildx_image = buildx_images[0]
+        buildkit_image = buildkit_images[0]
+        expected_version = expected_versions[0]
+        buildx_tag = buildx_image.split(":", maxsplit=1)[1].split("@", maxsplit=1)[0]
+        self.assertIn(f" v{buildx_tag} ", expected_version)
+
+        def run(
+            command: list[str], *, environment: dict[str, str] | None = None
+        ) -> subprocess.CompletedProcess[str]:
+            result = subprocess.run(
+                command,
+                cwd=REPOSITORY_ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                "Command failed:\n"
+                f"  {' '.join(command)}\n"
+                f"stdout:\n{result.stdout}\n"
+                f"stderr:\n{result.stderr}",
+            )
+            return result
+
+        builder_name = f"sentinel-buildx-proof-{uuid.uuid4().hex[:12]}"
+        buildx_container = ""
+        with tempfile.TemporaryDirectory(prefix="sentinel-buildx-proof-") as temp:
+            docker_config = Path(temp) / "docker-config"
+            plugin = docker_config / "cli-plugins" / "docker-buildx"
+            plugin.parent.mkdir(parents=True)
+            environment = os.environ.copy()
+            environment["DOCKER_CONFIG"] = str(docker_config)
+
+            try:
+                created = run(
+                    [
+                        "docker",
+                        "create",
+                        "--entrypoint",
+                        "/buildx",
+                        buildx_image,
+                        "version",
+                    ]
+                )
+                buildx_container = created.stdout.strip()
+                self.assertRegex(buildx_container, r"^[0-9a-f]{64}$")
+                run(["docker", "cp", f"{buildx_container}:/buildx", str(plugin)])
+                plugin.chmod(0o755)
+
+                version = run(
+                    ["docker", "buildx", "version"], environment=environment
+                )
+                self.assertEqual(version.stdout.strip(), expected_version)
+
+                run(
+                    [
+                        "docker",
+                        "buildx",
+                        "create",
+                        "--name",
+                        builder_name,
+                        "--driver",
+                        "docker-container",
+                        "--driver-opt",
+                        f"image={buildkit_image}",
+                        "--use",
+                    ],
+                    environment=environment,
+                )
+                run(
+                    ["docker", "buildx", "inspect", builder_name, "--bootstrap"],
+                    environment=environment,
+                )
+            finally:
+                subprocess.run(
+                    ["docker", "buildx", "rm", builder_name],
+                    cwd=REPOSITORY_ROOT,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if buildx_container:
+                    subprocess.run(
+                        ["docker", "rm", "-f", buildx_container],
+                        cwd=REPOSITORY_ROOT,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
 
     def test_policy_tests_and_secretless_dry_run_are_part_of_ci(self) -> None:
         self.assertIn("python3 scripts/test-release-policy.py", CI)
