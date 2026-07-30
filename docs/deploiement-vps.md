@@ -14,6 +14,23 @@ Ce guide documente **la topologie B pour l'instance publique**, déployée par
 image de registry épinglée par digest. La topologie A est décrite en annexe
 (section 10) pour une distribution autonome.
 
+### Observation publique en lecture seule du 30 juillet 2026
+
+Le bord observable confirme la topologie B : le DNS A de
+`sentinel.akiksystems.fr` vaut `79.137.34.84`, les ports publics 80 et 443
+répondent avec `Server: nginx`, et HTTP redirige vers HTTPS. Le certificat TLS
+couvre exactement le domaine, HSTS et les en-têtes publics attendus sont
+présents, et `/api/health` répond HTTP 200 avec la version
+`da97e5222e0978d9e4af08afe70a08d49a80f4de`. Cette version est encore celle de
+la RC4 publiée : cette observation n'est ni un déploiement ni une preuve RC5.
+
+Ces faits prouvent le frontal public Nginx et excluent Caddy intégré comme
+terminaison TLS publique. Aucun accès SSH nominatif n'étant disponible lors de
+la lecture, ils ne prouvent pas les fichiers Compose actifs, conteneurs,
+digests, binds loopback, version Nginx ou sortie `nginx -T` internes. Les trois
+fichiers ci-dessous restent le contrat normatif de la topologie B; leur état
+effectif devra être relu lors d'une recette VPS autorisée.
+
 Toutes les commandes s'exécutent depuis le répertoire de déploiement. Pour
 l'instance publique il est fixe ; on le référence par `SENTINEL_DIR`, et la
 topologie B se compose **toujours** des trois mêmes fichiers Compose, regroupés
@@ -31,7 +48,9 @@ export RELEASE_TAG=""   # p. ex. : export RELEASE_TAG=v1.0.0
 COMPOSE=(-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.registry.yml)
 ```
 
-## 1. Architecture de production
+## 1. Architectures de déploiement
+
+Topologie A — distribution autonome :
 
 ```text
 Internet
@@ -47,7 +66,7 @@ Nginx non-root :8080   API Node non-root :3000
                     PostgreSQL :5432
 ```
 
-Variante de l'instance publique :
+Topologie B — instance publique :
 
 ```text
 Internet -> Nginx hôte :443 -> 127.0.0.1:<port_frontend> -> frontend/Nginx :8080
@@ -58,15 +77,16 @@ Les deux ports loopback (`SENTINEL_FRONTEND_BIND_PORT`,
 `SENTINEL_BACKEND_BIND_PORT`) sont choisis par l'exploitant et reportés à
 l'identique dans le vhost Nginx ; ils ne sont publiés que sur `127.0.0.1`.
 
-- `caddy` appartient aux réseaux `edge` et `internal` ;
+- en topologie A, `caddy` appartient aux réseaux `edge` et `internal` ;
 - `postgres` appartient uniquement au réseau isolé `internal` et n'est jamais
   publié sur l'hôte ;
-- `frontend` appartient à `internal` ; dans la variante frontal-hôte
+- `frontend` appartient à `internal` ; dans la topologie B
   (`docker-compose.host-proxy.example.yml`), il rejoint aussi `edge` pour que sa
   publication sur le loopback fonctionne (sans quoi le port n'est pas
   réellement exposé) ;
 - `backend` appartient aussi à `edge` pour joindre les fournisseurs SMTP et IA ;
-- seuls les ports `80` et `443` sont publiés sur l'hôte ;
+- seuls les ports `80` et `443` sont exposés publiquement ; la topologie B
+  publie en plus deux binds privés sur `127.0.0.1` ;
 - les conteneurs applicatifs ont un système de fichiers en lecture seule, un
   `/tmp` borné et aucune capability Linux ;
 - les images et runtimes sont épinglés dans les Dockerfiles et le Compose.
@@ -137,7 +157,11 @@ VITE_API_URL=
 TRUST_PROXY=true
 ```
 
-`CLIENT_ORIGIN` est une origine HTTPS exacte, sans chemin ni slash final.
+`CLIENT_ORIGIN` est l'origine HTTPS canonique exacte (`URL.origin`) : schéma,
+hôte et éventuel port non standard, sans credentials, wildcard, chemin, query,
+fragment ni slash final. Le port HTTPS par défaut doit donc être omis. La même
+validation alimente le démarrage, CORS, CSRF et le préflight ; une valeur
+absente ou divergente arrête le backend avant écoute.
 `VITE_API_URL` reste vide : le navigateur appelle `/api` sur la même origine et
 le proxy retenu route ces requêtes vers le backend.
 

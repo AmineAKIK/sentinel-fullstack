@@ -154,7 +154,7 @@ export default function AdminSettingsPage() {
     });
     if (result.status === 'success') {
       await logout();
-      navigate('/admin/login', {
+      void navigate('/admin/login', {
         replace: true,
         state: { reason: 'Mot de passe modifié. Reconnectez-vous.' },
       });
@@ -492,7 +492,7 @@ export default function AdminSettingsPage() {
       if (didRevokeAdmin) {
         window.setTimeout(() => {
           void logout().then(() => {
-            navigate('/login', {
+            void navigate('/login', {
               replace: true,
               state: { reason: 'Sessions administrateur révoquées. Reconnectez-vous.' },
             });
@@ -1080,6 +1080,7 @@ export default function AdminSettingsPage() {
                       </label>
                       {appSettingsDraftValue('board_session_ttl_hours') === 0 ? (
                         <input
+                          id="boardSessionTtl"
                           className="form-input"
                           type="text"
                           value=""

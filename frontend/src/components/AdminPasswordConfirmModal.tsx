@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { verifyAdminPassword } from '../api/adminSecurity';
 import { ApiResponseError } from '../api/client';
 import { apiErrorMessage } from '../api/errorMessages';
@@ -36,8 +36,15 @@ export default function AdminPasswordConfirmModal({
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   const mutation = useMutationRunner();
   const loading = mutation.isPending(mutationKey);
+
+  useEffect(() => {
+    if (!loading && passwordError) {
+      passwordInputRef.current?.focus({ preventScroll: true });
+    }
+  }, [loading, passwordError]);
 
   async function handleConfirm() {
     setError('');
@@ -70,9 +77,6 @@ export default function AdminPasswordConfirmModal({
           } else {
             setError(safeMessage);
           }
-          requestAnimationFrame(() => {
-            document.getElementById('adminPassword')?.focus();
-          });
         },
       }
     );
@@ -97,6 +101,7 @@ export default function AdminPasswordConfirmModal({
           Mot de passe administrateur
         </label>
         <input
+          ref={passwordInputRef}
           id="adminPassword"
           className="form-input"
           type="password"
@@ -105,8 +110,14 @@ export default function AdminPasswordConfirmModal({
           disabled={loading}
           autoComplete="current-password"
           maxLength={MAX_PASSWORD_BYTES}
+          aria-invalid={passwordError ? true : undefined}
+          aria-describedby={passwordError ? 'admin-password-error' : undefined}
         />
-        {passwordError && <div className="field-error">{passwordError}</div>}
+        {passwordError && (
+          <div id="admin-password-error" className="field-error" role="alert">
+            {passwordError}
+          </div>
+        )}
       </div>
     </ConfirmModal>
   );

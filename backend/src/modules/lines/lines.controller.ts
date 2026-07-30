@@ -17,7 +17,12 @@ import {
   listLinesService,
   updateLineService,
 } from './lines.service';
-import { createLineSchema, lineNumberSchema, updateLineSchema } from './lines.validation';
+import {
+  checkLineConflictsSchema,
+  createLineSchema,
+  lineNumberSchema,
+  updateLineSchema,
+} from './lines.validation';
 
 export async function listLines(_req: Request, res: Response): Promise<void> {
   try {
@@ -43,16 +48,19 @@ export async function checkLineAvailability(req: Request, res: Response): Promis
 
 export async function checkLineConflicts(req: Request, res: Response): Promise<void> {
   try {
-    const parsedLineNumber = lineNumberSchema.safeParse(req.body?.lineNumber);
-    const machineIds = Array.isArray(req.body?.machineIds) ? req.body.machineIds : [];
-    const lineId = req.body?.lineId ? Number(req.body.lineId) : undefined;
-
-    if (!parsedLineNumber.success) {
-      sendServiceError(res, badRequest(formatZodError(parsedLineNumber.error)));
+    const parsed = checkLineConflictsSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
       return;
     }
 
-    res.json(await checkLineConflictsService(parsedLineNumber.data, machineIds, lineId));
+    res.json(
+      await checkLineConflictsService(
+        parsed.data.lineNumber,
+        parsed.data.machineIds,
+        parsed.data.lineId
+      )
+    );
   } catch (err) {
     handleControllerError(res, 'checkLineConflicts', err);
   }

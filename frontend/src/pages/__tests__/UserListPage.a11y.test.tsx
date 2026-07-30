@@ -87,3 +87,40 @@ describe('UserListPage — sémantique de tableau (lot 8, A11Y-02)', () => {
     expect(navigate).toHaveBeenCalledWith('/admin/users/42');
   });
 });
+
+describe('UserListPage — filtre de rôle (RC5-8)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('le filtre Role ne propose que les trois rôles humains standards', async () => {
+    vi.mocked(listAccounts).mockResolvedValue([user(1)]);
+    renderPage();
+
+    await waitFor(() => expect(screen.getAllByText('Dupont').length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrer' }));
+    const roleCombobox = screen.getByRole('combobox', { name: 'Rôle' });
+    fireEvent.click(roleCombobox);
+
+    expect(screen.getByRole('option', { name: 'Tous' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'Opérateur' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'Technicien' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'Responsable' })).toBeDefined();
+    expect(screen.queryByRole('option', { name: 'Administrateur' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Système' })).toBeNull();
+  });
+
+  it.each(['Rôle', 'Statut', 'Trier par'])(
+    'expose le nom accessible « %s » dans la modale de filtres',
+    async (name) => {
+      vi.mocked(listAccounts).mockResolvedValue([user(1)]);
+      renderPage();
+
+      await waitFor(() => expect(screen.getAllByText('Dupont').length).toBeGreaterThan(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Filtrer' }));
+
+      expect(screen.getByRole('combobox', { name })).toBeInTheDocument();
+    }
+  );
+});

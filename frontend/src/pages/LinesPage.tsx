@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import NavBar from '../components/NavBar';
 import CreateLineModal from '../components/CreateLineModal';
 import LineDetailView from '../components/LineDetailView';
@@ -6,7 +6,6 @@ import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import SuccessBanner from '../components/ui/SuccessBanner';
 import SelectField from '../components/ui/SelectField';
 import Spinner from '../components/ui/Spinner';
 import { listLines } from '../api/lines';
@@ -34,7 +33,6 @@ export default function LinesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -42,16 +40,6 @@ export default function LinesPage() {
   const [order, setOrder] = useState<SortOrder>('desc');
   const [draftStatus, setDraftStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [draftSortValue, setDraftSortValue] = useState('created_desc');
-  const successTimerRef = useRef<number | null>(null);
-
-  const showSuccess = useCallback((message: string): void => {
-    if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
-    setSuccessMsg(message);
-    successTimerRef.current = window.setTimeout(() => {
-      setSuccessMsg('');
-      successTimerRef.current = null;
-    }, 5000);
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,13 +57,6 @@ export default function LinesPage() {
       });
     return () => controller.abort();
   }, []);
-
-  useEffect(
-    () => () => {
-      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
-    },
-    []
-  );
 
   function getSortValue(): string {
     return lineSortCodec.encode({ sort, order });
@@ -188,18 +169,15 @@ export default function LinesPage() {
     return (
       <LineDetailView
         line={selected}
-        successMsg={successMsg}
         error={error}
         onBack={() => setSelected(null)}
-        onLineUpdated={(updated, message) => {
+        onLineUpdated={(updated) => {
           setSelected(updated);
           setLines((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-          showSuccess(message);
         }}
         onLineDeleted={(line) => {
           setLines((prev) => prev.filter((l) => l.id !== line.id));
           setSelected(null);
-          showSuccess(`Ligne ${line.line_number} archivée avec succès.`);
         }}
       />
     );
@@ -216,8 +194,6 @@ export default function LinesPage() {
             + Ajouter une ligne
           </button>
         </div>
-
-        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
 
         <div className="filters-row">
           <div className="filter-group">
@@ -385,7 +361,6 @@ export default function LinesPage() {
           onSuccess={(line) => {
             setShowCreate(false);
             setLines((prev) => [line, ...prev]);
-            showSuccess(`Ligne ${line.line_number} créée avec succès.`);
           }}
         />
       )}
@@ -407,8 +382,11 @@ export default function LinesPage() {
           }
         >
           <div className="form-group">
-            <label className="form-label">Statut</label>
+            <label className="form-label" htmlFor="line-status-filter">
+              Statut
+            </label>
             <SelectField
+              id="line-status-filter"
               value={draftStatus}
               onChange={(value) => setDraftStatus(value as 'all' | 'active' | 'inactive')}
               options={[
@@ -419,8 +397,11 @@ export default function LinesPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Trier par</label>
+            <label className="form-label" htmlFor="line-sort-filter">
+              Trier par
+            </label>
             <SelectField
+              id="line-sort-filter"
               value={draftSortValue}
               onChange={setDraftSortValue}
               options={[

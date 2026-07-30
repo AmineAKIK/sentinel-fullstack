@@ -23,6 +23,7 @@ const REQUIRED_PRODUCTION_ENV = [
 const MIN_SECRET_LENGTH = 24;
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 const GIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
+const LOCAL_CLIENT_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 function containsPlaceholder(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -116,6 +117,74 @@ function assertProductionDatabaseUrl(rawValue: string): void {
   }
 }
 
+/**
+ * Parses the one canonical browser origin shared by CORS, CSRF and deployment
+ * preflight. The returned value is already URL-serialized, so exact string
+ * comparison also compares scheme, host and effective port.
+ */
+export function parseClientOrigin(
+  rawValue: string | undefined,
+  nodeEnv: string | undefined = process.env.NODE_ENV
+): string {
+  if (!rawValue) {
+    throw new Error('CLIENT_ORIGIN is required.');
+  }
+  if (rawValue.trim() !== rawValue) {
+    throw new Error(
+      'CLIENT_ORIGIN must be a canonical absolute origin without credentials, path, query, fragment or trailing slash.'
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawValue);
+  } catch {
+    throw new Error(
+      'CLIENT_ORIGIN must be a canonical absolute origin without credentials, path, query, fragment or trailing slash.'
+    );
+  }
+
+  if (
+    !['http:', 'https:'].includes(parsed.protocol) ||
+    parsed.origin !== rawValue ||
+    parsed.username ||
+    parsed.password ||
+    parsed.pathname !== '/' ||
+    parsed.search ||
+    parsed.hash ||
+    parsed.hostname.includes('*') ||
+    parsed.hostname.endsWith('.')
+  ) {
+    throw new Error(
+      'CLIENT_ORIGIN must be a canonical absolute origin without credentials, path, query, fragment or trailing slash.'
+    );
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const isLocal = LOCAL_CLIENT_HOSTS.has(hostname);
+  const allowsLocalHttp = nodeEnv === 'development' || nodeEnv === 'test';
+
+  if (parsed.protocol === 'http:' && (!allowsLocalHttp || !isLocal)) {
+    if (nodeEnv === 'production') {
+      throw new Error('CLIENT_ORIGIN must be an HTTPS origin in production.');
+    }
+    throw new Error('HTTP CLIENT_ORIGIN is allowed only for localhost in development or test.');
+  }
+
+  if (
+    nodeEnv === 'production' &&
+    (isLocal ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.example.com') ||
+      hostname.endsWith('.example.test') ||
+      hostname.endsWith('.invalid'))
+  ) {
+    throw new Error('CLIENT_ORIGIN must not use a local or placeholder hostname in production.');
+  }
+
+  return parsed.origin;
+}
+
 export function assertProductionConfig(): void {
   if (process.env.NODE_ENV !== 'production') return;
 
@@ -142,28 +211,7 @@ export function assertProductionConfig(): void {
   }
   if (process.env.ADMIN_USERNAME) normalizeAdminUsername(process.env.ADMIN_USERNAME);
 
-  let clientOrigin: URL;
-  try {
-    clientOrigin = new URL(process.env.CLIENT_ORIGIN!);
-  } catch {
-    throw new Error('CLIENT_ORIGIN must be a valid absolute URL in production.');
-  }
-  if (clientOrigin.protocol !== 'https:' || clientOrigin.username || clientOrigin.password) {
-    throw new Error('CLIENT_ORIGIN must be an HTTPS origin without embedded credentials.');
-  }
-  if (clientOrigin.pathname !== '/' || clientOrigin.search || clientOrigin.hash) {
-    throw new Error('CLIENT_ORIGIN must contain only the HTTPS origin, without path or query.');
-  }
-  const hostname = clientOrigin.hostname.toLowerCase();
-  if (
-    hostname === 'localhost' ||
-    hostname.endsWith('.localhost') ||
-    hostname.endsWith('.example.com') ||
-    hostname.endsWith('.example.test') ||
-    hostname.endsWith('.invalid')
-  ) {
-    throw new Error('CLIENT_ORIGIN must not use a local or placeholder hostname in production.');
-  }
+  parseClientOrigin(process.env.CLIENT_ORIGIN, 'production');
 
   assertProductionDatabaseUrl(process.env.DATABASE_URL!);
 

@@ -3,9 +3,11 @@
 Une publication est autorisée uniquement lorsque chaque contrôle applicable est
 coché et rattaché au commit candidat.
 
-La stabilisation `v1.0.0` est pilotée dans
-[release-readiness-rc4.md](release-readiness-rc4.md). Aucun candidat ne peut recevoir un
-`GO` tant qu'un constat `P0` ou `P1` de ce registre n'est pas `VERIFIED`.
+La stabilisation `v1.0.0` est pilotée dans le registre courant
+[release-readiness.md](release-readiness.md). Le registre
+[release-readiness-rc4.md](release-readiness-rc4.md) reste une preuve historique
+de la RC4. Aucun candidat ne peut recevoir un `GO` tant qu'un constat `P0` ou
+`P1` du registre courant n'est pas `VERIFIED`.
 
 ## 1. Dépôt
 
@@ -101,7 +103,9 @@ npm run test:e2e
 - [ ] `.env` provient de `.env.release.example` et a le mode `600`
 - [ ] tous les placeholders ont été remplacés
 - [ ] `BUILD_SHA` est égal à `git rev-parse HEAD`
-- [ ] `CLIENT_ORIGIN` cible le domaine HTTPS réel
+- [ ] `CLIENT_ORIGIN` est l'origine HTTPS canonique exacte du domaine réel
+      (sans wildcard, credentials, chemin, query, fragment, port HTTPS par
+      défaut explicite ni slash final)
 - [ ] `CADDY_DOMAIN` cible ce domaine avec le frontal intégré, ou Caddy est
       désactivé par l'override Nginx hôte
 - [ ] `VITE_API_URL` est vide pour l'API same-origin
@@ -126,8 +130,10 @@ npm run test:e2e
 - [ ] healthchecks backend, frontend et PostgreSQL passent
 - [ ] les logs sont bornés par rotation
 - [ ] ShellCheck valide tous les scripts shell suivis
-- [ ] les deux advisories React Router modérées restent rattachées à l'issue `#29`
-      sans migration React Router 7 ni `npm audit fix --force`
+- [ ] les deux seules exceptions upstream high, `GHSA-qwww-vcr4-c8h2` pour la
+      surface Router RSC absente et `GHSA-mh99-v99m-4gvg` pour l'outillage
+      Brace dev-only, satisfont la garde RC5 bornée au 31 août 2026, sans
+      `npm audit fix --force`
 
 ## 8. Recette manuelle
 
@@ -153,9 +159,17 @@ npm run test:e2e
 
 ## 10. Publication
 
+- [ ] les réglages distants de
+      [github-release-protection-checklist.md](github-release-protection-checklist.md)
+      sont prouvés (SHA pins, rulesets, checks et environnements protégés)
 - [ ] CI GitHub verte sur le SHA exact à publier, sur `main`
 - [ ] commit et message de publication relus
 - [ ] tag de version créé sur ce SHA (`v1.0.0-rc.N` puis `v1.0.0`)
+- [ ] workflow `Release` lancé explicitement depuis `main` avec ce tag dans
+      l'entrée `tag` (jamais depuis la ref du tag)
+- [ ] en cas d'échec après création de la draft de réservation, ne pas supprimer
+      la draft ni réutiliser le tag : diagnostiquer puis publier une nouvelle
+      version
 - [ ] le workflow `Release` a construit et poussé les images GHCR sans échec
 - [ ] la release GitHub référence les deux digests d'images immuables
 - [ ] déploiement effectué par image de registry épinglée par digest

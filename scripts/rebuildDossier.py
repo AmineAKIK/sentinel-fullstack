@@ -675,7 +675,7 @@ def rebuild(args: argparse.Namespace) -> None:
     )
     architecture_replacements = {
         "—  Conteneurisation de la distribution autonome": "— Distribution autonome : Docker Compose orchestre PostgreSQL, le backend, le frontend servi par Nginx et Caddy. Dans cette variante, Caddy constitue le point d'entrée HTTPS de l'application.",
-        "—  Instance publique de démonstration": "— Instance publique de démonstration : le VPS exécute trois conteneurs — PostgreSQL, backend et frontend. Un Nginx installé sur l'hôte assure HTTPS et relaie les requêtes vers les ports liés uniquement à 127.0.0.1 ; Caddy est désactivé sur cette instance.",
+        "—  Instance publique de démonstration": "— Instance publique de démonstration : l'observation publique du 30 juillet 2026 prouve un frontal Nginx sur 80/443 et le SHA RC4 encore servi. Sans accès SSH nominatif, les fichiers Compose, conteneurs, binds, images et digests internes ne sont pas affirmés ; le runbook avec Nginx hôte reste le contrat normatif du prochain déploiement.",
         "—  Reverse proxy et exposition réseau": "— Exposition réseau : la topologie dépend du mode de déploiement. Caddy est le proxy de la distribution autonome ; Nginx hôte remplit ce rôle sur l'instance publique. PostgreSQL n'est jamais exposé publiquement.",
         "—  Front-end  en production": "— Frontend : Vite réalise le build statique ; Nginx sert les fichiers compilés et redirige les routes de la SPA vers index.html.",
         "—  Environnement de production": "— Hébergement : sentinel.akiksystems.fr est une instance publique de démonstration sur VPS Linux. Elle prouve le déploiement technique mais ne constitue pas un déploiement dans une usine ni une validation par l'entreprise observée.",
@@ -771,7 +771,7 @@ def rebuild(args: argparse.Namespace) -> None:
     replace_paragraph(
         body,
         "La logique dynamique (état, appels API, permissions conditionnelles)",
-        "Les états, appels API et permissions les plus complexes sont regroupés dans des hooks React réutilisables. useIncidentPermissions centralise les treize permissions directement utiles au volet incident et compose deux groupes supplémentaires pour l'arbitrage.",
+        "Les états, appels API et permissions les plus complexes sont regroupés dans des hooks React réutilisables. useIncidentPermissions centralise les quatorze permissions directement utiles au volet incident et compose deux groupes supplémentaires pour l'arbitrage.",
     )
     permissions_table = find_body_element(body, "export function useIncidentPermissions")
     permissions_code = """export function useIncidentPermissions(
@@ -781,11 +781,41 @@ def rebuild(args: argparse.Namespace) -> None:
   isResponsable: boolean
 ) {
   const canRequestEdit = canPerform(userRole, 'requestEdit', incident, userId);
-  const canTake = canPerform(userRole, 'take', incident);
+  const canDirectEdit = canPerform(userRole, 'directEdit', incident);
+  const canResponsableEdit = canPerform(userRole, 'responsableEdit', incident);
+  const canWithdrawEdit = canPerform(userRole, 'withdrawEdit', incident, userId);
+  const canRequestCancel = canPerform(userRole, 'requestCancel', incident, userId);
+  const canWithdrawCancel = canPerform(userRole, 'withdrawCancel', incident, userId);
+  const canCancel = canPerform(userRole, 'cancel', incident);
+  const canTake = canPerform(userRole, 'take', incident, userId);
+  const canSetPending = canPerform(userRole, 'setPending', incident);
+  const canResume = canPerform(userRole, 'resume', incident);
   const canClose = canPerform(userRole, 'close', incident);
   const canSetPriority = canPerform(userRole, 'setPriority', incident);
+  const canEditResponsibleComment =
+    canPerform(userRole, 'responsibleComment', incident);
+  const canInvalidateClosed =
+    canPerform(userRole, 'invalidateClosed', incident);
+
+  const canReviewEditRequest =
+    isResponsable &&
+    incident.edit_request != null &&
+    (canPerform(userRole, 'approveEdit', incident) ||
+      canPerform(userRole, 'rejectEdit', incident));
+  const canReviewCancelRequest =
+    isResponsable &&
+    incident.cancel_request === true &&
+    (canPerform(userRole, 'approveCancel', incident) ||
+      canPerform(userRole, 'rejectCancel', incident));
+
   const hasWorkflowActions = canTake || canSetPending || canResume || canClose || canSetPriority;
-  return { canRequestEdit, canTake, canClose, canSetPriority, hasWorkflowActions };
+  return {
+    canRequestEdit, canDirectEdit, canResponsableEdit, canWithdrawEdit,
+    canRequestCancel, canWithdrawCancel, canCancel, canTake, canSetPending,
+    canResume, canClose, canSetPriority, canEditResponsibleComment,
+    canInvalidateClosed, canReviewEditRequest, canReviewCancelRequest,
+    hasWorkflowActions,
+  };
 }"""
     permissions_index = list(body).index(permissions_table)
     body.remove(permissions_table)
@@ -800,16 +830,17 @@ def rebuild(args: argparse.Namespace) -> None:
     replace_paragraph(
         body,
         "backend/src/modules/workshop/ workshop.policy.ts",
-        "backend/src/modules/workshop/workshop.policy.ts centralise les dix-huit actions du cycle de vie d'un incident. Les gardes de routes et les permissions des autres modules restent dans leurs middlewares ou services dédiés.",
+        "backend/src/modules/workshop/workshop.policy.ts centralise les dix-neuf actions du cycle de vie d'un incident. Les gardes de routes et les permissions des autres modules restent dans leurs middlewares ou services dédiés.",
     )
     policy_table = find_body_element(body, "case  ‘ CANCEL")
     policy_code = """case 'CANCEL':
   // A PENDING incident requires a RESPONSABLE override.
   if (incident.status === 'PENDING') {
-    return workshopRole === 'RESPONSABLE';
+    return workshopRole === 'RESPONSABLE' && !hasPendingArbitration(incident);
   }
   return (
     isActiveIncident(incident) &&
+    !hasPendingArbitration(incident) &&
     !incident.is_taken &&
     (workshopRole === 'RESPONSABLE' || workshopRole === 'MAINTENANCE')
   );"""
@@ -828,8 +859,14 @@ def rebuild(args: argparse.Namespace) -> None:
   if (['CLOSED', 'CANCELED', 'INVALIDATED'].includes(current.status)) {
     return { kind: 'forbidden' as const };
   }
-  await workshopRepository.followIncidentData(incidentId, actorUserId, client);
-  await logIncidentEvent(incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client);
+  const changed = await workshopRepository.followIncidentData(
+    incidentId, actorUserId, client
+  );
+  if (changed) {
+    await logIncidentEvent(
+      incidentId, actorUserId, 'INCIDENT_FOLLOWED', {}, client
+    );
+  }
   return { kind: 'ok' as const };
 });"""
     follow_index = list(body).index(follow_table)
@@ -910,7 +947,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
         ["A03 — Injection", "Valeurs SQL liées ; fragments structurels limités à des choix internes"],
         ["A04 — Conception non sécurisée", "Matrice de permissions, validation et invariants PostgreSQL"],
         ["A05 — Mauvaise configuration", "assertProductionConfig, origines contrôlées et services internes non exposés"],
-        ["A06 — Composants vulnérables", "Dependabot hebdomadaire et npm audit --audit-level=high dans les deux jobs"],
+        ["A06 — Composants vulnérables", "Dependabot hebdomadaire, audits npm de production en CI et analyse séparée des vulnérabilités de l'outillage"],
         ["A07 — Authentification", "Bcrypt, codes temporaires, limitation de tentatives et révocation par session_version"],
         ["A08 — Intégrité logicielle", "Lockfiles, npm ci, builds Docker en CI et migrations versionnées"],
         ["A09 — Journalisation", "Événements horodatés avec acteur et journal d'administration"],
@@ -929,13 +966,16 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     security_watch = find_body_element(body, "À COMPLÉTER Décrivez ici votre démarche réelle de veille")
     watch_nodes = [
         make_paragraph(
-            "La veille sécurité repose d'abord sur des contrôles automatisés et traçables : Dependabot analyse chaque semaine les dépendances npm, les Dockerfiles et les actions GitHub ; les images épinglées uniquement dans Compose font l'objet d'une revue manuelle. La CI exécute npm audit avec un seuil high ; les avis de sécurité npm et les recommandations OWASP servent de grille lors des audits de publication. Pour une exploitation en entreprise, cette veille doit être complétée par les bulletins CERT-FR/ANSSI pertinents pour Node.js, PostgreSQL, Docker et le système du VPS.",
+            "Les contrôles automatisés vérifiables dans le dépôt comprennent Dependabot hebdomadaire pour les dépendances npm, les Dockerfiles et les actions GitHub, ainsi que `npm audit --omit=dev --audit-level=high` dans la CI pour les dépendances réellement expédiées. L'audit complet de l'outillage est analysé séparément : il ne doit être ni assimilé à l'artefact runtime, ni qualifié de faux positif.",
         ),
         make_paragraph(
-            "Exemple concret : l'audit d'authentification a identifié des incohérences de révocation et de contrôle des actions sensibles. Les commits 99606b8 et dd17b81 ont ajouté la revalidation des sessions et l'exigence du mot de passe administrateur avant certaines révocations. L'audit final du dossier a ensuite conduit à incrémenter session_version lors d'une réinitialisation de mot de passe ou d'un changement d'activation, afin qu'un ancien JWT ne puisse pas redevenir valable.",
+            "Des corrections versionnées illustrent ce contrôle : les commits 99606b8 et dd17b81 ont ajouté la revalidation des sessions et l'exigence du mot de passe administrateur avant certaines révocations. L'audit final du dossier a ensuite conduit à incrémenter session_version lors d'une réinitialisation de mot de passe ou d'un changement d'activation, afin qu'un ancien JWT ne puisse pas redevenir valable.",
         ),
         make_paragraph(
-            "La démarche suivie est : alerte ou constat → reproduction → évaluation de l'impact → correctif minimal → test de non-régression → revue du texte public et du dossier. En juillet 2026, les audits npm backend et frontend passent au seuil high ; deux advisories React Router modérées restent suivies dans l'issue #29 sans migration majeure dans la RC4. Cette situation reste datée et doit être revérifiée avant chaque livraison.",
+            "Au 30 juillet 2026, les audits sont évalués par une politique fermée : `GHSA-qwww-vcr4-c8h2` est bornée à la surface Router RSC absente et `GHSA-mh99-v99m-4gvg` aux chaînes Brace dev-only absentes du runtime et des images. Toute autre advisory high/critical, dérive de surface ou expiration après le 31 août 2026 fait échouer la garde.",
+        ),
+        make_paragraph(
+            "[À COMPLÉTER — personnel] Décrire uniquement la veille réellement pratiquée par l'auteur : sources consultées, fréquence et exemple personnel vérifiable."
         ),
     ]
     watch_index = list(body).index(security_watch)
@@ -974,6 +1014,9 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     retention_placeholder = find_body_element(body, "À COMPLÉTER Décision de politique de rétention")
     retention_nodes = [
         make_paragraph("Politique de conservation proposée", style="Titre3"),
+        make_paragraph(
+            "[À COMPLÉTER — décision d'exploitation] Faire valider par le responsable de traitement les durées, critères de purge et obligations applicables avant tout usage réel."
+        ),
         make_table(
             [
                 ["Catégorie", "Critère de conservation et action"],
@@ -1040,10 +1083,13 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     evidence_placeholder = find_body_element(body, "À COMPLÉTER Captures d'écran des résultats")
     evidence_nodes = [
         make_paragraph(
-            f"Vérification locale du {args.audit_date} sur la version corrigée : {args.backend_unit} tests unitaires backend, {args.backend_integration} cas d'intégration PostgreSQL, {args.frontend} tests frontend et {args.e2e} parcours navigateur passants sur le candidat code {args.commit}. La preuve CI distante et les captures de la RC4 réellement déployée restent à joindre après autorisation. Cette formulation distingue la preuve locale de la preuve externe.",
+            f"Vérification locale du {args.audit_date} sur la version corrigée : {args.backend_unit} tests unitaires backend, {args.backend_integration} cas d'intégration PostgreSQL, {args.frontend} tests frontend et {args.e2e} parcours navigateur passants sur le candidat code {args.commit}. La preuve CI distante et les captures de la RC5 réellement déployée restent à joindre après autorisation. Cette formulation distingue la preuve locale de la preuve externe.",
         ),
         make_paragraph(
             "Le jeu d'essai détaillé et reproductible est versionné dans docs/jeu-essai.md. Les valeurs de limite, codes HTTP et préconditions ont été resynchronisés avec le code courant avant la production de ce dossier.",
+        ),
+        make_paragraph(
+            "[À COMPLÉTER — preuve externe] Joindre les captures de la CI distante verte et de la RC5 réellement déployée, avec le SHA visible."
         ),
     ]
     evidence_index = list(body).index(evidence_placeholder)
@@ -1086,12 +1132,12 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     replace_paragraph(
         body,
         "Sentinel est déployé en production sur un VPS",
-        "Sentinel dispose d'une instance publique de démonstration sur un VPS Linux, accessible via sentinel.akiksystems.fr. Cette preuve de déploiement technique ne signifie pas que l'application est exploitée par l'entreprise industrielle à l'origine de l'observation.",
+        "La documentation prévoit une instance publique de démonstration sur un VPS Linux à l'adresse sentinel.akiksystems.fr. La lecture publique du 30 juillet 2026 observe un frontal Nginx et la santé du SHA RC4 encore servi ; l'état interne Compose/conteneurs/binds/digests et tout déploiement RC5 restent externes sans accès SSH nominatif.",
     )
     replace_paragraph(
         body,
         "Quatre services Docker Compose",
-        "La distribution autonome comporte quatre services Docker Compose : PostgreSQL, backend, frontend/Nginx et Caddy. L'instance publique utilise trois conteneurs et un Nginx hôte ; elle ne lance pas Caddy.",
+        "Deux topologies cibles sont documentées et ne doivent pas être mélangées : le mode autonome comporte PostgreSQL, backend, frontend/Nginx et Caddy ; le mode avec Nginx hôte désactive Caddy et lie backend et frontend en loopback via les ports `SENTINEL_BACKEND_BIND_PORT` et `SENTINEL_FRONTEND_BIND_PORT`. Le frontal public observé correspond à la topologie B au bord ; son état interne reste à constater séparément.",
     )
     deploy_heading = find_body_element(body, "14.3 — CI/CD et migrations", exact=True)
     set_paragraph_text(first_paragraph(deploy_heading), "14.3 — Intégration continue, migrations et sauvegardes")
@@ -1101,21 +1147,12 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
         "GitHub Actions construit et teste à chaque push ou pull request ciblé. Les migrations sont appliquées de façon idempotente au démarrage du backend et PostgreSQL utilise un volume persistant. Les scripts de sauvegarde et restauration sont fournis et exercés sur un projet PostgreSQL jetable ; leur planification, leur copie hors site et leur preuve sur l'infrastructure cible restent des responsabilités d'exploitation à démontrer séparément.",
     )
 
-    # Bilan personnel : aucun texte de consigne ne subsiste.
+    # Bilan personnel : préserver le marqueur, le dépôt ne prouve pas l'expérience de l'auteur.
     conclusion_placeholder = find_body_element(body, "À COMPLÉTER Votre propre bilan")
     conclusion_nodes = [
         make_paragraph("15.2 — Bilan personnel", style="Titre2"),
         make_paragraph(
-            "Sentinel m'a appris qu'une application métier ne se résume pas à faire fonctionner un formulaire et une base de données. Le plus difficile a été de transformer une observation de terrain en règles explicites : qui peut agir, dans quel état, avec quelle trace et quelle conséquence pour les autres utilisateurs. Les corrections les plus formatrices n'ont pas ajouté de fonctionnalités visibles ; elles ont supprimé des ambiguïtés, fermé des fenêtres de concurrence et rendu les décisions vérifiables.",
-        ),
-        make_paragraph(
-            "Si je recommençais, je formaliserais plus tôt le modèle de permissions, le cycle de vie et le plan de tests d'intégration. La première version m'a permis de valider le besoin, mais elle mélangeait prototype et produit. La reconstruction a montré l'intérêt d'accepter de repartir sur des fondations plus simples plutôt que d'empiler des correctifs sur une structure devenue trop limitée.",
-        ),
-        make_paragraph(
-            "Le projet reste perfectible : la purge RGPD doit être configurée pour un contexte d'exploitation réel, les sauvegardes hors site et les restaurations périodiques doivent être prouvées sur chaque environnement, et certaines écritures périphériques pourraient être harmonisées avec le modèle transactionnel principal. Identifier ces limites fait partie du résultat : je peux aujourd'hui distinguer ce qui est démontré, ce qui est seulement prévu et ce qui nécessite une décision de l'organisation.",
-        ),
-        make_paragraph(
-            "Enfin, Sentinel représente pour moi le passage d'un problème vécu comme conducteur de ligne à un système conçu, développé, testé, documenté et déployé. Cette continuité entre expérience métier et développement est l'apport principal du projet et la raison pour laquelle je peux en défendre chaque choix devant le jury.",
+            "[À COMPLÉTER — entièrement personnel] Rédiger le bilan sincère de l'auteur : apprentissages, difficultés les plus formatrices, choix qui seraient revus et lien personnel avec le besoin industriel. Aucun texte à la première personne n'est généré automatiquement.",
         ),
     ]
     conclusion_index = list(body).index(conclusion_placeholder)
@@ -1197,7 +1234,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
         "media/image40.png": "Interface réelle du rôle OPERATOR",
         "media/image41.png": "Interface réelle du rôle MAINTENANCE",
         "media/image42.png": "Interface réelle du rôle RESPONSABLE",
-        "media/image43.png": "Cinq jobs GitHub Actions réussis au commit audité",
+        "media/image43.png": f"{args.ci_jobs} jobs GitHub Actions réussis au commit audité",
         "media/sequence-workflow-simplifie.png": "Séquence simplifiée du workflow incident",
         "media/auth-jwt-flow.png": "Séquence d'authentification JWT et cookie HttpOnly",
     }
@@ -1261,6 +1298,9 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
         make_paragraph(
             "Les planches suivantes complètent les vues retenues dans le corps : comparaison des rôles, authentification, Board, Pilotage, Historique, Administration et responsive. Elles appartiennent au même fichier Figma et correspondent au commit fonctionnel audité."
         ),
+        make_paragraph(
+            "[À COMPLÉTER — ressources externes] Vérifier et joindre les maquettes, captures et exports réellement retenus pour la version remise."
+        ),
     ]
     for target, image_element in moved_images:
         if target in {"media/image33.png", "media/image35.png", "media/image37.png"}:
@@ -1323,9 +1363,9 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
     add_captions_after_images(body, rel_targets, captions, args.source_label)
     update_alt_text(body, rel_targets, captions)
 
-    # Aucun marqueur de brouillon ne doit subsister.
+    # Les marqueurs personnels, externes et de pagination sont conservés volontairement.
     full_text = element_text(body)
-    forbidden_markers = ["À COMPLÉTER", "RESPONSIBLE", "oseas", "return 😉", "ose : OPERATOR"]
+    forbidden_markers = ["RESPONSIBLE", "oseas", "return 😉", "ose : OPERATOR"]
     remaining = [marker for marker in forbidden_markers if marker in full_text]
     if remaining:
         raise ValueError(f"Marqueurs interdits encore présents: {remaining}")

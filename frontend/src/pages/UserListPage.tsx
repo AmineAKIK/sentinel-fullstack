@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import CreateUserModal from '../components/CreateUserModal';
@@ -6,13 +6,12 @@ import Modal from '../components/Modal';
 import FilterSummary, { FilterChip } from '../components/FilterSummary';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorBanner from '../components/ui/ErrorBanner';
-import SuccessBanner from '../components/ui/SuccessBanner';
 import SelectField from '../components/ui/SelectField';
 import Spinner from '../components/ui/Spinner';
 import { listAccounts } from '../api/accounts';
 import { SentinelUser, Role, SortOrder } from '../types';
 import { formatDate } from '../utils/date';
-import { formatRoleLabel, ROLE_LABELS } from '../utils/labels';
+import { ASSIGNABLE_ROLES, formatRoleLabel, ROLE_LABELS } from '../utils/labels';
 import { makeSortCodec } from '../utils/sortCodec';
 import { UserSortField, compareUsers } from '../utils/userSort';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -36,7 +35,6 @@ export default function UserListPage() {
   const [users, setUsers] = useState<SentinelUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -48,7 +46,6 @@ export default function UserListPage() {
   const [draftSortValue, setDraftSortValue] = useState('created_desc');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [draftStatus, setDraftStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const successTimerRef = useRef<number | null>(null);
 
   const fetchUsers = useCallback(
     async (signal?: AbortSignal) => {
@@ -72,22 +69,6 @@ export default function UserListPage() {
     void fetchUsers(controller.signal);
     return () => controller.abort();
   }, [fetchUsers]);
-
-  useEffect(
-    () => () => {
-      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
-    },
-    []
-  );
-
-  function showSuccess(message: string): void {
-    if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
-    setSuccessMsg(message);
-    successTimerRef.current = window.setTimeout(() => {
-      setSuccessMsg('');
-      successTimerRef.current = null;
-    }, 5000);
-  }
 
   function handleSortChange(value: string) {
     const { sort: s, order: o } = userSortCodec.decode(value);
@@ -202,11 +183,6 @@ export default function UserListPage() {
     return order === 'asc' ? 'Tri ascendant' : 'Tri descendant';
   }
 
-  function _headerSortIndicator(field: UserSortField): string {
-    if (sort !== field) return '↕';
-    return order === 'asc' ? '↑' : '↓';
-  }
-
   function headerAriaSort(field: UserSortField): 'ascending' | 'descending' | 'none' {
     if (sort !== field) return 'none';
     return order === 'asc' ? 'ascending' : 'descending';
@@ -222,8 +198,6 @@ export default function UserListPage() {
             + Ajouter un utilisateur
           </button>
         </div>
-
-        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
 
         <div className="filters-row">
           <div className="filter-group">
@@ -385,7 +359,6 @@ export default function UserListPage() {
           onSuccess={(user) => {
             setShowCreate(false);
             setUsers((prev) => [user, ...prev]);
-            showSuccess(`Utilisateur ${user.first_name} ${user.last_name} créé avec succès.`);
           }}
         />
       )}
@@ -407,19 +380,22 @@ export default function UserListPage() {
           }
         >
           <div className="form-group">
-            <label className="form-label">Role</label>
+            <label className="form-label" htmlFor="user-role-filter">
+              Rôle
+            </label>
             <SelectField
+              id="user-role-filter"
               value={draftRole}
               onChange={(value) => setDraftRole(value as Role | '')}
-              options={[
-                { value: '', label: 'Tous' },
-                ...Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label })),
-              ]}
+              options={[{ value: '', label: 'Tous' }, ...ASSIGNABLE_ROLES]}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Statut</label>
+            <label className="form-label" htmlFor="user-status-filter">
+              Statut
+            </label>
             <SelectField
+              id="user-status-filter"
               value={draftStatus}
               onChange={(value) => setDraftStatus(value as 'all' | 'active' | 'inactive')}
               options={[
@@ -430,8 +406,11 @@ export default function UserListPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Trier par</label>
+            <label className="form-label" htmlFor="user-sort-filter">
+              Trier par
+            </label>
             <SelectField
+              id="user-sort-filter"
               value={draftSortValue}
               onChange={setDraftSortValue}
               options={[

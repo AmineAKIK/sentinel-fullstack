@@ -13,12 +13,12 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: 0,
   workers: 1,
   reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:5174',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   projects: [
     {
@@ -36,6 +36,14 @@ export default defineConfig({
     {
       command: 'VITE_API_URL=http://127.0.0.1:3100 npm run dev -- --port 5174 --strictPort',
       url: 'http://127.0.0.1:5174',
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      // Origine sœur locale, dédiée à la preuve navigateur CSRF. Elle sert le
+      // même frontend mais n'est jamais autorisée par CLIENT_ORIGIN.
+      command: 'npm run dev -- --host 127.0.0.1 --port 5175 --strictPort',
+      url: 'http://127.0.0.1:5175',
       reuseExistingServer: false,
       timeout: 120_000,
     },

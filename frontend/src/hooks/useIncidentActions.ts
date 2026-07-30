@@ -120,7 +120,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
   async function handleApplyEditRequest() {
     if (!modal.state.reviewIncident) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
-      modal.setReviewError('Modification interdite apres prise en charge.');
+      modal.setReviewError('Modification interdite après prise en charge.');
       return;
     }
     modal.setReviewError('');
@@ -148,7 +148,7 @@ export function useIncidentActions(opts: IncidentActionsOptions) {
   async function handleRejectEditRequest(decisionReason: string) {
     if (!modal.state.reviewIncident) return;
     if (isMaintenance && modal.state.reviewIncident.is_taken) {
-      modal.setReviewError('Modification interdite apres prise en charge.');
+      modal.setReviewError('Modification interdite après prise en charge.');
       return;
     }
     modal.setReviewError('');

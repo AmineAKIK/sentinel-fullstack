@@ -26,10 +26,9 @@ export function Sparkline({ data, tone, width = 80, height = 28 }: SparklineProp
         : 'var(--color-success)';
   return (
     <svg
-      width={width}
-      height={height}
       className="pilotage-sparkline"
       aria-hidden="true"
+      preserveAspectRatio="none"
       viewBox={`0 0 ${width} ${height}`}
     >
       <polyline

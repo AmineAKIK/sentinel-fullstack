@@ -7,9 +7,10 @@
 # dans l'image backend) — aucun contrôle dupliqué en bash, aucune divergence
 # possible — puis ajoute les invariants d'infrastructure que cette garde ne peut
 # pas voir : POSTGRES_PASSWORD == mot de passe de DATABASE_URL, BUILD_SHA des
-# build-args, images épinglées par digest, et surtout la CORRESPONDANCE entre le
-# digest déployé et le BUILD_SHA attendu (label OCI + SHA runtime), enfin la
-# topologie réseau/ports.
+# build-args, images épinglées par digest, et surtout la CORRESPONDANCE entre
+# chaque service et l'image déployée (digest exact, révision source, architecture
+# et identité composant OCI ; SHA runtime backend), enfin la topologie
+# réseau/ports.
 #
 # Aucune valeur de secret n'est jamais placée dans argv, un message ou un log :
 # la configuration résolue (qui contient des secrets) ne circule que par un
@@ -169,16 +170,16 @@ else
   bad "une image backend/frontend n'est pas épinglée par un digest @sha256: + 64 hex (release registry exigée)"
 fi
 
-# 6. CORRESPONDANCE digest ↔ BUILD_SHA attendu. Le contrôle #4 vérifie que le
-#    build-arg BUILD_SHA est bien formé et #5 que les images sont épinglées par
-#    digest — mais rien ne garantit que ces digests désignent des images
-#    RÉELLEMENT construites pour ce SHA. Une release antérieure a un digest valide
-#    et un SHA valide : sans ce contrôle, on déploierait de mauvaises images sans
-#    le voir avant le health post-remplacement. On exige donc, pour backend et
-#    frontend, que le label OCI org.opencontainers.image.revision de l'image
-#    déployée soit égal au BUILD_SHA attendu, et pour le backend que le BUILD_SHA
-#    embarqué au runtime le soit aussi. Le SHA et les références d'images ne sont
-#    pas des secrets : ils peuvent apparaître.
+# 6. IDENTITÉ DES IMAGES. Les contrôles #4 et #5 prouvent seulement que le SHA
+#    attendu et les références par digest ont une forme valide. Ils ne prouvent
+#    pas qu'un digest désigne le bon composant, la bonne révision ni une
+#    architecture exécutable sur l'hôte. Pour chaque service, on confronte donc :
+#      - la référence digest exacte réellement inspectée ;
+#      - org.opencontainers.image.revision au SHA source attendu ;
+#      - l'architecture de l'image à celle du moteur Docker cible ;
+#      - org.opencontainers.image.title à sentinel-backend/sentinel-frontend.
+#    Le backend conserve en plus sa preuve BUILD_SHA au runtime. Le SHA, les
+#    architectures et les références d'images ne sont pas des secrets.
 #
 # Extrait (sans secret) le SHA attendu et les images par digest depuis la config.
 EXPECTED_SHA="$(json_check <<'PY'
@@ -199,6 +200,7 @@ PY
 )"
 
 sha_ok() { [[ "$1" =~ ^[a-f0-9]{40}$ ]]; }
+EXPECTED_ARCH="$(docker version --format '{{.Server.Arch}}' 2>/dev/null || true)"
 
 if ! sha_ok "$EXPECTED_SHA"; then
   # Sans SHA attendu bien formé (déjà signalé par #4), on ne peut pas comparer.
@@ -208,6 +210,10 @@ elif [[ -z "$DIGEST_IMAGES" ]]; then
   bad "aucune image par digest à confronter au BUILD_SHA (release registry exigée)"
 else
   MISMATCH=0
+  if [[ -z "$EXPECTED_ARCH" ]]; then
+    bad "impossible de déterminer l'architecture du moteur Docker cible"
+    MISMATCH=1
+  fi
   while IFS=$'\t' read -r svc ref; do
     [[ -n "$svc" ]] || continue
     # L'image doit être présente localement (procédure : pull non destructif
@@ -217,11 +223,32 @@ else
       MISMATCH=1
       continue
     fi
-    label="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$ref" 2>/dev/null || true)"
-    if [[ "$label" != "$EXPECTED_SHA" ]]; then
-      bad "label OCI de $svc (${label:-absent}) != BUILD_SHA attendu ($EXPECTED_SHA)"
+
+    repo_digests="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$ref" 2>/dev/null || true)"
+    if ! grep -Fxq -- "$ref" <<< "$repo_digests"; then
+      bad "digest inspecté de $svc ne contient pas la référence exacte demandée ($ref)"
       MISMATCH=1
     fi
+
+    revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$ref" 2>/dev/null || true)"
+    if [[ "$revision" != "$EXPECTED_SHA" ]]; then
+      bad "révision OCI de $svc (${revision:-absente}) != SHA source attendu ($EXPECTED_SHA)"
+      MISMATCH=1
+    fi
+
+    architecture="$(docker image inspect --format '{{.Architecture}}' "$ref" 2>/dev/null || true)"
+    if [[ -z "$EXPECTED_ARCH" || "$architecture" != "$EXPECTED_ARCH" ]]; then
+      bad "architecture d'image de $svc (${architecture:-absente}) != architecture Docker cible (${EXPECTED_ARCH:-indéterminée})"
+      MISMATCH=1
+    fi
+
+    expected_component="sentinel-$svc"
+    component="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.title" }}' "$ref" 2>/dev/null || true)"
+    if [[ "$component" != "$expected_component" ]]; then
+      bad "identité OCI du $svc (${component:-absente}) != composant attendu ($expected_component)"
+      MISMATCH=1
+    fi
+
     if [[ "$svc" == "backend" ]]; then
       runtime_sha="$(docker run --rm --entrypoint printenv "$ref" BUILD_SHA 2>/dev/null || true)"
       if [[ "$runtime_sha" != "$EXPECTED_SHA" ]]; then
@@ -231,7 +258,7 @@ else
     fi
   done <<< "$DIGEST_IMAGES"
   if [[ "$MISMATCH" -eq 0 ]]; then
-    ok "digests déployés cohérents avec le BUILD_SHA attendu (label OCI + SHA runtime)"
+    ok "images backend/frontend conformes (identité OCI, SHA source, architecture et digest ; SHA runtime backend)"
   fi
 fi
 

@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "policy_id": "sentinel-rc5-bounded-dependency-exceptions",
+  "risk_owner": "repository-owner:AmineAKIK",
+  "expires_on": "2026-08-31",
+  "severity_floor": "high",
+  "lockfiles": {
+    "backend/package-lock.json": {
+      "sha256": "728de5f41b71805425aa19d2ca9ef5ac00bf086d7464fed50be8157f9cc21251"
+    },
+    "frontend/package-lock.json": {
+      "sha256": "d63703ba6849bff0d9a641a7b523b3cb16ca2e45d578db07fb21a65c74c70b79"
+    }
+  },
+  "router_contract": {
+    "declared_package": "react-router-dom",
+    "declared_version": "7.18.2",
+    "resolved_packages": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1",
+      "react-router": "7.18.2",
+      "react-router-dom": "7.18.2"
+    },
+    "react_major": 18,
+    "mode": "declarative",
+    "production_entrypoint": "frontend/src/main.tsx",
+    "required_entrypoint_symbol": "BrowserRouter",
+    "forbidden_data_router_symbols": [
+      "createBrowserRouter",
+      "createHashRouter",
+      "HydratedRouter",
+      "RouterProvider"
+    ],
+    "forbidden_rsc_packages": [
+      "@react-router/dev",
+      "@react-router/node",
+      "@react-router/serve",
+      "@vitejs/plugin-rsc",
+      "react-server-dom-parcel",
+      "react-server-dom-vite",
+      "react-server-dom-webpack"
+    ],
+    "forbidden_rsc_symbols": [
+      "unstable_RSCHydratedRouter",
+      "unstable_RSCRouteConfig",
+      "unstable_RSCStaticRouter",
+      "unstable_createCallServer",
+      "unstable_getRequest",
+      "unstable_getRSCStream",
+      "unstable_matchRSCServerRequest",
+      "unstable_routeRSCServerRequest"
+    ]
+  },
+  "brace_contract": {
+    "forbidden_runtime_packages": [
+      "brace-expansion",
+      "glob",
+      "minimatch"
+    ],
+    "installations": {
+      "backend": {
+        "node_modules/brace-expansion": {
+          "version": "5.0.8",
+          "classification": "patched-dev"
+        },
+        "node_modules/glob/node_modules/brace-expansion": {
+          "version": "2.1.2",
+          "classification": "exception-dev"
+        },
+        "node_modules/test-exclude/node_modules/brace-expansion": {
+          "version": "1.1.16",
+          "classification": "exception-dev"
+        }
+      },
+      "frontend": {
+        "node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion": {
+          "version": "5.0.8",
+          "classification": "patched-dev"
+        },
+        "node_modules/brace-expansion": {
+          "version": "1.1.16",
+          "classification": "exception-dev"
+        }
+      }
+    },
+    "exception_chains": {
+      "backend": [
+        [
+          {
+            "path": "",
+            "name": "sentinel-backend",
+            "version": "1.0.0",
+            "dependency_scope": "devDependencies"
+          },
+          {
+            "path": "node_modules/jest",
+            "name": "jest",
+            "version": "30.4.2"
+          },
+          {
+            "path": "node_modules/@jest/core",
+            "name": "@jest/core",
+            "version": "30.4.2"
+          },
+          {
+            "path": "node_modules/@jest/reporters",
+            "name": "@jest/reporters",
+            "version": "30.4.1"
+          },
+          {
+            "path": "node_modules/glob",
+            "name": "glob",
+            "version": "10.5.0"
+          },
+          {
+            "path": "node_modules/glob/node_modules/minimatch",
+            "name": "minimatch",
+            "version": "9.0.9"
+          },
+          {
+            "path": "node_modules/glob/node_modules/brace-expansion",
+            "name": "brace-expansion",
+            "version": "2.1.2"
+          }
+        ],
+        [
+          {
+            "path": "",
+            "name": "sentinel-backend",
+            "version": "1.0.0",
+            "dependency_scope": "devDependencies"
+          },
+          {
+            "path": "node_modules/ts-jest",
+            "name": "ts-jest",
+            "version": "29.4.11"
+          },
+          {
+            "path": "node_modules/@jest/transform",
+            "name": "@jest/transform",
+            "version": "30.4.1"
+          },
+          {
+            "path": "node_modules/babel-plugin-istanbul",
+            "name": "babel-plugin-istanbul",
+            "version": "7.0.1"
+          },
+          {
+            "path": "node_modules/test-exclude",
+            "name": "test-exclude",
+            "version": "6.0.0"
+          },
+          {
+            "path": "node_modules/test-exclude/node_modules/minimatch",
+            "name": "minimatch",
+            "version": "3.1.5"
+          },
+          {
+            "path": "node_modules/test-exclude/node_modules/brace-expansion",
+            "name": "brace-expansion",
+            "version": "1.1.16"
+          }
+        ]
+      ],
+      "frontend": [
+        [
+          {
+            "path": "",
+            "name": "sentinel-frontend",
+            "version": "1.0.0",
+            "dependency_scope": "devDependencies"
+          },
+          {
+            "path": "node_modules/eslint-plugin-jsx-a11y",
+            "name": "eslint-plugin-jsx-a11y",
+            "version": "6.10.2"
+          },
+          {
+            "path": "node_modules/minimatch",
+            "name": "minimatch",
+            "version": "3.1.5"
+          },
+          {
+            "path": "node_modules/brace-expansion",
+            "name": "brace-expansion",
+            "version": "1.1.16"
+          }
+        ]
+      ]
+    }
+  },
+  "exceptions": [
+    {
+      "advisory": "GHSA-mh99-v99m-4gvg",
+      "package": "brace-expansion",
+      "affected_range": "<=5.0.7",
+      "classification": "upstream-dev-only",
+      "risk_owner": "repository-owner:AmineAKIK",
+      "expires_on": "2026-08-31",
+      "rationale": "The vulnerable installs are confined to exact development-tool chains. Sentinel runtime code and release images neither import nor contain brace-expansion, glob, or minimatch.",
+      "required_scopes": [
+        "backend-full",
+        "frontend-full"
+      ],
+      "forbidden_scopes": [
+        "backend-runtime",
+        "frontend-runtime"
+      ]
+    },
+    {
+      "advisory": "GHSA-qwww-vcr4-c8h2",
+      "package": "react-router",
+      "affected_range": ">=7.12.0 <8.3.0",
+      "classification": "not-applicable",
+      "risk_owner": "repository-owner:AmineAKIK",
+      "expires_on": "2026-08-31",
+      "rationale": "The advisory applies only to unstable React Server Components APIs. Sentinel remains on React 18, React Router 7.18.2 Declarative Mode and does not install or call an RSC API.",
+      "required_scopes": [
+        "frontend-full",
+        "frontend-runtime"
+      ],
+      "forbidden_scopes": [
+        "backend-full",
+        "backend-runtime"
+      ]
+    }
+  ]
+}

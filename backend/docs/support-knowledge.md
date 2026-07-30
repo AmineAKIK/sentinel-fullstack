@@ -28,9 +28,9 @@ en charge.
 
 ### Maintenance
 
-La maintenance prend ou transfère une prise en charge, documente le diagnostic,
-met en attente, reprend et clôture avec une note d'intervention. Elle peut
-modifier un incident non pris ou l'incident qui lui est affecté.
+La maintenance prend ou transfère une prise en charge, met en attente, reprend
+et clôture avec une note d'intervention. Elle peut modifier un incident non pris
+ou l'incident qui lui est affecté.
 
 ### Responsable
 
@@ -92,8 +92,7 @@ refusée pour conflit, ouvrir l'incident déjà présent au lieu d'en créer un 
 
 - **Ouvert, non pris** : personne n'est encore affecté ;
 - **Ouvert, pris en charge** : une maintenance est affectée ;
-- **En attente** : un diagnostic existe mais une pièce, une information ou une
-  action externe manque ;
+- **En attente** : un motif précise la pièce, l'information ou l'action attendue ;
 - **Clôturé** : l'intervention est terminée et documentée ;
 - **Annulé** : la déclaration a été annulée mais reste dans l'historique ;
 - **Invalidé** : un responsable a invalidé une clôture sans rouvrir l'incident.
@@ -103,7 +102,9 @@ refusée pour conflit, ouvrir l'incident déjà présent au lieu d'en créer un 
 - **Prendre en charge** un incident ouvert. Si un autre technicien est affecté,
   l'action effectue un transfert et conserve la trace de l'ancien technicien.
 - **Modifier** un incident non pris ou un incident qui lui est affecté.
-- **Mettre en attente** un incident pris, avec un diagnostic obligatoire.
+- **Mettre en attente** un incident pris, avec un motif obligatoire.
+  `diagnostic` est un champ historique en lecture seule, distinct du motif :
+  aucune action courante ne l'écrit.
 - **Reprendre** un incident en attente avant de poursuivre.
 - **Clôturer** un incident ouvert et pris, avec une note d'intervention
   obligatoire. Un incident en attente doit d'abord être repris.
@@ -134,6 +135,7 @@ pas à la place de la maintenance.
 - retirer sa demande de correction avant décision ;
 - demander l'annulation de sa propre déclaration active, si elle n'est pas prise,
   avec un motif.
+- retirer sa propre demande d'annulation tant qu'elle attend une décision.
 
 L'opérateur ne modifie pas directement sa déclaration après création. La
 correction doit être décidée par un responsable.
@@ -179,10 +181,10 @@ Sur ordinateur, le dossier s'ouvre à côté de la liste. Sur téléphone, il s'
 
 ## Suivre un incident
 
-Le responsable peut suivre un incident pour le retrouver facilement, même après
-sa clôture ou son annulation. Il est automatiquement abonné lorsqu'il crée un
-incident ou prend une décision d'arbitrage. Il peut retirer le suivi à tout
-moment.
+Le responsable active volontairement le suivi d'un incident actif avec l'étoile.
+La création, la priorité, la consigne et les décisions d'arbitrage n'abonnent
+jamais automatiquement. Un incident déjà suivi reste facile à retrouver après sa
+clôture ou son annulation, et le responsable peut retirer ce suivi à tout moment.
 
 ## Historique et Journal
 
@@ -205,8 +207,10 @@ Les incidents annulés ou invalidés ne sont pas comptés comme incidents actifs
 ## Connaissance
 
 La Connaissance regroupe les incidents clôturés qui possèdent une note
-d'intervention exploitable. Chaque fiche montre le contexte, le diagnostic et la
-solution appliquée. Les incidents annulés ou invalidés n'y apparaissent pas.
+d'intervention exploitable. Chaque fiche montre le contexte, un éventuel
+diagnostic historique en lecture seule lorsqu'une ancienne donnée en contient
+un, et la solution appliquée. Les incidents annulés ou invalidés n'y apparaissent
+pas.
 
 ## Board grand écran
 

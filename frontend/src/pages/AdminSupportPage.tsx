@@ -16,11 +16,11 @@ async function handleSend(
 export default function AdminSupportPage() {
   usePageTitle('Assistance administration');
   return (
-    <>
+    <div className="support-page-shell">
       <NavBar />
       <main id="main-content" className="page-container support-page">
         <SupportChat onSend={handleSend} />
       </main>
-    </>
+    </div>
   );
 }

@@ -72,13 +72,15 @@ assert_eq "variable absente -> vide" "" "$(read_env_var "$ENV_FILE" ABSENTE)"
 # On vérifie le VRAI comportement runtime (pas la sortie de `docker compose
 # config`, qui ré-échappe les $ en $$ pour rester ré-injectable et ne reflète
 # donc PAS ce que le conteneur reçoit). `docker compose run` exécute réellement
-# le service et expose la valeur telle que le processus la voit.
+# le service et expose la valeur telle que le processus la voit. L'image de
+# probe est versionnée et épinglée au digest OCI vérifié, comme tous les outils
+# réellement tirés par les six checks de la CI.
 COMPOSE_TEST_DIR="$WORKDIR/compose"
 mkdir -p "$COMPOSE_TEST_DIR"
 cat > "$COMPOSE_TEST_DIR/docker-compose.yml" <<'YAML'
 services:
   probe:
-    image: alpine
+    image: alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
     environment:
       HASH: ${BOARD_ACCESS_CODE_HASH:?set}
 YAML

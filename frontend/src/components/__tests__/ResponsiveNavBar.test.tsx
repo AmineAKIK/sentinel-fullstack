@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ResponsiveNavBar, { NavItem } from '../ResponsiveNavBar';
 
@@ -45,15 +46,23 @@ describe('ResponsiveNavBar', () => {
     );
   });
 
-  it('closes the mobile menu on Escape', () => {
-    renderNav();
+  it('ferme le menu avec la vraie touche Échap et rend le focus au hamburger', async () => {
+    const user = userEvent.setup();
+    const { container } = renderNav();
+    const nav = container.querySelector('.nav-bar');
+    const toggle = screen.getByRole('button', { name: 'Ouvrir le menu' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.click(toggle);
+    expect(nav).toHaveClass('is-open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-    expect(screen.getByRole('button', { name: 'Ouvrir le menu' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
+    await user.tab();
+    expect(screen.getByRole('link', { name: 'Accueil' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+
+    expect(nav).not.toHaveClass('is-open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAccessibleName('Ouvrir le menu');
+    expect(toggle).toHaveFocus();
   });
 });

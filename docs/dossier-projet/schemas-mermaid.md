@@ -15,23 +15,27 @@
 
 Les cardinalités traduisent la nullabilité réelle des clés étrangères. Par exemple,
 `taken_by_user_id`, les cibles des journaux d'administration et `admin_id` sont
-facultatifs en base ; le déclarant, la ligne, l'acteur d'un événement et les clés des
-tables de suivi ou d'arbitrage sont obligatoires.
+facultatifs en base ; le déclarant et la ligne sont obligatoires. L'acteur d'un
+événement est modélisé par un triplet exclusif : utilisateur Atelier, administrateur
+ou système.
 
 ```mermaid
 erDiagram
     ADMIN_ACCOUNTS o|--o{ ACCOUNT_AUDIT_EVENTS : "effectue"
     ADMIN_ACCOUNTS o|--o{ LINE_AUDIT_EVENTS : "effectue"
     ADMIN_ACCOUNTS o|--o{ ADMIN_SYSTEM_AUDIT_EVENTS : "effectue"
+    ADMIN_ACCOUNTS o|--o{ WORKSHOP_INCIDENT_EVENTS : "agit comme admin"
 
     SENTINEL_USERS o|--o{ ACCOUNT_AUDIT_EVENTS : "est cible de"
     SENTINEL_USERS ||--o{ PASSWORD_RESET_REQUESTS : "demande"
     SENTINEL_USERS ||--o{ WORKSHOP_INCIDENTS : "declare"
     SENTINEL_USERS o|--o{ WORKSHOP_INCIDENTS : "prend en charge"
-    SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_EVENTS : "agit"
+    SENTINEL_USERS o|--o{ WORKSHOP_INCIDENT_EVENTS : "agit"
     SENTINEL_USERS ||--o{ WORKSHOP_INCIDENT_FOLLOWERS : "suit"
     SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CONSULTATIONS : "consulte"
-    SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CASES : "demande ou decide"
+    SENTINEL_USERS ||--o{ WORKSHOP_ARBITRATION_CASES : "demande"
+    SENTINEL_USERS o|--o{ WORKSHOP_ARBITRATION_CASES : "consulte"
+    SENTINEL_USERS o|--o{ WORKSHOP_ARBITRATION_CASES : "decide"
 
     PRODUCTION_LINES o|--o{ LINE_AUDIT_EVENTS : "est cible de"
     PRODUCTION_LINES ||--o{ WORKSHOP_INCIDENTS : "concerne"
@@ -42,12 +46,13 @@ erDiagram
     WORKSHOP_INCIDENTS ||--o{ WORKSHOP_ARBITRATION_CONSULTATIONS : "porte"
     WORKSHOP_INCIDENTS ||--o{ WORKSHOP_ARBITRATION_CASES : "porte"
     WORKSHOP_INCIDENT_EVENTS ||--o| WORKSHOP_ARBITRATION_CONSULTATIONS : "demande consultee"
-    WORKSHOP_INCIDENT_EVENTS ||--o| WORKSHOP_ARBITRATION_CASES : "ouvre"
-    WORKSHOP_INCIDENT_EVENTS ||--o| NOTIFICATION_OUTBOX : "notifie"
-    PASSWORD_RESET_REQUESTS ||--o| NOTIFICATION_OUTBOX : "notifie"
+    WORKSHOP_INCIDENT_EVENTS o|--o| WORKSHOP_ARBITRATION_CASES : "ouvre"
+    WORKSHOP_INCIDENT_EVENTS o|--o| NOTIFICATION_OUTBOX : "notifie"
+    PASSWORD_RESET_REQUESTS o|--o| NOTIFICATION_OUTBOX : "notifie"
 
     ADMIN_ACCOUNTS {
         int id PK
+        smallint singleton_key UK
         varchar username UK
         varchar password_hash
         varchar email "nullable"
@@ -125,7 +130,7 @@ erDiagram
         boolean is_taken
         boolean is_priority
         text waiting_reason "nullable"
-        text diagnostic "nullable"
+        text diagnostic "historique, nullable, lecture seule"
         text intervention_note "nullable"
         text responsible_comment "nullable"
         jsonb edit_request "nullable"
@@ -149,7 +154,10 @@ erDiagram
     WORKSHOP_INCIDENT_EVENTS {
         int id PK
         int incident_id FK
-        int actor_user_id FK
+        int actor_user_id FK "nullable"
+        int actor_admin_id FK "nullable"
+        varchar actor_kind
+        varchar actor_display_name "nullable"
         varchar event_type
         jsonb payload "nullable"
         varchar actor_first_name "snapshot nullable"
@@ -178,7 +186,7 @@ erDiagram
     WORKSHOP_ARBITRATION_CASES {
         bigint id PK
         int incident_id FK
-        int request_event_id FK, UK
+        int request_event_id FK, UK "nullable"
         varchar request_type
         varchar status
         jsonb payload "nullable"
@@ -186,7 +194,12 @@ erDiagram
         int requested_by_user_id FK
         int consulted_by_user_id FK "nullable"
         int decided_by_user_id FK "nullable"
+        timestamptz requested_at
+        timestamptz consulted_at "nullable"
+        timestamptz decided_at "nullable"
         text decision_reason "nullable"
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     ACCOUNT_AUDIT_EVENTS {
@@ -207,7 +220,7 @@ erDiagram
         int admin_id FK "nullable"
         varchar event_type
         jsonb changes "nullable"
-        varchar target_line_number "snapshot nullable"
+        varchar target_line_number "snapshot"
         timestamptz created_at
     }
 
@@ -237,6 +250,9 @@ erDiagram
         timestamptz locked_at "nullable"
         timestamptz completed_at "nullable"
         varchar last_error_code "nullable"
+        jsonb delivered_recipients
+        timestamptz created_at
+        timestamptz updated_at
     }
 ```
 
@@ -249,7 +265,13 @@ erDiagram
   `SKIPEE_PAR_CONDUCTEUR`, `DEGRADEE` ou `INDISPONIBLE` ;
 - `chk_taken_consistency` synchronise `is_taken`, `taken_by_user_id` et `taken_at` ;
 - `chk_pending_must_be_taken` interdit un incident `PENDING` non pris ;
+- `waiting_reason` porte le motif requis par `SET_PENDING`, sans réutiliser
+  `diagnostic`, colonne historique en lecture seule qu'aucune action courante
+  n'écrit ;
 - `chk_edit_request_shape` impose un objet JSON contenant au moins un champ métier connu ;
+- `chk_workshop_incident_event_actor` impose exactement un acteur utilisateur,
+  administrateur ou système selon `actor_kind` ;
+- `uq_admin_singleton_key` garantit au plus une ligne `admin_accounts` ;
 - l'index unique partiel `idx_unique_active_incident_per_machine` interdit deux
   incidents actifs sur le même emplacement `(line_id, machine_id, robot_label, head_number)` ;
 - `workshop_arbitration_consultations.request_event_id` est à la fois sa clé primaire
@@ -260,6 +282,11 @@ erDiagram
   PostgreSQL par défaut (`NO ACTION`) ;
 - les suppressions des comptes et lignes sont logiques. Les snapshots d'identité
   préservent la lisibilité de l'historique après anonymisation ou archivage ;
+- `notification_outbox.delivered_recipients` conserve les destinataires déjà
+  servis lors d'une reprise partielle ; les états terminaux incluent les cas
+  `SKIPPED_DISABLED` et `SKIPPED_NO_RECIPIENT` ;
+- `board_session_ttl_hours = 0` signifie absence d'expiration automatique, sans
+  supprimer la révocation par `board_session_version` ;
 - `schema_migrations(filename, checksum, applied_at)` est une table technique du
   moteur de migration : elle doit être montrée à part dans le MPD, jamais
   comptée parmi les quatorze tables applicatives.
@@ -292,12 +319,13 @@ flowchart LR
         O1[Demander la correction de son incident actif]
         O2[Retirer sa demande de correction]
         O3[Demander l'annulation de son incident non pris]
+        O4[Retirer sa demande d'annulation]
     end
 
     subgraph MAINT[Actions MAINTENANCE]
-        M1[Prendre un incident OPEN ou reprendre celui d'un autre technicien]
+        M1[Prendre un incident OPEN ou transférer celui d'un autre technicien]
         M2[Modifier un incident non pris ou pris par soi]
-        M3[Mettre en attente avec diagnostic]
+        M3[Mettre en attente avec motif]
         M4[Reprendre un incident PENDING]
         M5[Clôturer avec note d'intervention]
         M6[Annuler directement un incident actif non pris]
@@ -308,7 +336,7 @@ flowchart LR
         R2[Approuver ou refuser une correction]
         R3[Approuver ou refuser une annulation]
         R4[Définir la priorité et la consigne]
-        R5[Suivre ou ne plus suivre un incident actif]
+        R5[Activer un suivi explicite ou retirer son suivi]
         R6[Consulter le Journal et les arbitrages]
         R7[Annuler un incident non pris ou PENDING]
         R8[Invalider une clôture avec motif]
@@ -334,6 +362,7 @@ flowchart LR
     OP --> O1
     OP --> O2
     OP --> O3
+    OP --> O4
 
     MA --> W1
     MA --> W2
@@ -381,9 +410,11 @@ flowchart LR
 
 ## 3. Diagramme de séquence — workflow nominal complet (référencé §7.2)
 
-Chaque mutation est réalisée dans une transaction. La lecture `FOR UPDATE`, la
-vérification par `canPerform`, la mutation et l'insertion de l'événement appartiennent
-au même bloc transactionnel ; une exception provoque un `ROLLBACK`.
+Les mutations critiques sont réalisées dans une transaction. Après création, les
+transitions d'état lisent l'incident `FOR UPDATE`, appliquent `canPerform`, modifient
+l'état et insèrent l'événement dans le même bloc transactionnel ; une exception
+provoque un `ROLLBACK`. La création et le suivi explicite utilisent leurs gardes de
+service dédiées.
 
 ```mermaid
 sequenceDiagram
@@ -399,10 +430,9 @@ sequenceDiagram
     F->>C: POST /api/workshop/incidents
     C->>C: Validation Zod du corps
     C->>S: createIncidentService(données, userId, rôle)
-    S->>DB: SELECT ligne active et machine_sequence
+    S->>DB: BEGIN puis SELECT ligne active FOR UPDATE
     DB-->>S: Ligne et configuration
     S->>S: Vérifie machine, robot et tête
-    S->>DB: BEGIN
     S->>DB: INSERT workshop_incidents (status OPEN, is_taken false)
     DB-->>S: id incident
     S->>DB: INSERT workshop_incident_events (INCIDENT_CREATED)
@@ -585,13 +615,23 @@ sequenceDiagram
     F->>API: POST /api/board/session avec code
     API->>DB: Lit board_enabled, board_code_hash, board_session_version et durée
     DB-->>API: Paramètres Board
-    API->>API: SHA-256 du code puis comparaison en temps constant
-    API->>API: Signe JWT scope board, label, boardSessionVersion
-    API-->>F: Set-Cookie sentinel_board_token HttpOnly et profil sans JWT
+    alt Hash bcrypt courant
+        API->>API: Vérifie le code avec bcrypt
+    else Digest SHA-256 historique
+        API->>API: Compare en temps constant
+        API->>DB: S'il vient de admin_accounts, remplace le digest valide par bcrypt
+    end
+    alt Durée configurée égale à 0
+        API->>API: Signe le JWT sans exp
+        API-->>F: Cookie de session HttpOnly sans maxAge
+    else Durée comprise entre 1 et 168 heures
+        API->>API: Signe le JWT avec exp
+        API-->>F: Cookie HttpOnly avec maxAge
+    end
 
     loop Actualisation du Board
         F->>API: GET /api/board/data avec cookie
-        API->>API: Vérifie signature, expiration et scope du JWT
+        API->>API: Vérifie signature, scope et expiration si elle existe
         API->>DB: Relit activation et board_session_version
         DB-->>API: Paramètres courants
         alt Board actif et version identique
@@ -610,8 +650,8 @@ sequenceDiagram
 
 ## Sources de vérification dans le dépôt
 
-- structure et contraintes : `backend/migrations/001_create_admin_accounts.sql` à
-  `backend/migrations/038_create_workshop_arbitration_consultations.sql` ;
+- structure et contraintes : les migrations `001` à `050` dans
+  `backend/migrations/` ;
 - routes : `backend/src/server.ts`, `backend/src/modules/*/*.routes.ts` et
   `backend/src/modules/board/board.auth.ts` ;
 - permissions : `backend/src/modules/workshop/workshop.policy.ts` ;

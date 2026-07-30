@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 // Les types Node ne font volontairement pas partie du bundle navigateur.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 const source = (path: string): string => readFileSync(resolve('src', path), 'utf8');
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+const documentation = (path: string): string => readFileSync(resolve('..', 'docs', path), 'utf8');
 
 const mutationSurfaces = [
   'components/CreateUserModal.tsx',
@@ -77,5 +79,29 @@ describe('architecture des mutations hors Atelier RC4', () => {
     const clear = support.indexOf("setInput('')");
     expect(call).toBeGreaterThan(-1);
     expect(clear).toBeGreaterThan(call);
+  });
+
+  it.each([
+    'pages/UserListPage.tsx',
+    'pages/UserDetailPage.tsx',
+    'pages/LinesPage.tsx',
+    'components/LineDetailView.tsx',
+  ])('%s ne maintient plus de bannière de succès temporisée concurrente', (path) => {
+    expect(source(path)).not.toContain('SuccessBanner');
+    expect(source(path)).not.toContain('successTimerRef');
+    expect(source(path)).not.toContain('showSuccess');
+  });
+
+  it('réserve les succès locaux aux sorties persistantes contenant un secret à usage unique', () => {
+    expect(source('components/CreateUserModal.tsx')).toContain('password_setup_code');
+    expect(source('components/CreateUserModal.tsx')).toContain('SuccessBanner');
+    expect(source('components/ResetPasswordConfirmModal.tsx')).toContain('password_setup_code');
+    expect(source('components/ResetPasswordConfirmModal.tsx')).toContain('SuccessBanner');
+  });
+
+  it('rattache le rendu partagé aux 61 interactions déjà auditées', () => {
+    const inventoryTable = documentation('rc4-mutation-inventory.md').split('## Synthèse')[0];
+    expect(inventoryTable.match(/\| `COVERED` \|/g) ?? []).toHaveLength(59);
+    expect(inventoryTable.match(/\| `EXCEPTION_PROVEN` \|/g) ?? []).toHaveLength(2);
   });
 });

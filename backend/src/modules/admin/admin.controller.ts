@@ -1,5 +1,11 @@
 import { Request, Response } from 'express';
-import { handleControllerError, parseIdParam, sendServiceError } from '../../utils/controller';
+import {
+  formatZodError,
+  handleControllerError,
+  parseIdParam,
+  sendServiceError,
+} from '../../utils/controller';
+import { sendError } from '../../utils/errors';
 import {
   getReferenceDashboardService,
   getReferenceQualityService,
@@ -8,6 +14,7 @@ import {
   markPasswordResetRequestHandledService,
 } from './admin.service';
 import { sendUnauthenticated } from '../../auth/authResponses';
+import { referenceAuditQuerySchema } from './admin.validation';
 
 export async function getReferenceDashboard(_req: Request, res: Response): Promise<void> {
   try {
@@ -27,7 +34,12 @@ export async function getReferenceQuality(_req: Request, res: Response): Promise
 
 export async function listReferenceAudit(req: Request, res: Response): Promise<void> {
   try {
-    res.json(await listReferenceAuditService(req.query));
+    const parsed = referenceAuditQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, 400, 'VALIDATION_ERROR', formatZodError(parsed.error));
+      return;
+    }
+    res.json(await listReferenceAuditService(parsed.data));
   } catch (err) {
     handleControllerError(res, 'listReferenceAudit', err);
   }

@@ -134,7 +134,9 @@ describe('Nginx hôte RC4 — autorité unique et compatibilité 1.18', () => {
     }
     expect(inheritanceTestSource).toContain('X-Sentinel-Global-Probe');
     expect(inheritanceTestSource).toContain('nginx/1.18.0');
-    expect(workflow).toContain('nginx:1.18.0 nginx -t');
+    expect(workflow).toContain(
+      'nginx:1.18.0@sha256:e90ac5331fe095cea01b121a3627174b2e33e06e83720e9a934c7b8ccc9c55a0 nginx -t'
+    );
   });
 });
 

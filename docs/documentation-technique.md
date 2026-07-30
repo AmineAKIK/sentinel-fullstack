@@ -1,6 +1,6 @@
 # Documentation technique Sentinel
 
-**État documenté :** 17 juillet 2026
+**État documenté :** 29 juillet 2026
 **Architecture :** SPA React + API Express + PostgreSQL + Docker Compose
 
 Cette référence décrit le code du dépôt. Les procédures d'exploitation sont
@@ -37,7 +37,7 @@ sentinel/
     workflows/ci.yml         pipeline de qualité
     dependabot.yml           mises à jour automatisées
   backend/
-    migrations/              001 à 046, SQL append-only
+    migrations/              001 à 050, SQL append-only
     scripts/                 seeds et audit structurel
     src/
       auth/                  JWT, cookies, bcrypt et payloads
@@ -82,7 +82,7 @@ sentinel/
 ### Frontend
 
 - React 18 ;
-- React Router 6 ;
+- React Router 7.18.2 en Declarative Mode ;
 - Vite 8 ;
 - TypeScript strict ;
 - Vitest + Testing Library ;
@@ -103,7 +103,7 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 | `DATABASE_URL` | requise | URL PostgreSQL interne |
 | `COOKIE_SECRET` | requise | secret cookies, 24 caractères minimum |
 | `JWT_SECRET` | requise | secret JWT, 24 caractères minimum |
-| `CLIENT_ORIGIN` | requise | origine HTTPS exacte sans chemin |
+| `CLIENT_ORIGIN` | requise | origine HTTPS canonique exacte, sans slash final |
 | `TRUST_PROXY` | requise | confiance accordée au proxy inverse retenu |
 | `BOARD_ACCESS_CODE_HASH` | requise | hash bcrypt du code Board |
 | `ADMIN_USERNAME` | bootstrap | premier admin sur base vide |
@@ -119,7 +119,8 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 
 - les variables requises absentes ;
 - les secrets trop courts, identiques ou contenant encore un placeholder ;
-- une origine non HTTPS, locale, factice, avec credentials, chemin, query ou fragment ;
+- une origine non canonique, non HTTPS, locale, factice, avec credentials,
+  wildcard, chemin, query, fragment, port par défaut explicite ou slash final ;
 - une URL PostgreSQL incomplète, d'un autre protocole ou avec un mot de passe faible ;
 - un hash Board qui ne respecte pas le format bcrypt ;
 - un `BUILD_SHA` absent ou différent d'un SHA Git complet ;
@@ -127,6 +128,11 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 
 Les variables admin ne sont plus requises après l'amorçage si un admin existe
 déjà. Une base de production vide sans ces variables refuse de démarrer.
+
+`parseClientOrigin()` constitue l'unique contrat pour la validation de
+configuration, le préflight, CORS et CSRF. La comparaison des requêtes porte sur
+le schéma, l'hôte et le port effectif exacts. HTTP n'est accepté que pour
+`localhost`, `127.0.0.1` ou `[::1]` en développement/test.
 
 ### 4.2 Frontend
 
@@ -176,7 +182,7 @@ nouvelle migration.
 
 ### 6.2 Évolution du schéma
 
-Le dépôt comprend 46 migrations :
+Le dépôt comprend 50 migrations :
 
 - 001-006 : admin, utilisateurs, audit initial, lignes et mots de passe ;
 - 007-019 : incidents, workflow, événements, intégrité et followers ;
@@ -187,7 +193,11 @@ Le dépôt comprend 46 migrations :
 - 042-043 : projection normalisée et validation des machines ;
 - 044 : normalisation/unicité des badges actifs ;
 - 045 : outbox durable ;
-- 046 : namespaces des identifiants opérationnels.
+- 046 : namespaces des identifiants opérationnels ;
+- 047 : états terminaux observables de l'outbox ;
+- 048 : destinataires déjà livrés pour la reprise idempotente de l'outbox ;
+- 049 : durée Board `0`, sans expiration automatique mais toujours révocable ;
+- 050 : motif de mise en attente séparé du diagnostic.
 
 ### 6.3 Modèle principal
 
@@ -538,10 +548,12 @@ peuvent jamais s'exécuter en même temps. La restauration refuse par défaut to
 dump sans checksum SHA-256 associé — `--allow-unverified` force le passage avec
 un avertissement audité en sortie d'erreur. Elle importe ensuite dans une base
 temporaire, valide la présence des quinze tables du schéma, la cohérence du
-ledger `schema_migrations` (aucun checksum ni horodatage manquant) et quelques
-colonnes témoins, avant d'arrêter brièvement le backend et d'échanger les noms
-de base. Un trap nettoie la base temporaire et tente le retour arrière si la
-bascule est incomplète.
+ledger `schema_migrations` puis son égalité exacte avec les fichiers canoniques
+du checkout (noms, ordre et checksums), avant d'arrêter brièvement le backend et
+d'échanger les noms de base. Le test RC5 couvre les variantes tronquée, absente,
+supplémentaire, désordonnée et au checksum modifié avant toute mutation de la
+destination. Un trap nettoie la base temporaire et tente le retour arrière si
+la bascule est incomplète.
 
 ## 17. Limites connues et extensions
 

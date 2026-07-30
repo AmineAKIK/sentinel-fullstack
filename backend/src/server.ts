@@ -7,7 +7,12 @@ import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import logger from './logger';
 import { httpLoggingOptions } from './httpLogging';
-import { assertProductionConfig, parsePort, parseTrustProxy } from './config/production';
+import {
+  assertProductionConfig,
+  parseClientOrigin,
+  parsePort,
+  parseTrustProxy,
+} from './config/production';
 import pool from './db/pool';
 import runMigrations from './db/migrate';
 import seedAdminAccount from './db/seed';
@@ -29,13 +34,14 @@ import { boardRouter } from './modules/board/board.auth';
 import { FIELD_LIMITS } from './domain/constants';
 import { startNotificationOutboxWorker } from './modules/notifications/notificationOutbox.worker';
 import { apiErrorHandler, apiNotFoundHandler } from './middlewares/apiErrors';
+import { createCsrfProtection } from './middlewares/csrfProtection';
 
 const app = express();
 app.disable('x-powered-by');
 const PORT = parsePort(process.env.PORT, 'PORT', 3000);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
 assertProductionConfig();
+const CLIENT_ORIGIN = parseClientOrigin(process.env.CLIENT_ORIGIN);
 
 const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 if (trustProxy !== false) {
@@ -52,6 +58,7 @@ app.use(
 app.use(pinoHttp(httpLoggingOptions(logger)));
 
 app.use(securityHeaders);
+app.use('/api', createCsrfProtection(CLIENT_ORIGIN));
 app.use(express.json({ limit: '50kb' }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 

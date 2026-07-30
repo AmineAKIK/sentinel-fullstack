@@ -3,11 +3,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import CloseIcon from '../icons/CloseIcon';
 
 /**
  * Mécanisme global unique de retour d'action (contrat UX RC3, lot 1).
@@ -27,7 +29,7 @@ import { createPortal } from 'react-dom';
  * (réseau, métier non liée à un champ précis).
  */
 
-export type FeedbackKind = 'success' | 'error';
+export type FeedbackKind = 'success' | 'error' | 'info';
 
 export const SUCCESS_AUTO_DISMISS_MS = 6000;
 
@@ -42,6 +44,7 @@ type MutationFeedbackContextValue = FeedbackState & {
   pendingKey: string | null;
   notifySuccess: (message: string, actionKey?: string) => void;
   notifyError: (message: string, actionKey?: string, presentation?: 'global' | 'local') => void;
+  notifyInfo: (message: string, actionKey?: string) => void;
   dismiss: () => void;
   beginMutation: (owner: symbol, actionKey: string) => boolean;
   finishMutation: (owner: symbol) => void;
@@ -49,15 +52,31 @@ type MutationFeedbackContextValue = FeedbackState & {
 
 const MutationFeedbackContext = createContext<MutationFeedbackContextValue | null>(null);
 
+const EMPTY_FEEDBACK: FeedbackState = {
+  kind: null,
+  message: null,
+  actionKey: null,
+  presentation: 'global',
+};
+
+const FEEDBACK_FOCUSABLE_SELECTOR = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
 export function MutationFeedbackProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<FeedbackState>({
-    kind: null,
-    message: null,
-    actionKey: null,
-    presentation: 'global',
-  });
+  const [state, setState] = useState<FeedbackState>(EMPTY_FEEDBACK);
+  const stateRef = useRef<FeedbackState>(EMPTY_FEEDBACK);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerStartedAt = useRef<number | null>(null);
+  const remainingDismissMs = useRef(SUCCESS_AUTO_DISMISS_MS);
+  const pauseReasons = useRef(new Set<'hover' | 'focus'>());
+  const feedbackGeneration = useRef(0);
   const activeMutation = useRef<{ owner: symbol; actionKey: string } | null>(null);
   const mounted = useRef(true);
   const lastUsefulFocus = useRef<HTMLElement | null>(null);
@@ -67,61 +86,138 @@ export function MutationFeedbackProvider({ children }: { children: React.ReactNo
       clearTimeout(dismissTimer.current);
       dismissTimer.current = null;
     }
+    timerStartedAt.current = null;
   }, []);
 
-  const dismiss = useCallback(() => {
-    clearTimer();
+  const commitState = useCallback((next: FeedbackState) => {
+    stateRef.current = next;
+    if (mounted.current) setState(next);
+  }, []);
+
+  const restoreUsefulFocus = useCallback(() => {
     const focused = document.activeElement;
-    if (
-      focused instanceof HTMLElement &&
-      focused.closest('.mutation-feedback-region') &&
-      lastUsefulFocus.current?.isConnected
-    ) {
-      lastUsefulFocus.current.focus({ preventScroll: true });
+    if (!(focused instanceof HTMLElement) || !focused.closest('.mutation-feedback-region')) {
+      return;
     }
-    setState({
-      kind: null,
-      message: null,
-      actionKey: null,
-      presentation: 'global',
-    });
-  }, [clearTimer]);
+
+    const firstUsefulFocusable = (container: Element | null) =>
+      container
+        ? Array.from(container.querySelectorAll<HTMLElement>(FEEDBACK_FOCUSABLE_SELECTOR)).find(
+            (element) => !element.closest('.mutation-feedback-region')
+          )
+        : undefined;
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'));
+    const activeDialog = dialogs[dialogs.length - 1];
+    const dialogFallback = firstUsefulFocusable(activeDialog);
+    const pageFallback =
+      firstUsefulFocusable(document.getElementById('main-content')) ??
+      firstUsefulFocusable(document.querySelector('.nav-bar'));
+    const target = lastUsefulFocus.current?.isConnected
+      ? lastUsefulFocus.current
+      : (dialogFallback ?? pageFallback);
+    target?.focus({ preventScroll: true });
+  }, []);
+
+  const expireFeedback = useCallback(
+    (generation: number) => {
+      if (
+        !mounted.current ||
+        feedbackGeneration.current !== generation ||
+        stateRef.current.kind === 'error'
+      ) {
+        return;
+      }
+      clearTimer();
+      feedbackGeneration.current += 1;
+      remainingDismissMs.current = SUCCESS_AUTO_DISMISS_MS;
+      pauseReasons.current.clear();
+      restoreUsefulFocus();
+      commitState(EMPTY_FEEDBACK);
+    },
+    [clearTimer, commitState, restoreUsefulFocus]
+  );
+
+  const startDismissTimer = useCallback(
+    (delay: number, generation: number) => {
+      clearTimer();
+      if (pauseReasons.current.size > 0) return;
+      timerStartedAt.current = Date.now();
+      dismissTimer.current = setTimeout(() => expireFeedback(generation), Math.max(0, delay));
+    },
+    [clearTimer, expireFeedback]
+  );
+
+  const dismiss = useCallback(() => {
+    feedbackGeneration.current += 1;
+    clearTimer();
+    remainingDismissMs.current = SUCCESS_AUTO_DISMISS_MS;
+    pauseReasons.current.clear();
+    restoreUsefulFocus();
+    commitState(EMPTY_FEEDBACK);
+  }, [clearTimer, commitState, restoreUsefulFocus]);
+
+  const notifyAutoDismiss = useCallback(
+    (kind: 'success' | 'info', message: string, actionKey: string) => {
+      clearTimer();
+      const generation = feedbackGeneration.current + 1;
+      feedbackGeneration.current = generation;
+      remainingDismissMs.current = SUCCESS_AUTO_DISMISS_MS;
+      commitState({ kind, message, actionKey, presentation: 'global' });
+      startDismissTimer(remainingDismissMs.current, generation);
+    },
+    [clearTimer, commitState, startDismissTimer]
+  );
 
   const notifySuccess = useCallback(
     (message: string, actionKey = 'feedback') => {
-      clearTimer();
-      setState({ kind: 'success', message, actionKey, presentation: 'global' });
-      // Un succès non critique reste affiché ~6 s puis s'efface.
-      dismissTimer.current = setTimeout(() => {
-        dismissTimer.current = null;
-        const focused = document.activeElement;
-        if (
-          focused instanceof HTMLElement &&
-          focused.closest('.mutation-feedback-region') &&
-          lastUsefulFocus.current?.isConnected
-        ) {
-          lastUsefulFocus.current.focus({ preventScroll: true });
-        }
-        if (mounted.current) {
-          setState({
-            kind: null,
-            message: null,
-            actionKey: null,
-            presentation: 'global',
-          });
-        }
-      }, SUCCESS_AUTO_DISMISS_MS);
+      notifyAutoDismiss('success', message, actionKey);
     },
-    [clearTimer]
+    [notifyAutoDismiss]
+  );
+
+  const notifyInfo = useCallback(
+    (message: string, actionKey = 'feedback') => {
+      notifyAutoDismiss('info', message, actionKey);
+    },
+    [notifyAutoDismiss]
   );
 
   const notifyError = useCallback(
     (message: string, actionKey = 'feedback', presentation: 'global' | 'local' = 'global') => {
       // Une erreur ne disparaît jamais automatiquement : aucun timer.
+      feedbackGeneration.current += 1;
       clearTimer();
-      setState({ kind: 'error', message, actionKey, presentation });
+      remainingDismissMs.current = SUCCESS_AUTO_DISMISS_MS;
+      commitState({ kind: 'error', message, actionKey, presentation });
+    },
+    [clearTimer, commitState]
+  );
+
+  const pauseAutoDismiss = useCallback(
+    (reason: 'hover' | 'focus') => {
+      pauseReasons.current.add(reason);
+      if (dismissTimer.current === null || timerStartedAt.current === null) return;
+      const elapsed = Math.max(0, Date.now() - timerStartedAt.current);
+      remainingDismissMs.current = Math.max(0, remainingDismissMs.current - elapsed);
+      clearTimer();
     },
     [clearTimer]
+  );
+
+  const resumeAutoDismiss = useCallback(
+    (reason: 'hover' | 'focus') => {
+      pauseReasons.current.delete(reason);
+      if (
+        pauseReasons.current.size > 0 ||
+        stateRef.current.kind === null ||
+        stateRef.current.kind === 'error' ||
+        dismissTimer.current !== null
+      ) {
+        return;
+      }
+      startDismissTimer(remainingDismissMs.current, feedbackGeneration.current);
+    },
+    [startDismissTimer]
   );
 
   const beginMutation = useCallback((owner: symbol, actionKey: string): boolean => {
@@ -154,6 +250,7 @@ export function MutationFeedbackProvider({ children }: { children: React.ReactNo
     document.addEventListener('focusin', rememberUsefulFocus);
     return () => {
       mounted.current = false;
+      feedbackGeneration.current += 1;
       clearTimer();
       activeMutation.current = null;
       document.removeEventListener('focusin', rememberUsefulFocus);
@@ -166,59 +263,133 @@ export function MutationFeedbackProvider({ children }: { children: React.ReactNo
       pendingKey,
       notifySuccess,
       notifyError,
+      notifyInfo,
       dismiss,
       beginMutation,
       finishMutation,
     }),
-    [state, pendingKey, notifySuccess, notifyError, dismiss, beginMutation, finishMutation]
+    [
+      state,
+      pendingKey,
+      notifySuccess,
+      notifyError,
+      notifyInfo,
+      dismiss,
+      beginMutation,
+      finishMutation,
+    ]
   );
 
   return (
     <MutationFeedbackContext.Provider value={value}>
       {children}
-      <GlobalFeedbackRegion />
+      <GlobalFeedbackRegion onPause={pauseAutoDismiss} onResume={resumeAutoDismiss} />
     </MutationFeedbackContext.Provider>
   );
 }
 
-/**
- * Région vivante globale. Deux conteneurs distincts et toujours montés : la
- * zone polie (succès) et la zone d'alerte (erreur). Les garder montés permet aux
- * lecteurs d'écran d'annoncer le changement de contenu de façon fiable.
- */
-function GlobalFeedbackRegion() {
+function useFeedbackTopOffset(visibleKey: string | null): number {
+  const [topOffset, setTopOffset] = useState(16);
+
+  useLayoutEffect(() => {
+    let frame: number | null = null;
+    const nav = document.querySelector<HTMLElement>('.nav-bar');
+
+    const update = () => {
+      frame = null;
+      const viewportGap = window.innerWidth <= 700 ? 12 : 16;
+      const navBottom = nav?.getBoundingClientRect().bottom ?? 0;
+      setTopOffset(Math.max(viewportGap, Math.ceil(navBottom) + viewportGap));
+    };
+    const scheduleUpdate = () => {
+      if (frame === null) frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('scroll', scheduleUpdate, true);
+    let resizeObserver: ResizeObserver | null = null;
+    if (nav && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(scheduleUpdate);
+      resizeObserver.observe(nav);
+    }
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleUpdate);
+      window.removeEventListener('scroll', scheduleUpdate, true);
+    };
+  }, [visibleKey]);
+
+  return topOffset;
+}
+
+type GlobalFeedbackRegionProps = {
+  onPause: (reason: 'hover' | 'focus') => void;
+  onResume: (reason: 'hover' | 'focus') => void;
+};
+
+function GlobalFeedbackRegion({ onPause, onResume }: GlobalFeedbackRegionProps) {
   const ctx = useContext(MutationFeedbackContext);
-  const success = ctx?.kind === 'success' ? ctx.message : null;
+  const polite =
+    ctx?.presentation === 'global' && (ctx.kind === 'success' || ctx.kind === 'info')
+      ? ctx.message
+      : null;
   const error = ctx?.kind === 'error' && ctx.presentation === 'global' ? ctx.message : null;
   const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'));
   // Une erreur globale doit appartenir à la modale encore ouverte (le #root est
-  // alors inert). Un succès ferme souvent cette modale dans le même rendu :
-  // son statut est donc toujours porté par body afin de survivre à la fermeture.
+  // alors inert). Un succès est porté par body afin de survivre à la fermeture
+  // éventuelle de la modale dans le même commit React.
   const target = error ? (dialogs[dialogs.length - 1] ?? document.body) : document.body;
+  const visibleKey = ctx?.message ? `${ctx.kind}:${ctx.actionKey}:${ctx.message}` : null;
+  const topOffset = useFeedbackTopOffset(visibleKey);
+  const kind = error ? 'error' : ctx?.kind === 'info' ? 'info' : 'success';
+  const message = error ?? polite;
+  const title =
+    kind === 'error' ? 'Action impossible' : kind === 'info' ? 'Information' : 'Action réussie';
+  const icon = kind === 'error' ? '!' : kind === 'info' ? 'i' : '✓';
+
   return createPortal(
-    <div className="mutation-feedback-region">
-      <div className="mutation-feedback-polite" role="status" aria-live="polite" aria-atomic="true">
-        {success ? (
-          <div className="success-message" data-feedback="success">
-            {success}
-            <button
-              type="button"
-              className="mutation-feedback-dismiss"
-              aria-label="Fermer le message"
-              onClick={() => ctx?.dismiss()}
-            >
-              ×
-            </button>
+    <div
+      className="mutation-feedback-region"
+      style={{ '--mutation-feedback-top': `${topOffset}px` } as React.CSSProperties}
+      onMouseEnter={() => onPause('hover')}
+      onMouseLeave={() => onResume('hover')}
+      onFocusCapture={() => onPause('focus')}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          onResume('focus');
+        }
+      }}
+    >
+      {message ? (
+        <div
+          className={`mutation-feedback-card mutation-feedback-card--${kind}`}
+          data-feedback={kind}
+        >
+          <span className="mutation-feedback-icon" aria-hidden="true">
+            {icon}
+          </span>
+          <div
+            className="mutation-feedback-content"
+            role={kind === 'error' ? 'alert' : 'status'}
+            aria-live={kind === 'error' ? 'assertive' : 'polite'}
+            aria-atomic="true"
+          >
+            <strong className="mutation-feedback-title">{title}</strong>
+            <p className="mutation-feedback-message">{message}</p>
           </div>
-        ) : null}
-      </div>
-      <div className="mutation-feedback-alert" aria-live="assertive">
-        {error ? (
-          <div className="error-message" role="alert" data-feedback="error">
-            {error}
-          </div>
-        ) : null}
-      </div>
+          <button
+            type="button"
+            className="mutation-feedback-dismiss"
+            aria-label="Fermer la notification"
+            onClick={() => ctx?.dismiss()}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      ) : null}
     </div>,
     target
   );

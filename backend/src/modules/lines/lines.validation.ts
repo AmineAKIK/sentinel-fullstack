@@ -86,5 +86,14 @@ export const updateLineSchema = lineFieldsSchema.partial().superRefine((value, c
   requireUniqueMachineIds(value.machines, context);
 });
 
+export const checkLineConflictsSchema = z.object({
+  lineNumber: lineNumberSchema,
+  machineIds: z
+    .array(machineIdSchema)
+    .max(10, 'Une ligne ne peut pas dépasser 10 machines.')
+    .default([]),
+  lineId: z.coerce.number().int().positive().safe().optional(),
+});
+
 export type CreateLineInput = z.infer<typeof createLineSchema>;
 export type UpdateLineInput = z.infer<typeof updateLineSchema>;

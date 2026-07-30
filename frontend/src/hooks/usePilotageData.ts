@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getIncidentMetrics,
   getWorkshopAnalytics,
@@ -12,7 +12,7 @@ import {
   WorkshopIncidentMetrics,
 } from '../types';
 import { isOlderThanDays } from '../utils/date';
-import { buildAnalyticsParams } from '../utils/workshopAnalytics';
+import { buildAnalyticsParams, presetDateRange } from '../utils/workshopAnalytics';
 import { HistoryPeriod } from '../utils/workshopHistory';
 
 export type StatusTone = 'stable' | 'watch' | 'tension';
@@ -39,12 +39,44 @@ export function usePilotageData() {
   const [analyticsError, setAnalyticsError] = useState('');
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  const [period, setPeriod] = useState<HistoryPeriod>('7d');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const [period, setPeriodState] = useState<HistoryPeriod>('7d');
+  const initialRange = presetDateRange('7d');
+  const [customStart, setCustomStartState] = useState(initialRange?.start ?? '');
+  const [customEnd, setCustomEndState] = useState(initialRange?.end ?? '');
   const [lineFilter, setLineFilter] = useState('all');
   const [machineFilter, setMachineFilter] = useState('all');
   const [rankingLimit, setRankingLimit] = useState<RankingLimit>('10');
+  // Distingue une transition programmatique (preset → dates recalculées) d'une
+  // vraie saisie utilisateur, pour ne jamais faire régresser 'custom' vers un
+  // preset lors du recalcul déclenché par un changement de période explicite.
+  const applyingPresetRef = useRef(false);
+
+  /** Choix explicite d'un preset (ou "Personnalisée") dans le sélecteur. */
+  function setPeriod(next: HistoryPeriod): void {
+    setPeriodState(next);
+    const range = presetDateRange(next);
+    if (range) {
+      applyingPresetRef.current = true;
+      setCustomStart(range.start);
+      setCustomEnd(range.end);
+      applyingPresetRef.current = false;
+    }
+    // Sélection explicite de "Personnalisée" : les bornes actuellement
+    // affichées (dernier preset ou dernière saisie) sont conservées telles
+    // quelles, aucun recalcul ni réinitialisation.
+  }
+
+  /** Modification directe d'une borne : bascule sur "Personnalisée" sauf si le
+   * changement est provoqué par l'application d'un preset (voir setPeriod). */
+  function setCustomStart(next: string): void {
+    if (!applyingPresetRef.current && period !== 'custom') setPeriodState('custom');
+    setCustomStartState(next);
+  }
+
+  function setCustomEnd(next: string): void {
+    if (!applyingPresetRef.current && period !== 'custom') setPeriodState('custom');
+    setCustomEndState(next);
+  }
 
   useEffect(() => {
     let active = true;
@@ -109,10 +141,31 @@ export function usePilotageData() {
   }, []);
 
   useEffect(() => {
-    if (period === 'custom' && customStart && customEnd && customStart > customEnd) {
-      setAnalyticsLoading(false);
-      setAnalyticsError('La date de début doit être antérieure à la date de fin.');
-      return undefined;
+    if (period === 'custom') {
+      if (customStart && customEnd && customStart > customEnd) {
+        setAnalyticsLoading(false);
+        setAnalyticsError('La date de début doit être antérieure à la date de fin.');
+        return undefined;
+      }
+      // Fenêtre maximale contractuelle du backend (ANALYTICS_MAX_WINDOW_DAYS,
+      // DR-10) : vérifiée côté client pour éviter un aller-retour réseau inutile.
+      if (customStart && customEnd) {
+        const spanDays =
+          (new Date(customEnd).getTime() - new Date(customStart).getTime()) / 86_400_000;
+        if (spanDays > 366) {
+          setAnalyticsLoading(false);
+          setAnalyticsError('La période personnalisée est limitée à 366 jours.');
+          return undefined;
+        }
+      }
+      // Plage personnalisée incomplète (une seule borne saisie, ou aucune) :
+      // pas de requête tant qu'elle ne redevient pas complète — les derniers
+      // résultats valides restent affichés, sans erreur ni transition visible.
+      if (Boolean(customStart) !== Boolean(customEnd)) {
+        setAnalyticsLoading(false);
+        setAnalyticsError('');
+        return undefined;
+      }
     }
     const controller = new AbortController();
     setAnalyticsLoading(true);

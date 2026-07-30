@@ -13,14 +13,24 @@ export default function SupportChat({ onSend }: Props) {
   const [input, setInput] = useState('');
   const mutation = useMutationRunner();
   const loading = mutation.isPending('support:send');
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const requestRef = useRef<AbortController | null>(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
+  // Fait défiler uniquement le transcript (jamais le document) lors d'un
+  // nouvel échange. Ignoré au montage : rien à révéler tant qu'aucun message
+  // n'a encore été échangé.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const el = messagesRef.current;
+    if (!el) return;
+    el.scrollTo?.({ top: el.scrollHeight, behavior: 'smooth' });
   }, [history, loading]);
 
   useEffect(() => {
@@ -84,12 +94,12 @@ export default function SupportChat({ onSend }: Props) {
         <span className="support-status">Disponible</span>
       </div>
 
-      <div className="support-messages" role="log" aria-live="polite">
+      <div className="support-messages" role="log" aria-live="polite" ref={messagesRef}>
         {history.length === 0 && !loading && (
           <div className="support-empty">
             <div className="support-empty-copy">
               <span className="support-empty-kicker">Support Sentinel</span>
-              <p className="support-empty-title">Comment puis-je vous aider ?</p>
+              <p className="support-empty-title">Comment puis-je vous aider&nbsp;?</p>
               <p className="support-empty-sub">
                 Posez une question précise sur les incidents, les rôles ou les workflows atelier.
               </p>
@@ -128,8 +138,6 @@ export default function SupportChat({ onSend }: Props) {
             </div>
           </div>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
       <div className="support-composer">

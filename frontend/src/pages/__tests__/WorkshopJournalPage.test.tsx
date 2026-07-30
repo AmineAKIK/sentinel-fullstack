@@ -57,6 +57,7 @@ function baseJournalData(overrides: Partial<ReturnType<typeof useJournalData>> =
     updateLineFilter: vi.fn(),
     updateStartFilter: vi.fn(),
     updateEndFilter: vi.fn(),
+    clearPeriodFilter: vi.fn(),
     clearFilters: vi.fn(),
     handleSort: vi.fn(),
     ...overrides,
@@ -73,11 +74,18 @@ function renderJournalPage(overrides: Partial<ReturnType<typeof useJournalData>>
 }
 
 describe('WorkshopJournalPage — filtre période (lot 6, ANA-03)', () => {
+  it('conserve Début et Fin dans le nom accessible des deux champs visibles', () => {
+    renderJournalPage();
+
+    expect(screen.getByLabelText('Début')).toHaveAccessibleName('Début');
+    expect(screen.getByLabelText('Fin')).toHaveAccessibleName('Fin');
+  });
+
   it('affiche deux champs de date accessibles pour filtrer par période', () => {
     renderJournalPage();
 
-    expect(screen.getByLabelText('Depuis le')).toBeInTheDocument();
-    expect(screen.getByLabelText("Jusqu'au")).toBeInTheDocument();
+    expect(screen.getByLabelText('Début')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fin')).toBeInTheDocument();
   });
 
   it('appelle updateStartFilter/updateEndFilter quand les dates changent', () => {
@@ -85,8 +93,8 @@ describe('WorkshopJournalPage — filtre période (lot 6, ANA-03)', () => {
     const updateEndFilter = vi.fn();
     renderJournalPage({ updateStartFilter, updateEndFilter });
 
-    fireEvent.change(screen.getByLabelText('Depuis le'), { target: { value: '2026-03-01' } });
-    fireEvent.change(screen.getByLabelText("Jusqu'au"), { target: { value: '2026-03-31' } });
+    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '2026-03-01' } });
+    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '2026-03-31' } });
 
     expect(updateStartFilter).toHaveBeenCalledWith('2026-03-01');
     expect(updateEndFilter).toHaveBeenCalledWith('2026-03-31');
@@ -101,21 +109,18 @@ describe('WorkshopJournalPage — filtre période (lot 6, ANA-03)', () => {
   });
 
   it('affiche un chip de période retirable qui efface les deux bornes', () => {
-    const updateStartFilter = vi.fn();
-    const updateEndFilter = vi.fn();
+    const clearPeriodFilter = vi.fn();
     renderJournalPage({
       startFilter: '2026-03-01',
       endFilter: '2026-03-31',
-      updateStartFilter,
-      updateEndFilter,
+      clearPeriodFilter,
     });
 
     expect(screen.getByText(/Période : 2026-03-01 → 2026-03-31/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(/Retirer le filtre Période/i));
 
-    expect(updateStartFilter).toHaveBeenCalledWith('');
-    expect(updateEndFilter).toHaveBeenCalledWith('');
+    expect(clearPeriodFilter).toHaveBeenCalledOnce();
   });
 });
 

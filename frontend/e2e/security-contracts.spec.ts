@@ -62,17 +62,26 @@ async function tamperCookie(context: BrowserContext, name: string): Promise<void
   ]);
 }
 
-async function verifyWrongAdminPassword(page: Page): Promise<{ status: number; code: string }> {
-  return page.evaluate(async (url) => {
-    const response = await fetch(url, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: 'E2eWrongPassword!23' }),
-    });
-    const body = (await response.json()) as { error?: { code?: string } };
-    return { status: response.status, code: body.error?.code ?? '' };
-  }, `${API_ORIGIN}/api/admin/security/verify-password`);
+async function verifyAdminPassword(
+  page: Page,
+  password: string
+): Promise<{ status: number; code: string }> {
+  return page.evaluate(
+    async ({ url, password: submittedPassword }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: submittedPassword }),
+      });
+      const body = (await response.json()) as { error?: { code?: string } };
+      return { status: response.status, code: body.error?.code ?? '' };
+    },
+    {
+      url: `${API_ORIGIN}/api/admin/security/verify-password`,
+      password,
+    }
+  );
 }
 
 test('le cookie Admin absent ou altéré est refusé', async ({ page, context }) => {
@@ -120,15 +129,20 @@ test('la réauthentification révoque la session exactement au cinquième échec
 }) => {
   await loginAsAdmin(page);
 
+  await expect(verifyAdminPassword(page, E2E_ADMIN_PASSWORD)).resolves.toEqual({
+    status: 200,
+    code: '',
+  });
+
   for (let attempt = 1; attempt <= 4; attempt += 1) {
-    await expect(verifyWrongAdminPassword(page)).resolves.toEqual({
+    await expect(verifyAdminPassword(page, 'E2eWrongPassword!23')).resolves.toEqual({
       status: 401,
       code: 'REAUTHENTICATION_FAILED',
     });
     expect((await context.cookies()).some((cookie) => cookie.name === ADMIN_COOKIE)).toBe(true);
   }
 
-  await expect(verifyWrongAdminPassword(page)).resolves.toEqual({
+  await expect(verifyAdminPassword(page, 'E2eWrongPassword!23')).resolves.toEqual({
     status: 401,
     code: 'SESSION_REVOKED',
   });
@@ -147,7 +161,10 @@ test("l'écran Admin refuse le namespace numérique sans ouvrir de session Ateli
   expect((await context.cookies()).some((cookie) => cookie.name === WORKSHOP_COOKIE)).toBe(false);
 });
 
-test('les endpoints Board et Atelier détaillés exigent une session valide', async ({ page }) => {
+test('RC5-AUD-01 — les endpoints Board et Atelier détaillés exigent une session valide', async ({
+  page,
+  context,
+}) => {
   await page.goto('/board');
 
   const protectedPaths = [
@@ -166,6 +183,10 @@ test('les endpoints Board et Atelier détaillés exigent une session valide', as
 
   // Une session Board seule ouvre /api/board/data, jamais les endpoints
   // détaillés workshopAuthMiddleware — ce sont deux gardes distincts.
+  const jsonSessionResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url() === `${API_ORIGIN}/api/board/session` && response.request().method() === 'POST'
+  );
   await page.evaluate(
     async ({ url, code }) => {
       const response = await fetch(url, {
@@ -178,15 +199,59 @@ test('les endpoints Board et Atelier détaillés exigent une session valide', as
     },
     { url: `${API_ORIGIN}/api/board/session`, code: E2E_BOARD_CODE }
   );
+  const jsonSessionResponse = await jsonSessionResponsePromise;
+  const jsonSessionHeaders = await jsonSessionResponse.request().allHeaders();
+  expect(jsonSessionResponse.status()).toBe(200);
+  expect(jsonSessionHeaders.origin).toBe('http://127.0.0.1:5174');
+  expect(jsonSessionHeaders['content-type']).toBe('application/json');
+  expect(jsonSessionHeaders['sec-fetch-site']).toBe('same-site');
 
   const boardDataResponse = await fetchContract(page, '/api/board/data');
   expect(boardDataResponse.status).toBe(200);
   const incidentsAsBoard = await fetchContract(page, '/api/workshop/incidents');
   expect(incidentsAsBoard.status).toBe(401);
 
-  await page.evaluate(async (url) => {
-    await fetch(url, { method: 'POST', credentials: 'include' });
+  // Vrai Chromium depuis une seconde origine locale contrôlée. Le formulaire
+  // simple n'est pas preflighté : la barrière applicative doit donc refuser le
+  // POST avant qu'il n'efface la session Board.
+  const siblingPage = await context.newPage();
+  await siblingPage.goto('http://127.0.0.1:5175/robots.txt');
+  const siblingMethods: string[] = [];
+  siblingPage.on('request', (outgoing) => {
+    if (outgoing.url() === `${API_ORIGIN}/api/board/logout`) {
+      siblingMethods.push(outgoing.method());
+    }
+  });
+  const siblingResponsePromise = siblingPage.waitForResponse(
+    (response) =>
+      response.url() === `${API_ORIGIN}/api/board/logout` && response.request().method() === 'POST'
+  );
+  await siblingPage.evaluate(async (url) => {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'logout=true',
+    });
   }, `${API_ORIGIN}/api/board/logout`);
+  const siblingResponse = await siblingResponsePromise;
+  const siblingHeaders = await siblingResponse.request().allHeaders();
+  expect(siblingResponse.status()).toBe(403);
+  expect(siblingMethods).toEqual(['POST']);
+  expect(siblingHeaders.referer).toBe('http://127.0.0.1:5175/');
+  expect(siblingHeaders['content-type']).toBe('application/x-www-form-urlencoded');
+  await siblingPage.close();
+
+  // La tentative sœur n'a produit aucun changement de session.
+  expect((await fetchContract(page, '/api/board/data')).status).toBe(200);
+
+  const exactOriginLogout = await page.evaluate(async (url) => {
+    const response = await fetch(url, { method: 'POST', credentials: 'include' });
+    return response.status;
+  }, `${API_ORIGIN}/api/board/logout`);
+  expect(exactOriginLogout).toBe(200);
+  expect((await fetchContract(page, '/api/board/data')).status).toBe(401);
 
   // Une session Atelier ouvre les deux : elle satisfait aussi le garde Board
   // (hasValidWorkshopSession est vérifié en second recours dans boardReadAuthMiddleware).

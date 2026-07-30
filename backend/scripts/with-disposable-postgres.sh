@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Exécute une commande avec un PostgreSQL JETABLE et ISOLÉ, identique à celui du
-# job CI « Backend / PostgreSQL integration » (postgres:15.18-alpine3.23). Sert à
+# job CI « Backend / PostgreSQL integration »
+# (postgres:15.18-alpine3.23, épinglé au même digest OCI). Sert à
 # faire tourner localement le cycle « test rouge → correction → test vert » sur
 # une vraie base, sans sudo et sans toucher au PostgreSQL système ni au .env du
 # dépôt.
@@ -30,7 +31,7 @@ if [[ $# -eq 0 ]]; then
   exit 2
 fi
 
-PG_IMAGE="postgres:15.18-alpine3.23"
+PG_IMAGE="postgres:15.18-alpine3.23@sha256:3889f6e66267065437b17a404058a6220d9080c73b701edd225770f8b2d6a52c"
 RUN_ID="$$-${RANDOM}${RANDOM}"
 PG_NAME="sentinel-testpg-${RUN_ID}"
 PG_VOL=""

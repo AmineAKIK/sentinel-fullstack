@@ -1,10 +1,12 @@
 import {
   assertProductionConfig,
   parseBooleanEnv,
+  parseClientOrigin,
   parseIntegerEnv,
   parsePort,
   parseTrustProxy,
 } from '../production';
+import { createCsrfProtection } from '../../middlewares/csrfProtection';
 
 const ORIGINAL_ENV = process.env;
 
@@ -124,6 +126,15 @@ describe('assertProductionConfig', () => {
     expect(() => assertProductionConfig()).toThrow('origin');
   });
 
+  it('rejects a trailing slash instead of diverging from the runtime CSRF guard', () => {
+    setProductionEnv({ CLIENT_ORIGIN: 'https://sentinel.akiksystems.fr/' });
+
+    expect(() => assertProductionConfig()).toThrow('canonical absolute origin');
+    expect(() => createCsrfProtection(process.env.CLIENT_ORIGIN!)).toThrow(
+      'canonical absolute origin'
+    );
+  });
+
   it('rejects a placeholder production origin', () => {
     setProductionEnv({ CLIENT_ORIGIN: 'https://sentinel.example.com' });
 
@@ -189,6 +200,71 @@ describe('assertProductionConfig', () => {
       SMTP_PORT: 'invalid',
     });
     expect(() => assertProductionConfig()).toThrow('SMTP_PORT');
+  });
+});
+
+describe('parseClientOrigin', () => {
+  it('accepts canonical HTTPS production and explicit local HTTP test origins', () => {
+    expect(parseClientOrigin('https://sentinel.akiksystems.fr', 'production')).toBe(
+      'https://sentinel.akiksystems.fr'
+    );
+    expect(parseClientOrigin('https://sentinel.akiksystems.fr:8443', 'production')).toBe(
+      'https://sentinel.akiksystems.fr:8443'
+    );
+    expect(parseClientOrigin('http://localhost:5173', 'test')).toBe('http://localhost:5173');
+    expect(parseClientOrigin('http://127.0.0.1:5173', 'development')).toBe('http://127.0.0.1:5173');
+    expect(parseClientOrigin('http://[::1]:5173', 'test')).toBe('http://[::1]:5173');
+  });
+
+  it('uses NODE_ENV=development when the caller omits the explicit environment', () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      expect(parseClientOrigin('http://localhost:5173')).toBe('http://localhost:5173');
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it.each([
+    undefined,
+    '',
+    ' https://sentinel.akiksystems.fr',
+    'https://sentinel.akiksystems.fr/',
+    'https://sentinel.akiksystems.fr:443',
+    'https://user@sentinel.akiksystems.fr',
+    'https://sentinel.akiksystems.fr/path',
+    'https://sentinel.akiksystems.fr?query=yes',
+    'https://sentinel.akiksystems.fr#fragment',
+    'https://*.akiksystems.fr',
+    'ftp://sentinel.akiksystems.fr',
+  ])('rejects a missing, malformed or non-canonical origin: %p', (origin) => {
+    expect(() => parseClientOrigin(origin, 'production')).toThrow('CLIENT_ORIGIN');
+  });
+
+  it.each([
+    ['production', 'http://localhost:5173'],
+    ['production', 'http://sentinel.akiksystems.fr'],
+    ['development', 'http://sentinel.akiksystems.fr'],
+    ['test', 'http://untrusted.localhost:5173'],
+    ['staging', 'http://localhost:5173'],
+  ])('rejects HTTP outside an explicitly local development/test origin', (nodeEnv, origin) => {
+    expect(() => parseClientOrigin(origin, nodeEnv)).toThrow('CLIENT_ORIGIN');
+  });
+
+  it('uses the same canonical contract in production preflight and runtime CSRF', () => {
+    for (const origin of [
+      'https://sentinel.akiksystems.fr/',
+      'https://sentinel.akiksystems.fr/path',
+      'https://sentinel.akiksystems.fr?query=yes',
+      'https://sentinel.akiksystems.fr#fragment',
+      'https://user@sentinel.akiksystems.fr',
+    ]) {
+      setProductionEnv({ CLIENT_ORIGIN: origin });
+
+      expect(() => assertProductionConfig()).toThrow('canonical absolute origin');
+      expect(() => createCsrfProtection(origin)).toThrow('canonical absolute origin');
+    }
   });
 });
 

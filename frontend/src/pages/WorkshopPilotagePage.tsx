@@ -20,7 +20,7 @@ const PERIOD_LABELS: Record<HistoryPeriod, string> = {
   today: "Aujourd'hui",
   '7d': '7 derniers jours',
   '30d': '30 derniers jours',
-  lifetime: '90 derniers jours (max)',
+  lifetime: '90 derniers jours',
   custom: 'Personnalisée',
 };
 
@@ -100,8 +100,6 @@ export default function WorkshopPilotagePage() {
             label: `Période: ${PERIOD_LABELS[period]}`,
             onRemove: () => {
               setPeriod('7d');
-              setCustomStart('');
-              setCustomEnd('');
             },
           },
         ]
@@ -118,8 +116,6 @@ export default function WorkshopPilotagePage() {
 
   function clearFilters() {
     setPeriod('7d');
-    setCustomStart('');
-    setCustomEnd('');
     setLineFilter('all');
     setMachineFilter('all');
   }
@@ -322,7 +318,9 @@ export default function WorkshopPilotagePage() {
           </div>
 
           {analyticsError && (
-            <ErrorBanner style={{ marginBottom: 12 }}>{analyticsError}</ErrorBanner>
+            <ErrorBanner id="pilotage-period-error" style={{ marginBottom: 12 }}>
+              {analyticsError}
+            </ErrorBanner>
           )}
 
           <div className="card pilotage-filter-card">
@@ -355,7 +353,7 @@ export default function WorkshopPilotagePage() {
                     className="form-input"
                     value={customStart}
                     onChange={(e) => setCustomStart(e.target.value)}
-                    disabled={period !== 'custom'}
+                    aria-describedby={analyticsError ? 'pilotage-period-error' : undefined}
                   />
                 </div>
                 <div className="form-group">
@@ -368,8 +366,11 @@ export default function WorkshopPilotagePage() {
                     className="form-input"
                     value={customEnd}
                     onChange={(e) => setCustomEnd(e.target.value)}
-                    disabled={period !== 'custom'}
+                    aria-describedby={analyticsError ? 'pilotage-period-error' : undefined}
                   />
+                  <span className="form-hint">
+                    La période personnalisée est limitée à 366 jours.
+                  </span>
                 </div>
                 <div className="form-group">
                   <label className="form-label" aria-hidden="true">

@@ -91,7 +91,7 @@ Utiliser des sessions distinctes ou se reconnecter entre rôles.
 | 6.3 | Maintenance | prendre en charge | affectation et date renseignées |
 | 6.4 | Même maintenance | reprendre immédiatement | action absente/refusée, aucun no-op |
 | 6.5 | Autre maintenance | utiliser TAKE | transfert tracé |
-| 6.6 | Maintenance | mettre en attente sans diagnostic | refus |
+| 6.6 | Maintenance | mettre en attente sans motif de mise en attente | refus |
 | 6.7 | Technicien | mettre en attente avec un motif | `PENDING` |
 | 6.8 | Maintenance | clôturer depuis `PENDING` | refus |
 | 6.9 | Maintenance | reprendre puis clôturer avec note | `CLOSED` |

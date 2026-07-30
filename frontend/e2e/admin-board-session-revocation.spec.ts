@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { E2E_ADMIN_PASSWORD, E2E_ADMIN_USERNAME, E2E_BOARD_CODE } from './fixtures';
 
 const API_ORIGIN = 'http://127.0.0.1:3100';
@@ -21,12 +21,99 @@ async function loginToBoard(page: Page): Promise<void> {
 }
 
 async function expectNoSeriousViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
   const blocking = results.violations.filter(
     (violation) => violation.impact === 'serious' || violation.impact === 'critical'
   );
   expect(blocking, JSON.stringify(blocking, null, 2)).toEqual([]);
 }
+
+async function expectVisibleKeyboardFocus(locator: Locator): Promise<void> {
+  await expect(locator).toBeFocused();
+  expect(
+    await locator.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const outlined =
+        style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth || '0') > 0;
+      return outlined || (style.boxShadow !== 'none' && style.boxShadow !== '');
+    })
+  ).toBe(true);
+}
+
+test('RC5-AUD-04 — l’erreur Admin est reliée au champ et la croix restaure le focus exact', async ({
+  page,
+}) => {
+  await loginAsAdmin(page);
+  await page.goto('/admin/parametres');
+
+  const boardSessions = page.getByLabel('Sessions board atelier', { exact: true });
+  await boardSessions.check();
+  const behaviorForm = boardSessions.locator('xpath=ancestor::form');
+  const save = behaviorForm.getByRole('button', { name: 'Enregistrer' });
+  await save.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Révoquer des sessions ?' });
+  await expect(dialog).toBeVisible();
+  const password = dialog.getByLabel('Mot de passe administrateur');
+  await password.fill('mot-de-passe-incorrect');
+  const confirm = dialog.getByRole('button', { name: 'Révoquer' });
+  await confirm.focus();
+  await page.keyboard.press('Enter');
+
+  const passwordError = dialog.getByRole('alert');
+  await expect(passwordError).toHaveText('Mot de passe incorrect.');
+  await expect(passwordError).toHaveAttribute('id', 'admin-password-error');
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
+  await expect(password).toHaveAttribute('aria-describedby', 'admin-password-error');
+  await expect(password).toHaveAccessibleDescription('Mot de passe incorrect.');
+  await expectVisibleKeyboardFocus(password);
+  await expectNoSeriousViolations(page);
+
+  const close = dialog.getByRole('button', { name: 'Fermer' });
+  await close.focus();
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeHidden();
+  await expectVisibleKeyboardFocus(save);
+});
+
+test('RC5-AUD-05 — Espace conserve le label et le focus visible du champ Board désactivé', async ({
+  page,
+}) => {
+  await loginAsAdmin(page);
+  await page.goto('/admin/parametres');
+
+  const noExpiry = page.getByRole('checkbox', {
+    name: 'Session Board sans expiration automatique',
+  });
+  await expect(noExpiry).not.toBeChecked();
+  for (let index = 0; index < 100; index += 1) {
+    if (await noExpiry.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(noExpiry).toBeFocused();
+  await page.keyboard.press('Space');
+
+  await expect(noExpiry).toBeChecked();
+  await expect(noExpiry).toBeFocused();
+  const toggleTrack = noExpiry.locator(
+    'xpath=following-sibling::span[contains(@class,"toggle-track")]'
+  );
+  expect(
+    await toggleTrack.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth || '0') > 0;
+    })
+  ).toBe(true);
+  const ttlInput = page.getByRole('textbox', {
+    name: 'Durée de session — Board atelier',
+  });
+  await expect(ttlInput).toHaveAttribute('id', 'boardSessionTtl');
+  await expect(ttlInput).toBeDisabled();
+  await expect(ttlInput).toHaveAccessibleName('Durée de session — Board atelier');
+  await expectNoSeriousViolations(page);
+});
 
 test('la révocation Board est confirmée et refuse réellement une session HTTP déjà émise', async ({
   page,

@@ -1,19 +1,72 @@
 import { AnalyticsParams } from '../api/workshop';
 import { HistoryPeriod } from './workshopHistory';
 
+const CANONICAL_CIVIL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 /**
- * Borne de début de journée en ISO 8601. Une date sans heure (`YYYY-MM-DD`)
- * est déjà interprétée à minuit par le moteur JS — aucun recalage nécessaire.
+ * Valide un jour civil sans le confier au constructeur Date, qui normalise
+ * silencieusement les dates impossibles (par exemple le 31 février).
  */
-export function dayStartIso(dateInput: string): string {
-  return new Date(dateInput).toISOString();
+export function isCanonicalCivilDate(dateInput: string): boolean {
+  const match = CANONICAL_CIVIL_DATE.exec(dateInput);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
+}
+
+/**
+ * Borne de début de journée locale en ISO 8601. Une date seule (`YYYY-MM-DD`)
+ * serait interprétée en UTC par le moteur JS : l'heure explicite sans fuseau
+ * conserve le jour civil choisi dans le navigateur.
+ */
+export function dayStartIso(dateInput: string): string | undefined {
+  if (!isCanonicalCivilDate(dateInput)) return undefined;
+  return new Date(`${dateInput}T00:00:00.000`).toISOString();
 }
 
 /** Borne de fin de journée (23:59:59.999, horloge locale) en ISO 8601. */
-export function dayEndIso(dateInput: string): string {
-  const date = new Date(dateInput);
-  date.setHours(23, 59, 59, 999);
-  return date.toISOString();
+export function dayEndIso(dateInput: string): string | undefined {
+  if (!isCanonicalCivilDate(dateInput)) return undefined;
+  return new Date(`${dateInput}T23:59:59.999`).toISOString();
+}
+
+/** Sérialise une Date en `YYYY-MM-DD` (jour local), format natif d'un `<input type="date">`. */
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export type PresetDateRange = { start: string; end: string };
+
+/**
+ * Bornes effectives d'un preset non personnalisé, au format `YYYY-MM-DD`
+ * (jour local) — mêmes règles que `buildAnalyticsParams`, pour affichage
+ * dans les champs Début/Fin quand un preset est actif. `null` pour `custom`,
+ * qui n'a pas de bornes calculées : ce sont les valeurs saisies par l'utilisateur.
+ */
+export function presetDateRange(period: HistoryPeriod): PresetDateRange | null {
+  const end = new Date();
+  if (period === 'today') {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return { start: toDateInputValue(start), end: toDateInputValue(end) };
+  }
+  if (period === '7d' || period === '30d' || period === 'lifetime') {
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    return { start: toDateInputValue(start), end: toDateInputValue(end) };
+  }
+  return null;
 }
 
 export function buildAnalyticsParams(
@@ -32,15 +85,20 @@ export function buildAnalyticsParams(
     params.start = startDate.toISOString();
     params.end = endDate.toISOString();
   }
-  if (period === '7d' || period === '30d') {
+  if (period === '7d' || period === '30d' || period === 'lifetime') {
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - (period === '7d' ? 7 : 30));
+    startDate.setDate(endDate.getDate() - days);
     params.start = startDate.toISOString();
     params.end = endDate.toISOString();
   }
   if (period === 'custom') {
-    if (customStart) params.start = dayStartIso(customStart);
-    if (customEnd) params.end = dayEndIso(customEnd);
+    const start = dayStartIso(customStart);
+    const end = dayEndIso(customEnd);
+    if (!(start && end && customStart > customEnd)) {
+      if (start) params.start = start;
+      if (end) params.end = end;
+    }
   }
   if (lineFilter !== 'all') params.lineId = Number(lineFilter);
   if (machineFilter !== 'all') params.machineId = machineFilter;

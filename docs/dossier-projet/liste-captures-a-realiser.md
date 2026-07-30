@@ -1,7 +1,7 @@
 # Liste des captures à réaliser — Dossier de projet DWWM
 
 > Une instance existe sur `sentinel.akiksystems.fr`, mais aucune capture de
-> cette instance ne constitue une preuve RC4 tant que le SHA RC4 n'a pas été
+> cette instance ne constitue une preuve RC5 tant que le SHA RC5 n'a pas été
 > explicitement autorisé, déployé et vérifié. Chaque ligne ci-dessous précise l'écran,
 > l'état exact à afficher après ce futur déploiement, et ce que la capture doit démontrer pour le jury.
 > Format recommandé : PNG, viewport desktop 1440×900 sauf mention "mobile" (viewport 390×844,
@@ -55,19 +55,19 @@
 
 | # | Contenu | Comment l'obtenir |
 |---|---|---|
-| 26 | Run GitHub Actions vert | Capturer le SHA RC4 exact et les six jobs verts : Backend/Frontend Quality, PostgreSQL integration, Browser, Containers et Backup/restore |
+| 26 | Run GitHub Actions vert | Capturer le SHA RC5 exact et les six jobs verts : Backend/Frontend Quality, PostgreSQL integration, Browser, Containers et Backup/restore |
 
-## Preuves externes RC4 à ne produire qu'après autorisation
+## Preuves externes RC5 à ne produire qu'après autorisation
 
 | # | Preuve | État exact requis |
 |---|---|---|
-| 27 | Version déployée | `/api/health` en HTTP 200 avec `version` égale au SHA du tag RC4 |
+| 27 | Version déployée | `/api/health` en HTTP 200 avec `version` égale au SHA du tag RC5 |
 | 28 | En-têtes HTTPS | Sortie de `verify-public-headers.sh` : valeurs uniques sur `/login` et `/api/health`, barrière absente |
 | 29 | Courriel multipart | Message reçu dans une vraie boîte : alternatives texte et HTML, lien same-origin correct, aucune image distante obligatoire |
-| 30 | Provenance des images | Digests backend/frontend de la prerelease et labels OCI `revision` égaux au merge RC4 |
+| 30 | Provenance des images | Digests backend/frontend de la prerelease et labels OCI `revision` égaux au merge RC5 |
 | 31 | Sauvegarde avant déploiement | Nom horodaté, checksum vérifié et copie hors site confirmée, sans afficher de secret |
-| 32 | Recette multi-rôle | Admin, Atelier et Board sur la RC4 réellement servie ; motif, correction, annulation et Historique visibles |
+| 32 | Recette multi-rôle | Admin, Atelier et Board sur la RC5 réellement servie ; motif, correction, annulation et Historique visibles |
 
-Les captures 1 à 25 doivent elles aussi être reprises sur cette même RC4. Une
+Les captures 1 à 25 doivent elles aussi être reprises sur cette même RC5. Une
 capture RC3, locale ou issue d'un autre SHA peut illustrer une maquette, mais
-doit être légendée comme telle et ne jamais être attribuée à la candidate RC4.
+doit être légendée comme telle et ne jamais être attribuée à la candidate RC5.

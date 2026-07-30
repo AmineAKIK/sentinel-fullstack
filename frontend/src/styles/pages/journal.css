@@ -67,36 +67,25 @@
   border-top: 1px solid var(--color-border);
 }
 
+/* Barre de filtre Action/Début/Fin : réutilise les primitives canoniques
+   .form-group/.form-label/.form-select/.form-input et la grille .history-grid
+   déjà employées par le filtre Pilotage — pas de second bloc de style dupliqué. */
 .history-event-filter {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
   margin-bottom: 14px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--color-border);
 }
 
-.history-event-select {
-  appearance: none;
-  -webkit-appearance: none;
-  height: 36px;
-  padding: 0 32px 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background-color: var(--color-bg-card);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  color: var(--color-text);
-  font-size: 0.875rem;
-  font-family: inherit;
-  cursor: pointer;
-  min-width: 180px;
+.history-event-filter-grid {
+  align-items: end;
 }
 
-.history-event-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
+.history-event-result {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+.history-event-chip {
+  margin-top: var(--space-3);
 }

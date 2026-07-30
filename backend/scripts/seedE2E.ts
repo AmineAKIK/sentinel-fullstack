@@ -21,7 +21,11 @@ import {
   createIncidentService,
   requestEditIncidentService,
 } from '../src/modules/workshop/workshop.service.edit';
-import { requestCancelIncidentService } from '../src/modules/workshop/workshop.service.mutations';
+import {
+  closeIncidentService,
+  requestCancelIncidentService,
+  takeIncidentService,
+} from '../src/modules/workshop/workshop.service.mutations';
 import { assertSafeTestDatabaseUrl } from '../src/testing/databaseGuard';
 
 // Identifiants partagés avec le test (frontend/e2e/fixtures.ts en garde une copie).
@@ -259,6 +263,69 @@ async function createScrollGeometryIncidents(lineId: number, operatorId: number)
   }
 }
 
+async function createKnowledgeIncidents(
+  lineId: number,
+  operatorId: number,
+  maintenanceId: number
+): Promise<void> {
+  const fixtures = [
+    {
+      headNumber: 5,
+      currentProduct: 'E2E-KB-A',
+      comment:
+        'Symptôme observé avec un texte volontairement long pour vérifier le retour à la ligne sur mobile sans provoquer de débordement horizontal du document complet.',
+      interventionNote:
+        'Solution détaillée et longue décrivant précisément chaque étape de l’intervention réalisée sur la machine afin de vérifier que le fond de la carte solution ne dépasse jamais la largeur de son conteneur parent.',
+    },
+    {
+      headNumber: 14,
+      currentProduct: `E2E-KB-LONGPRODUCT-${'X'.repeat(100)}`.slice(0, FIELD_LIMITS.PRODUCT),
+      comment:
+        'Symptôme B avec un texte volontairement long pour vérifier le retour à la ligne sur mobile sans provoquer de débordement horizontal du document complet, sur plusieurs phrases.',
+      interventionNote:
+        'Solution B détaillée et longue décrivant précisément chaque étape de l’intervention réalisée sur la machine afin de vérifier que le fond de la carte solution ne dépasse jamais la largeur de son conteneur parent, même avec un paragraphe conséquent.',
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    const created = await createIncidentService(
+      {
+        lineId,
+        machineId: E2E_MACHINE_ID,
+        robotLabel: '1',
+        headNumber: fixture.headNumber,
+        state: 'DEGRADEE',
+        comment: fixture.comment,
+        currentProduct: fixture.currentProduct,
+      },
+      operatorId,
+      'OPERATOR'
+    );
+    if (!created.ok) {
+      throw new Error(`Création connaissance E2E tête ${fixture.headNumber}: ${created.message}`);
+    }
+    const incidentId = createdIncidentId(
+      created.data,
+      `Création connaissance E2E tête ${fixture.headNumber}`
+    );
+    const taken = await takeIncidentService(incidentId, maintenanceId, 'MAINTENANCE');
+    if (!taken.ok) {
+      throw new Error(
+        `Prise en charge connaissance E2E tête ${fixture.headNumber}: ${taken.message}`
+      );
+    }
+    const closed = await closeIncidentService(
+      incidentId,
+      fixture.interventionNote,
+      maintenanceId,
+      'MAINTENANCE'
+    );
+    if (!closed.ok) {
+      throw new Error(`Clôture connaissance E2E tête ${fixture.headNumber}: ${closed.message}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   assertSafeTestDatabaseUrl(process.env.DATABASE_URL, 'e2e');
   await upsertAdmin();
@@ -278,7 +345,7 @@ async function main(): Promise<void> {
     badgeNumber: E2E_RESPONSABLE_BADGE,
     role: 'RESPONSABLE',
   });
-  await upsertWorkshopUser({
+  const maintenanceId = await upsertWorkshopUser({
     firstName: 'Maintenance',
     lastName: 'E2E',
     badgeNumber: E2E_MAINTENANCE_BADGE,
@@ -286,6 +353,7 @@ async function main(): Promise<void> {
   });
   await createArbitrationIncidents(lineId, operatorId);
   await createScrollGeometryIncidents(lineId, operatorId);
+  await createKnowledgeIncidents(lineId, operatorId, maintenanceId);
   console.log(
     `Seed E2E OK — admin « ${E2E_ADMIN_USERNAME} », atelier « ${E2E_RESPONSABLE_BADGE} », ` +
       `ligne admin ${E2E_ADMIN_LINE_NUMBER} (${E2E_ADMIN_MACHINE_ID}), ` +

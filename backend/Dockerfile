@@ -1,4 +1,4 @@
-FROM node:24.18.0-alpine3.23 AS builder
+FROM node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436 AS builder
 
 WORKDIR /app
 
@@ -11,13 +11,14 @@ COPY migrations ./migrations
 
 RUN npm run build
 
-FROM node:24.18.0-alpine3.23 AS production
+FROM node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436 AS production
 
 WORKDIR /app
 
 ARG BUILD_SHA=unknown
 ENV BUILD_SHA=$BUILD_SHA
-LABEL org.opencontainers.image.revision=$BUILD_SHA
+LABEL org.opencontainers.image.revision=$BUILD_SHA \
+      org.opencontainers.image.title=sentinel-backend
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force

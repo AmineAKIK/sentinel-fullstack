@@ -145,7 +145,7 @@ export default function WorkshopLoginPage() {
             role: response.role,
           },
         });
-        navigate('/workshop/dashboard', { replace: true });
+        void navigate('/workshop/dashboard', { replace: true });
       }
       return;
     }
@@ -194,7 +194,7 @@ export default function WorkshopLoginPage() {
             role: response.role,
           },
         });
-        navigate('/workshop/dashboard', { replace: true });
+        void navigate('/workshop/dashboard', { replace: true });
       }
     }
   }

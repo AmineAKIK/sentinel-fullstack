@@ -190,6 +190,33 @@ describe('BoardIncidentGrid', () => {
     expect(screen.queryByLabelText('Modification à arbitrer')).toBeNull();
   });
 
+  it('affiche l’état, Urgent et l’arbitrage cumulés sans les masquer (RC5-7)', () => {
+    const cumulative = mockIncident({
+      state: 'INDISPONIBLE',
+      is_priority: true,
+      has_cancel_arbitration: true,
+    });
+    renderGrid([cumulative]);
+
+    expect(screen.getByText('Indisponible')).toBeDefined();
+    expect(screen.getByText('Urgent')).toBeDefined();
+    expect(screen.getByLabelText('Annulation à arbitrer')).toBeDefined();
+  });
+
+  it('permet à la rangée d’indicateurs de revenir à la ligne indépendamment du titre (RC5-7)', () => {
+    expect(boardStyles).toMatch(/\.board-incident-top\s*\{[^}]*flex-wrap:\s*wrap;[^}]*\}/s);
+    expect(boardStyles).toMatch(/\.board-incident-top-status\s*\{[^}]*flex-wrap:\s*wrap;[^}]*\}/s);
+  });
+
+  it('ne comprime plus l’état machine sous une largeur maximale fixe (RC5-7)', () => {
+    // RC5-7 : l'ancien max-width: 190px forçait l'état à s'écraser sur une
+    // largeur minuscule quand les badges Urgent/arbitrage se cumulaient sur
+    // la même ligne, provoquant un chevauchement avec le numéro de ligne.
+    // flex-shrink: 0 préserve sa largeur de contenu naturelle.
+    expect(boardStyles).not.toMatch(/\.board-incident-state\s*\{[^}]*max-width:[^}]*\}/s);
+    expect(boardStyles).toMatch(/\.board-incident-state\s*\{[^}]*flex-shrink:\s*0;[^}]*\}/s);
+  });
+
   it('reste en lecture seule et ne rend aucune donnée privée injectée dans la source', () => {
     const adversarialIncident = {
       ...mockIncident({ status: 'PENDING' }),

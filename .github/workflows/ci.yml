@@ -25,8 +25,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -38,14 +38,27 @@ jobs:
       - run: npm run build
       - run: npm run test:coverage
       - run: npm run verify:reliability
-      # Audit des dépendances de PRODUCTION (celles réellement expédiées).
-      # Portée : --omit=dev ne couvre PAS l'intégralité de la chaîne d'outillage
-      # de dev ; il valide ce qui part en production. Les paquets de dev (Jest,
-      # ESLint) tirent des versions de brace-expansion (1.1.16, 2.1.2) déjà
-      # corrigées mais que l'avis GHSA-mh99-v99m-4gvg — aplati par npm en une
-      # plage unique `<=5.0.7` — signale à tort ; aucune ne part en production.
-      # La version 5.x réellement vulnérable est épinglée en 5.0.8 via overrides.
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Enforce bounded dependency exceptions
+        run: |
+          python3 ../scripts/dependency_exception_guard.py repository
+          set +e
+          npm audit --omit=dev --audit-level=high --json > "${RUNNER_TEMP}/backend-runtime-audit.json"
+          runtime_status=$?
+          npm audit --audit-level=high --json > "${RUNNER_TEMP}/backend-full-audit.json"
+          full_status=$?
+          set -e
+          if [ "$runtime_status" -gt 1 ] || [ "$full_status" -gt 1 ]; then
+            echo "npm audit failed without a reviewable vulnerability result" >&2
+            exit 1
+          fi
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace backend \
+            --audit-kind runtime \
+            --audit-json "${RUNNER_TEMP}/backend-runtime-audit.json"
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace backend \
+            --audit-kind full \
+            --audit-json "${RUNNER_TEMP}/backend-full-audit.json"
 
   frontend:
     name: Frontend / Quality
@@ -55,8 +68,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -66,10 +79,27 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
-      # Voir le job backend : audit des dépendances de production (pas de toute
-      # la chaîne de dev) ; les faux positifs brace-expansion viennent de
-      # l'outillage de dev, jamais expédié.
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Enforce bounded dependency exceptions
+        run: |
+          python3 ../scripts/dependency_exception_guard.py repository
+          set +e
+          npm audit --omit=dev --audit-level=high --json > "${RUNNER_TEMP}/frontend-runtime-audit.json"
+          runtime_status=$?
+          npm audit --audit-level=high --json > "${RUNNER_TEMP}/frontend-full-audit.json"
+          full_status=$?
+          set -e
+          if [ "$runtime_status" -gt 1 ] || [ "$full_status" -gt 1 ]; then
+            echo "npm audit failed without a reviewable vulnerability result" >&2
+            exit 1
+          fi
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace frontend \
+            --audit-kind runtime \
+            --audit-json "${RUNNER_TEMP}/frontend-runtime-audit.json"
+          python3 ../scripts/dependency_exception_guard.py audit \
+            --workspace frontend \
+            --audit-kind full \
+            --audit-json "${RUNNER_TEMP}/frontend-full-audit.json"
 
   integration:
     name: Backend / PostgreSQL integration
@@ -80,7 +110,7 @@ jobs:
         working-directory: backend
     services:
       postgres:
-        image: postgres:15.18-alpine3.23
+        image: postgres:15.18-alpine3.23@sha256:3889f6e66267065437b17a404058a6220d9080c73b701edd225770f8b2d6a52c
         env:
           POSTGRES_DB: sentinel_test
           POSTGRES_USER: sentinel
@@ -101,11 +131,11 @@ jobs:
       # (waitingReasonUpgrade048to050) compare au tag immuable v1.0.0-rc.2, qui
       # n'existe pas dans un checkout superficiel. Elle est ainsi OBLIGATOIRE
       # (aucun skip) et échoue si le tag manque.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -120,7 +150,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:15.18-alpine3.23
+        image: postgres:15.18-alpine3.23@sha256:3889f6e66267065437b17a404058a6220d9080c73b701edd225770f8b2d6a52c
         env:
           POSTGRES_DB: sentinel_e2e
           POSTGRES_USER: sentinel
@@ -141,8 +171,8 @@ jobs:
       CLIENT_ORIGIN: http://127.0.0.1:5174
       GLOBAL_API_RATE_LIMIT_MAX: 10000
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -155,7 +185,7 @@ jobs:
       - run: npm --prefix frontend run test:e2e
       - name: Upload Playwright diagnostics
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-diagnostics
           path: |
@@ -179,7 +209,20 @@ jobs:
       BUILD_SHA: ${{ github.sha }}
       CADDY_DOMAIN: sentinel.example.test
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate the main-only release policy and secretless dry-run
+        run: |
+          python3 scripts/test-release-policy.py
+          python3 scripts/test-release-gate.py
+          python3 scripts/test-release-workflow.py
+          python3 scripts/test-dependency-exception-policy.py
+      - name: Validate GitHub Actions workflow structure
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/repo:ro"
+          -w /repo
+          rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -color=false .github/workflows/ci.yml .github/workflows/release.yml
       - name: Validate Compose interpolation and schema
         run: docker compose config --quiet
       - name: Validate host-proxy Compose variant
@@ -215,6 +258,11 @@ jobs:
             --build-arg BUILD_SHA="$BUILD_SHA" \
             --tag sentinel-frontend:ci \
             ./frontend
+      - name: Enforce bounded exceptions in application image payloads
+        run: >-
+          python3 scripts/dependency_exception_guard.py images
+          --backend-image sentinel-backend:ci
+          --frontend-image sentinel-frontend:ci
       - name: Assert non-root image users
         run: |
           test "$(docker image inspect --format '{{.Config.User}}' sentinel-backend:ci)" = "node"
@@ -242,27 +290,27 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}/deploy/nginx/sentinel.conf.example:/etc/nginx/conf.d/default.conf:ro" \
             -v "${{ github.workspace }}/.ci-certs:/etc/letsencrypt:ro" \
-            nginx:1.18.0 nginx -t
+            nginx:1.18.0@sha256:e90ac5331fe095cea01b121a3627174b2e33e06e83720e9a934c7b8ccc9c55a0 nginx -t
       - name: Validate Caddy configuration
         run: >-
           docker run --rm
           -e CADDY_DOMAIN=sentinel.example.test
           -v "${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile:ro"
-          caddy:2.11.4-alpine
+          caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
           caddy validate --config /etc/caddy/Caddyfile
       - name: ShellCheck operational scripts
         run: >-
           docker run --rm
           -v "${{ github.workspace }}:/mnt:ro"
           -w /mnt
-          koalaman/shellcheck-alpine:v0.10.0
-          shellcheck -x scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh scripts/test-preflight.sh scripts/verify-public-headers.sh scripts/test-nginx-header-inheritance.sh
+          koalaman/shellcheck-alpine:v0.10.0@sha256:5921d946dac740cbeec2fb1c898747b6105e585130cc7f0602eec9a10f7ddb63
+          shellcheck -x scripts/lib/env.sh scripts/backup.sh scripts/restore.sh scripts/test-backup-restore.sh scripts/verify-compose-topology.sh scripts/test-env-parsing.sh scripts/preflight.sh scripts/test-preflight.sh scripts/verify-public-headers.sh scripts/test-nginx-header-inheritance.sh scripts/verify-release-candidate.sh backend/scripts/with-disposable-postgres.sh
 
   ops:
     name: Ops / Backup and restore drill
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Exercise backup.sh and restore.sh against a real PostgreSQL
         run: ./scripts/test-backup-restore.sh

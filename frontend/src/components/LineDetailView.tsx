@@ -6,16 +6,14 @@ import EditMachineModal from './EditMachineModal';
 import LinePlanModal from './LinePlanModal';
 import DetailField from './ui/DetailField';
 import ErrorBanner from './ui/ErrorBanner';
-import SuccessBanner from './ui/SuccessBanner';
 import { LineMachine, ProductionLine } from '../types';
 import { formatDate } from '../utils/date';
 
 interface LineDetailViewProps {
   line: ProductionLine;
-  successMsg: string;
   error: string;
   onBack: () => void;
-  onLineUpdated: (updated: ProductionLine, message: string) => void;
+  onLineUpdated: (updated: ProductionLine) => void;
   onLineDeleted: (line: ProductionLine) => void;
 }
 
@@ -28,7 +26,6 @@ function robotLabel(machine: LineMachine): string {
 
 export default function LineDetailView({
   line,
-  successMsg,
   error,
   onBack,
   onLineUpdated,
@@ -62,7 +59,6 @@ export default function LineDetailView({
           </div>
         </div>
 
-        {successMsg && <SuccessBanner style={{ marginBottom: 16 }}>{successMsg}</SuccessBanner>}
         {error && <ErrorBanner style={{ marginBottom: 16 }}>{error}</ErrorBanner>}
 
         <div className="card">
@@ -126,7 +122,7 @@ export default function LineDetailView({
           onClose={() => setShowEdit(false)}
           onSuccess={(updated) => {
             setShowEdit(false);
-            onLineUpdated(updated, `Ligne ${updated.line_number} modifiée avec succès.`);
+            onLineUpdated(updated);
           }}
         />
       )}
@@ -146,7 +142,7 @@ export default function LineDetailView({
           onClose={() => setShowPlan(false)}
           onSuccess={(updated) => {
             setShowPlan(false);
-            onLineUpdated(updated, 'Ordre des machines mis à jour.');
+            onLineUpdated(updated);
           }}
         />
       )}
@@ -157,7 +153,7 @@ export default function LineDetailView({
           onClose={() => setEditMachineIndex(null)}
           onSuccess={(updated) => {
             setEditMachineIndex(null);
-            onLineUpdated(updated, 'Machine modifiée avec succès.');
+            onLineUpdated(updated);
           }}
         />
       )}

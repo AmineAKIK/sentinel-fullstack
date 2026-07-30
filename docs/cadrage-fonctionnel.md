@@ -46,7 +46,7 @@ Compte système unique, hors rôles Atelier.
 ### Opérateur (`OPERATOR`)
 
 - déclare un incident ;
-- suit ses propres déclarations ;
+- consulte l'avancement de ses propres déclarations ;
 - demande une correction sur sa déclaration active ;
 - demande une annulation tant que sa déclaration n'est pas prise ;
 - consulte les vues Atelier autorisées.
@@ -55,7 +55,6 @@ Compte système unique, hors rôles Atelier.
 
 - déclare un incident ;
 - prend ou transfère une prise en charge ;
-- documente un diagnostic ;
 - met en attente et reprend ;
 - modifie un incident non pris ou celui qui lui est affecté ;
 - clôture avec une note d'intervention ;
@@ -158,7 +157,7 @@ normalisée synchronisée par trigger pour garantir l'unicité concurrente.
 | Emplacement | ligne, machine, marque, robot, tête |
 | Production | état d'anomalie, produit en cours |
 | Déclaration | commentaire, déclarant, rôle, date |
-| Traitement | statut, technicien, prise, diagnostic, intervention |
+| Traitement | statut, technicien, prise, motif de mise en attente, diagnostic historique en lecture seule, intervention |
 | Pilotage | priorité, consigne responsable, ordre stable |
 | Arbitrage | demande, demandeur, payload/motif, consultation, décision |
 | Historique | snapshots et événements horodatés |
@@ -182,8 +181,10 @@ PENDING ---------------- RESPONSABLE/CANCEL------> CANCELED
 CLOSED ---------------- INVALIDATE_CLOSED--------> INVALIDATED
 ```
 
-Une mise en attente exige un diagnostic. Une clôture exige une note
-d'intervention et ne peut pas partir directement de `PENDING`.
+Une mise en attente exige un motif non vide dans `waiting_reason`. La colonne
+`diagnostic` est historique et en lecture seule : aucune action de production
+actuelle ne l'écrit, et `SET_PENDING` ne la modifie pas. Une clôture exige une
+note d'intervention et ne peut pas partir directement de `PENDING`.
 
 Le détail complet est dans [../INCIDENT_LIFECYCLE.md](../INCIDENT_LIFECYCLE.md).
 
@@ -253,9 +254,10 @@ début ; la fermeture restaure la position de liste utile.
 
 ## 10. Suivi
 
-Un responsable peut suivre/ne plus suivre un incident. Il est automatiquement
-abonné lorsqu'il crée un incident ou prend une décision d'arbitrage. Les incidents
-terminaux suivis restent visibles dans le scope « Suivis » jusqu'au retrait.
+Un responsable peut suivre/ne plus suivre un incident. L'abonnement est
+strictement volontaire : l'étoile active le suivi d'un incident actif, et ni la
+création ni une décision d'arbitrage ne l'ajoutent automatiquement. Les incidents
+terminaux déjà suivis restent visibles dans le scope « Suivis » jusqu'au retrait.
 
 Le désabonnement est logique afin de préserver l'historique de relation.
 
@@ -324,6 +326,7 @@ explicite sans bloquer le reste de l'application.
 | Demander correction sur sa déclaration | oui | non | non |
 | Retirer sa correction | oui | non | non |
 | Demander annulation sur sa déclaration non prise | oui | non | non |
+| Retirer sa demande d'annulation | oui | non | non |
 | Modifier actif non pris | non | oui | oui |
 | Modifier actif pris | non | affecté uniquement | oui |
 | Prendre/transférer `OPEN` | non | oui | non |

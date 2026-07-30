@@ -1,5 +1,5 @@
 import { Role } from '../types';
-import { ROLE_LABELS } from '../utils/labels';
+import { ASSIGNABLE_ROLES } from '../utils/labels';
 import { useFieldLimits } from '../routes/FieldLimitsContext';
 import SelectField from './ui/SelectField';
 
@@ -19,10 +19,6 @@ interface UserFormProps {
   showStatus?: boolean;
   badgeError?: string;
 }
-
-const ROLES: { value: Role; label: string }[] = Object.entries(ROLE_LABELS).map(
-  ([value, label]) => ({ value: value as Role, label })
-);
 
 export default function UserForm({
   data,
@@ -85,8 +81,14 @@ export default function UserForm({
           disabled={disabled}
           placeholder="0001"
           maxLength={FIELD_LIMITS.BADGE}
+          aria-invalid={Boolean(badgeError) || undefined}
+          aria-describedby={badgeError ? 'badge-number-error' : undefined}
         />
-        {badgeError && <div className="field-error">{badgeError}</div>}
+        {badgeError && (
+          <div id="badge-number-error" className="field-error">
+            {badgeError}
+          </div>
+        )}
       </div>
       <div className="form-group">
         <label className="form-label" htmlFor="email">
@@ -118,10 +120,7 @@ export default function UserForm({
           onChange={(value) => handleChange('role', value)}
           disabled={disabled}
           ariaLabel="Rôle"
-          options={[
-            { value: '', label: 'Sélectionner un rôle' },
-            ...ROLES.map((role) => ({ value: role.value, label: role.label })),
-          ]}
+          options={[{ value: '', label: 'Sélectionner un rôle' }, ...ASSIGNABLE_ROLES]}
         />
       </div>
       {showStatus && (
