@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import type { RequestHandler } from 'express';
+import { parseClientOrigin } from '../config/production';
 import { sendError } from '../utils/errors';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -7,32 +8,6 @@ const ALLOWED_FETCH_SITES = new Set(['same-origin', 'same-site', 'none']);
 
 type HeaderValue =
   { state: 'missing' } | { state: 'invalid' } | { state: 'present'; value: string };
-
-function assertExactOrigin(clientOrigin: string): string {
-  if (!clientOrigin || clientOrigin.trim() !== clientOrigin) {
-    throw new Error('CLIENT_ORIGIN must be an exact absolute origin.');
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(clientOrigin);
-  } catch {
-    throw new Error('CLIENT_ORIGIN must be an exact absolute origin.');
-  }
-
-  if (
-    !['http:', 'https:'].includes(parsed.protocol) ||
-    parsed.origin !== clientOrigin ||
-    parsed.username ||
-    parsed.password ||
-    parsed.pathname !== '/' ||
-    parsed.search ||
-    parsed.hash
-  ) {
-    throw new Error('CLIENT_ORIGIN must be an exact absolute origin.');
-  }
-  return clientOrigin;
-}
 
 function readSingleHeader(
   req: Request,
@@ -90,7 +65,7 @@ function hasAllowedFetchMetadata(req: Request): boolean {
  * refused in every environment; Sentinel has no mutating non-browser client.
  */
 export function createCsrfProtection(configuredClientOrigin: string): RequestHandler {
-  const clientOrigin = assertExactOrigin(configuredClientOrigin);
+  const clientOrigin = parseClientOrigin(configuredClientOrigin);
 
   return (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) {

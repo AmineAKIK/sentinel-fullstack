@@ -103,7 +103,7 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 | `DATABASE_URL` | requise | URL PostgreSQL interne |
 | `COOKIE_SECRET` | requise | secret cookies, 24 caractères minimum |
 | `JWT_SECRET` | requise | secret JWT, 24 caractères minimum |
-| `CLIENT_ORIGIN` | requise | origine HTTPS exacte sans chemin |
+| `CLIENT_ORIGIN` | requise | origine HTTPS canonique exacte, sans slash final |
 | `TRUST_PROXY` | requise | confiance accordée au proxy inverse retenu |
 | `BOARD_ACCESS_CODE_HASH` | requise | hash bcrypt du code Board |
 | `ADMIN_USERNAME` | bootstrap | premier admin sur base vide |
@@ -119,7 +119,8 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 
 - les variables requises absentes ;
 - les secrets trop courts, identiques ou contenant encore un placeholder ;
-- une origine non HTTPS, locale, factice, avec credentials, chemin, query ou fragment ;
+- une origine non canonique, non HTTPS, locale, factice, avec credentials,
+  wildcard, chemin, query, fragment, port par défaut explicite ou slash final ;
 - une URL PostgreSQL incomplète, d'un autre protocole ou avec un mot de passe faible ;
 - un hash Board qui ne respecte pas le format bcrypt ;
 - un `BUILD_SHA` absent ou différent d'un SHA Git complet ;
@@ -127,6 +128,11 @@ est utilisé en CI, dans les images et dans les procédures reproductibles.
 
 Les variables admin ne sont plus requises après l'amorçage si un admin existe
 déjà. Une base de production vide sans ces variables refuse de démarrer.
+
+`parseClientOrigin()` constitue l'unique contrat pour la validation de
+configuration, le préflight, CORS et CSRF. La comparaison des requêtes porte sur
+le schéma, l'hôte et le port effectif exacts. HTTP n'est accepté que pour
+`localhost`, `127.0.0.1` ou `[::1]` en développement/test.
 
 ### 4.2 Frontend
 

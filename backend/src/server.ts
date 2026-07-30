@@ -7,7 +7,12 @@ import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import logger from './logger';
 import { httpLoggingOptions } from './httpLogging';
-import { assertProductionConfig, parsePort, parseTrustProxy } from './config/production';
+import {
+  assertProductionConfig,
+  parseClientOrigin,
+  parsePort,
+  parseTrustProxy,
+} from './config/production';
 import pool from './db/pool';
 import runMigrations from './db/migrate';
 import seedAdminAccount from './db/seed';
@@ -34,9 +39,9 @@ import { createCsrfProtection } from './middlewares/csrfProtection';
 const app = express();
 app.disable('x-powered-by');
 const PORT = parsePort(process.env.PORT, 'PORT', 3000);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
 assertProductionConfig();
+const CLIENT_ORIGIN = parseClientOrigin(process.env.CLIENT_ORIGIN);
 
 const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 if (trustProxy !== false) {

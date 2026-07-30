@@ -103,7 +103,9 @@ npm run test:e2e
 - [ ] `.env` provient de `.env.release.example` et a le mode `600`
 - [ ] tous les placeholders ont été remplacés
 - [ ] `BUILD_SHA` est égal à `git rev-parse HEAD`
-- [ ] `CLIENT_ORIGIN` cible le domaine HTTPS réel
+- [ ] `CLIENT_ORIGIN` est l'origine HTTPS canonique exacte du domaine réel
+      (sans wildcard, credentials, chemin, query, fragment, port HTTPS par
+      défaut explicite ni slash final)
 - [ ] `CADDY_DOMAIN` cible ce domaine avec le frontal intégré, ou Caddy est
       désactivé par l'override Nginx hôte
 - [ ] `VITE_API_URL` est vide pour l'API same-origin

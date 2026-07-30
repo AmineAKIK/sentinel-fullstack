@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import request from 'supertest';
@@ -92,6 +93,7 @@ describe('protection CSRF centrale — Origin et Referer exacts', () => {
     { label: 'préfixe trompeur', origin: `https://attacker.example/${CLIENT_ORIGIN}` },
     { label: 'URL mal formée', origin: 'https://[invalid' },
     { label: 'origine avec chemin', origin: `${CLIENT_ORIGIN}/form` },
+    { label: 'mauvais port', origin: `${CLIENT_ORIGIN}:8443` },
     { label: 'origine avec identifiant incorporé', origin: 'https://user@sentinel.akiksystems.fr' },
   ])('refuse $label', async ({ origin }) => {
     const response = await request(app)
@@ -192,6 +194,38 @@ describe('protection CSRF centrale — Origin et Referer exacts', () => {
     const response = await request(app).post('/api/board/logout');
 
     expectCsrfRefusal(response);
+  });
+
+  it('refuse une origine sœur sans altérer la session, puis accepte la même origine', async () => {
+    const sessionApp = express();
+    sessionApp.use(cookieParser());
+    sessionApp.get('/api/session/start', (_req, res) => {
+      res.cookie('sentinel_session', 'stable', {
+        httpOnly: true,
+        sameSite: 'strict',
+      });
+      res.status(204).end();
+    });
+    sessionApp.use('/api', createCsrfProtection(CLIENT_ORIGIN));
+    sessionApp.post('/api/session/probe', (req, res) => {
+      res.json({ session: req.cookies.sentinel_session ?? null });
+    });
+    const agent = request.agent(sessionApp);
+
+    await agent.get('/api/session/start').expect(204);
+    const refused = await agent
+      .post('/api/session/probe')
+      .set('Origin', SIBLING_ORIGIN)
+      .set('Sec-Fetch-Site', 'same-site');
+    expectCsrfRefusal(refused);
+    expect(refused.headers['set-cookie']).toBeUndefined();
+
+    const accepted = await agent
+      .post('/api/session/probe')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Sec-Fetch-Site', 'same-origin');
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toEqual({ session: 'stable' });
   });
 });
 

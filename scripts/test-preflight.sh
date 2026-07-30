@@ -464,6 +464,10 @@ sed -i "s#^CLIENT_ORIGIN=.*#CLIENT_ORIGIN=http://sentinel.akiksystems.fr#" "$TES
 expect_reject "CLIENT_ORIGIN en HTTP" "CLIENT_ORIGIN must be an HTTPS origin"
 
 write_env
+sed -i "s#^CLIENT_ORIGIN=.*#CLIENT_ORIGIN=https://sentinel.akiksystems.fr/#" "$TEST_ENV_FILE"
+expect_reject "CLIENT_ORIGIN avec slash final" "canonical absolute origin"
+
+write_env
 sed -i "s#^CLIENT_ORIGIN=.*#CLIENT_ORIGIN=https://localhost#" "$TEST_ENV_FILE"
 expect_reject "CLIENT_ORIGIN local" "local or placeholder hostname"
 

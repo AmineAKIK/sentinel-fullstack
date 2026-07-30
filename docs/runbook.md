@@ -171,7 +171,7 @@ la validation invalide.
 | `SENTINEL_FRONTEND_IMAGE` | oui (topo B) | image frontend épinglée par digest `@sha256:` |
 | `SENTINEL_BACKEND_BIND_PORT` | oui (topo B) | port loopback de publication du backend |
 | `SENTINEL_FRONTEND_BIND_PORT` | oui (topo B) | port loopback de publication du frontend |
-| `CLIENT_ORIGIN` | oui | origine HTTPS exacte autorisée par CORS |
+| `CLIENT_ORIGIN` | oui | origine HTTPS canonique exacte autorisée par CORS/CSRF, sans slash final |
 | `TRUST_PROXY` | oui | prise en compte sûre de l'IP via le proxy inverse |
 | `POSTGRES_PASSWORD` | oui | mot de passe du service PostgreSQL |
 | `DATABASE_URL` | oui | connexion interne du backend à PostgreSQL |

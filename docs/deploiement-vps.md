@@ -157,7 +157,11 @@ VITE_API_URL=
 TRUST_PROXY=true
 ```
 
-`CLIENT_ORIGIN` est une origine HTTPS exacte, sans chemin ni slash final.
+`CLIENT_ORIGIN` est l'origine HTTPS canonique exacte (`URL.origin`) : schéma,
+hôte et éventuel port non standard, sans credentials, wildcard, chemin, query,
+fragment ni slash final. Le port HTTPS par défaut doit donc être omis. La même
+validation alimente le démarrage, CORS, CSRF et le préflight ; une valeur
+absente ou divergente arrête le backend avant écoute.
 `VITE_API_URL` reste vide : le navigateur appelle `/api` sur la même origine et
 le proxy retenu route ces requêtes vers le backend.
 
