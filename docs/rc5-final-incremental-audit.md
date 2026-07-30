@@ -2,32 +2,29 @@
 
 **Date :** 30 juillet 2026
 
-**Verdict :** `BLOCKED`
+**Verdict :** `BLOCKED_EXTERNAL`
 
-La fermeture express ne satisfait pas la condition de sortie « seules deux
-alertes upstream restent ». Les deux exceptions de dépendances sont strictement
-bornées et aucune vulnérabilité exploitable n'a été mise en évidence dans leur
-surface réelle, mais l'audit incrémental a identifié six défauts P1 locaux non
-couverts par les suites existantes. Ils ne sont pas corrigés dans cette phase,
-qui n'autorisait aucune modification du runtime ou des tests applicatifs.
+Les six constats P1 locaux `RC5-AUD-01..06` sont corrigés et disposent chacun
+d'un cycle rouge→vert permanent ciblant le comportement constaté. La revue
+terminale du delta ne relève aucun risque résiduel local non documenté.
+
+Le seul blocage restant est organisationnel et externe : le dépôt ne possède
+ni reviewer indépendant de l'initiateur, ni identité technique dédiée à la
+création contrôlée des tags. Ces deux identités ne peuvent pas être remplacées
+honnêtement par un seul administrateur.
 
 ## 1. Périmètre et couverture
 
-Le grand audit de référence porte sur le commit
-`29db4d1eeb49f5850ce6c5c64dc1dcf5aba78bb2` et ses `550` fichiers. Son registre
-`/tmp/sentinel-rc5-audit-29db4d1/tracked-audit-register.tsv` a le SHA-256
-`bdc8ba5a778dcf6f9194befc51312ea22f2f0af791ae4b79f26ce22bcbc36a23`.
+Le registre exhaustif validé au début de la correction terminale couvrait les
+`576` chemins du commit
+`1a145816b5230bc49e348a25a78730297bb14973`. Un test permanent a été ajouté;
+le dépôt suivi comporte maintenant `577` chemins.
 
-La fermeture express a audité les changements jusqu'au parent documentaire
-`1a8bb63fff99a6f6363f4a3b2d8227afa159487a`, puis a relu ses propres artefacts
-finaux :
-
-| Provenance | Fichiers | Traitement |
+| Provenance terminale | Fichiers | Traitement |
 | --- | ---: | --- |
-| inchangés depuis `29db4d1` | `472` | hash Git identique ; héritage de `471` statuts `REVIEWED` et d'un statut `LOCKFILE_VALIDATED` |
-| modifiés ou ajoutés depuis `29db4d1` | `102` | diff et contenu courant relus |
-| rapport et registre finaux | `2` | autorelecture ; le registre porte un marqueur non récursif pour sa propre ligne |
-| **total courant** | **`576/576`** | **`100 %`** |
+| byte-identiques à `1a145816b5230bc49e348a25a78730297bb14973` | `545` | héritage du registre validé par identité de hash |
+| modifiés ou ajoutés pendant la correction terminale, documentation finale comprise | `32` | diff, appels directs et tests relus |
+| **total courant** | **`577/577`** | **`100 %`** |
 
 Le registre exhaustif est
 [`rc5-final-audit-register.tsv`](rc5-final-audit-register.tsv). Chaque chemin
@@ -36,37 +33,54 @@ cas échéant, l'identifiant du constat. La ligne du registre lui-même utilise
 `SELF_REVIEWED_NO_RECURSIVE_HASH` : intégrer son propre hash rendrait le fichier
 récursif et impossible à stabiliser.
 
-## 2. Fast path légitime
+## 2. Réutilisation bornée et preuves terminales
 
-Les manifestes ont été capturés au HEAD de départ
-`514469896299bf27c2ce52ab3c5621f78cea44b1`. Après les travaux de politique et
-de documentation, les six catégories restent byte-identiques :
+La correction terminale modifie le runtime, les tests applicatifs et
+`scripts/test-preflight.sh`; leurs anciennes preuves ne sont donc pas héritées.
+Les manifestes et lockfiles, Dockerfiles, workflows, migrations `001..050` et
+sous-arbres PostgreSQL/restore restent byte-identiques au HEAD terminal de
+départ :
 
-| Catégorie | Fichiers | SHA-256 agrégé avant = après |
-| --- | ---: | --- |
-| runtime backend/frontend | `253` | `39a259c2fab0c1930f34c4787cdc8e58462fb12f2ec0614ef79fc15f197ea187` |
-| tests applicatifs existants | `176` | `9002fccc945eedfc652fd0a1716e6e52ad4dd6e1323d967389bd2fed9c362be1` |
-| manifests et lockfiles | `4` | `48b1cbbb9a558607b5c037f89b633b78d9a90629f62e952717c7a2eab3ffe9b0` |
-| Dockerfiles | `4` | `9aee89281365d60f5a8f1438830674215ba02db9746e4f4cc7636d40011b1edd` |
-| Compose et scripts d'exploitation | `17` | `95480d568d72538bc589bd6cdeaf983f4ea3e5e72764458b6b49a4f1d341a91d` |
-| migrations `001..050` | `50` | `5453a99d974465a667d707567019bb09415509f5172b60d0dc1503649701226` |
+| Périmètre hérité | Identité vérifiée |
+| --- | --- |
+| manifestes et lockfiles, `4` fichiers | SHA-256 agrégé `48b1cbbb9a558607b5c037f89b633b78d9a90629f62e952717c7a2eab3ffe9b0` |
+| Dockerfiles et `.dockerignore`, `4` fichiers | SHA-256 agrégé `9aee89281365d60f5a8f1438830674215ba02db9746e4f4cc7636d40011b1edd` |
+| workflows GitHub | arbre Git `a04d2fea95cd3bb278b125295261b43514edc93d` |
+| migrations `001..050`, sans `051` | arbre Git `10a13718252c65a9e2f8b17f89c562b26c35a9c1`; SHA-256 agrégé `5453a99d974465a667d707567019bb09415509f5172b60d0dc1503649701226` |
+| intégration PostgreSQL | arbre Git `0fb5782494b3454c91fdc05981c6cc3ad3b4f6c8` |
+| base de données, modules et outillage de test backend | arbres Git `3c0b08f9fe026680cbc9b9c87f4bb141279a1d3a`, `2f2fe6bafc56ff4f2118f11d7cc7728ad79d28c4`, `79030e9687ff6b6ecc15e36a7194ba3f561334b9` |
+| contrat backup/restore, `55` fichiers | SHA-256 agrégé `3623393b9aacc9a84df01790e646146444ae2eddbfcfd045181f0775e2d93813` |
 
-Les preuves longues ont donc été réutilisées conformément au fast path :
-backend `604/604`, PostgreSQL `165/165`, frontend `754/754`, Chromium
-`156/156 ×3` sur bases fraîches avec axe, restore `21/21`, préflight `25/25`
-et images locales déjà construites.
+Les preuves terminales exécutées sont :
 
-Les validations propres aux nouveaux changements ont réellement été exécutées :
+- backend ciblé configuration/CSRF : `146/146`;
+- frontend ciblé Journal, dates et accessibilité : `74/74`;
+- concurrence Journal : scénario terminal vert cinq fois consécutives;
+- E2E des six constats : `6/6` sur chacune de trois bases PostgreSQL fraîches;
+- backend global : build vert, `626/626` tests et `17/17` contrôles de
+  fiabilité;
+- frontend global avec couverture : `787/787`, statements `90,38 %`,
+  branches `83,75 %`, fonctions `92,36 %`, lignes `92,63 %`;
+- PostgreSQL : `165/165` hérité par identité des sous-arbres concernés;
+- restore : `21/21` hérité par identité du périmètre;
+- Chromium complet : `161/161` en `5,1` minutes sur une base PostgreSQL fraîche,
+  axe inclus, sans retry ni skip;
+- préflight réel, images locales reconstruites et registre jetable nettoyé :
+  `26/26`;
+- audits réels : backend complet/runtime `20/0 high`, frontend
+  complet/runtime `8/2 high`; les quatre gardes passent et ne reconnaissent que
+  les deux exceptions documentées;
+- politique des exceptions `15/15`, ShellCheck, formatage, ESLint, build,
+  typecheck et `git diff --check` verts;
+- `actionlint` est hérité : l'arbre `.github/workflows` est byte-identique.
 
-- garde des exceptions : rouge initial `15` tests et `25` assertions en échec,
-  puis vert `15/15`;
-- audits JSON réels conformes à la politique : backend runtime `0 high`,
-  backend complet `20 high` Brace uniquement, frontend runtime `2 high` Router
-  uniquement, frontend complet `8 high` limités aux deux GHSA;
-- garde des payloads des deux images locales : Brace absent;
-- politiques release `10/10`, gate `1/1`, workflow `8/8`, `actionlint` vert;
-- syntaxe du générateur Python, liens Markdown locaux et `git diff --check`
-  verts.
+Le premier build backend global a été arrêté avant compilation par un ancien
+répertoire ignoré `backend/dist` appartenant à `nobody:nogroup`; cet artefact
+généré a été supprimé, puis build, couverture et fiabilité ont passé. Les deux
+premiers passages frontend ont exposé des erreurs de typage dans les nouvelles
+preuves, puis l'inventaire permanent Router passé factuellement de `53` à `54`;
+les tests ont été corrigés sans relaxation et la suite globale finale est
+entièrement verte.
 
 ## 3. Exceptions de dépendances
 
@@ -84,19 +98,135 @@ applicatif, payload d'image, nouvelle GHSA high/critical ou expiration fait
 échouer la garde. Aucun override, downgrade ou `npm audit fix --force` n'a été
 utilisé.
 
-## 4. Constats P1 bloquants
+## 4. Constats P1 corrigés
 
-| ID | Constat et preuve | Impact |
-| --- | --- | --- |
-| `RC5-AUD-01` | `assertProductionConfig()` accepte un `CLIENT_ORIGIN` HTTPS avec slash final, tandis que `createCsrfProtection()` refuse la même valeur. Reproduction Node 24 sans réseau : `assertProductionConfig=PASS`, puis `createCsrfProtection=FAIL: CLIENT_ORIGIN must be an exact absolute origin.` | préflight faussement vert puis backend arrêté avant écoute |
-| `RC5-AUD-02` | `useJournalData` annule un chargement de page lors d'un changement de filtre sans remettre atomiquement `loadingMore` et `nextCursor`; une période inversée conserve aussi les anciennes données | bouton bloqué sur « Chargement… », curseur d'un ancien filtre ou données périmées |
-| `RC5-AUD-03` | les dates `start`/`end` de l'URL sont converties sans validation civile stricte. Reproduction Node 24 : `invalid` produit `RangeError: Invalid time value`; `2026-02-31` devient `2026-03-03T00:00:00.000Z` | ErrorBoundary ou période silencieusement différente de l'URL |
-| `RC5-AUD-04` | l'erreur de mot de passe dans `AdminPasswordConfirmModal` n'est reliée au champ par aucun `id`, `aria-describedby` ou `aria-invalid` | erreur non associée programmatiquement, WCAG 1.3.1/3.3.1 |
-| `RC5-AUD-05` | la branche désactivée de la durée Board rend un champ sans l'`id` ciblé par le `label` | libellé non associé, WCAG 1.3.1 |
-| `RC5-AUD-06` | les champs Journal visibles « Début » et « Fin » sont renommés « Depuis le » et « Jusqu'au » par `aria-label` | violation Label in Name, WCAG 2.5.3 |
+| ID | État | Cause racine et correction | Commits principaux |
+| --- | --- | --- | --- |
+| `RC5-AUD-01` | `FIXED` | La validation URL normalisait implicitement le slash final alors que CSRF comparait la valeur brute. `parseClientOrigin()` est la source canonique commune au démarrage, à CORS, CSRF, au préflight et au checker. | `8181b7835d8fd38b01913ed0accc9e1b85a20276` |
+| `RC5-AUD-02` | `FIXED` | L'abort d'une suite ne réinitialisait pas atomiquement curseur/chargement et un effet passif autorisait un rendu des anciennes lignes. Génération de requête, abort, reset et signature de portée empêchent toute réponse ou peinture périmée. | `0b46903823a68d9e4a91a0bfcdb7999ebae249b9`, `11443efa7e4eb5d198b2e73d090624e017504c11` |
+| `RC5-AUD-03` | `FIXED` | Le constructeur `Date` normalisait les jours impossibles et `get()` masquait les paramètres répétés. Validation civile stricte partagée, cardinalité `getAll()`, suppression par `replace` et bornes locales sûres. | `dbacf3c29f0bb726419ea7ad4cc545ad39c07642`, `8aa53a373bab039bb845a957dfce9355537df29a` |
+| `RC5-AUD-04` | `FIXED` | L'erreur Admin était visuelle seulement. Elle possède maintenant `role="alert"`, un identifiant, `aria-invalid`, `aria-describedby` et le focus revient au champ après refus. | `2d192c0657ef25ae5d39107781a9d315d9e96ae0`, `35492c3ba9f822b05e0ba1ed82b5062116912d38` |
+| `RC5-AUD-05` | `FIXED` | La branche désactivée du TTL Board omettait l'identifiant visé par le libellé. Les deux branches exposent maintenant `boardSessionTtl`. | `2d192c0657ef25ae5d39107781a9d315d9e96ae0` |
+| `RC5-AUD-06` | `FIXED` | Les `aria-label` remplaçaient « Début » et « Fin » par d'autres noms. Ils sont retirés afin que les libellés visibles constituent les noms accessibles. | `2d192c0657ef25ae5d39107781a9d315d9e96ae0`, `35492c3ba9f822b05e0ba1ed82b5062116912d38` |
 
-Les fichiers et tests concernés sont identifiés dans le registre. Aucun P0,
-secret réel ou vulnérabilité exploitable supplémentaire n'a été détecté.
+### RC5-AUD-01
+
+Commande rouge, depuis `backend` :
+`npm test -- --runInBand src/config/__tests__/production.test.ts`. Le test
+`rejects a trailing slash instead of diverging from the runtime CSRF guard`
+attendait une exception `canonical absolute origin` pour
+`https://sentinel.akiksystems.fr/`; la validation de production n'en levait
+aucune. Sortie : `1` échec et `55` succès. Le fichier responsable était
+`backend/src/config/production.ts`.
+
+La correction centralise l'origine absolue canonique et exacte, exige HTTPS en
+production, ne permet HTTP qu'en développement/test local explicite et refuse
+identifiants, chemin, query, fragment, wildcard, sous-domaines ou ports frères.
+Commande verte :
+`npm test -- --runInBand src/config/__tests__/production.test.ts src/middlewares/__tests__/csrfProtection.test.ts`,
+soit `146/146`. Les tests permanents sont ces deux fichiers,
+`security-contracts.spec.ts` et `test-preflight.sh`; l'E2E réel passe dans les
+trois passages et le préflight passe `26/26`.
+
+### RC5-AUD-02
+
+Commande rouge, depuis `frontend` :
+`npm test -- src/hooks/__tests__/useJournalData.test.ts`. Les tests
+`annule une suite et réinitialise atomiquement son état quand un filtre change`
+et `annule réellement une suite en vol au démontage sans publier d'erreur`
+attendaient respectivement une liste et un curseur vides, puis un
+`AbortSignal.aborted` à `true`; les anciennes lignes/curseur restaient présents
+et le signal valait `false`. Sortie : `5` échecs et `9` succès. Une seconde
+preuve exécutée avec
+`npm test -- src/hooks/__tests__/useJournalData.test.ts -t "ne présente jamais les anciennes lignes dans le rendu du nouveau filtre réel"`
+attendait `[]` mais recevait l'ancienne ligne : `1` échec et `27` tests ignorés.
+Le fichier responsable était `frontend/src/hooks/useJournalData.ts`.
+
+L'annulation seule ne définissait ni identité de suite ni portée du rendu.
+Commande verte :
+`npm test -- src/hooks/__tests__/useJournalData.test.ts`, soit `28/28`; le test
+`ignore la réponse tardive de deux changements rapides et conserve la génération récente`
+a ensuite passé cinq fois consécutives avec `-t`. Les tests permanents sont ce
+fichier et `journal-filter-alignment.spec.ts`; l'E2E réel passe dans les trois
+passages.
+
+### RC5-AUD-03
+
+Commande rouge, depuis `frontend` :
+`npm test -- src/hooks/__tests__/useJournalData.test.ts src/utils/__tests__/workshopAnalytics.test.ts`.
+Le test paramétré
+`refuse $0 sans exception ni normalisation silencieuse` attendait `undefined`;
+`invalid` produisait `RangeError: Invalid time value`,
+`2026-02-29` devenait `2026-02-28T23:00:00.000Z` et `2026-02-31` devenait
+`2026-03-02T23:00:00.000Z` sous `TZ=Europe/Paris`. Les tests de nettoyage URL
+attendaient un `replace` sans requête invalide; des paramètres vides, répétés
+ou inversés restaient dans l'URL. Sortie : `21` échecs et `23` succès. Les
+fichiers responsables étaient `frontend/src/utils/workshopAnalytics.ts` et
+`frontend/src/hooks/useJournalData.ts`.
+
+La racine était la construction directe de `Date` et l'usage de
+`URLSearchParams.get()`. La même commande passe ensuite `44/44`. Les tests
+permanents sont les deux fichiers de test ciblés et
+`journal-filter-alignment.spec.ts`; l'E2E hostile, répété et inversé passe dans
+les trois passages, avec borne ISO calculée dans le navigateur pour prouver
+l'absence de décalage de fuseau.
+
+### RC5-AUD-04
+
+La commande rouge accessibilité commune, depuis `frontend`, était
+`npm test -- src/components/__tests__/AdminPasswordConfirmModal.test.tsx src/pages/__tests__/AdminSettingsPage.a11y.test.tsx src/pages/__tests__/WorkshopJournalPage.test.tsx`.
+Dans
+`associe l’erreur au champ et restaure son focus après un refus activé au clavier`,
+le rôle attendu était `alert`, avec `aria-invalid` et une description liée; le
+rôle obtenu était `null` et les relations étaient absentes. Le fichier
+responsable était `frontend/src/components/AdminPasswordConfirmModal.tsx`. La
+sortie rouge commune était `3` échecs et `10` succès dans `3` fichiers.
+
+La commande verte ajoute
+`src/pages/__tests__/WorkshopJournalPeriodRemoval.test.tsx` à la commande
+rouge : `14/14`. Les tests permanents sont
+`AdminPasswordConfirmModal.test.tsx` et
+`admin-board-session-revocation.spec.ts`. Vert navigateur : activation réelle
+par Entrée, fermeture par la croix, restauration exacte du focus et axe.
+
+### RC5-AUD-05
+
+Dans la même commande rouge,
+`conserve le label du champ désactivé après activation réelle du mode sans expiration`
+activait réellement le contrôle Board par Espace, attendait la cible
+`boardSessionTtl` et obtenait `null`. La branche désactivée de
+`frontend/src/pages/AdminSettingsPage.tsx` omettait l'identifiant. La commande
+verte accessibilité passe `14/14`. Les tests permanents sont
+`AdminSettingsPage.a11y.test.tsx` et
+`admin-board-session-revocation.spec.ts`. Vert navigateur : champ correctement
+nommé et désactivé, activation par Espace, focus visible et axe.
+
+### RC5-AUD-06
+
+Dans la même commande rouge,
+`conserve Début et Fin dans le nom accessible des deux champs visibles`
+attendait les noms « Début » et « Fin » mais obtenait « Depuis le » et
+« Jusqu'au ». Le fichier responsable était
+`frontend/src/pages/WorkshopJournalPage.tsx`. La commande verte accessibilité
+passe `14/14`. Les tests permanents sont `WorkshopJournalPage.test.tsx`,
+`WorkshopJournalPeriodRemoval.test.tsx` et
+`journal-filter-alignment.spec.ts`. Vert navigateur : noms exacts, navigation
+clavier réelle, focus visible et axe.
+
+Le premier passage E2E terminal a donné `4/6` : `RC5-AUD-04` utilisait Échap
+alors que le parcours annoncé devait vérifier la croix, et `RC5-AUD-06`
+supposait à tort que Fin suivait Début d'un seul Tab. Les assertions ont été
+corrigées sans changement runtime dans
+`35492c3ba9f822b05e0ba1ed82b5062116912d38`, puis les deux preuves ont passé
+`2/2` et l'ensemble `6/6 ×3`.
+
+La commande navigateur ciblée réellement exécutée depuis la racine était
+`DISPOSABLE_PG_DB=sentinel_e2e backend/scripts/with-disposable-postgres.sh npm --prefix frontend run test:e2e -- e2e/security-contracts.spec.ts e2e/journal-filter-alignment.spec.ts e2e/admin-board-session-revocation.spec.ts --grep 'RC5-AUD-0[1-6]'`.
+Elle a été exécutée trois fois et a passé `6/6` sur chacun des trois PostgreSQL
+jetables, avec migration, seed, garde de base de test et nettoyage complet à
+chaque passage.
+
+Aucun P0, secret réel ou risque résiduel local non documenté n'a été détecté.
 
 Trois réserves P2 n'allongent pas la RC5 : teardown du test Board fragile sous
 exécution partielle, assertion responsive Pilotage conditionnelle, et test
@@ -131,7 +261,12 @@ Compose/conteneurs/images/digests/binds/`nginx -T`.
 
 ## 6. Arrêt
 
-Le verdict est `BLOCKED`, et non `BLOCKED_EXTERNAL` : l'absence d'identités de
-gouvernance reste un blocage externe, mais elle n'est plus la seule cause après
-les six constats P1 locaux. Aucun push, PR, merge, tag, release, publication
-d'image, déploiement, accès SSH ou changement VPS/DNS n'a été effectué.
+Le verdict local est `BLOCKED_EXTERNAL`. Les six P1 locaux sont `FIXED` et
+aucun risque résiduel local P1 ou bloquant n'est ouvert; les trois P2 déjà
+documentés restent non bloquants. La seule action humaine restante est une
+décision organisationnelle fournissant simultanément un reviewer réellement
+indépendant et une identité technique dédiée aux tags.
+
+Aucun compte ou environnement fictif n'a été créé. Aucun push, PR, merge, tag,
+release, publication d'image, déploiement, SSH, DNS ou changement VPS n'a été
+effectué.

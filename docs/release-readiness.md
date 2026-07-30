@@ -14,61 +14,40 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 
 ### Mise à jour documentaire RC5
 
-**Statut RC5 : BLOCKED.** Les décisions R1, P2, C1+C3 et D2 sont désormais
-enregistrées dans les sections 6 et 7 de
-[rc5-decision-dossiers.md](rc5-decision-dossiers.md). R1, P2 et C1+C3 sont
-implémentées localement. D2 reste factuellement `BLOCKED_UPSTREAM`, mais ses
-alertes, avec l'alerte Router restante de R1, disposent désormais d'un
-traitement explicite, automatique et expirant au 31 août 2026. L'observation
-publique O confirme le bord Nginx de la topologie B; l'intérieur du VPS n'est
-pas affirmé sans accès SSH nominatif.
+**Statut RC5 : BLOCKED_EXTERNAL.** Les six constats terminaux
+`RC5-AUD-01..06` sont désormais corrigés avec tests permanents rouges→verts et
+risque résiduel local `NONE`. Le registre terminal couvre
+[`577/577`](rc5-final-audit-register.tsv) chemins.
 
-L'[audit final incrémental RC5](rc5-final-incremental-audit.md), couvert par son
-[registre `576/576`](rc5-final-audit-register.tsv), a ensuite identifié six P1
-locaux : divergence du contrat `CLIENT_ORIGIN` entre préflight et CSRF, course
-de pagination Journal, dates URL non validées strictement, puis trois défauts
-d'association ou de nom accessible. Ces constats ne sont pas corrigés dans la
-fermeture documentaire autorisée et interdisent le `GO`.
+Les preuves terminales sont : backend `626/626`, PostgreSQL `165/165` hérité
+par identité de sous-arbre, frontend `787/787`, ciblés frontend `74/74`,
+backend configuration/CSRF `146/146`, concurrence Journal cinq passages
+consécutifs et E2E des six constats `6/6 ×3`. Chromium complet est vert
+`161/161` sur base fraîche avec axe. Le préflight reconstruit les images
+locales et passe `26/26`. Les audits réels et la garde de politique `15/15`
+ne reconnaissent que les deux exceptions documentées.
 
-Le blocage externe de gouvernance reste également ouvert : le dépôt ne possède
-ni reviewer réellement indépendant de l'initiateur, ni identité technique
-dédiée à la création contrôlée des tags. Les environnements protégés ne peuvent
-donc pas être configurés honnêtement. Aucun environnement factice n'a été créé
-et la création de tous les tags `v*` reste verrouillée. Cette cause n'est plus
-présentée comme unique.
+Les deux advisories Router et Brace restent des faits upstream, mais sont
+bornés par la politique expirant le 31 août 2026 et ne constituent pas un
+défaut local ouvert tant que la garde reste verte. Router `7.18.2` est utilisé
+en mode déclaratif React 18 sans RSC; Brace reste limité aux chaînes de
+développement et absent du runtime.
 
-Les autres protections disponibles sont appliquées et relues : Actions
-GitHub-owned + `docker/*`, SHA complets obligatoires, ruleset `main` avec les
-six checks, deux rulesets `v*` sans bypass et immutabilité des nouvelles
-releases. La CI distante, la publication et les preuves de recette restent des
-étapes séparément autorisées; leur absence n'est pas transformée en défaut du
-candidat local.
+Les protections GitHub déjà appliquées restent celles documentées dans
+[rc5-decision-dossiers.md](rc5-decision-dossiers.md) : Actions limitées,
+SHA complets, ruleset `main` avec six checks, tags `v*` verrouillés et releases
+immuables. Aucune opération distante supplémentaire n'a été faite pendant la
+correction terminale.
 
-Les constats dépendances ne sont pas effacés : Router `7.18.2` reste dans la
-plage de `GHSA-qwww-vcr4-c8h2` et les anciennes chaînes Brace restent dans
-`GHSA-mh99-v99m-4gvg`. La politique fermée
-[`security/dependency-exceptions.json`](../security/dependency-exceptions.json)
-les accepte seulement dans leurs surfaces constatées, avec propriétaire,
-échéance, hashes des deux lockfiles, graphes transitifs et tests de refus. Toute
-nouvelle GHSA high/critical, surface RSC, variation Router/React, présence Brace
-runtime/image, usage applicatif contrôlable, modification de lockfile ou
-expiration remet immédiatement la CI en échec.
+Le seul blocage de release restant est externe : absence d'un reviewer
+indépendant et d'une identité technique dédiée aux tags. Cette décision
+organisationnelle ne peut pas être résolue localement avec l'unique
+administrateur actuel; aucun compte, reviewer, environnement ou identité
+fictive n'a été créé.
 
-La narration des lots, SHA et runs antérieurs est conservée comme historique
-daté. Pour le candidat RC5 courant, les faits structurels dérivés du dépôt sont
-`50` migrations (`001..050`), `15` tables physiques (`14` applicatives et
-`schema_migrations`) et `6` jobs CI. Les preuves locales courantes sont
-`604` tests backend, `165` PostgreSQL, `754` frontend et `156` Chromium
-(`156/156` sur trois bases fraîches, axe inclus). Le garde de dépendances passe
-ses `15/15` tests et les quatre audits JSON réels dans leurs portées exactes.
-Ces nombres ne ferment ni la CI distante, ni les preuves GitHub/VPS externes.
-
-La lecture publique non mutative du 30 juillet 2026 donne DNS A
-`79.137.34.84`, Nginx sur 80/443, redirection HTTPS, TLS/HSTS et en-têtes
-conformes, puis `/api/health` HTTP 200 sur le SHA RC4
-`da97e5222e0978d9e4af08afe70a08d49a80f4de`. Elle tranche la topologie publique
-B et aligne README, guide VPS et runbook. Elle ne prouve ni l'état interne
-Compose/conteneurs/digests/binds/`nginx -T`, ni un déploiement RC5.
+La lecture publique non mutative antérieure reste un fait historique sur RC4,
+pas une preuve de déploiement RC5. La CI distante, la publication et la recette
+restent soumises à des autorisations séparées.
 
 ## 1. Règles de pilotage
 

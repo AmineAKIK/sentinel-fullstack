@@ -997,36 +997,41 @@ Le verdict global ne devient pas `GO` par cette seule décision : P2 reste
 bloqué par l'absence des identités de gouvernance nécessaires aux environnements
 et à la création contrôlée des tags. La vérité opérationnelle publique O est
 traitée en section 6.5; les effets de publication restent gouvernés par une
-autorisation séparée. L'audit incrémental ultérieur de la section 8 remplace le
-verdict externe seul par un blocage comprenant aussi six P1 locaux.
+autorisation séparée. L'audit incrémental de la section 8 avait ajouté six P1
+locaux au blocage; la correction terminale les ferme et rétablit le verdict
+`BLOCKED_EXTERNAL` fondé sur les seules identités manquantes.
 
 ## 8. Audit final incrémental
 
-L'audit de fermeture couvre `576/576` fichiers : `472` fichiers inchangés
-héritent du grand audit par identité de hash, `102` fichiers modifiés ou ajoutés
-ont été relus, puis les deux artefacts finaux ont été autorelus. Le rapport
-détaillé et le registre exhaustif sont :
+La correction terminale porte le registre à `577/577` chemins. Aucun audit
+général n'a été recommencé : les chemins byte-identiques héritent de la revue
+validée et seuls le delta terminal, ses appels directs, ses tests et les
+artefacts documentaires finaux ont été relus. Le rapport détaillé et le
+registre exhaustif sont :
 
 - [`rc5-final-incremental-audit.md`](rc5-final-incremental-audit.md);
 - [`rc5-final-audit-register.tsv`](rc5-final-audit-register.tsv).
 
-Six constats P1 locaux restent ouverts :
+| ID | État | Correction |
+| --- | --- | --- |
+| `RC5-AUD-01` | `FIXED` | contrat canonique `CLIENT_ORIGIN` commun au préflight, au démarrage, à CORS et à CSRF |
+| `RC5-AUD-02` | `FIXED` | génération, abort, reset et portée de rendu empêchant curseurs, réponses et peintures périmés |
+| `RC5-AUD-03` | `FIXED` | validation civile stricte, paramètres répétés/inversés nettoyés par `replace`, bornes locales sûres |
+| `RC5-AUD-04` | `FIXED` | erreur Admin reliée au champ, état invalide et focus restauré |
+| `RC5-AUD-05` | `FIXED` | libellé Board relié dans la branche TTL désactivée |
+| `RC5-AUD-06` | `FIXED` | noms accessibles Journal identiques aux libellés visibles |
 
-| ID | Constat |
-| --- | --- |
-| `RC5-AUD-01` | `CLIENT_ORIGIN` avec slash final accepté par le préflight mais refusé par la garde CSRF avant écoute |
-| `RC5-AUD-02` | état de pagination Journal non réinitialisé atomiquement après abort ou période inversée |
-| `RC5-AUD-03` | dates Journal issues de l'URL non validées strictement, avec crash ou normalisation silencieuse |
-| `RC5-AUD-04` | erreur du mot de passe de confirmation Admin non associée au champ |
-| `RC5-AUD-05` | champ Board désactivé sans l'identifiant ciblé par son libellé |
-| `RC5-AUD-06` | noms accessibles des dates Journal différents des libellés visibles |
+Les preuves ciblées sont backend `146/146`, frontend `74/74`, concurrence
+Journal cinq passages et E2E `6/6 ×3`. Les suites globales donnent backend
+`626/626`, frontend `787/787` et Chromium `161/161` sur une base fraîche avec
+axe. Le préflight réel reconstruit les images locales et passe `26/26`; les
+audits réels et la politique des deux exceptions passent également.
 
-Aucun P0, secret réel ou défaut exploitable dans les deux surfaces upstream
-bornées n'a été mis en évidence. Néanmoins, les conditions de la fermeture
-express exigent que seules ces deux alertes restent. Le verdict final est donc
-`BLOCKED`, pas `GO` ni `BLOCKED_EXTERNAL`. Les défauts applicatifs n'ont pas été
-modifiés sans autorisation; aucun push, PR, merge, tag, release, publication
-d'image ou changement VPS/DNS n'a été réalisé.
+Le verdict local est `BLOCKED_EXTERNAL`. Sa seule cause est l'absence conjointe
+d'un reviewer indépendant et d'une identité technique dédiée aux tags, décision
+organisationnelle impossible à résoudre avec un seul administrateur. Aucun
+compte fictif n'a été créé et aucune opération distante ou de publication n'a
+été réalisée.
 
 ## Sources officielles consultées le 29 juillet 2026
 
