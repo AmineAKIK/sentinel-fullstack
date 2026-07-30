@@ -93,14 +93,12 @@ jobs:
             docker rm "$buildx_container" >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-          mkdir -p "$RUNNER_TEMP/docker-config/cli-plugins"
+          mkdir -p "$HOME/.docker/cli-plugins"
           docker cp \
             "$buildx_container:/buildx" \
-            "$RUNNER_TEMP/docker-config/cli-plugins/docker-buildx"
-          chmod 0755 "$RUNNER_TEMP/docker-config/cli-plugins/docker-buildx"
-          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker-config" >>"$GITHUB_ENV"
-          DOCKER_CONFIG="$RUNNER_TEMP/docker-config" \
-            docker buildx version \
+            "$HOME/.docker/cli-plugins/docker-buildx"
+          chmod 0755 "$HOME/.docker/cli-plugins/docker-buildx"
+          docker buildx version \
             | grep -F 'github.com/docker/buildx v0.35.0 a319e5b15052cf6557ceb666eb8ff6e32380b782'
 
       - name: Create a builder with digest-pinned BuildKit
