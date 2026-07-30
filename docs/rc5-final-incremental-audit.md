@@ -2,16 +2,23 @@
 
 **Date :** 30 juillet 2026
 
-**Verdict :** `BLOCKED_EXTERNAL`
+**Verdict de l'audit technique local RC5 :** `BLOCKED_EXTERNAL`
 
 Les six constats P1 locaux `RC5-AUD-01..06` sont corrigés et disposent chacun
 d'un cycle rouge→vert permanent ciblant le comportement constaté. La revue
 terminale du delta ne relève aucun risque résiduel local non documenté.
 
-Le seul blocage restant est organisationnel et externe : le dépôt ne possède
-ni reviewer indépendant de l'initiateur, ni identité technique dédiée à la
-création contrôlée des tags. Ces deux identités ne peuvent pas être remplacées
-honnêtement par un seul administrateur.
+Le premier prérequis externe pour engager l'étape de publication contrôlée est
+organisationnel : le dépôt ne possède ni reviewer indépendant de l'initiateur,
+ni identité technique dédiée à la création contrôlée des tags. Ces deux
+identités ne peuvent pas être remplacées honnêtement par un administrateur
+unique.
+
+Ce verdict clôt uniquement l'audit technique local RC5 et ne vaut pas
+`GO v1.0.0` en production. Le GO global reste `NO-GO` tant que les portes
+opérationnelles, documentaires, de publication, de déploiement et de recette
+encore ouvertes dans
+[`release-readiness.md`](release-readiness.md) ne disposent pas de leurs preuves.
 
 ## 1. Périmètre et couverture
 
@@ -259,13 +266,20 @@ La lecture publique non mutative observe DNS A `79.137.34.84`, Nginx sur
 bord uniquement. Sans cible SSH nominative, elle ne prouve pas l'intérieur
 Compose/conteneurs/images/digests/binds/`nginx -T`.
 
-## 6. Arrêt
+## 6. Arrêt et portée du verdict
 
 Le verdict local est `BLOCKED_EXTERNAL`. Les six P1 locaux sont `FIXED` et
-aucun risque résiduel local P1 ou bloquant n'est ouvert; les trois P2 déjà
-documentés restent non bloquants. La seule action humaine restante est une
-décision organisationnelle fournissant simultanément un reviewer réellement
-indépendant et une identité technique dédiée aux tags.
+aucune anomalie P1 locale bloquante connue ne reste ouverte; les trois P2 déjà
+documentés restent non bloquants. La prochaine décision organisationnelle
+requise pour franchir la première étape de publication doit fournir
+simultanément un reviewer réellement indépendant et une identité technique
+dédiée aux tags.
+
+Le `GO v1.0.0` global reste distinct et `NO-GO` : `OPS-04`, `REL-01..04`,
+`DOC-02..06` et `GOV-01`, ainsi que les preuves effectives de publication,
+déploiement et recette associées, conservent leur état courant. Ces portes ne
+constituent pas des défauts locaux du code RC5 et aucune n'est déclarée
+`VERIFIED` sans sa preuve.
 
 Aucun compte ou environnement fictif n'a été créé. Aucun push, PR, merge, tag,
 release, publication d'image, déploiement, SSH, DNS ou changement VPS n'a été

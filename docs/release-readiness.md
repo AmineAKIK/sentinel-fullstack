@@ -14,10 +14,13 @@ opérationnelle ; le présent registre détermine si ses préconditions sont ré
 
 ### Mise à jour documentaire RC5
 
-**Statut RC5 : BLOCKED_EXTERNAL.** Les six constats terminaux
+#### 1. Clôture technique locale RC5
+
+**Verdict de l'audit local : BLOCKED_EXTERNAL.** Les six constats terminaux
 `RC5-AUD-01..06` sont désormais corrigés avec tests permanents rouges→verts et
-risque résiduel local `NONE`. Le registre terminal couvre
-[`577/577`](rc5-final-audit-register.tsv) chemins.
+risque résiduel local `NONE` pour chacun de ces six P1. Aucune autre anomalie
+P1 locale bloquante n'est connue dans le périmètre audité. Le registre
+terminal couvre [`577/577`](rc5-final-audit-register.tsv) chemins.
 
 Les preuves terminales sont : backend `626/626`, PostgreSQL `165/165` hérité
 par identité de sous-arbre, frontend `787/787`, ciblés frontend `74/74`,
@@ -39,11 +42,26 @@ SHA complets, ruleset `main` avec six checks, tags `v*` verrouillés et releases
 immuables. Aucune opération distante supplémentaire n'a été faite pendant la
 correction terminale.
 
-Le seul blocage de release restant est externe : absence d'un reviewer
-indépendant et d'une identité technique dédiée aux tags. Cette décision
-organisationnelle ne peut pas être résolue localement avec l'unique
-administrateur actuel; aucun compte, reviewer, environnement ou identité
+Le premier prérequis externe pour engager l'étape de publication contrôlée est
+la fourniture d'un reviewer indépendant et d'une identité technique dédiée aux
+tags. Cette décision organisationnelle ne peut pas être résolue localement avec
+l'administrateur actuel; aucun compte, reviewer, environnement ou identité
 fictive n'a été créé.
+
+#### 2. GO global `v1.0.0` en production
+
+**Statut global : NO-GO.** La clôture technique locale RC5 ne ferme pas les
+portes que le présent document conserve explicitement ouvertes :
+
+- `OPS-04` et `REL-04` restent `BLOCKED_EXTERNAL`;
+- `REL-01..03` restent `OPEN`;
+- `DOC-02..05` restent `OPEN`;
+- `DOC-06` et `GOV-01` restent `BLOCKED_EXTERNAL`.
+
+Les preuves opérationnelles, le dossier, la publication, le déploiement et la
+recette correspondants restent à produire. Ces portes ne sont pas des défauts
+locaux du code RC5 et aucune ne doit passer à `VERIFIED` sans la preuve exigée.
+La définition du `GO v1.0.0` en section 8 continue donc de conclure à `NO-GO`.
 
 La lecture publique non mutative antérieure reste un fait historique sur RC4,
 pas une preuve de déploiement RC5. La CI distante, la publication et la recette
