@@ -100,7 +100,9 @@ describe('architecture des mutations hors Atelier RC4', () => {
   });
 
   it('rattache le rendu partagé aux 61 interactions déjà auditées', () => {
-    const inventoryTable = documentation('rc4-mutation-inventory.md').split('## Synthèse')[0];
+    const inventoryTable = documentation('archive-rc/rc4-mutation-inventory.md').split(
+      '## Synthèse'
+    )[0];
     expect(inventoryTable.match(/\| `COVERED` \|/g) ?? []).toHaveLength(59);
     expect(inventoryTable.match(/\| `EXCEPTION_PROVEN` \|/g) ?? []).toHaveLength(2);
   });
