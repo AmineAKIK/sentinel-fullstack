@@ -9,7 +9,8 @@
 
 Audit final exécuté le **17 juillet 2026** sur le candidat
 `a77d6cb9e449e689f34bd224b102238cac81fb6c`, publié sur `main`, selon
-[audit-prod.md](audit-prod.md) et [release-checklist.md](release-checklist.md).
+[production.md](production.md#15-protocole-daudit-de-production) (protocole) et
+[production.md](production.md#14-checklist-de-publication) (checklist).
 
 ## Périmètre et environnement
 

@@ -85,9 +85,8 @@ si un secret requis, l'origine HTTPS, le proxy de confiance, le hash bcrypt
 Board ou le SHA déployé sont invalides. `/api/health` publie ce SHA pour vérifier
 l'alignement du VPS.
 
-La procédure complète se trouve dans
-[docs/deploiement-vps.md](docs/deploiement-vps.md) et l'exploitation quotidienne
-dans [docs/runbook.md](docs/runbook.md).
+La procédure complète, ainsi que l'exploitation quotidienne, se trouvent dans
+[docs/production.md](docs/production.md).
 
 ## Qualité
 
@@ -185,21 +184,29 @@ frontend/
 
 ## Documentation
 
-- [Architecture](ARCHITECTURE.md)
-- [Cycle de vie des incidents](INCIDENT_LIFECYCLE.md)
-- [Cadrage fonctionnel](docs/cadrage-fonctionnel.md)
-- [Documentation technique](docs/documentation-technique.md)
-- [Doctrine UX](docs/doctrine-ux.md)
-- [Jeu d'essai](docs/jeu-essai.md)
-- [Tests manuels](docs/manual-tests.md)
-- [Déploiement VPS](docs/deploiement-vps.md)
-- [Runbook d'exploitation](docs/runbook.md)
-- [Checklist de publication](docs/release-checklist.md)
-- [Préparation de la release v1.0.0](docs/release-readiness.md)
-- [Protocole d'audit production](docs/audit-prod.md)
-- [Derniers résultats d'audit](docs/audit-prod-resultats.md)
+Un document par périmètre :
+
+- [Collaboration](docs/collaboration.md) — règles de changement, contrôles
+  locaux, gouvernance GitHub
+- [Conception](docs/conception.md) — cadrage fonctionnel, acteurs, cycle de
+  vie complet des incidents
+- [Design](docs/design.md) — doctrine d'expérience, principes P1-P7,
+  historique du chantier UX
+- [Technique](docs/technique.md) — architecture, configuration, sécurité
+  applicative, modèle de données, jeu d'essai
+- [Production](docs/production.md) — déploiement, exploitation, checklist de
+  publication, protocole et état d'audit
+
 - [Politique de sécurité](SECURITY.md)
-- [Guide de contribution](CONTRIBUTING.md)
+
+### Suivi de stabilisation
+
+- [Registre de préparation de release](docs/release-readiness.md) — pilotage
+  courant, lot par lot
+- [Derniers résultats d'audit](docs/audit-prod-resultats.md) — historique
+  daté, y compris les verdicts invalidés depuis corrigés
+- [Archives RC3-RC5](docs/archive-rc/) — registres et audits des candidats
+  antérieurs, conservés comme preuve du processus itératif
 
 ## Licence
 
