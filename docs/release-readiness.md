@@ -9,7 +9,7 @@
 
 Ce document est la source de pilotage de la stabilisation `v1.0.0`. Il relie
 chaque constat connu à une décision, un lot, une preuve de correction et un état.
-La [checklist de publication](release-checklist.md) reste la porte de sortie
+La [checklist de publication](production.md#14-checklist-de-publication) reste la porte de sortie
 opérationnelle ; le présent registre détermine si ses préconditions sont réunies.
 
 ### Mise à jour documentaire RC5
@@ -21,7 +21,7 @@ terminaux `RC5-AUD-01..06` sont désormais corrigés avec tests permanents
 rouges→verts et risque résiduel local `NONE` pour chacun de ces six P1. Aucune
 autre anomalie P1 locale bloquante n'est connue dans le périmètre audité. Le
 registre
-terminal couvre [`577/577`](rc5-final-audit-register.tsv) chemins.
+terminal couvre [`577/577`](archive-rc/rc5-final-audit-register.tsv) chemins.
 
 Les preuves terminales sont : backend `626/626`, PostgreSQL `165/165` hérité
 par identité de sous-arbre, frontend `787/787`, ciblés frontend `74/74`,
@@ -619,7 +619,7 @@ npm test
 
 Les lots SQL ajoutent `npm run test:integration` sur une base dédiée. Les lots
 interface ajoutent les parcours Playwright concernés. Avant chaque porte, la
-matrice CI complète de [release-checklist.md](release-checklist.md) est exigée.
+matrice CI complète de [production.md](production.md#14-checklist-de-publication) est exigée.
 
 ## 7. Entrées externes à obtenir
 
