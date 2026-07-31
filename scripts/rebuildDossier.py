@@ -740,7 +740,7 @@ def rebuild(args: argparse.Namespace) -> None:
     replace_paragraph(
         body,
         "Diagramme d'états de l'incident, transcription directe",
-        "Le diagramme d'états représente les cinq statuts persistés et les transitions autorisées par la politique serveur. INCIDENT_LIFECYCLE.md a été resynchronisé avec le comportement réel avant la finalisation du dossier.",
+        "Le diagramme d'états représente les cinq statuts persistés et les transitions autorisées par la politique serveur. La section 8 de conception.md (cycle de vie détaillé d'un incident) a été resynchronisée avec le comportement réel avant la finalisation du dossier.",
     )
 
     # Frontend : extraits exacts et formulations proportionnees.
@@ -1086,7 +1086,7 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
             f"Vérification locale du {args.audit_date} sur la version corrigée : {args.backend_unit} tests unitaires backend, {args.backend_integration} cas d'intégration PostgreSQL, {args.frontend} tests frontend et {args.e2e} parcours navigateur passants sur le candidat code {args.commit}. La preuve CI distante et les captures de la RC5 réellement déployée restent à joindre après autorisation. Cette formulation distingue la preuve locale de la preuve externe.",
         ),
         make_paragraph(
-            "Le jeu d'essai détaillé et reproductible est versionné dans docs/jeu-essai.md. Les valeurs de limite, codes HTTP et préconditions ont été resynchronisés avec le code courant avant la production de ce dossier.",
+            "Le jeu d'essai détaillé et reproductible est versionné dans docs/technique.md (§19). Les valeurs de limite, codes HTTP et préconditions ont été resynchronisés avec le code courant avant la production de ce dossier.",
         ),
         make_paragraph(
             "[À COMPLÉTER — preuve externe] Joindre les captures de la CI distante verte et de la RC5 réellement déployée, avec le SHA visible."
@@ -1348,10 +1348,10 @@ GROUP BY dk.day ORDER BY dk.day ASC;"""
                     ["Maquettes desktop et mobile", "Fichier Figma et §5 / annexe A.1"],
                     ["Interfaces réelles par rôle", "§8.2"],
                     ["Migrations et schéma", "backend/migrations/ et §6"],
-                    ["Jeu d'essai reproductible", "docs/jeu-essai.md et §12"],
+                    ["Jeu d'essai reproductible", "docs/technique.md §19 et §12"],
                     ["Tests automatisés", "backend/frontend et §13"],
                     ["CI", ".github/workflows/ci.yml et capture §13"],
-                    ["Décisions UX", "docs/doctrine-ux.md et docs/plan-ux.md"],
+                    ["Décisions UX", "docs/design.md"],
                 ]
             ),
         ]
@@ -1389,7 +1389,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", default="Dossier-projet-Sentinel-DWWM.docx")
     parser.add_argument("--output", default="Dossier-projet-Sentinel-DWWM-CORRIGE.docx")
-    parser.add_argument("--assets-dir", default="docs/dossier-projet/assets-corrected")
+    parser.add_argument("--assets-dir", default="assets-corrected")
     parser.add_argument("--backend-unit", type=int, required=True)
     parser.add_argument("--backend-integration", type=int, required=True)
     parser.add_argument("--frontend", type=int, required=True)
