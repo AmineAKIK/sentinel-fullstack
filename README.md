@@ -12,6 +12,17 @@ réunit trois points d'entrée dans un même portail :
 - **Administration** : comptes, lignes, paramètres, sécurité et audit ;
 - **Atelier** : déclaration, traitement, arbitrage, pilotage et capitalisation.
 
+## Candidat présenté au titre DWWM
+
+Le candidat de référence présenté au jury est **`v1.0.0-rc.8`**, au commit
+**`deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7`**. Pour reproduire exactement le
+code évalué, utiliser ce tag plutôt que la tête de `main`.
+
+Depuis ce candidat, `main` contient des consolidations documentaires et du
+nettoyage de dépôt postérieurs à la release. La release `v1.0.0-rc.8`, son tag,
+son SHA, ses images épinglées par digest, ses SBOM et ses attestations constituent
+la référence immuable du candidat DWWM.
+
 ## Stack
 
 - Frontend : React 18, TypeScript, Vite 8, React Router, Vitest et Playwright
