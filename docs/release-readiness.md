@@ -30,7 +30,7 @@ preuve de déploiement RC9. Voir [production.md §16](production.md#16-état-vé
 
 | Porte | Critère de fermeture |
 | --- | --- |
-| Dépendances | politique sans exception expirée ; quatre audits npm revus ; aucune PR Dependabot laissée sans décision |
+| Dépendances | politique revue avec `exceptions: []` ; quatre audits npm revus ; aucune PR Dependabot laissée sans décision |
 | Documentation | cinq documents de référence et README cohérents avec le code courant ; documents historiques explicitement datés |
 | CI | six jobs obligatoires verts sur le SHA candidat exact |
 | Gouvernance | `main` protégé, PR obligatoire, six checks stricts, aucun bypass ; tags `v*` immuables après création |
