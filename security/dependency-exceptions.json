@@ -4,6 +4,14 @@
   "risk_owner": "repository-owner:AmineAKIK",
   "reviewed_on": "2026-09-16",
   "severity_floor": "high",
+  "verification": {
+    "audited_on": "2026-09-16",
+    "staging_run_id": 35040242465,
+    "backend_runtime": "0 vulnerabilities",
+    "backend_full": "0 vulnerabilities",
+    "frontend_runtime": "0 vulnerabilities",
+    "frontend_full": "0 vulnerabilities"
+  },
   "lockfiles": {
     "backend/package-lock.json": {
       "sha256": "0fa75b694c359fce799658938f8fbfab9a9e8d362da2cc36259a68bf6453bbad"
