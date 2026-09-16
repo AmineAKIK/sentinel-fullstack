@@ -19,9 +19,7 @@
     "backend_forbidden_packages": [
       "brace-expansion"
     ],
-    "frontend_forbidden_paths": [
-      "/usr/share/nginx/html/node_modules"
-    ]
+    "frontend_forbidden_paths": []
   },
   "exceptions": []
 }
