@@ -10,7 +10,7 @@ GitHub est dans [collaboration.md](collaboration.md).
 restauration · 8. Sécurité d'exploitation · 9. Contrôles rapides et
 diagnostic · 10. Rotation des secrets · 11. Procédures d'incident ·
 12. Retour arrière · 13. Trace d'intervention · 14. Checklist de publication
-· 15. Protocole d'audit de production · 16. État vérifié de l'instance
+· 15. Protocole d'audit de production · 16. État vérifié historique de l'instance
 publique · 17. Publication GitHub — spécificités release.
 
 Toutes les commandes ci-dessous s'exécutent depuis le répertoire de
