@@ -529,18 +529,20 @@ Les templates échappent noms, motifs, détails, identifiants et URLs,
 séparent sujet texte et HTML, et passent par un layout commun. Sans SMTP,
 l'application reste fonctionnelle et journalise la dégradation.
 
-La garantie est **au moins une tentative** : la clé source empêche de créer
-deux éléments d'outbox pour le même événement, mais un arrêt brutal après
-acceptation par le fournisseur SMTP et avant le passage local à `COMPLETED`
-peut provoquer un nouvel envoi. L'outbox déduplique la source et livre au
-moins une fois, par destinataire : chaque canal de notification
-(`delivered_recipients`, migration 048) mémorise les adresses déjà confirmées
-et les exclut des tentatives suivantes ; un crash entre l'acceptation SMTP
-d'une adresse précise et l'acquittement local de cette même adresse peut donc
-encore déclencher un renvoi à cette adresse précise, mais jamais aux adresses
-déjà confirmées d'un même item ou d'un canal frère du même événement. C'est
-une limite explicite des effets externes non transactionnels, à surveiller
-côté exploitation.
+Pour chaque canal **éligible** — transport SMTP configuré et au moins un
+destinataire résolu — le worker effectue au moins une tentative d'envoi. Un
+canal désactivé ou sans destinataire est au contraire terminé explicitement
+en `SKIPPED_DISABLED` ou `SKIPPED_NO_RECIPIENT`, sans tentative SMTP. La clé
+source empêche de créer deux éléments d'outbox pour le même événement, mais
+la livraison externe reste bornée par `NOTIFICATION_MAX_ATTEMPTS` et peut
+donc finir en échec définitif. `delivered_recipients` (migration 048)
+mémorise les adresses déjà confirmées afin de ne pas les renvoyer lors d'une
+tentative suivante. Un arrêt brutal après acceptation par le fournisseur
+SMTP et avant l'acquittement local peut toutefois provoquer un doublon pour
+l'adresse dont l'acceptation n'a pas encore été persistée. L'outbox ne
+fournit donc pas une garantie absolue de livraison « au moins une fois » par
+destinataire ; elle fournit une reprise bornée, une déduplication de la
+source et une trace observable des succès, retries, skips et abandons.
 
 ## 11. Support IA
 
@@ -743,9 +745,14 @@ remontent pas cette advisory sur le lockfile revu.
 
 Toute future exception doit déclarer son GHSA, son paquet, son propriétaire,
 sa justification, sa date d'expiration et la classification des quatre
-périmètres d'audit. L'expiration est validée dès le chargement de la politique
-et fait donc échouer tous les modes du garde, y compris `repository` et
-`images`, sans attendre une analyse d'audit.
+périmètres d'audit. Dans l'implémentation actuelle, la commande
+`repository` appelle `validate_policy()` et vérifie notamment l'échéance des
+exceptions avant les commandes `npm audit` du workflow. Une exception
+expirée fait donc échouer ce garde en amont et peut court-circuiter la
+collecte des rapports d'audit de ce run. Le comportement reste fail-closed,
+mais la preuve d'audit doit alors être recollectée après correction de la
+politique ou des dépendances ; la documentation ne présente pas cette
+séquence comme une collecte garantie avant l'échec.
 
 Toute modification d'un `package-lock.json` fait échouer le hash enregistré
 avec `dependency review required`. La correction attendue est une nouvelle

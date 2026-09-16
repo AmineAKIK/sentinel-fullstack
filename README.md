@@ -57,13 +57,12 @@ ports `80` et `443`; PostgreSQL, l'API et Nginx restent sur des réseaux
 internes. La commande ci-dessous sert à cette distribution autonome ou à une
 validation locale, pas à l'instance publique.
 
-L'observation publique du 30 juillet 2026 prouve un frontal Nginx sur les ports
-80/443, ce qui exclut la topologie A avec Caddy propriétaire de ces ports et
-rend la **topologie B** cohérente avec le bord exposé. Sans accès SSH nominatif,
-elle ne prouve toutefois ni les fichiers Compose actifs, ni les binds loopback,
-ni les images et digests internes. Le runbook B reste le contrat normatif du
-prochain déploiement public : trois fichiers Compose, images par digest et
-aucune reconstruction avec la commande `--build` ci-dessous.
+Une observation publique datée du 30 juillet 2026 a montré un frontal Nginx
+sur les ports 80/443, cohérent avec la **topologie B** documentée. Cette
+observation historique ne prouve ni les fichiers Compose actuellement actifs,
+ni les binds loopback, ni les images/digests internes. Le runbook B reste le
+contrat normatif de déploiement public : trois fichiers Compose, images par
+digest et aucune reconstruction locale lors d'une release certifiée.
 
 ```bash
 cp .env.release.example .env
@@ -184,7 +183,7 @@ frontend/
 
 ## Documentation
 
-Un document par périmètre :
+Les cinq documents de référence pour le jury sont :
 
 - [Collaboration](docs/collaboration.md) — règles de changement, contrôles
   locaux, gouvernance GitHub
@@ -195,18 +194,22 @@ Un document par périmètre :
 - [Technique](docs/technique.md) — architecture, configuration, sécurité
   applicative, modèle de données, jeu d'essai
 - [Production](docs/production.md) — déploiement, exploitation, checklist de
-  publication, protocole et état d'audit
+  publication, protocole et preuves de production datées
 
-- [Politique de sécurité](SECURITY.md)
+La [politique de sécurité](SECURITY.md) complète ces références.
 
-### Suivi de stabilisation
+### Statut et historique de stabilisation
 
-- [Registre de préparation de release](docs/release-readiness.md) — pilotage
-  courant, lot par lot
-- [Derniers résultats d'audit](docs/audit-prod-resultats.md) — historique
-  daté, y compris les verdicts invalidés depuis corrigés
-- [Archives RC3-RC5](docs/archive-rc/) — registres et audits des candidats
+- [Préparation de release](docs/release-readiness.md) — portes RC9 et règle de
+  lecture des preuves historiques ; ce fichier n'est pas une source métier
+- [Résultats d'audit](docs/audit-prod-resultats.md) — index historique ; les
+  verdicts et métriques anciens restent attachés à leur candidat et à leur date
+- [Archives RC](docs/archive-rc/) — registres et audits des candidats
   antérieurs, conservés comme preuve du processus itératif
+
+La preuve de production RC8 datée ne vaut pas preuve de déploiement RC9. Le
+candidat final devra faire coïncider `main`, tag, release, images, health SHA et
+dossier avant présentation.
 
 ## Licence
 

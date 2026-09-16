@@ -10,7 +10,7 @@ GitHub est dans [collaboration.md](collaboration.md).
 restauration · 8. Sécurité d'exploitation · 9. Contrôles rapides et
 diagnostic · 10. Rotation des secrets · 11. Procédures d'incident ·
 12. Retour arrière · 13. Trace d'intervention · 14. Checklist de publication
-· 15. Protocole d'audit de production · 16. État vérifié de l'instance
+· 15. Protocole d'audit de production · 16. État vérifié historique de l'instance
 publique · 17. Publication GitHub — spécificités release.
 
 Toutes les commandes ci-dessous s'exécutent depuis le répertoire de
@@ -823,9 +823,10 @@ cd frontend && npx playwright install chromium && npm run test:e2e
 - [ ] healthchecks backend, frontend et PostgreSQL passent
 - [ ] les logs sont bornés par rotation
 - [ ] ShellCheck valide tous les scripts shell suivis
-- [ ] les deux seules exceptions upstream high (voir
-      [technique.md](technique.md) §16) satisfont la garde bornée au
-      31 août 2026, sans `npm audit fix --force`
+- [ ] la politique RC9 de dépendances est relue : `exceptions` est vide,
+      les hashes des deux lockfiles correspondent à la revue et les quatre
+      audits npm (backend/frontend, runtime/complet) ne remontent aucune
+      vulnérabilité ; aucun `npm audit fix --force` n'est utilisé
 
 ### Exploitation
 
@@ -907,10 +908,11 @@ même arbitrage ; endurance 30 à 60 minutes à charge nominale.
 
 Critères minimaux : aucune violation d'unicité métier ; aucun double
 événement ni double élément d'outbox pour une même source ; le scénario de
-crash après acceptation SMTP documente le risque résiduel de nouvel envoi
-inhérent à la livraison « au moins une fois » ; aucun 5xx inexpliqué ;
-mémoire backend sans croissance linéaire ; pool PostgreSQL stable ; p95 et
-taux d'erreur conformes aux objectifs.
+crash après acceptation SMTP doit documenter le risque résiduel de doublon
+avant acquittement local, tandis que les retries restent bornés et peuvent
+aboutir à un abandon définitif ; aucun 5xx inexpliqué ; mémoire backend sans
+croissance linéaire ; pool PostgreSQL stable ; p95 et taux d'erreur conformes
+aux objectifs.
 
 ### Sécurité dynamique
 
@@ -986,21 +988,23 @@ signataires.
   et échéance ;
 - **NO-GO** : intégrité, sécurité, reprise ou parcours critique non prouvé.
 
-## 16. État vérifié de l'instance publique
+## 16. État vérifié historique de l'instance publique
 
-Dernière vérification : **31 juillet 2026**, sur le SHA
-`deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7` (tag `v1.0.0-rc.8`).
+Dernière preuve de production consignée dans ce document : **31 juillet
+2026**, sur le SHA `deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7` (tag
+`v1.0.0-rc.8`). Cette section est une photographie historique RC8 : elle ne
+prouve pas que le candidat RC9 en préparation est déjà déployé.
 
-- `/api/health` répond `{"status":"ok","db":"ok","version":"deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7"}` ;
-- le DNS A de `sentinel.akiksystems.fr` pointe vers l'adresse du VPS, les
-  ports 80 et 443 répondent avec `Server: nginx`, HTTP redirige vers HTTPS ;
-- le certificat TLS couvre exactement le domaine, HSTS et les en-têtes
-  publics attendus sont présents ;
-- le VPS est aligné sur le candidat décrit dans le dossier de projet : le
-  dépôt et l'instance publique désignent le même commit.
+- `/api/health` répondait `{"status":"ok","db":"ok","version":"deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7"}` ;
+- le DNS A de `sentinel.akiksystems.fr` pointait vers l'adresse du VPS, les
+  ports 80 et 443 répondaient avec `Server: nginx`, HTTP redirigeait vers
+  HTTPS ;
+- le certificat TLS couvrait exactement le domaine, HSTS et les en-têtes
+  publics attendus étaient présents ;
+- à cette date, le VPS et RC8 désignaient le même commit.
 
-**Preuves de qualité correspondantes** (rejouées et vérifiées sur ce même
-SHA) :
+**Preuves de qualité RC8 correspondantes** (historiques, rejouées et
+vérifiées sur ce même SHA) :
 
 | Suite | Résultat |
 | --- | --- |
@@ -1016,12 +1020,17 @@ SHA) :
 | Dépôt | 577 fichiers suivis, 50 migrations (001-050, sans trou) |
 | CI | 6 jobs indépendants, tous verts sur ce SHA |
 
+Ces valeurs décrivent RC8 et ne doivent pas être reprises comme état de
+sécurité RC9. La revue RC9 du 16 septembre 2026 est décrite dans
+[technique.md](technique.md) §16 : politique sans exception active et quatre
+audits npm à zéro vulnérabilité au moment de la revue.
+
 Sans accès SSH nominatif au VPS, cette section ne prouve pas les fichiers
-Compose actifs, les binds loopback ni les images/digests internes : ces
-points restent à contrôler lors de la prochaine recette VPS autorisée
-(§6). Elle prouve en revanche, de façon vérifiable par quiconque, que le
-service exposé publiquement exécute le commit exact décrit dans l'ensemble
-de cette documentation.
+Compose actifs, les binds loopback ni les images/digests internes. Une
+nouvelle preuve de production doit être créée après publication et
+déploiement du candidat RC9 : SHA de `/api/health`, digests de release et
+d'images, puis recette courte. Aucune affirmation d'alignement RC9 ne doit
+être déduite de la preuve RC8 ci-dessus.
 
 ### Historique des audits
 
@@ -1031,8 +1040,8 @@ résultats de test et sa propre décision (GO / GO conditionnel / NO-GO). Ces
 rapports historiques — y compris un verdict du 17 juillet 2026 explicitement
 invalidé après coup parce que le VPS n'était alors pas encore aligné sur le
 candidat audité — restent conservés dans l'historique Git comme preuve d'un
-processus itératif réel plutôt qu'effacés ou réécrits. Seul l'état ci-dessus
-fait foi pour la version actuellement présentée.
+processus itératif réel plutôt qu'effacés ou réécrits. Ils ne remplacent pas
+la preuve à produire pour RC9.
 
 ## 17. Publication GitHub — spécificités release
 
