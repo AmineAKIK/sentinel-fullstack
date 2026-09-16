@@ -712,33 +712,47 @@ Le détail des topologies de déploiement (autonome vs VPS) est dans
 
 ## 16. Sécurité des dépendances
 
-La politique d'exceptions bornées est décrite dans
-[`security/dependency-exceptions.json`](../security/dependency-exceptions.json),
-source normative lue par la CI, et appliquée par
+La politique normative est décrite dans
+[`security/dependency-exceptions.json`](../security/dependency-exceptions.json)
+et appliquée par
 [`scripts/dependency_exception_guard.py`](../scripts/dependency_exception_guard.py)
 (fail-closed).
 
-Deux exceptions sont actives, toutes deux bornées au **31 août 2026 inclus** :
+La revue RC9 du **16 septembre 2026** ne comporte **aucune exception active** :
+`exceptions` est vide. Les quatre audits npm enregistrés au moment de la revue
+(`backend-runtime`, `backend-full`, `frontend-runtime`, `frontend-full`) ne
+remontent aucune vulnérabilité.
 
-| Advisory | Portée | Classification |
-| --- | --- | --- |
-| [`GHSA-qwww-vcr4-c8h2`](https://github.com/advisories/GHSA-qwww-vcr4-c8h2) | `react-router >=7.12.0 <8.3.0` | `not-applicable` — l'advisory cible les API React Server Components instables ; Sentinel reste sur React 18, React Router 7.18.2 en Declarative Mode, sans dépendance ni API RSC |
-| [`GHSA-mh99-v99m-4gvg`](https://github.com/advisories/GHSA-mh99-v99m-4gvg) | `brace-expansion <=5.0.7` | `upstream-dev-only` — présent uniquement dans les chaînes de développement Jest/ts-jest/ESLint/jsx-a11y ; absent de la fermeture runtime de l'application et des images |
+La remédiation comprend notamment Nodemailer `10.0.10` côté backend et les
+branches corrigées de `brace-expansion` (`1.1.18`, `2.1.4`, `5.0.9`) dans les
+chaînes de développement. Le garde maintient en plus un contrat de fermeture
+runtime : `brace-expansion`, `glob` et `minimatch` ne doivent pas devenir
+atteignables depuis les dépendances de production, et ces paquets sont aussi
+interdits dans l'image backend construite.
 
-Le garde échoue si le propriétaire, les GHSA, leurs bornes, classifications
-ou l'échéance changent, si un lockfile change sans réévaluation, si la
-version ou le mode Router change, si React quitte la majeure 18, si Brace
-devient atteignable depuis les dépendances runtime, ou si une GHSA
-supplémentaire high/critical apparaît sans être résolue vers l'une des deux
-exceptions. La CI exécute les audits npm JSON runtime et complets des deux
-workspaces, puis le job Containers inspecte les deux images applicatives
-réellement construites.
+Pour React Router, Sentinel reste sur React 18 et React Router `7.18.2` en
+Declarative Mode avec `BrowserRouter`, sans dépendance ni API React Server
+Components. Au 16 septembre 2026, l'advisory upstream
+[`GHSA-qwww-vcr4-c8h2`](https://github.com/remix-run/react-router/security/advisories/GHSA-qwww-vcr4-c8h2)
+indique la branche 7 affectée pour `>=7.12.0 <7.18.2` et `7.18.2` comme version
+corrigée. La base GitHub centralisée a présenté une plage plus large ; la
+politique enregistre donc explicitement la plage upstream revue et conserve
+les invariants d'architecture (React 18, Router 7.18.2 exact, Declarative
+Mode, absence de dépendances et symboles RSC). Les audits npm courants ne
+remontent pas cette advisory sur le lockfile revu.
+
+Toute future exception doit déclarer son GHSA, son paquet, son propriétaire,
+sa justification, sa date d'expiration et la classification des quatre
+périmètres d'audit. L'expiration est validée dès le chargement de la politique
+et fait donc échouer tous les modes du garde, y compris `repository` et
+`images`, sans attendre une analyse d'audit.
 
 Toute modification d'un `package-lock.json` fait échouer le hash enregistré
-avec `D2 re-evaluation required` : la correction attendue est une nouvelle
-revue complète (vérifier d'abord une mise à jour compatible qui supprimerait
-l'exception), jamais une simple mise à jour de hash, un `npm audit fix
---force`, un retry ou un downgrade.
+avec `dependency review required`. La correction attendue est une nouvelle
+revue complète des dépendances et des quatre audits, jamais une simple mise à
+jour de hash, un `npm audit fix --force`, un retry ou un downgrade. La CI
+exécute les audits npm JSON runtime et complets des deux workspaces, puis le
+job Containers inspecte les images applicatives réellement construites.
 
 ## 17. Backup et reprise applicative
 
