@@ -40,7 +40,7 @@ Les nombres de tests, versions de paquets, résultats npm, SHA, décisions
 datés attachés à leur candidat. Ils ne décrivent pas automatiquement le
 candidat RC9.
 
-Pour une décision RC9, utiliser exclusivement :
+Pour établir la **preuve de publication et de déploiement RC9**, utiliser :
 
 1. le SHA final de `main` et les six jobs CI sur ce SHA ;
 2. la politique et les lockfiles de dépendances du même candidat ;
@@ -48,6 +48,10 @@ Pour une décision RC9, utiliser exclusivement :
 4. la vérification après déploiement que `/api/health.version` égale le SHA du
    tag ;
 5. la recette et la trace d'intervention correspondantes.
+
+La décision globale de préparation RC9 reste régie par les autres portes de
+[release-readiness.md](release-readiness.md), notamment documentation,
+gouvernance et alignement final du dossier DWWM.
 
 Les rapports détaillés des candidats antérieurs restent disponibles dans
 [`docs/archive-rc/`](archive-rc/) et dans l'historique Git.
