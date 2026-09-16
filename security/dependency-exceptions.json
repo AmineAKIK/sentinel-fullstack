@@ -20,12 +20,72 @@
       "sha256": "7f6e71a0d9c8d9fe103e36a4d43eee366aee668c40fda554154c682c0202bf14"
     }
   },
+  "router_contract": {
+    "declared_package": "react-router-dom",
+    "declared_version": "7.18.2",
+    "resolved_packages": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1",
+      "react-router": "7.18.2",
+      "react-router-dom": "7.18.2"
+    },
+    "react_major": 18,
+    "mode": "declarative",
+    "production_entrypoint": "frontend/src/main.tsx",
+    "required_entrypoint_symbol": "BrowserRouter",
+    "forbidden_data_router_symbols": [
+      "createBrowserRouter",
+      "createHashRouter",
+      "HydratedRouter",
+      "RouterProvider"
+    ],
+    "forbidden_rsc_packages": [
+      "@react-router/dev",
+      "@react-router/node",
+      "@react-router/serve",
+      "@vitejs/plugin-rsc",
+      "react-server-dom-parcel",
+      "react-server-dom-vite",
+      "react-server-dom-webpack"
+    ],
+    "forbidden_rsc_symbols": [
+      "unstable_RSCHydratedRouter",
+      "unstable_RSCRouteConfig",
+      "unstable_RSCStaticRouter",
+      "unstable_createCallServer",
+      "unstable_getRequest",
+      "unstable_getRSCStream",
+      "unstable_matchRSCServerRequest",
+      "unstable_routeRSCServerRequest"
+    ],
+    "reviewed_advisory": {
+      "id": "GHSA-qwww-vcr4-c8h2",
+      "affected_ranges": [
+        ">=7.12.0 <7.18.2",
+        ">=8.0.0 <8.3.0"
+      ],
+      "patched_versions": [
+        "7.18.2",
+        "8.3.0"
+      ],
+      "checked_on": "2026-09-16"
+    }
+  },
+  "runtime_contract": {
+    "forbidden_packages": [
+      "brace-expansion",
+      "glob",
+      "minimatch"
+    ]
+  },
   "image_contract": {
     "backend_exact_versions": {
       "nodemailer": "10.0.10"
     },
     "backend_forbidden_packages": [
-      "brace-expansion"
+      "brace-expansion",
+      "glob",
+      "minimatch"
     ],
     "frontend_forbidden_paths": []
   },
