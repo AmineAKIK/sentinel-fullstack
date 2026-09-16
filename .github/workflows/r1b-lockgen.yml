@@ -1,15 +1,14 @@
-name: R1B lockfile refresh
+name: R1B lockfile evidence
 
 on:
   push:
     branches: ['release/r1b-lockgen']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  refresh:
-    if: github.actor != 'github-actions[bot]'
+  evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -17,44 +16,20 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.18.0
-      - name: Apply non-breaking audit fixes to lockfiles
-        run: |
-          npm --prefix backend audit fix --package-lock-only --ignore-scripts
-          npm --prefix frontend audit fix --package-lock-only --ignore-scripts
+      - name: Lockfile SHA-256
+        run: sha256sum backend/package-lock.json frontend/package-lock.json
       - name: Verify deterministic installs
         run: |
           npm --prefix backend ci --ignore-scripts
           npm --prefix frontend ci --ignore-scripts
-      - name: Capture current audit facts
+      - name: Verify all four npm audit scopes
         shell: bash
         run: |
-          set +e
-          npm --prefix backend audit --omit=dev --audit-level=high --json > /tmp/backend-runtime.json
-          npm --prefix backend audit --audit-level=high --json > /tmp/backend-full.json
-          npm --prefix frontend audit --omit=dev --audit-level=high --json > /tmp/frontend-runtime.json
-          npm --prefix frontend audit --audit-level=high --json > /tmp/frontend-full.json
-          set -e
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          for name in ('backend-runtime','backend-full','frontend-runtime','frontend-full'):
-              doc=json.loads(Path('/tmp/'+name+'.json').read_text())
-              print(f'=== {name} ===')
-              print(json.dumps(doc.get('metadata',{}).get('vulnerabilities',{}), sort_keys=True))
-              for pkg,v in sorted(doc.get('vulnerabilities',{}).items()):
-                  via=v.get('via',[]) if isinstance(v,dict) else []
-                  direct=[]
-                  for item in via:
-                      if isinstance(item,dict):
-                          direct.append({k:item.get(k) for k in ('name','severity','range','url')})
-                  if direct:
-                      print(pkg, json.dumps(direct, sort_keys=True))
-          PY
-      - name: Commit generated lockfiles
+          npm --prefix backend audit --omit=dev --audit-level=high
+          npm --prefix backend audit --audit-level=high
+          npm --prefix frontend audit --omit=dev --audit-level=high
+          npm --prefix frontend audit --audit-level=high
+      - name: Resolve remediated package versions
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add backend/package-lock.json frontend/package-lock.json
-          git diff --cached --quiet && exit 0
-          git commit -m 'chore(security): apply safe audit lockfile fixes for R1-B'
-          git push origin HEAD:release/r1b-lockgen
+          npm --prefix backend ls nodemailer brace-expansion js-yaml browserslist --all || true
+          npm --prefix frontend ls brace-expansion js-yaml browserslist nanoid undici vitest @vitest/coverage-v8 --all || true
