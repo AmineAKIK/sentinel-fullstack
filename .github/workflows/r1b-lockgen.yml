@@ -1,0 +1,60 @@
+name: R1B lockfile refresh
+
+on:
+  push:
+    branches: ['release/r1b-lockgen']
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Regenerate lockfiles only
+        run: |
+          npm --prefix backend install --package-lock-only --ignore-scripts
+          npm --prefix frontend install --package-lock-only --ignore-scripts
+      - name: Verify deterministic installs
+        run: |
+          npm --prefix backend ci --ignore-scripts
+          npm --prefix frontend ci --ignore-scripts
+      - name: Capture current audit facts
+        shell: bash
+        run: |
+          set +e
+          npm --prefix backend audit --omit=dev --audit-level=high --json > /tmp/backend-runtime.json
+          npm --prefix backend audit --audit-level=high --json > /tmp/backend-full.json
+          npm --prefix frontend audit --omit=dev --audit-level=high --json > /tmp/frontend-runtime.json
+          npm --prefix frontend audit --audit-level=high --json > /tmp/frontend-full.json
+          set -e
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ('backend-runtime','backend-full','frontend-runtime','frontend-full'):
+              doc=json.loads(Path('/tmp/'+name+'.json').read_text())
+              print(f'=== {name} ===')
+              print(json.dumps(doc.get('metadata',{}).get('vulnerabilities',{}), sort_keys=True))
+              for pkg,v in sorted(doc.get('vulnerabilities',{}).items()):
+                  via=v.get('via',[]) if isinstance(v,dict) else []
+                  direct=[]
+                  for item in via:
+                      if isinstance(item,dict):
+                          direct.append({k:item.get(k) for k in ('name','severity','range','url')})
+                  if direct:
+                      print(pkg, json.dumps(direct, sort_keys=True))
+          PY
+      - name: Commit generated lockfiles
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/package-lock.json frontend/package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore(security): refresh lockfiles for R1-B'
+          git push origin HEAD:release/r1b-lockgen
