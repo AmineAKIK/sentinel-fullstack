@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed guard for Sentinel's two temporary RC5 dependency exceptions."""
+"""Fail-closed dependency policy guard for Sentinel release candidates."""
 
 from __future__ import annotations
 
@@ -7,21 +7,25 @@ import argparse
 from datetime import date, datetime, timezone
 import hashlib
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import subprocess
 import sys
 from typing import Any
 
-
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
-POLICY_ID = "sentinel-rc5-bounded-dependency-exceptions"
+POLICY_ID = "sentinel-rc9-dependency-policy"
 EXPECTED_OWNER = "repository-owner:AmineAKIK"
-MAX_EXPIRY = date(2026, 8, 31)
-EXPECTED_LOCKFILES = {
-    "backend/package-lock.json",
-    "frontend/package-lock.json",
+EXPECTED_LOCKFILES = {"backend/package-lock.json", "frontend/package-lock.json"}
+VALID_SCOPES = {"backend-runtime", "backend-full", "frontend-runtime", "frontend-full"}
+SEVERITY_RANK = {"info": 0, "low": 1, "moderate": 2, "high": 3, "critical": 4}
+GHSA_PATTERN = re.compile(r"GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}")
+SOURCE_SUFFIXES = {".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"}
+RSC_IMPORT_FRAGMENTS = {
+    "react-router/internal/react-server",
+    "react-router/internal/react-server-client",
 }
+EXPECTED_RUNTIME_FORBIDDEN_PACKAGES = {"brace-expansion", "glob", "minimatch"}
 EXPECTED_ROUTER_CONTRACT = {
     "declared_package": "react-router-dom",
     "declared_version": "7.18.2",
@@ -60,38 +64,17 @@ EXPECTED_ROUTER_CONTRACT = {
         "unstable_matchRSCServerRequest",
         "unstable_routeRSCServerRequest",
     ],
-}
-EXPECTED_EXCEPTIONS = {
-    "GHSA-mh99-v99m-4gvg": {
-        "package": "brace-expansion",
-        "affected_range": "<=5.0.7",
-        "classification": "upstream-dev-only",
-        "required_scopes": {"backend-full", "frontend-full"},
-        "forbidden_scopes": {"backend-runtime", "frontend-runtime"},
+    "reviewed_advisory": {
+        "id": "GHSA-qwww-vcr4-c8h2",
+        "affected_ranges": [">=7.12.0 <7.18.2", ">=8.0.0 <8.3.0"],
+        "patched_versions": ["7.18.2", "8.3.0"],
+        "checked_on": "2026-09-16",
     },
-    "GHSA-qwww-vcr4-c8h2": {
-        "package": "react-router",
-        "affected_range": ">=7.12.0 <8.3.0",
-        "classification": "not-applicable",
-        "required_scopes": {"frontend-full", "frontend-runtime"},
-        "forbidden_scopes": {"backend-full", "backend-runtime"},
-    },
-}
-EXPECTED_BRACE_RUNTIME_PACKAGES = {
-    "brace-expansion",
-    "glob",
-    "minimatch",
-}
-SOURCE_SUFFIXES = {".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"}
-GHSA_PATTERN = re.compile(r"GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}")
-RSC_IMPORT_FRAGMENTS = {
-    "react-router/internal/react-server",
-    "react-router/internal/react-server-client",
 }
 
 
 class GuardError(RuntimeError):
-    """An invariant protected by the policy has changed."""
+    """A dependency policy invariant is not satisfied."""
 
 
 def require(condition: bool, message: str) -> None:
@@ -121,113 +104,67 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def parse_iso_date(raw_value: Any, field: str) -> date:
-    require(isinstance(raw_value, str), f"{field} must be an ISO date")
+def parse_iso_date(raw: Any, field: str) -> date:
+    require(isinstance(raw, str), f"{field} must be an ISO date")
     try:
-        return date.fromisoformat(raw_value)
+        return date.fromisoformat(raw)
     except ValueError as error:
         raise GuardError(f"{field} must be an ISO date") from error
 
 
 def validate_policy(policy: dict[str, Any], today: date) -> dict[str, dict[str, Any]]:
-    require(policy.get("schema_version") == 1, "unsupported policy schema_version")
+    require(policy.get("schema_version") == 2, "unsupported policy schema_version")
     require(policy.get("policy_id") == POLICY_ID, "unexpected policy_id")
-    require(
-        policy.get("risk_owner") == EXPECTED_OWNER,
-        f"risk_owner must be explicit and equal to {EXPECTED_OWNER}",
-    )
+    require(policy.get("risk_owner") == EXPECTED_OWNER, f"risk_owner must equal {EXPECTED_OWNER}")
     require(policy.get("severity_floor") == "high", "severity_floor must remain high")
-
-    expiry = parse_iso_date(policy.get("expires_on"), "expires_on")
-    require(expiry == MAX_EXPIRY, "policy expiration must remain 2026-08-31")
-    require(today <= expiry, f"dependency exception policy expired on {expiry}")
+    reviewed_on = parse_iso_date(policy.get("reviewed_on"), "reviewed_on")
+    require(reviewed_on <= today, "reviewed_on cannot be in the future")
 
     lockfiles = policy.get("lockfiles")
     require(isinstance(lockfiles, dict), "lockfiles must be an object")
-    require(
-        set(lockfiles) == EXPECTED_LOCKFILES,
-        "policy must cover exactly both reviewed package-lock.json files",
-    )
+    require(set(lockfiles) == EXPECTED_LOCKFILES, "policy must cover exactly both package-lock.json files")
     for relative_path, record in lockfiles.items():
         require(isinstance(record, dict), f"invalid lock record for {relative_path}")
         digest = record.get("sha256")
-        require(
-            isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest) is not None,
-            f"invalid SHA-256 for {relative_path}",
-        )
+        require(isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest) is not None, f"invalid SHA-256 for {relative_path}")
 
-    require(
-        policy.get("router_contract") == EXPECTED_ROUTER_CONTRACT,
-        "Router contract must remain React 18 / Router 7.18.2 / Declarative Mode",
-    )
+    require(policy.get("router_contract") == EXPECTED_ROUTER_CONTRACT, "Router/React contract must remain React 18 / Router 7.18.2 / Declarative Mode")
 
-    brace_contract = policy.get("brace_contract")
-    require(isinstance(brace_contract, dict), "missing brace_contract")
-    runtime_packages = brace_contract.get("forbidden_runtime_packages")
-    require(
-        isinstance(runtime_packages, list)
-        and set(runtime_packages) == EXPECTED_BRACE_RUNTIME_PACKAGES,
-        "Brace runtime package deny-list must remain closed",
-    )
-    require(
-        isinstance(brace_contract.get("installations"), dict),
-        "brace_contract.installations must be an object",
-    )
-    require(
-        isinstance(brace_contract.get("exception_chains"), dict),
-        "brace_contract.exception_chains must be an object",
-    )
+    runtime_contract = policy.get("runtime_contract")
+    require(isinstance(runtime_contract, dict), "runtime_contract must be an object")
+    forbidden_runtime = runtime_contract.get("forbidden_packages")
+    require(isinstance(forbidden_runtime, list) and set(forbidden_runtime) == EXPECTED_RUNTIME_FORBIDDEN_PACKAGES, "runtime forbidden package set must remain closed")
+
+    image_contract = policy.get("image_contract")
+    require(isinstance(image_contract, dict), "image_contract must be an object")
+    exact = image_contract.get("backend_exact_versions")
+    forbidden = image_contract.get("backend_forbidden_packages")
+    frontend_paths = image_contract.get("frontend_forbidden_paths")
+    require(isinstance(exact, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in exact.items()), "invalid backend_exact_versions")
+    require(isinstance(forbidden, list) and set(forbidden) == EXPECTED_RUNTIME_FORBIDDEN_PACKAGES, "backend image forbidden package set must match runtime contract")
+    require(isinstance(frontend_paths, list) and all(isinstance(v, str) and v.startswith("/") for v in frontend_paths), "invalid frontend_forbidden_paths")
 
     raw_exceptions = policy.get("exceptions")
-    require(
-        isinstance(raw_exceptions, list) and len(raw_exceptions) == 2,
-        "policy must contain exactly the two approved dependency exceptions",
-    )
+    require(isinstance(raw_exceptions, list), "exceptions must be an array")
     exceptions: dict[str, dict[str, Any]] = {}
     for exception in raw_exceptions:
         require(isinstance(exception, dict), "each exception must be an object")
         advisory = exception.get("advisory")
-        require(
-            isinstance(advisory, str) and advisory in EXPECTED_EXCEPTIONS,
-            "policy must contain exactly the two approved GHSA identifiers",
-        )
+        require(isinstance(advisory, str) and GHSA_PATTERN.fullmatch(advisory) is not None, "exception advisory must be a GHSA identifier")
         require(advisory not in exceptions, f"duplicate exception {advisory}")
-        expected = EXPECTED_EXCEPTIONS[advisory]
-        for key in ("package", "affected_range", "classification"):
-            require(
-                exception.get(key) == expected[key],
-                f"{advisory} {key} differs from the approved exception",
-            )
-        require(
-            exception.get("risk_owner") == EXPECTED_OWNER,
-            f"{advisory} risk_owner must be explicit",
-        )
-        exception_expiry = parse_iso_date(
-            exception.get("expires_on"), f"{advisory}.expires_on"
-        )
-        require(
-            exception_expiry == MAX_EXPIRY,
-            f"{advisory} expiration must remain 2026-08-31",
-        )
-        require(
-            isinstance(exception.get("rationale"), str)
-            and bool(exception["rationale"].strip()),
-            f"{advisory} rationale must be explicit",
-        )
-        require(
-            set(exception.get("required_scopes", [])) == expected["required_scopes"],
-            f"{advisory} required scopes differ from the approved exception",
-        )
-        require(
-            set(exception.get("forbidden_scopes", []))
-            == expected["forbidden_scopes"],
-            f"{advisory} forbidden scopes differ from the approved exception",
-        )
+        require(isinstance(exception.get("package"), str) and exception["package"], f"{advisory} package must be explicit")
+        require(exception.get("risk_owner") == EXPECTED_OWNER, f"{advisory} risk_owner must be explicit")
+        expiry = parse_iso_date(exception.get("expires_on"), f"{advisory}.expires_on")
+        require(expiry >= reviewed_on, f"{advisory} expires before policy review date")
+        require(today <= expiry, f"dependency exception {advisory} expired on {expiry}")
+        require(isinstance(exception.get("rationale"), str) and exception["rationale"].strip(), f"{advisory} rationale must be explicit")
+        required_scopes = set(exception.get("required_scopes", []))
+        forbidden_scopes = set(exception.get("forbidden_scopes", []))
+        require(required_scopes and required_scopes <= VALID_SCOPES, f"{advisory} required_scopes are invalid")
+        require(forbidden_scopes <= VALID_SCOPES, f"{advisory} forbidden_scopes are invalid")
+        require(not (required_scopes & forbidden_scopes), f"{advisory} scope sets overlap")
+        require(required_scopes | forbidden_scopes == VALID_SCOPES, f"{advisory} must classify all audit scopes")
         exceptions[advisory] = exception
-    require(
-        set(exceptions) == set(EXPECTED_EXCEPTIONS),
-        "policy must contain exactly the two approved dependency exceptions",
-    )
     return exceptions
 
 
@@ -241,25 +178,16 @@ def package_name_from_path(package_path: str, entry: dict[str, Any]) -> str:
     return package_path.rsplit(marker, 1)[1]
 
 
-def resolve_lock_dependency(
-    packages: dict[str, Any],
-    parent_path: str,
-    dependency_name: str,
-) -> str | None:
+def resolve_lock_dependency(packages: dict[str, Any], parent_path: str, dependency_name: str) -> str | None:
     prefix = parent_path
     tried: set[str] = set()
     while True:
-        candidate = (
-            f"{prefix}/node_modules/{dependency_name}"
-            if prefix
-            else f"node_modules/{dependency_name}"
-        )
+        candidate = f"{prefix}/node_modules/{dependency_name}" if prefix else f"node_modules/{dependency_name}"
         if candidate not in tried:
             tried.add(candidate)
             if candidate in packages:
                 return candidate
-        nested_marker = "/node_modules/"
-        nested_index = prefix.rfind(nested_marker)
+        nested_index = prefix.rfind("/node_modules/")
         if nested_index >= 0:
             prefix = prefix[:nested_index]
             continue
@@ -291,170 +219,37 @@ def production_closure(packages: dict[str, Any]) -> set[str]:
         entry = packages.get(package_path)
         require(isinstance(entry, dict), f"invalid lock entry {package_path}")
         for dependency_name in entry.get("dependencies", {}):
-            resolved = resolve_lock_dependency(
-                packages, package_path, dependency_name
-            )
-            require(
-                resolved is not None,
-                f"unresolved runtime dependency {dependency_name} from {package_path}",
-            )
+            resolved = resolve_lock_dependency(packages, package_path, dependency_name)
+            require(resolved is not None, f"unresolved runtime dependency {dependency_name} from {package_path}")
             pending.append(resolved)
         for dependency_name in entry.get("optionalDependencies", {}):
-            resolved = resolve_lock_dependency(
-                packages, package_path, dependency_name
-            )
+            resolved = resolve_lock_dependency(packages, package_path, dependency_name)
             if resolved is not None:
                 pending.append(resolved)
     return visited
 
 
-def validate_exception_chain(
-    workspace: str,
-    packages: dict[str, Any],
-    chain: Any,
-) -> None:
-    require(
-        isinstance(chain, list) and len(chain) >= 2,
-        f"invalid {workspace} Brace exception chain",
-    )
-    for index, expected_node in enumerate(chain):
-        require(
-            isinstance(expected_node, dict),
-            f"invalid {workspace} Brace exception chain node",
-        )
-        path = expected_node.get("path")
-        require(isinstance(path, str), "Brace chain path must be a string")
-        entry = packages.get(path)
-        require(
-            isinstance(entry, dict),
-            f"Brace exception chain path is missing: {workspace}/{path}",
-        )
-        actual_name = package_name_from_path(path, entry)
-        require(
-            actual_name == expected_node.get("name"),
-            f"Brace exception chain package changed at {workspace}/{path}",
-        )
-        require(
-            entry.get("version") == expected_node.get("version"),
-            f"Brace exception chain version changed at {workspace}/{path}",
-        )
-        if index == 0:
-            require(path == "", "Brace exception chain must start at lock root")
-            require(
-                expected_node.get("dependency_scope") == "devDependencies",
-                "Brace exception chain must be rooted in devDependencies",
-            )
-            continue
-
-        parent_expected = chain[index - 1]
-        parent_path = parent_expected["path"]
-        parent_entry = packages[parent_path]
-        child_name = expected_node["name"]
-        scopes = (
-            ["devDependencies"]
-            if index == 1
-            else ["dependencies", "optionalDependencies", "peerDependencies"]
-        )
-        require(
-            any(child_name in parent_entry.get(scope, {}) for scope in scopes),
-            (
-                f"Brace exception chain edge changed: {workspace}/"
-                f"{parent_expected['name']} -> {child_name}"
-            ),
-        )
-        resolved = resolve_lock_dependency(packages, parent_path, child_name)
-        require(
-            resolved == path,
-            (
-                f"Brace exception transitive path changed: {workspace}/"
-                f"{parent_expected['name']} -> {child_name}"
-            ),
-        )
+def read_reviewed_locks(repo_root: Path, policy: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    locks: dict[str, dict[str, Any]] = {}
+    for workspace in ("backend", "frontend"):
+        relative_path = f"{workspace}/package-lock.json"
+        expected = policy["lockfiles"][relative_path]["sha256"]
+        actual = file_sha256(repo_root / relative_path)
+        require(actual == expected, f"{relative_path} changed: dependency review required (expected {expected}, got {actual})")
+        lock = read_json(repo_root / relative_path)
+        require(isinstance(lock.get("packages"), dict), f"{relative_path} has no packages map")
+        locks[workspace] = lock
+    return locks
 
 
-def validate_lockfile(
-    repo_root: Path,
-    workspace: str,
-    policy: dict[str, Any],
-) -> dict[str, Any]:
-    relative_path = f"{workspace}/package-lock.json"
-    lock_path = repo_root / relative_path
-    expected_digest = policy["lockfiles"][relative_path]["sha256"]
-    actual_digest = file_sha256(lock_path)
-    require(
-        actual_digest == expected_digest,
-        (
-            f"{relative_path} changed: D2 re-evaluation required "
-            f"(expected {expected_digest}, got {actual_digest})"
-        ),
-    )
-    lock = read_json(lock_path)
-    packages = lock.get("packages")
-    require(isinstance(packages, dict), f"{relative_path} has no packages map")
-
-    expected_installations = policy["brace_contract"]["installations"].get(workspace)
-    require(
-        isinstance(expected_installations, dict),
-        f"missing Brace installations for {workspace}",
-    )
-    actual_installations: dict[str, str] = {}
-    for package_path, raw_entry in packages.items():
-        if not isinstance(raw_entry, dict) or package_path == "":
-            continue
-        if package_name_from_path(package_path, raw_entry) == "brace-expansion":
-            version = raw_entry.get("version")
-            require(
-                isinstance(version, str),
-                f"Brace installation has no version: {workspace}/{package_path}",
-            )
-            actual_installations[package_path] = version
-    expected_paths = set(expected_installations)
-    require(
-        set(actual_installations) == expected_paths,
-        (
-            f"Brace installation graph changed in {workspace}: "
-            f"expected {sorted(expected_paths)}, got {sorted(actual_installations)}"
-        ),
-    )
-    for package_path, record in expected_installations.items():
-        require(
-            isinstance(record, dict)
-            and record.get("classification") in {"exception-dev", "patched-dev"},
-            f"invalid Brace installation classification at {workspace}/{package_path}",
-        )
-        require(
-            actual_installations[package_path] == record.get("version"),
-            f"Brace installation graph version changed at {workspace}/{package_path}",
-        )
-
-    raw_chains = policy["brace_contract"]["exception_chains"].get(workspace)
-    require(isinstance(raw_chains, list), f"missing Brace chains for {workspace}")
-    for chain in raw_chains:
-        validate_exception_chain(workspace, packages, chain)
-    chain_terminals = {
-        chain[-1]["path"] for chain in raw_chains if isinstance(chain, list) and chain
-    }
-    exception_paths = {
-        path
-        for path, record in expected_installations.items()
-        if record.get("classification") == "exception-dev"
-    }
-    require(
-        chain_terminals == exception_paths,
-        f"Brace exception chains do not exactly cover {workspace} exception installs",
-    )
-
-    for package_path in production_closure(packages):
-        entry = packages[package_path]
-        package_name = package_name_from_path(package_path, entry)
-        require(
-            package_name not in EXPECTED_BRACE_RUNTIME_PACKAGES,
-            (
-                f"Brace runtime contract violated: {package_name} is reachable "
-                f"at {workspace}/{package_path}"
-            ),
-        )
-    return lock
+def validate_runtime_closure(policy: dict[str, Any], locks: dict[str, dict[str, Any]]) -> None:
+    forbidden = set(policy["runtime_contract"]["forbidden_packages"])
+    for workspace, lock in locks.items():
+        packages = lock["packages"]
+        for package_path in production_closure(packages):
+            entry = packages[package_path]
+            package_name = package_name_from_path(package_path, entry)
+            require(package_name not in forbidden, f"runtime contract violated: {package_name} is reachable at {workspace}/{package_path}")
 
 
 def production_source_files(repo_root: Path) -> list[Path]:
@@ -466,10 +261,8 @@ def production_source_files(repo_root: Path) -> list[Path]:
         for path in source_root.rglob("*"):
             if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
                 continue
-            relative_parts = path.relative_to(source_root).parts
-            if any(part in {"__tests__", "test", "tests"} for part in relative_parts):
-                continue
-            if ".test." in path.name or ".spec." in path.name:
+            parts = path.relative_to(source_root).parts
+            if any(part in {"__tests__", "test", "tests"} for part in parts) or ".test." in path.name or ".spec." in path.name:
                 continue
             files.append(path)
     return files
@@ -479,125 +272,63 @@ def all_source_files(repo_root: Path) -> list[Path]:
     files: list[Path] = []
     for relative_root in ("backend/src", "frontend/src"):
         source_root = repo_root / relative_root
-        if not source_root.exists():
-            continue
-        files.extend(
-            path
-            for path in source_root.rglob("*")
-            if path.is_file() and path.suffix in SOURCE_SUFFIXES
-        )
+        if source_root.exists():
+            files.extend(path for path in source_root.rglob("*") if path.is_file() and path.suffix in SOURCE_SUFFIXES)
     return files
 
 
-def validate_router_and_source_contracts(
-    repo_root: Path,
-    policy: dict[str, Any],
-    frontend_lock: dict[str, Any],
-    backend_lock: dict[str, Any],
-) -> None:
+def validate_router_and_source_contracts(repo_root: Path, policy: dict[str, Any], frontend_lock: dict[str, Any], backend_lock: dict[str, Any]) -> None:
+    contract = policy["router_contract"]
     frontend_package = read_json(repo_root / "frontend/package.json")
     dependencies = frontend_package.get("dependencies")
     require(isinstance(dependencies, dict), "frontend dependencies are missing")
-    require(
-        dependencies.get("react-router-dom") == "7.18.2",
-        "declared router version must remain exactly react-router-dom 7.18.2",
-    )
-    require(
-        dependencies.get("react") == "^18.2.0"
-        and dependencies.get("react-dom") == "^18.2.0",
-        "declared React major must remain 18",
-    )
+    require(dependencies.get(contract["declared_package"]) == contract["declared_version"], "declared router version changed")
+    require(dependencies.get("react") == "^18.2.0" and dependencies.get("react-dom") == "^18.2.0", "declared React major must remain 18")
 
     lock_root = frontend_lock["packages"].get("")
     require(isinstance(lock_root, dict), "frontend lock root is missing")
-    require(
-        lock_root.get("dependencies", {}).get("react-router-dom") == "7.18.2",
-        "lock root router version must remain exactly 7.18.2",
-    )
-    for package_name, expected_version in EXPECTED_ROUTER_CONTRACT[
-        "resolved_packages"
-    ].items():
-        package_path = f"node_modules/{package_name}"
-        entry = frontend_lock["packages"].get(package_path)
-        require(
-            isinstance(entry, dict)
-            and entry.get("version") == expected_version,
-            (
-                "React major changed"
-                if package_name in {"react", "react-dom"}
-                else "resolved router version changed"
-            ),
-        )
+    require(lock_root.get("dependencies", {}).get(contract["declared_package"]) == contract["declared_version"], "lock root router version changed")
+    for package_name, expected_version in contract["resolved_packages"].items():
+        entry = frontend_lock["packages"].get(f"node_modules/{package_name}")
+        require(isinstance(entry, dict) and entry.get("version") == expected_version, "resolved React/Router version changed")
 
-    forbidden_rsc_packages = set(
-        policy["router_contract"]["forbidden_rsc_packages"]
-    )
+    forbidden_rsc_packages = set(contract["forbidden_rsc_packages"])
     for workspace, lock in (("frontend", frontend_lock), ("backend", backend_lock)):
-        packages = lock["packages"]
-        for package_path, entry in packages.items():
+        for package_path, entry in lock["packages"].items():
             if not isinstance(entry, dict):
                 continue
             if package_path:
                 package_name = package_name_from_path(package_path, entry)
-                require(
-                    package_name not in forbidden_rsc_packages,
-                    f"RSC dependency is forbidden: {workspace}/{package_name}",
-                )
-            for scope in (
-                "dependencies",
-                "devDependencies",
-                "optionalDependencies",
-                "peerDependencies",
-            ):
+                require(package_name not in forbidden_rsc_packages, f"RSC dependency is forbidden: {workspace}/{package_name}")
+            for scope in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
                 declared = entry.get(scope, {})
-                if not isinstance(declared, dict):
-                    continue
-                for dependency_name in declared:
-                    require(
-                        dependency_name not in forbidden_rsc_packages,
-                        (
-                            f"RSC dependency is forbidden: "
-                            f"{workspace}/{dependency_name}"
-                        ),
-                    )
+                if isinstance(declared, dict):
+                    for dependency_name in declared:
+                        require(dependency_name not in forbidden_rsc_packages, f"RSC dependency is forbidden: {workspace}/{dependency_name}")
 
-    entrypoint = repo_root / policy["router_contract"]["production_entrypoint"]
+    entrypoint = repo_root / contract["production_entrypoint"]
     try:
         entrypoint_text = entrypoint.read_text(encoding="utf-8")
     except FileNotFoundError as error:
         raise GuardError(f"missing Router production entrypoint: {entrypoint}") from error
-    required_symbol = policy["router_contract"]["required_entrypoint_symbol"]
-    require(
-        required_symbol in entrypoint_text,
-        f"Router must remain in Declarative Mode with {required_symbol}",
-    )
+    required_symbol = contract["required_entrypoint_symbol"]
+    require(required_symbol in entrypoint_text, f"Router must remain in Declarative Mode with {required_symbol}")
 
-    forbidden_mode_symbols = set(
-        policy["router_contract"]["forbidden_data_router_symbols"]
-    )
-    forbidden_rsc_symbols = set(policy["router_contract"]["forbidden_rsc_symbols"])
-    quoted_pattern = re.compile(
-        r"['\"](?:brace-expansion|glob|minimatch)(?:/[^'\"]*)?['\"]"
-    )
+    forbidden_mode_symbols = set(contract["forbidden_data_router_symbols"])
+    forbidden_rsc_symbols = set(contract["forbidden_rsc_symbols"])
+    runtime_names = "|".join(re.escape(name) for name in sorted(policy["runtime_contract"]["forbidden_packages"]))
+    quoted_runtime_pattern = re.compile(r"['\"](?:" + runtime_names + r")(?:/[^'\"]*)?['\"]")
+
     for source_path in all_source_files(repo_root):
         try:
             source = source_path.read_text(encoding="utf-8")
         except UnicodeDecodeError as error:
             raise GuardError(f"non-UTF-8 source file: {source_path}") from error
         for symbol in forbidden_rsc_symbols:
-            require(
-                symbol not in source,
-                f"RSC API is forbidden: {symbol} in {source_path.relative_to(repo_root)}",
-            )
-        require(
-            '"use server"' not in source and "'use server'" not in source,
-            f"RSC API directive is forbidden in {source_path.relative_to(repo_root)}",
-        )
+            require(symbol not in source, f"RSC API is forbidden: {symbol} in {source_path.relative_to(repo_root)}")
+        require('"use server"' not in source and "'use server'" not in source, f"RSC API directive is forbidden in {source_path.relative_to(repo_root)}")
         for fragment in RSC_IMPORT_FRAGMENTS:
-            require(
-                fragment not in source,
-                f"RSC API import is forbidden in {source_path.relative_to(repo_root)}",
-            )
+            require(fragment not in source, f"RSC API import is forbidden in {source_path.relative_to(repo_root)}")
 
     for source_path in production_source_files(repo_root):
         try:
@@ -605,284 +336,138 @@ def validate_router_and_source_contracts(
         except UnicodeDecodeError as error:
             raise GuardError(f"non-UTF-8 source file: {source_path}") from error
         for symbol in forbidden_mode_symbols:
-            require(
-                symbol not in source,
-                (
-                    "Router must remain in Declarative Mode; "
-                    f"found {symbol} in {source_path.relative_to(repo_root)}"
-                ),
-            )
-        match = quoted_pattern.search(source)
-        require(
-            match is None,
-            (
-                "attacker-controlled application pattern guard: "
-                f"runtime source references {match.group(0) if match else ''} in "
-                f"{source_path.relative_to(repo_root)}"
-            ),
-        )
+            require(symbol not in source, f"Router must remain in Declarative Mode; found {symbol} in {source_path.relative_to(repo_root)}")
+        match = quoted_runtime_pattern.search(source)
+        require(match is None, f"runtime source references a forbidden dependency {match.group(0) if match else ''} in {source_path.relative_to(repo_root)}")
 
-    framework_configs = list((repo_root / "frontend").glob("react-router.config.*"))
-    require(
-        not framework_configs,
-        "Router must remain in Declarative Mode; framework config detected",
-    )
+    require(not list((repo_root / "frontend").glob("react-router.config.*")), "Router must remain in Declarative Mode; framework config detected")
 
 
-def validate_repository(
-    repo_root: Path,
-    policy: dict[str, Any],
-    today: date,
-) -> dict[str, dict[str, Any]]:
+def validate_repository(repo_root: Path, policy: dict[str, Any], today: date) -> dict[str, dict[str, Any]]:
     exceptions = validate_policy(policy, today)
-    backend_lock = validate_lockfile(repo_root, "backend", policy)
-    frontend_lock = validate_lockfile(repo_root, "frontend", policy)
-    validate_router_and_source_contracts(
-        repo_root, policy, frontend_lock, backend_lock
-    )
+    locks = read_reviewed_locks(repo_root, policy)
+    validate_runtime_closure(policy, locks)
+    validate_router_and_source_contracts(repo_root, policy, locks["frontend"], locks["backend"])
     return exceptions
 
 
 def advisory_ids_from_object(value: dict[str, Any]) -> set[str]:
-    haystacks = [
-        value.get("url"),
-        value.get("title"),
-        value.get("name"),
-    ]
     found: set[str] = set()
-    for haystack in haystacks:
-        if isinstance(haystack, str):
-            found.update(GHSA_PATTERN.findall(haystack))
+    for field in ("url", "title", "name"):
+        raw = value.get(field)
+        if isinstance(raw, str):
+            found.update(GHSA_PATTERN.findall(raw))
     return found
 
 
-def resolve_vulnerability_advisories(
-    name: str,
-    vulnerabilities: dict[str, Any],
-    memo: dict[str, set[str]],
-    stack: set[str],
-) -> set[str]:
+def resolve_advisories(name: str, vulnerabilities: dict[str, Any], memo: dict[str, set[str]], stack: set[str]) -> set[str]:
     if name in memo:
         return memo[name]
     require(name not in stack, f"cycle in npm audit vulnerability graph at {name}")
-    vulnerability = vulnerabilities.get(name)
-    require(
-        isinstance(vulnerability, dict),
-        f"npm audit references unknown vulnerability node {name}",
-    )
-    via = vulnerability.get("via")
+    node = vulnerabilities.get(name)
+    require(isinstance(node, dict), f"npm audit references unknown vulnerability node {name}")
+    via = node.get("via")
     require(isinstance(via, list), f"npm audit node {name} has invalid via data")
     stack.add(name)
-    advisories: set[str] = set()
+    result: set[str] = set()
     for item in via:
         if isinstance(item, str):
-            advisories.update(
-                resolve_vulnerability_advisories(
-                    item, vulnerabilities, memo, stack
-                )
-            )
+            result.update(resolve_advisories(item, vulnerabilities, memo, stack))
         elif isinstance(item, dict):
-            direct_ids = advisory_ids_from_object(item)
-            require(
-                direct_ids,
-                f"unapproved advisory without a GHSA identifier in npm audit node {name}",
-            )
-            advisories.update(direct_ids)
+            ids = advisory_ids_from_object(item)
+            require(ids, f"high/critical advisory in {name} has no GHSA identifier")
+            result.update(ids)
         else:
             raise GuardError(f"npm audit node {name} has unsupported via data")
     stack.remove(name)
-    require(
-        advisories,
-        f"high/critical npm audit node {name} does not resolve to an advisory",
-    )
-    memo[name] = advisories
-    return advisories
+    require(result, f"high/critical npm audit node {name} does not resolve to a GHSA advisory")
+    memo[name] = result
+    return result
 
 
-def expected_direct_nodes(
-    policy: dict[str, Any],
-    workspace: str,
-    advisory: str,
-) -> set[str]:
-    if advisory == "GHSA-qwww-vcr4-c8h2":
-        return {"node_modules/react-router"}
-    installations = policy["brace_contract"]["installations"][workspace]
-    return {
-        path
-        for path, record in installations.items()
-        if record.get("classification") == "exception-dev"
-    }
-
-
-def validate_audit(
-    policy: dict[str, Any],
-    exceptions: dict[str, dict[str, Any]],
-    workspace: str,
-    audit_kind: str,
-    audit_path: Path,
-) -> None:
+def validate_audit(policy: dict[str, Any], exceptions: dict[str, dict[str, Any]], workspace: str, audit_kind: str, audit_path: Path) -> None:
     scope = f"{workspace}-{audit_kind}"
     audit = read_json(audit_path)
     vulnerabilities = audit.get("vulnerabilities")
-    require(isinstance(vulnerabilities, dict), "npm audit JSON has no vulnerabilities")
-
-    required_advisories = {
-        advisory
-        for advisory, exception in exceptions.items()
-        if scope in exception["required_scopes"]
-    }
-    forbidden_advisories = {
-        advisory
-        for advisory, exception in exceptions.items()
-        if scope in exception["forbidden_scopes"]
-    }
-    require(
-        required_advisories | forbidden_advisories == set(EXPECTED_EXCEPTIONS),
-        f"scope classification is incomplete for {scope}",
-    )
-
+    require(isinstance(vulnerabilities, dict), "npm audit JSON has no vulnerabilities object")
+    threshold = SEVERITY_RANK[policy["severity_floor"]]
+    required = {a for a, e in exceptions.items() if scope in set(e["required_scopes"])}
+    forbidden = {a for a, e in exceptions.items() if scope in set(e["forbidden_scopes"])}
     memo: dict[str, set[str]] = {}
     observed: set[str] = set()
-    for name, vulnerability in vulnerabilities.items():
-        require(isinstance(vulnerability, dict), f"invalid npm audit node {name}")
-        severity = vulnerability.get("severity")
-        if severity not in {"high", "critical"}:
-            continue
-        advisories = resolve_vulnerability_advisories(
-            name, vulnerabilities, memo, set()
-        )
-        unknown = advisories - set(EXPECTED_EXCEPTIONS)
-        require(
-            not unknown,
-            f"unapproved advisory detected in {scope}: {sorted(unknown)}",
-        )
-        forbidden = advisories & forbidden_advisories
-        require(
-            not forbidden,
-            f"{sorted(forbidden)} is forbidden in {scope}",
-        )
-        observed.update(advisories)
 
-    for vulnerability_name, vulnerability in vulnerabilities.items():
-        if not isinstance(vulnerability, dict):
+    for name, node in vulnerabilities.items():
+        require(isinstance(node, dict), f"invalid npm audit node {name}")
+        severity = node.get("severity")
+        if not isinstance(severity, str) or SEVERITY_RANK.get(severity, -1) < threshold:
             continue
-        via = vulnerability.get("via")
-        if not isinstance(via, list):
-            continue
-        for direct in via:
+        advisories = resolve_advisories(name, vulnerabilities, memo, set())
+        unknown = advisories - set(exceptions)
+        require(not unknown, f"unapproved advisory detected in {scope}: {sorted(unknown)}")
+        blocked = advisories & forbidden
+        require(not blocked, f"exception advisory forbidden in {scope}: {sorted(blocked)}")
+        observed.update(advisories)
+        for direct in node.get("via", []):
             if not isinstance(direct, dict):
                 continue
-            direct_ids = advisory_ids_from_object(direct)
-            for advisory in direct_ids:
-                require(
-                    advisory in EXPECTED_EXCEPTIONS,
-                    f"unapproved advisory detected in {scope}: {advisory}",
-                )
-                expected = EXPECTED_EXCEPTIONS[advisory]
-                require(
-                    vulnerability_name == expected["package"],
-                    (
-                        f"{advisory} direct advisory package changed: "
-                        f"{vulnerability_name}"
-                    ),
-                )
-                require(
-                    direct.get("range") == expected["affected_range"],
-                    f"{advisory} affected range changed",
-                )
-                require(
-                    direct.get("severity") == "high",
-                    f"{advisory} severity changed",
-                )
-                actual_nodes = vulnerability.get("nodes")
-                require(
-                    isinstance(actual_nodes, list)
-                    and set(actual_nodes)
-                    == expected_direct_nodes(policy, workspace, advisory),
-                    f"{advisory} direct advisory node paths changed",
-                )
+            for advisory in advisory_ids_from_object(direct):
+                if advisory in exceptions:
+                    require(name == exceptions[advisory]["package"], f"{advisory} direct package changed: {name}")
 
-    require(
-        observed == required_advisories,
-        (
-            f"{scope} required exception set differs: "
-            f"expected {sorted(required_advisories)}, got {sorted(observed)}"
-        ),
-    )
+    require(observed == required, f"{scope} exception set differs: expected {sorted(required)}, got {sorted(observed)}")
 
 
-def validate_images(backend_image: str, frontend_image: str) -> None:
-    application_roots = (
-        (backend_image, "/app/node_modules"),
-        (frontend_image, "/usr/share/nginx/html"),
-    )
-    for image, application_root in application_roots:
-        command = [
-            "docker",
-            "run",
-            "--rm",
-            "--entrypoint",
-            "find",
-            image,
-            application_root,
-            "-path",
-            "*/node_modules/brace-expansion/package.json",
-            "-print",
-        ]
+def docker_output(command: list[str], label: str) -> str:
+    try:
+        result = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+    except FileNotFoundError as error:
+        raise GuardError("docker is required for the release image guard") from error
+    require(result.returncode == 0, f"{label}: {result.stdout.strip()}")
+    return result.stdout
+
+
+def validate_images(policy: dict[str, Any], backend_image: str) -> None:
+    contract = policy["image_contract"]
+    for package in contract["backend_forbidden_packages"]:
+        output = docker_output(
+            ["docker", "run", "--rm", "--entrypoint", "find", backend_image, "/app/node_modules", "-path", f"*/node_modules/{package}/package.json", "-print"],
+            f"could not inspect backend image for {package}",
+        )
+        require(not [line for line in output.splitlines() if line.strip()], f"forbidden runtime package {package} found in backend image")
+
+    for package, expected_version in contract["backend_exact_versions"].items():
+        raw = docker_output(
+            ["docker", "run", "--rm", "--entrypoint", "cat", backend_image, f"/app/node_modules/{package}/package.json"],
+            f"could not read {package} metadata from backend image",
+        )
         try:
-            result = subprocess.run(
-                command,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=False,
-            )
-        except FileNotFoundError as error:
-            raise GuardError("docker is required for the release image guard") from error
-        require(
-            result.returncode == 0,
-            f"could not inspect release image {image}: {result.stdout.strip()}",
+            metadata = json.loads(raw)
+        except json.JSONDecodeError as error:
+            raise GuardError(f"invalid {package} package metadata in backend image") from error
+        require(metadata.get("version") == expected_version, f"backend image {package} version changed: expected {expected_version}, got {metadata.get('version')}")
+
+
+def validate_frontend_paths(policy: dict[str, Any], frontend_image: str) -> None:
+    for forbidden_path in policy["image_contract"]["frontend_forbidden_paths"]:
+        output = docker_output(
+            ["docker", "run", "--rm", "--entrypoint", "sh", frontend_image, "-c", f"if [ -e '{forbidden_path}' ]; then echo present; fi"],
+            f"could not inspect frontend image path {forbidden_path}",
         )
-        paths = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-        require(
-            not paths,
-            f"Brace reappeared in release image {image}: {paths}",
-        )
+        require(not output.strip(), f"forbidden path present in frontend image: {forbidden_path}")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Enforce Sentinel's bounded RC5 dependency exceptions."
-    )
-    parser.add_argument(
-        "--repo-root",
-        type=Path,
-        default=SCRIPT_ROOT,
-        help="repository root (defaults to the script's parent repository)",
-    )
-    parser.add_argument(
-        "--policy",
-        type=Path,
-        default=SCRIPT_ROOT / "security/dependency-exceptions.json",
-        help="machine-readable exception policy",
-    )
-    parser.add_argument(
-        "--today",
-        type=date.fromisoformat,
-        default=None,
-        help=argparse.SUPPRESS,
-    )
+    parser = argparse.ArgumentParser(description="Enforce Sentinel's reviewed dependency policy.")
+    parser.add_argument("--repo-root", type=Path, default=SCRIPT_ROOT)
+    parser.add_argument("--policy", type=Path, default=SCRIPT_ROOT / "security/dependency-exceptions.json")
+    parser.add_argument("--today", type=date.fromisoformat, default=None, help=argparse.SUPPRESS)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("repository", help="validate lockfiles and source contracts")
-
-    audit = subparsers.add_parser("audit", help="validate an npm audit JSON document")
+    subparsers.add_parser("repository")
+    audit = subparsers.add_parser("audit")
     audit.add_argument("--workspace", choices=("backend", "frontend"), required=True)
     audit.add_argument("--audit-kind", choices=("runtime", "full"), required=True)
     audit.add_argument("--audit-json", type=Path, required=True)
-
-    images = subparsers.add_parser(
-        "images", help="ensure release images contain no Brace runtime"
-    )
+    images = subparsers.add_parser("images")
     images.add_argument("--backend-image", required=True)
     images.add_argument("--frontend-image", required=True)
     return parser
@@ -890,37 +475,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    repo_root = args.repo_root.resolve()
-    policy_path = args.policy.resolve()
     today = args.today or datetime.now(timezone.utc).date()
     try:
-        policy = read_json(policy_path)
-        exceptions = validate_repository(repo_root, policy, today)
+        policy = read_json(args.policy.resolve())
+        exceptions = validate_repository(args.repo_root.resolve(), policy, today)
         if args.command == "repository":
-            print(
-                "repository policy: PASS "
-                "(Router 7.18.2 Declarative / React 18 / RSC absent / "
-                "Brace dev paths exact / runtime closure clean)"
-            )
+            print(f"repository dependency policy: PASS ({len(exceptions)} active declaration(s); reviewed contracts exact)")
         elif args.command == "audit":
-            validate_audit(
-                policy,
-                exceptions,
-                args.workspace,
-                args.audit_kind,
-                args.audit_json.resolve(),
-            )
-            print(
-                f"audit policy: PASS ({args.workspace}-{args.audit_kind}; "
-                "only exact required GHSA exceptions observed)"
-            )
+            validate_audit(policy, exceptions, args.workspace, args.audit_kind, args.audit_json.resolve())
+            print(f"audit dependency policy: PASS ({args.workspace}-{args.audit_kind})")
         elif args.command == "images":
-            validate_images(args.backend_image, args.frontend_image)
-            print("release image policy: PASS (Brace absent from both images)")
+            validate_images(policy, args.backend_image)
+            validate_frontend_paths(policy, args.frontend_image)
+            print("release image dependency policy: PASS")
         else:
             raise GuardError(f"unsupported command: {args.command}")
     except GuardError as error:
-        print(f"dependency exception policy: FAIL: {error}")
+        print(f"dependency policy: FAIL: {error}")
         return 1
     return 0
 
