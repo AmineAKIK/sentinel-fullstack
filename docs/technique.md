@@ -356,7 +356,7 @@ Une demande de correction ou d'annulation crée un
 - `APPROVED` / `REJECTED` : décision finale ;
 - `WITHDRAWN` / `SUPERSEDED` : demande retirée ou rendue caduque.
 
-« Reporter » ferme la modale sans consulter le cas : il reste `ACTIVE`, la
+« Annuler » (fermer la modale) ferme la modale sans consulter le cas : il reste `ACTIVE`, la
 pastille reste visible et la modale réapparaît à la prochaine ouverture.
 Ouvrir le dossier pour une autre raison ne marque jamais l'arbitrage comme
 consulté. Toutes les transitions de cas et d'incident sont effectuées dans la
@@ -646,7 +646,7 @@ Le composant `Modal` est rendu dans un portail unique et gère :
 Le dossier incident adopte un panneau desktop et une navigation mobile qui
 place le dossier en haut de la fenêtre. Les modales d'arbitrage sont denses,
 sans scroll interne sur les viewports couverts, et permettent la décision
-directe. Reporter ne modifie pas l'état de consultation ; Consulter le
+directe. Annuler ne modifie pas l'état de consultation ; Consulter le
 dossier est la seule action qui le fait. Les arbitrages mobiles sont
 couverts par Playwright sur un viewport 393 x 851.
 

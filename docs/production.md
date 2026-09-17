@@ -735,9 +735,14 @@ cd backend && npm ci && npm run format:check && npm run lint \
 
 ### PostgreSQL réel
 
+Créer d'abord une base locale dédiée ; le
+[guide jury](jury-quickstart.md#6-tests-postgresql-réels) fournit les commandes
+PowerShell et Bash. Ne pas exécuter ces tests sur la base de production.
+
 ```bash
 cd backend
-export DATABASE_URL=postgres://sentinel:<password>@localhost:5432/sentinel_test
+export NODE_ENV=test
+export DATABASE_URL='postgres://sentinel:MOT_DE_PASSE@localhost:5432/sentinel_test'
 npm run test:integration
 ```
 
@@ -765,6 +770,10 @@ cd frontend && npm ci && npm run format:check && npm run lint \
 
 ### Parcours E2E
 
+Préparer impérativement la base dédiée `_e2e` et les variables du
+[guide E2E](jury-quickstart.md#tests-navigateur-e2e) avant cette commande.
+Le script recrée ses fixtures ; les données de cette base doivent être jetables.
+
 ```bash
 cd frontend && npx playwright install chromium && npm run test:e2e
 ```
@@ -773,7 +782,7 @@ cd frontend && npx playwright install chromium && npm run test:e2e
 - [ ] passage simple vers double robot validé
 - [ ] arbitrage d'annulation décidé directement dans la modale mobile
 - [ ] arbitrage de correction décidé directement dans la modale mobile
-- [ ] Reporter conserve le cas actif et ouvre le dossier en haut sur mobile
+- [ ] Annuler (fermer la modale) conserve le cas actif et ouvre le dossier en haut sur mobile
 - [ ] aucune modale, aucun bouton et aucun contenu ne déborde
       horizontalement
 - [ ] le body est verrouillé pendant une modale et redevient scrollable
