@@ -43,4 +43,13 @@ describe('contrat d’exécution E2E', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it('configure les serveurs sans affectations shell incompatibles avec Windows', () => {
+    const config = readFileSync(resolve('playwright.config.ts'), 'utf8');
+
+    expect(config).not.toMatch(/command:\s*['"][A-Z_]+=/);
+    expect(config).toContain("env: { PORT: '3100', CLIENT_ORIGIN: 'http://127.0.0.1:5174' }");
+    expect(config).toContain("env: { VITE_API_URL: 'http://127.0.0.1:3100' }");
+    expect(config.match(/reuseExistingServer:\s*false/g)).toHaveLength(3);
+  });
 });

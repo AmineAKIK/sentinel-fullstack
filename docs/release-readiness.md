@@ -9,6 +9,11 @@
 
 ## État de préparation RC9 au 16 septembre 2026
 
+**Mise à jour post-publication :** consulter la
+[vérification datée du 17 septembre 2026](rc9-verification-2026-09-17.md).
+Le récit ci-dessous est conservé comme état de préparation antérieur au tag,
+pas comme affirmation que RC9 reste à publier.
+
 Le dépôt est en gel fonctionnel : aucune nouvelle fonctionnalité métier n'est
 introduite pour le candidat d'examen. La remédiation sécurité RC9 a remplacé
 l'ancienne politique d'exceptions temporaires par une politique sans exception

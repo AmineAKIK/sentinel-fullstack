@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -62,7 +63,7 @@ class DependencyPolicyTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
-                "python3",
+                sys.executable,
                 str(GUARD),
                 "--repo-root",
                 str(repo_root),

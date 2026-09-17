@@ -25,6 +25,16 @@ réunit trois points d'entrée dans un même portail :
 
 Prérequis : Node.js 24.18.0, npm 11.16.0 et PostgreSQL 15+.
 
+**Première lecture / jury :** suivre le [guide depuis un clone neuf](docs/jury-quickstart.md).
+Il détaille la création de la base, les secrets locaux et les commandes
+PowerShell **et** Bash. Aucun accès au VPS ni compte de production n'est requis.
+Les commandes ci-dessous sont en Bash ; chaque terminal part de la racine du dépôt.
+
+```bash
+git clone https://github.com/AmineAKIK/sentinel-fullstack.git
+cd sentinel-fullstack
+```
+
 ```bash
 # Terminal 1 : API
 cd backend
@@ -69,6 +79,7 @@ cp .env.release.example .env
 # Remplacer chaque placeholder et générer le hash bcrypt du code Board.
 export BUILD_SHA="$(git rev-parse HEAD)"
 cd backend
+npm ci
 BOARD_ACCESS_CODE='code-board-temporaire' npm run hash:board
 cd ..
 
@@ -103,10 +114,11 @@ npm run verify:reliability
 ```
 
 Les tests d'intégration nécessitent une base PostgreSQL dédiée dont le nom se
-termine par `_test` ou `_integration` :
+termine par `_test` ou `_integration`, créée au préalable (voir le guide jury) :
 
 ```bash
 export DATABASE_URL=postgres://sentinel:mot_de_passe@localhost:5432/sentinel_test
+export NODE_ENV=test
 npm run test:integration
 ```
 
@@ -119,13 +131,14 @@ npm run format:check
 npm run lint
 npm run build
 npm run test:coverage
-npx playwright install chromium
-npm run test:e2e
 ```
 
-`test:e2e` applique les migrations, recrée un jeu de données isolé, puis démarre
-deux serveurs sur les ports réservés `3100` et `5174`. Il ne réutilise jamais un
-serveur de développement existant.
+Pour Playwright, suivre la [configuration E2E explicite](docs/jury-quickstart.md#tests-navigateur-e2e) :
+une base dédiée **dont le nom se termine par `_e2e`** et les variables de test
+sont obligatoires. Ne jamais utiliser une base métier ou de production.
+`test:e2e` applique les migrations, recrée les fixtures de cette base isolée,
+puis démarre trois serveurs sur `3100`, `5174` et `5175` (origine sœur pour
+les tests CSRF). Il ne réutilise jamais un serveur existant.
 
 GitHub Actions rejoue ces contrôles dans des jobs indépendants, ajoute les tests
 PostgreSQL réels, les parcours Playwright mobiles, ShellCheck, la validation du
@@ -200,6 +213,8 @@ La [politique de sécurité](SECURITY.md) complète ces références.
 
 ### Statut et historique de stabilisation
 
+- [Vérification RC9 du 17 septembre 2026](docs/rc9-verification-2026-09-17.md) —
+  release, CI et observation publique datées, avec limites de la vérification
 - [Préparation de release](docs/release-readiness.md) — portes RC9 et règle de
   lecture des preuves historiques ; ce fichier n'est pas une source métier
 - [Résultats d'audit](docs/audit-prod-resultats.md) — index historique ; les
@@ -207,9 +222,11 @@ La [politique de sécurité](SECURITY.md) complète ces références.
 - [Archives RC](docs/archive-rc/) — registres et audits des candidats
   antérieurs, conservés comme preuve du processus itératif
 
-La preuve de production RC8 datée ne vaut pas preuve de déploiement RC9. Le
-candidat final devra faire coïncider `main`, tag, release, images, health SHA et
-dossier avant présentation.
+Le tag immuable `v1.0.0-rc.9` désigne
+`ed26a25e3c005cabb0da30a4553dfbbee03afe81`. Les améliorations de documentation
+et de portabilité postérieures n'altèrent pas ce tag ni la production.
+Consulter la vérification datée ci-dessus ; une ancienne preuve RC8 n'est
+pas une preuve RC9 et la branche `main` peut évoluer après une release.
 
 ## Licence
 

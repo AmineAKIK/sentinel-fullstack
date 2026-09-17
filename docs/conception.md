@@ -266,7 +266,7 @@ marqueur de demande sur l'incident, écrit l'événement et crée un cas
 `CANCEL/ACTIVE` avec demandeur, motif et date.
 
 **Navigation du responsable.** Ouverture de l'incident : la modale présente
-le contexte suffisant pour décider. **Reporter** : ferme la modale, ne
+le contexte suffisant pour décider. **Annuler** (fermer la modale) : ferme la modale, ne
 change pas le cas, puis montre le dossier. **Consulter le dossier** : passe
 explicitement `ACTIVE` vers `CONSULTED` et montre le dossier. Fermeture par
 la croix/Escape : aucun changement métier. Seul `ACTIVE` compte dans la
@@ -290,7 +290,7 @@ pas modifié.
 clôt le cas en `APPROVED`. `REJECT_EDIT` ne modifie pas l'incident et clôt
 le cas en `REJECTED`. `WITHDRAW_EDIT` retire la demande du déclarant et clôt
 le cas en `WITHDRAWN`. Le responsable voit côte à côte la valeur actuelle et
-la valeur demandée ; les règles Reporter/Consulter/pastille sont identiques
+la valeur demandée ; les règles Annuler/Consulter/pastille sont identiques
 à l'annulation.
 
 ### 8.6 Modifications directes
@@ -346,7 +346,7 @@ Les états décrivent l'anomalie, indépendamment du statut de traitement.
 | `SUPERSEDED` | demande rendue caduque par une autre opération |
 
 Comportement de navigation : décider directement est le chemin principal ;
-Reporter ferme la modale et ouvre le dossier sans changer `ACTIVE` ;
+Annuler ferme la modale et ouvre le dossier sans changer `ACTIVE` ;
 Consulter le dossier est la seule action qui passe vers `CONSULTED` ; ouvrir
 le dossier par ailleurs ne compte pas comme consultation d'arbitrage ;
 rouvrir un cas `ACTIVE` fait réapparaître la modale. La tuile « À arbitrer »
