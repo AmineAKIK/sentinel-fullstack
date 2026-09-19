@@ -35,6 +35,35 @@ git clone https://github.com/AmineAKIK/sentinel-fullstack.git
 cd sentinel-fullstack
 ```
 
+### Reproduire exactement la version présentée au jury
+
+Le dossier de projet et les preuves associées se réfèrent à la release immuable
+`v1.0.0-rc.9`, au commit
+`ed26a25e3c005cabb0da30a4553dfbbee03afe81`. La branche `main` contient des
+améliorations documentaires et de portabilité postérieures à ce candidat.
+
+Pour examiner exactement la version présentée dans le dossier :
+
+```bash
+git fetch --tags
+git switch --detach v1.0.0-rc.9
+git rev-parse HEAD
+```
+
+Le SHA attendu est :
+
+```text
+ed26a25e3c005cabb0da30a4553dfbbee03afe81
+```
+
+Le mode `detached HEAD` est volontaire : il permet de reproduire le candidat
+d'examen sans modifier une branche locale. Pour revenir ensuite sur l'état
+courant du dépôt :
+
+```bash
+git switch main
+```
+
 ```bash
 # Terminal 1 : API
 cd backend
