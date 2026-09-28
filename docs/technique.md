@@ -304,6 +304,10 @@ jamais sur le texte du message.
 ### 6.5 Défenses HTTP
 
 - CORS limité à `CLIENT_ORIGIN` ;
+- garde anti-CSRF sur toute requête d'écriture : `Origin` (ou `Referer` à
+  défaut) doit valoir exactement `CLIENT_ORIGIN`, et un `Sec-Fetch-Site`
+  inter-sites est refusé (`middlewares/csrfProtection.ts`), en plus des
+  cookies `SameSite=Strict` ;
 - headers de sécurité applicatifs ;
 - corps JSON limité à 50 Ko ;
 - limite globale par IP et limite renforcée sur les connexions ;
@@ -342,8 +346,11 @@ CLOSED -> INVALIDATED
 Une prise en charge est une revendication ou un transfert explicite. Les
 champs `is_taken`, `taken_by_user_id` et `taken_at` sont cohérents par
 contrainte SQL. Une seule anomalie active peut exister pour un emplacement
-machine donné. Voir [conception.md](conception.md) pour le détail complet des
-transitions et invariants métier.
+machine donné. Un incident `OPEN` pris ne passe à `CANCELED` que par
+l'archivage forcé de sa ligne ; un incident `PENDING` peut aussi être annulé
+par le responsable.
+Voir [conception.md](conception.md) pour le détail complet des transitions et
+invariants métier.
 
 ### 7.3 Arbitrage
 
@@ -766,9 +773,10 @@ job Containers inspecte les images applicatives réellement construites.
 `scripts/backup.sh` produit un dump gzip atomique avec checksum et
 rétention. `scripts/restore.sh` valide le dump dans une base temporaire avant
 une bascule de noms, avec arrêt court du backend et tentative de rollback en
-cas d'échec. Les deux scripts partagent un même verrou de fichier : sauvegarde
-et restauration ne peuvent jamais s'exécuter en même temps. La restauration
-refuse par défaut tout dump sans checksum SHA-256 associé, importe dans une
+cas d'échec. Les deux scripts partagent un même verrou de fichier
+(`$BACKUP_DIR/.sentinel-backup.lock`) : sauvegarde et restauration ne peuvent
+pas s'exécuter en même temps sur un même répertoire de sauvegarde. La
+restauration refuse par défaut tout dump sans checksum SHA-256 associé, importe dans une
 base temporaire, valide la présence des tables du schéma et l'égalité exacte
 du ledger `schema_migrations` avec les fichiers canoniques du checkout (noms,
 ordre et checksums) avant d'échanger les noms de base. Un trap nettoie la
@@ -799,9 +807,11 @@ est dans [production.md](production.md).
   et le verrou de migration tolèrent plusieurs workers, mais un déploiement
   horizontal demanderait une stratégie explicite de sessions, santé et
   orchestration ;
-- le rate limiting (`backend/src/utils/inMemoryRateLimit.ts`) est un
-  compteur en mémoire de processus : il protège correctement une réplique
-  unique mais ne partage aucun état entre instances. Tout passage à
+- le rate limiting (`backend/src/middlewares/loginRateLimit.ts`, utilisé
+  pour les limites globale, connexion, réinitialisation et support ;
+  `backend/src/utils/inMemoryRateLimit.ts` pour la réauthentification Admin)
+  repose sur des compteurs en mémoire de processus : il protège correctement
+  une réplique unique mais ne partage aucun état entre instances. Tout passage à
   plusieurs répliques exige un stockage partagé (Redis ou équivalent) avant
   déploiement ;
 - les migrations sont forward-only ; le rollback de schéma passe par une

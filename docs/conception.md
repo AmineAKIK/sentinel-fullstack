@@ -66,8 +66,7 @@ Compte système unique, hors rôles Atelier.
 - arbitre correction et annulation ;
 - priorise et ajoute une consigne ;
 - modifie les informations descriptives d'un incident actif ;
-- annule un incident non pris ou reprend le contrôle d'un incident en
-  attente ;
+- annule un incident actif non pris ou en attente ;
 - invalide une clôture avec motif ;
 - suit des incidents ;
 - accède seul au journal transverse (le Pilotage, comme le Dashboard et la
@@ -101,8 +100,10 @@ Atelier.
 
 ### Board
 
-Le code local est comparé à un hash bcrypt. La session est limitée dans le
-temps, révocable par version et ne donne accès qu'à la projection Board. Un
+Le code local est comparé à un hash bcrypt. La durée de session est réglée
+par l'administrateur (0 = sans expiration automatique) ; la session reste
+révocable à tout moment par version et ne donne accès qu'à la projection
+Board. Un
 utilisateur Atelier déjà connecté peut aussi lire cette projection sans
 obtenir de nouveau droit.
 
@@ -253,6 +254,11 @@ uniquement si l'incident n'est pas pris et n'a pas d'arbitrage. Cas
 `PENDING` : uniquement `RESPONSABLE`, comme décision de supervision. Effet :
 statut `CANCELED`, conservation intégrale dans l'historique.
 
+**Archivage forcé d'une ligne.** Acteur : administrateur, après affichage de
+l'impact. Effet : tous les incidents actifs de la ligne, y compris pris ou en
+attente, passent `CANCELED` avec le motif `line_archived`, et leurs
+arbitrages ouverts deviennent `SUPERSEDED`, dans la même transaction.
+
 **`INVALIDATE_CLOSED`.** Acteur : `RESPONSABLE`. Condition : incident
 `CLOSED`. Donnée requise : motif. Effet : statut `INVALIDATED`, sans
 réouverture de l'incident.
@@ -272,6 +278,10 @@ explicitement `ACTIVE` vers `CONSULTED` et montre le dossier. Fermeture par
 la croix/Escape : aucun changement métier. Seul `ACTIVE` compte dans la
 pastille rouge « À arbitrer ». Une consultation du dossier déclenchée en
 dehors du bouton d'arbitrage ne marque jamais le cas lu.
+
+**Retrait.** `WITHDRAW_CANCEL` : l'opérateur déclarant retire sa demande
+tant qu'elle attend l'arbitrage. Le cas passe `WITHDRAWN`, l'incident reste
+actif et le marqueur de demande est effacé.
 
 **Décision.** `APPROVE_CANCEL` : cas `APPROVED`, incident `CANCELED`.
 `REJECT_CANCEL` : cas `REJECTED`, incident reste actif, demande effacée.
@@ -342,7 +352,7 @@ Les états décrivent l'anomalie, indépendamment du statut de traitement.
 | `CONSULTED` | consultation explicitement demandée, décision encore attendue |
 | `APPROVED` | demande acceptée |
 | `REJECTED` | demande refusée |
-| `WITHDRAWN` | correction retirée par son demandeur |
+| `WITHDRAWN` | demande (correction ou annulation) retirée par son demandeur |
 | `SUPERSEDED` | demande rendue caduque par une autre opération |
 
 Comportement de navigation : décider directement est le chemin principal ;

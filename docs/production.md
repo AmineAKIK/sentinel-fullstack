@@ -419,8 +419,11 @@ ne pas interrompre le script pendant la bascule.
 ```
 
 Le script refuse de démarrer si une sauvegarde est en cours (verrou partagé
-avec `backup.sh`), et refuse tout dump sans `.sha256` associé sauf ajout
-explicite de `--allow-unverified` (journalise un avertissement audité). Il
+avec `backup.sh` dans le même répertoire : si les dumps sont écrits avec
+`--dir`, lancer la restauration avec la même valeur, par exemple
+`BACKUP_DIR=/srv/backups/sentinel ./scripts/restore.sh …`), et refuse
+tout dump sans `.sha256` associé sauf ajout explicite de
+`--allow-unverified` (journalise un avertissement audité). Il
 importe dans une base temporaire, contrôle le schéma, exige que le ledger
 corresponde exactement aux migrations canoniques du checkout (noms, ordre et
 checksums), puis arrête le backend et bascule les bases. En cas d'échec
@@ -546,7 +549,7 @@ vérificateur dans la trace d'intervention.
 | `BOARD_ACCESS_CODE_HASH` | oui | hash bcrypt du code Board initial (entre quotes simples) |
 | `ADMIN_USERNAME` | base vide | bootstrap Admin, non vide, max. 80 caractères, non numérique |
 | `ADMIN_PASSWORD` | base vide | mot de passe temporaire du premier admin |
-| `CADDY_DOMAIN` | topo A | domaine servi par Caddy (annexe uniquement) |
+| `CADDY_DOMAIN` | oui | domaine servi par Caddy ; exigé à la lecture du Compose même en topologie B, où Caddy ne démarre pas |
 
 Ne jamais mettre un secret dans une commande versionnée, un ticket public ou
 une capture d'écran.
@@ -585,8 +588,13 @@ locale (`up -d --no-build --force-recreate backend`). La rotation de
 `JWT_SECRET` invalide toutes les sessions : planifier l'opération et
 prévenir les utilisateurs.
 
-**Code Board.** Voie normale : Administration > Paramètres. Procédure de
-secours :
+**Code Board.** Voie normale et voie de secours : Administration >
+Paramètres. Le nouveau hash est enregistré en base et la version de session
+Board est incrémentée : toutes les sessions Board existantes sont révoquées
+immédiatement. Dès qu'un code a été défini depuis l'interface, le hash en
+base est prioritaire et `BOARD_ACCESS_CODE_HASH` (`.env`) est ignoré ; cette
+variable ne sert qu'au code initial, tant qu'aucun code n'est enregistré en
+base :
 
 ```bash
 cd backend
@@ -594,10 +602,8 @@ BOARD_ACCESS_CODE='nouveau-code-temporaire' npm run hash:board
 cd ..
 ```
 
-Mettre le hash bcrypt dans `.env` entre quotes simples, recréer le backend,
-vérifier une nouvelle connexion Board. Les sessions Board antérieures
-peuvent rester valides jusqu'à expiration ; une rotation du `JWT_SECRET` les
-invalide toutes.
+Si l'accès Admin est lui-même perdu, le rétablir d'abord (paragraphe
+suivant), puis définir le nouveau code Board depuis Paramètres.
 
 **Mot de passe admin.** Voie normale : Administration > Sécurité. Si l'accès
 est perdu :
@@ -999,10 +1005,15 @@ signataires.
 
 ## 16. État vérifié historique de l'instance publique
 
-Dernière preuve de production consignée dans ce document : **31 juillet
-2026**, sur le SHA `deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7` (tag
-`v1.0.0-rc.8`). Cette section est une photographie historique RC8 : elle ne
-prouve pas que le candidat RC9 en préparation est déjà déployé.
+La release `v1.0.0-rc.9` (SHA `ed26a25e3c005cabb0da30a4553dfbbee03afe81`)
+est publiée ; le 17 septembre 2026, `/api/health` de l'instance publique
+renvoyait ce SHA. Cette observation datée, avec la CI, la publication et les
+digests d'images, est consignée dans
+[rc9-verification-2026-09-17.md](rc9-verification-2026-09-17.md).
+
+La suite de cette section est la photographie historique précédente, sur RC8 :
+**31 juillet 2026**, SHA `deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7` (tag
+`v1.0.0-rc.8`).
 
 - `/api/health` répondait `{"status":"ok","db":"ok","version":"deecf6d57d3f0304e18fe9fd56847f5d9cd0d1a7"}` ;
 - le DNS A de `sentinel.akiksystems.fr` pointait vers l'adresse du VPS, les
@@ -1034,12 +1045,11 @@ sécurité RC9. La revue RC9 du 16 septembre 2026 est décrite dans
 [technique.md](technique.md) §16 : politique sans exception active et quatre
 audits npm à zéro vulnérabilité au moment de la revue.
 
-Sans accès SSH nominatif au VPS, cette section ne prouve pas les fichiers
-Compose actifs, les binds loopback ni les images/digests internes. Une
-nouvelle preuve de production doit être créée après publication et
-déploiement du candidat RC9 : SHA de `/api/health`, digests de release et
-d'images, puis recette courte. Aucune affirmation d'alignement RC9 ne doit
-être déduite de la preuve RC8 ci-dessus.
+Une observation publique ne prouve ni les fichiers Compose actifs, ni les
+binds loopback, ni les digests effectivement exécutés : ces points se
+contrôlent sur le serveur (§5.2 et §9). Aucune affirmation RC9 ne doit être
+déduite de la photographie RC8 ci-dessus : la vérification RC9 est le
+document daté cité en tête de section.
 
 ### Historique des audits
 
@@ -1050,7 +1060,7 @@ rapports historiques — y compris un verdict du 17 juillet 2026 explicitement
 invalidé après coup parce que le VPS n'était alors pas encore aligné sur le
 candidat audité — restent conservés dans l'historique Git comme preuve d'un
 processus itératif réel plutôt qu'effacés ou réécrits. Ils ne remplacent pas
-la preuve à produire pour RC9.
+la vérification RC9 citée en tête de section.
 
 ## 17. Publication GitHub — spécificités release
 
