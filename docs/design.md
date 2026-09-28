@@ -317,9 +317,17 @@ au lieu de redéfinir localement des couleurs d'état.
 ### 5.2 Mouvement (P1, P2)
 
 Le mouvement est l'attribut pré-attentif le plus puissant : il est réservé à
-de rares cas et n'est jamais mis en boucle. Les transitions servent la
-continuité — comprendre ce qui change — non la décoration. Le réglage
-`prefers-reduced-motion` est respecté.
+de rares cas et n'est jamais mis en boucle pour décorer. Les transitions
+servent la continuité — comprendre ce qui change — non la décoration. Le
+réglage `prefers-reduced-motion` est respecté : il ramène toute animation à
+une seule itération quasi instantanée.
+
+Exceptions assumées, parce qu'elles signalent une attente ou un état
+dégradé : les indicateurs de chargement (spinner d'action ponctuelle,
+squelette), l'indicateur « écrit… » de l'assistance, et le bandeau
+« Hors ligne » du Board, qui pulse doucement tant que l'écran n'est plus
+synchronisé — le seul cas où le Board risquerait d'afficher une situation
+dépassée.
 
 ### 5.3 Densité (P2, P3)
 
@@ -344,10 +352,16 @@ esthétique. L'échelle de tokens (`--text-*`) en est le vocabulaire.
 ### 5.6 Temps (P7)
 
 Le temps s'exprime en durée vécue (« depuis 3 h », « depuis 8 j »), la date
-précise restant accessible au second plan. Le vieillissement module le
-niveau d'attention (§5.1) de manière continue ; le seuil « 7 jours » est un
+précise restant accessible au second plan. Le vieillissement doit moduler le
+niveau d'attention (§5.1) de manière progressive ; le seuil « 7 jours » est un
 repère, pas une alarme. Les durées sont alignées et lisibles d'un coup d'œil
 pour permettre la comparaison sans calcul.
+
+État actuel : la durée vécue est appliquée partout via une fonction unique
+(`formatDuration`). La fonction de montée par ancienneté (`ageAttentionLevel`,
+paliers à 1, 3 et 7 jours) existe mais n'est pas encore branchée sur les
+cartes, dont le niveau dépend aujourd'hui du statut, de la priorité et de la
+prise en charge (`incidentAttentionLevel`). C'est une évolution prévue.
 
 ---
 
@@ -391,8 +405,8 @@ Le chantier a été mené en cinq phases, des fondations transversales vers les
 | Phase | Lot | Objet | État |
 |-------|-----|-------|------|
 | 1 — Fondations | F1 | Tokens de niveaux d'attention (`--attention-calm/-watch/-act/-critical`) | Fait |
-| 1 — Fondations | F2 | Composant unique appliquant la grammaire d'attention | Fait |
-| 1 — Fondations | F3 | Fonction unique « durée vécue + niveau d'attention dérivé de l'âge » | Fait |
+| 1 — Fondations | F2 | Fonction unique `incidentAttentionLevel()` et classes CSS appliquant la grammaire d'attention (le composant `AttentionBadge`, jamais branché, a été retiré en juillet 2026) | Fait |
+| 1 — Fondations | F3 | Fonction unique « durée vécue + niveau d'attention dérivé de l'âge » | Fait (niveau par l'âge non encore branché, voir §5.6) |
 | 1 — Fondations | F4 | Skeleton unifié, spinner réservé aux actions ponctuelles | Fait |
 | 2 — Urgence | U1 | Refonte des cartes urgentes du Dashboard selon F1 | Fait |
 | 2 — Urgence | U2 | Alignement des cartes Board sur F1, lisibilité à distance vérifiée | Fait |
@@ -417,7 +431,8 @@ service backend, ramenant l'Historique à une seule question au sens de P3.
 - un lot correspond à un commit testé et déployable ;
 - chaque changement est justifié par un principe (référence explicite en
   commit) ;
-- le backend n'a pas été touché : la doctrine agit comme une couche
-  d'expérience au-dessus d'un domaine jugé sain ;
+- le backend n'a été modifié que pour S2 (contrôle d'accès du Journal côté
+  service) : la doctrine agit comme une couche d'expérience au-dessus d'un
+  domaine jugé sain ;
 - l'ordre des phases n'était pas négociable — les fondations avant les
   écrans, pour ne pas refaire le travail deux fois.
