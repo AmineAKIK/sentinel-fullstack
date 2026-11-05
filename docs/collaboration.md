@@ -6,7 +6,7 @@ gouvernance réellement active sur GitHub.
 
 ## Prérequis
 
-- Node.js `24.18.0` (`nvm use` lit `.nvmrc`) ;
+- Node.js `24.22.2` (`nvm use` lit `.nvmrc`) ;
 - npm `11.16.0`, fourni avec cette version de Node.js ;
 - PostgreSQL 15 pour l'intégration ;
 - Chromium Playwright pour les parcours E2E.

@@ -23,7 +23,7 @@ réunit trois points d'entrée dans un même portail :
 
 ## Démarrage local
 
-Prérequis : Node.js 24.18.0, npm 11.16.0 et PostgreSQL 15+.
+Prérequis : Node.js 24.22.2, npm 11.16.0 et PostgreSQL 15+.
 
 **Première lecture / jury :** suivre le [guide depuis un clone neuf](docs/jury-quickstart.md).
 Il détaille la création de la base, les secrets locaux et les commandes

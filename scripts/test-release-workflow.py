@@ -118,11 +118,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         expected_references = (
             (
                 REPOSITORY_ROOT / "backend" / "Dockerfile",
-                "node:24.18.0-alpine3.23@sha256:",
+                "node:24.22.2-alpine3.23@sha256:",
             ),
             (
                 REPOSITORY_ROOT / "frontend" / "Dockerfile",
-                "node:24.18.0-alpine3.23@sha256:",
+                "node:24.22.2-alpine3.23@sha256:",
             ),
             (
                 REPOSITORY_ROOT / "frontend" / "Dockerfile",

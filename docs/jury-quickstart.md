@@ -8,7 +8,7 @@ ces intégrations ne sont pas disponibles ; les parcours métier restent locaux.
 
 ## 1. Prérequis et version examinée
 
-- Git, Node.js **24.18.0**, npm **11.16.0** (versions de référence de la CI).
+- Git, Node.js **24.22.2**, npm **11.16.0** (versions de référence de la CI).
 - PostgreSQL **15** installé et démarré ; accès à son outil `psql` ou pgAdmin
   avec un compte capable de créer un rôle et des bases locales.
 - Ports locaux libres : `3000` et `5173` pour le développement ; `3100`, `5174`
