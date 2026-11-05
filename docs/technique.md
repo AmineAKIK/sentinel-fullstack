@@ -706,7 +706,7 @@ chaque semaine.
 | Service | Image/runtime | Port interne | Exposition |
 | --- | --- | --- | --- |
 | `postgres` | PostgreSQL 15.18 Alpine | 5432 | aucune |
-| `backend` | Node 24.18.0 Alpine, user `node` | 3000 | aucune |
+| `backend` | Node 24.22.2 Alpine, user `node` | 3000 | aucune |
 | `frontend` | Nginx 1.30.4 Alpine, user `nginx` | 8080 | aucune |
 | `caddy` | Caddy 2.11.4 Alpine (topologie autonome uniquement) | 80/443 | 80/443 |
 

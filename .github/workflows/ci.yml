@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: 24.18.0
+  NODE_VERSION: 24.22.2
 
 jobs:
   backend:
